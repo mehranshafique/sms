@@ -1,0 +1,33 @@
+<div class="dlabnav">
+    <div class="dlabnav-scroll">
+        <ul class="metismenu" id="menu">
+
+            <li class="nav-label first">Main Menu</li>
+
+            {{-- Dashboard --}}
+            <li class="{{ isActive('dashboard') }}">
+                <a class="ai-icon {{ isActive('dashboard') }}"
+                   href="{{ route('dashboard') }}" aria-expanded="false">
+                    <i class="la la-calendar"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+            </li>
+
+            {{-- Permissions Menu --}}
+            <li class="{{ isActive(['roles.index', 'permissions.index']) }}">
+                <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
+                    <i class="la la-home"></i>
+                    <span class="nav-text">Permissions</span>
+                </a>
+                <ul aria-expanded="false" class="{{ isActive(['roles.index', 'permissions.index'], 'mm-show') }}">
+                    <li><a class="{{ isActive('roles.index') }}"
+                           href="{{ route('roles.index') }}">Roles</a></li>
+
+                    <li><a class="{{ isActive('permissions.index') }}"
+                           href="{{ route('permissions.index') }}">Roles Permissions</a></li>
+                </ul>
+            </li>
+
+        </ul>
+    </div>
+</div>
