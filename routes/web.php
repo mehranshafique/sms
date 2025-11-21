@@ -4,7 +4,9 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RolesController;
-use App\Http\Controllers\PermissionsController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\ModuleController;
+use App\Http\Controllers\RolePermissionController;
 
 Route::redirect('/','/login' );
 
@@ -16,12 +18,30 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::prefix('/roles')->as('roles.')->middleware('auth')->group(function () {
-    Route::get('/', [RolesController::class, 'index'])->name('index');
-});
+Route::middleware('auth')->group(function () {
+    Route::resource('roles', RolesController::class);
 
-Route::prefix('/permissions')->as('permissions.')->middleware('auth')->group(function () {
-    Route::get('/', [PermissionsController::class, 'index'])->name('index');
+    Route::prefix('modules')->group(function () {
+        Route::get('/', [ModuleController::class, 'index'])->name('modules.index');
+        Route::post('/', [ModuleController::class, 'store'])->name('modules.store');
+        Route::get('/{module}/edit', [ModuleController::class, 'edit'])->name('modules.edit');
+        Route::put('/{module}', [ModuleController::class, 'update'])->name('modules.update');
+        Route::delete('/{module}', [ModuleController::class, 'destroy'])->name('modules.destroy');
+    });
+
+    Route::prefix('permissions')->group(function(){
+        Route::get('/', [PermissionController::class, 'index'])->name('permissions.index');
+        Route::post('/', [PermissionController::class, 'store'])->name('permissions.store');
+        Route::get('/{permission}/edit', [PermissionController::class, 'edit'])->name('permissions.edit');
+        Route::put('/{permission}', [PermissionController::class, 'update'])->name('permissions.update');
+        Route::delete('/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
+    });
+
+    Route::prefix('roles')->group(function(){
+        Route::get('{role}/assign-permissions', [RolePermissionController::class, 'edit'])->name('roles.assign-permissions');
+        Route::post('{role}/assign-permissions', [RolePermissionController::class, 'update'])->name('roles.update-permissions');
+    });
+
 });
 
 

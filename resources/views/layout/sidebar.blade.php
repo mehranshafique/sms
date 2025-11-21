@@ -20,11 +20,14 @@
                     <span class="nav-text">Permissions</span>
                 </a>
                 <ul aria-expanded="false" class="{{ isActive(['roles.index', 'permissions.index'], 'mm-show') }}">
-                    <li><a class="{{ isActive('roles.index') }}"
+                    <li><a class="{{ isActive(['roles.index', 'roles.assign-permissions']) }}"
                            href="{{ route('roles.index') }}">Roles</a></li>
 
+                    <li><a class="{{ isActive('modules.index') }}"
+                           href="{{ route('modules.index') }}">Modules</a></li>
+
                     <li><a class="{{ isActive('permissions.index') }}"
-                           href="{{ route('permissions.index') }}">Roles Permissions</a></li>
+                           href="{{ route('permissions.index') }}">Permissions</a></li>
                 </ul>
             </li>
 

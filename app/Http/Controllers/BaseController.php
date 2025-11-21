@@ -6,6 +6,9 @@ use Illuminate\Routing\Controller as LaravelController;
 
 class BaseController extends LaravelController
 {
+    public function __construct() {
+
+    }
     protected $pageTitle = null;
 
     public function setPageTitle($title)

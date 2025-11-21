@@ -31,6 +31,10 @@
     <!-- Init file -->
     <script src="{{ asset('js/plugins-init/widgets-script-init.js') }}"></script>
 
+    <script src="{{ asset('vendor/datatables/js/jquery.dataTables.min.js')  }}"></script>
+    <script src="{{ asset('vendor/datatables/js/dataTables.responsive.min.js')  }}"></script>
+    <script src="{{ asset('js/plugins-init/datatables.init.js')  }}"></script>
+
 	<!-- Svganimation scripts -->
     <script src="{{ asset('vendor/svganimation/vivus.min.js') }}"></script>
     <script src="{{ asset('vendor/svganimation/svg.animation.js') }}"></script>

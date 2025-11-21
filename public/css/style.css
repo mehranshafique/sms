@@ -4,7 +4,7 @@
     Name                 : Edumin
     Author               : Dexignlabs
     Author Portfolio     : https://themeforest.net/user/dexignlabs/portfolio
-    
+
     Table of Sass Contents
 
     1. Abstracts
@@ -14,7 +14,7 @@
         _mixin
         _variable
 
-    2. bootstrap 
+    2. bootstrap
         -Here goes all official bootstrap scss files
 
     3. Global/Base
@@ -56,15 +56,15 @@
 @import url("https://fonts.googleapis.com/css?family=Montserrat:400,500,600,700");
 @import url("https://fonts.googleapis.com/css?family=Roboto:400,500,700");
 @import url("https://fonts.googleapis.com/css?family=Nunito:400,600,700");
-@import url("./../icons/simple-line-icons/css/simple-line-icons.css");
-@import url("./../icons/fontawesome/css/all.min.css");
-@import url("./../icons/material-design-iconic-font/css/materialdesignicons.min.css");
-@import url("./../icons/themify-icons/css/themify-icons.css");
-@import url("./../icons/line-awesome/css/line-awesome.min.css");
-@import url("./../icons/avasta/css/style.css");
-@import url("./../icons/flaticon/flaticon.css");
-@import url(./../vendor/perfect-scrollbar/css/perfect-scrollbar.css);
-@import url(./../vendor/metismenu/css/metisMenu.min.css);
+@import url("/icons/simple-line-icons/css/simple-line-icons.css");
+@import url("/icons/fontawesome/css/all.min.css");
+@import url("/icons/material-design-iconic-font/css/materialdesignicons.min.css");
+@import url("/icons/themify-icons/css/themify-icons.css");
+@import url("/icons/line-awesome/css/line-awesome.min.css");
+@import url("/icons/avasta/css/style.css");
+@import url("/icons/flaticon/flaticon.css");
+@import url("/vendor/perfect-scrollbar/css/perfect-scrollbar.css");
+@import url("/vendor/metismenu/css/metisMenu.min.css");
 :root {
   --primary: #6a73fa;
   --secondary: #673BB7;

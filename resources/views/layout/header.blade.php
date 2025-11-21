@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<!-- Title -->
-	<title>EduMin - Education Admin Dashboard Template | dexignlabs</title>
+	<title>{{ $pageTitle ?? ''  }}</title>
 
 	<!-- Meta -->
 	<meta charset="utf-8">
@@ -33,9 +33,13 @@
 	<link rel="stylesheet" href="{{ asset('vendor/jqvmap/css/jqvmap.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/global/global.min.css') }}">
 	<link rel="stylesheet" href="{{ asset('vendor/chartist/css/chartist.min.css') }}">
+
+    <link href="{{ asset('vendor/datatables/css/jquery.dataTables.min.css')  }}" rel="stylesheet">
+    <link href="{{ asset('vendor/datatables/css/responsive.bootstrap.min.css')  }}" rel="stylesheet">
+
 	<link rel="stylesheet" href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css') }}">
     <link class="main-css" rel="stylesheet" href="{{ asset('css/style.css') }}">
-
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
 
@@ -101,7 +105,7 @@
                 <nav class="navbar navbar-expand">
                     <div class="collapse navbar-collapse justify-content-between">
                         <div class="header-left">
-                            <div class="dashboard_bar">
+                            <div class="dashboard_bar h4">
 								{{ $pageTitle ?? ''  }}
 							</div>
                         </div>

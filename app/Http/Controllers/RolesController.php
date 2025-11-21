@@ -3,62 +3,45 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-
-class RolesController extends Controller
+use Spatie\Permission\Models\Role;
+use App\Http\Controllers\BaseController;
+class RolesController extends BaseController
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        dd('ok');
+        $this->setPageTitle('Roles');
+        $roles = Role::latest()->get();
+        return view('permissions.roles.index', compact('roles'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'name' => 'required|unique:roles,name',
+        ]);
+
+        Role::create(['name' => $request->name]);
+
+        return redirect()->back()->with('success', 'Role created successfully');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function update(Request $request, $id)
     {
-        //
+        $request->validate([
+            'name' => 'required|unique:roles,name,' . $id,
+        ]);
+
+        $role = Role::findOrFail($id);
+        $role->update([
+            'name' => $request->name
+        ]);
+
+        return redirect()->back()->with('success', 'Role updated successfully');
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function destroy($id)
     {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        Role::findOrFail($id)->delete();
+        return redirect()->back()->with('success', 'Role deleted successfully');
     }
 }
