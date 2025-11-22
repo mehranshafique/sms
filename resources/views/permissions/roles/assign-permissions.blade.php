@@ -14,7 +14,7 @@
                 @csrf
                 <div class="row">
                     @foreach($modules as $module)
-                        <div class="col-12 mb-3">
+                        <div class="col-12">
                             <div class="card">
                                 <div class="card-header">
                                     <strong>{{ $module->name }}</strong>

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use App\Models\Module;
-use App\Models\Permission;
+//use App\Models\Permission;
+use Spatie\Permission\Models\Permission;
+
 use App\Http\Controllers\BaseController;
 class RolePermissionController extends BaseController
 {
@@ -18,8 +20,8 @@ class RolePermissionController extends BaseController
     {
         $modules = Module::with('permissions')->get();
         $rolePermissions = $role->permissions()->pluck('id')->toArray();
-        return view('permissions.index');
-//        return view('permissions.roles.assign-permissions', compact('role', 'modules', 'rolePermissions'));
+//        return view('permissions.index');
+        return view('permissions.roles.assign-permissions', compact('role', 'modules', 'rolePermissions'));
     }
 
     // Assign permissions to role
@@ -28,9 +30,11 @@ class RolePermissionController extends BaseController
         $request->validate([
             'permissions' => 'array'
         ]);
+        $permissions = Permission::whereIn('id', $request->permissions ?? [])->pluck('name')->toArray();
+        $role->syncPermissions($permissions);
 
-        $role->syncPermissions($request->permissions ?? []);
+//        $role->syncPermissions($request->permissions ?? []);
 
-        return redirect()->route('permissions.roles.index')->with('success', 'Permissions assigned successfully.');
+        return redirect()->route('roles.index')->with('success', 'Permissions assigned successfully.');
     }
 }

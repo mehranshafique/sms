@@ -14,12 +14,12 @@
             </li>
 
             {{-- Permissions Menu --}}
-            <li class="{{ isActive(['roles.index', 'permissions.index']) }}">
+            <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">
                 <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
                     <i class="la la-home"></i>
                     <span class="nav-text">Permissions</span>
                 </a>
-                <ul aria-expanded="false" class="{{ isActive(['roles.index', 'permissions.index'], 'mm-show') }}">
+                <ul aria-expanded="false" class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions'], 'mm-show') }}">
                     <li><a class="{{ isActive(['roles.index', 'roles.assign-permissions']) }}"
                            href="{{ route('roles.index') }}">Roles</a></li>
 
