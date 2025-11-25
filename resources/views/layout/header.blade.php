@@ -40,6 +40,22 @@
 	<link rel="stylesheet" href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css') }}">
     <link class="" rel="stylesheet" href="{{ asset('css/style.css') }}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css')  }}">
+    <link href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css')  }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        .select2-selection{
+            border: 2px solid #e0e7ff !important;
+            border-radius: 4px !important;
+            transition: all 0.3s ease !important;
+            padding: 9px 4px !important;
+            height: 48px !important;
+        }
+        .select2-selection__arrow{
+            margin: 12px !important;
+        }
+    </style>
 </head>
 <body>
 

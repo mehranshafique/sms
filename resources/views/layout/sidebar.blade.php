@@ -13,10 +13,18 @@
                 </a>
             </li>
 
+            <li class="{{ isActive(['institutes.index','institutes.create','institutes.edit']) }}">
+                <a class="ai-icon {{ isActive('institutes.index') }}"
+                   href="{{ route('institutes.index') }}" aria-expanded="false">
+                    <i class="la la-university"></i>
+                    <span class="nav-text">Institutes</span>
+                </a>
+            </li>
+
             {{-- Permissions Menu --}}
             <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">
                 <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
-                    <i class="la la-home"></i>
+                    <i class="la la-shield"></i>
                     <span class="nav-text">Permissions</span>
                 </a>
                 <ul aria-expanded="false" class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions'], 'mm-show') }}">

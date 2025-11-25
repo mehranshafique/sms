@@ -24,6 +24,9 @@
     <script src="{{ asset('vendor/jquery-sparkline/jquery.sparkline.min.js') }}"></script>
 	<script src="{{ asset('js/plugins-init/sparkline-init.js') }}"></script>
 
+    <script src="{{ asset('vendor/select2/js/select2.full.min.js')  }}"></script>
+    <script src="{{ asset('js/plugins-init/select2-init.js')  }}"></script>
+
 	<!-- Chart Morris plugin files -->
     <script src="{{ asset('vendor/raphael/raphael.min.js') }}"></script>
     <script src="{{ asset('vendor/morris/morris.min.js') }}"></script>

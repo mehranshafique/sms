@@ -7,6 +7,7 @@ use App\Http\Controllers\RolesController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\InstituteController;
 
 Route::redirect('/','/login' );
 
@@ -41,6 +42,8 @@ Route::middleware('auth')->group(function () {
         Route::get('{role}/assign-permissions', [RolePermissionController::class, 'edit'])->name('roles.assign-permissions');
         Route::post('{role}/assign-permissions', [RolePermissionController::class, 'update'])->name('roles.update-permissions');
     });
+
+    Route::resource('institutes', InstituteController::class);
 
 });
 
