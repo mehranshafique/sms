@@ -22,7 +22,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'institute_id'
+        'institute_id',
+        'user_type',
+        'phone',
+        'address'
     ];
 
     /**
@@ -47,4 +50,10 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function institute()
+    {
+        return $this->belongsTo(Institute::class);
+    }
+
 }

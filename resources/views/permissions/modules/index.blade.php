@@ -39,6 +39,10 @@
 {{--                                                </td>--}}
 
                                                 <td>
+                                                    <a href="{{ route('permissions.index',$module->id)  }}" class="btn btn-xs sharp btn-info">
+                                                        <i class="fa fa-key"></i>
+                                                    </a>
+
                                                     <button
                                                         class="btn btn-xs sharp btn-primary edit-btn"
                                                         data-id="{{ $module->id }}"
@@ -48,6 +52,7 @@
                                                     >
                                                         <i class="fa fa-pencil"></i>
                                                     </button>
+
 
                                                     <form action="{{ route('modules.destroy', $module->id) }}" method="POST" class="d-inline">
                                                         @csrf

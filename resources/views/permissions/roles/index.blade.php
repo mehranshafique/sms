@@ -96,25 +96,26 @@
                                                 <a href="{{ route('roles.assign-permissions', $role->id) }}" class="btn btn-xs sharp btn-info">
                                                     <i class="fa fa-key"></i>
                                                 </a>
-
-                                                <button
-                                                    class="btn btn-xs sharp btn-primary editRoleBtn"
-                                                    data-id="{{ $role->id }}"
-                                                    data-name="{{ $role->name }}"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#editRoleModal"
-                                                >
-                                                    <i class="fa fa-pencil"></i>
-                                                </button>
-
-                                                <form action="{{ route('roles.destroy', $role->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    @method('DELETE')
-
-                                                    <button class="btn btn-xs sharp btn-danger" onclick="return confirm('Delete role?')">
-                                                        <i class="fa fa-trash"></i>
+                                                @if($role->can_delete == 0)
+                                                    <button
+                                                        class="btn btn-xs sharp btn-primary editRoleBtn"
+                                                        data-id="{{ $role->id }}"
+                                                        data-name="{{ $role->name }}"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#editRoleModal"
+                                                    >
+                                                        <i class="fa fa-pencil"></i>
                                                     </button>
-                                                </form>
+
+                                                    <form action="{{ route('roles.destroy', $role->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('DELETE')
+
+                                                        <button class="btn btn-xs sharp btn-danger" onclick="return confirm('Delete role?')">
+                                                            <i class="fa fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             </td>
                                         </tr>
                                     @endforeach

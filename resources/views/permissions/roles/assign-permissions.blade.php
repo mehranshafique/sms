@@ -49,7 +49,7 @@
                                                         {{ in_array($permission->id, $rolePermissions) ? 'checked' : '' }}
                                                     >
                                                     <label class="form-check-label" for="perm-{{ $permission->id }}">
-                                                        {{ $permission->name }}
+                                                        {{ explode('.', $permission->name)[1]; }}
                                                     </label>
                                                 </div>
                                             </div>

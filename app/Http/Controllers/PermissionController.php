@@ -6,27 +6,30 @@ use Illuminate\Http\Request;
 use App\Models\Permission;
 use App\Models\Module;
 use App\Http\Controllers\BaseController;
+use App\Models\User;
 class PermissionController extends BaseController
 {
     public function __construct(){
         parent::__construct();
         $this->setPageTitle('Permissions');
     }
-    public function index()
+    public function index($id)
     {
-        $permissions = Permission::with('module')->get();
-        return view('permissions.permissions.index', compact('permissions'));
+        $module = Module::find($id);
+        $permissions = Permission::with('module')->where('module_id',$id)->get();
+        return view('permissions.permissions.index', compact('permissions','module'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|unique:permissions,name',
+            'name' => 'required',
             'module_id' => 'required|exists:modules,id'
         ]);
-
+        $module = Module::find($request->module_id);
+//        dd($module);.
         Permission::create([
-            'name' => $request->name,
+            'name' => $module->slug . '.' . $request->name,
             'module_id' => $request->module_id,
             'guard_name' => 'web'
         ]);
@@ -36,6 +39,7 @@ class PermissionController extends BaseController
 
     public function edit(Permission $permission)
     {
+        $permission->name = explode('.', $permission->name)[1];
         return response()->json($permission);
     }
 
@@ -47,7 +51,7 @@ class PermissionController extends BaseController
         ]);
 
         $permission->update([
-            'name' => $request->name,
+            'name' => $permission->module->slug . '.' . $request->name,
             'module_id' => $request->module_id
         ]);
 

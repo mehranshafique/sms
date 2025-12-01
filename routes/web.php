@@ -8,6 +8,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\InstituteController;
+use App\Http\Controllers\HeadOfficersController;
 
 Route::redirect('/','/login' );
 
@@ -31,7 +32,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('permissions')->group(function(){
-        Route::get('/', [PermissionController::class, 'index'])->name('permissions.index');
+        Route::get('/{id}', [PermissionController::class, 'index'])->name('permissions.index');
         Route::post('/', [PermissionController::class, 'store'])->name('permissions.store');
         Route::get('/{permission}/edit', [PermissionController::class, 'edit'])->name('permissions.edit');
         Route::put('/{permission}', [PermissionController::class, 'update'])->name('permissions.update');
@@ -44,6 +45,8 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::resource('institutes', InstituteController::class);
+
+    Route::resource('header-officers', HeadOfficersController::class);
 
 });
 

@@ -17,19 +17,15 @@
                             </div>
 
                             <div class="modal-body">
-                                <div class="form-group mb-3">
-                                    <label>Module</label>
-                                    <select name="module_id" class="form-control" required>
-                                        <option value="">Select Module</option>
-                                        @foreach(App\Models\Module::all() as $module)
-                                            <option value="{{ $module->id }}">{{ $module->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
+
 
                                 <div class="form-group mb-3">
                                     <label>Permission Name</label>
                                     <input type="text" name="name" class="form-control" required>
+                                </div>
+                                <div class="form-group mb-3">
+{{--                                    <label>Module ID</label>--}}
+                                    <input type="hidden" name="module_id" value="{{ $module->id  }}" class="form-control" required>
                                 </div>
                             </div>
 
@@ -60,12 +56,7 @@
                             <div class="modal-body">
                                 <div class="form-group mb-3">
                                     <label>Module</label>
-                                    <select name="module_id" class="form-control" id="editModuleSelect" required>
-                                        <option value="">Select Module</option>
-                                        @foreach(App\Models\Module::all() as $module)
-                                            <option value="{{ $module->id }}">{{ $module->name }}</option>
-                                        @endforeach
-                                    </select>
+                                    <input type="hidden" value="{{ $module->id  }}" name="module_id">
                                 </div>
 
                                 <div class="form-group mb-3">
@@ -83,14 +74,18 @@
                 </div>
             </div>
 
-            <!-- Add Permission Button -->
-            <div class="row mb-3">
-                <div class="col-12">
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPermissionModal">
-                        Add Permission
-                    </button>
+            <div class="row page-titles mx-0 py-3">
+                <div class="col-sm-12 p-md-0 ">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h4>{{ $module->name }}</h4>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPermissionModal">
+                            Add Permission
+                        </button>
+                    </div>
                 </div>
             </div>
+
+
 
             <!-- Permissions Table -->
             <div class="row">
@@ -117,7 +112,7 @@
                                                 <button
                                                     class="btn btn-xs sharp btn-primary editPermissionBtn"
                                                     data-id="{{ $permission->id }}"
-                                                    data-name="{{ $permission->name }}"
+                                                    data-name="{{ explode('.',$permission->name)[1] }}"
                                                     data-module="{{ $permission->module_id }}"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#editPermissionModal"
