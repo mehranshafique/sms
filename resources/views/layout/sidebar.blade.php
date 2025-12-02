@@ -22,7 +22,7 @@
             </li>
             @endcan
 
-            @can('sub-campus.view')
+            @can('head-officers.view')
                 <li class="{{ isActive(['header-officers.index',]) }}">
                     <a class="ai-icon {{ isActive('header-officers.index') }}"
                        href="{{ route('header-officers.index') }}" aria-expanded="false">
