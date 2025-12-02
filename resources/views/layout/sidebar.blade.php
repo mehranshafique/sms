@@ -32,7 +32,7 @@
                 </li>
             @endcan
             {{-- Permissions Menu --}}
-            @can('permissions.view')
+{{--            @can('permissions.view')--}}
             <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">
                 <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
                     <i class="la la-shield"></i>
@@ -49,7 +49,7 @@
 {{--                           href="{{ route('permissions.index') }}">Permissions</a></li>--}}
                 </ul>
             </li>
-            @endcan
+{{--            @endcan--}}
         </ul>
     </div>
 </div>
