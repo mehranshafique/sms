@@ -22,7 +22,7 @@ return new class extends Migration {
             $table->enum('status', ['active','transferred','withdrawn','graduated'])->default('active');
             $table->timestamps();
 
-            $table->foreign('institute_id')->references('id')->on('institutes')->onDelete('cascade');
+//            $table->foreign('institute_id')->references('id')->on('institutes')->onDelete('cascade');
             $table->unique(['institute_id','registration_no']);
         });
     }
