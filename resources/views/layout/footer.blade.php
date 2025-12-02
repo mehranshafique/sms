@@ -49,6 +49,15 @@
     <script src="{{ asset('js/dlabnav-init.js') }}"></script>
 
 
-
+    <script src="{{asset('vendor/moment/moment.min.js')}}"></script>
+    <script src="{{asset('vendor/bootstrap-daterangepicker/daterangepicker.js')}}"></script>
+    <script src="{{ asset('vendor/bootstrap-material-datetimepicker/js/bootstrap-material-datetimepicker.js')  }}"></script>
+    <!-- pickdate -->
+    <script src="{{asset('vendor/pickadate/picker.js')}}"></script>
+    <script src="{{asset('vendor/pickadate/picker.time.js')}}"></script>
+    <script src="{{asset('vendor/pickadate/picker.date.js')}}"></script>
+    <script src="{{asset('js/plugins-init/bs-daterange-picker-init.js')}}"></script>
+    <script src="{{asset('js/plugins-init/material-date-picker-init.js')}}"></script>
+    <script src="{{asset('js/plugins-init/pickadate-init.js')}}"></script>
 </body>
 </html>

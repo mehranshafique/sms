@@ -12,6 +12,17 @@
                     <span class="nav-text">Dashboard</span>
                 </a>
             </li>
+
+            @can('students.view')
+                <li class="{{ isActive(['students.index','students.create']) }}">
+                    <a class="ai-icon {{ isActive('students.index') }}"
+                       href="{{ route('students.index') }}" aria-expanded="false">
+                        <i class="la la-calendar"></i>
+                        <span class="nav-text">Students</span>
+                    </a>
+                </li>
+            @endcan
+
             @can('institute.view')
             <li class="{{ isActive(['institutes.index','institutes.create','institutes.edit']) }}">
                 <a class="ai-icon {{ isActive('institutes.index') }}"
@@ -32,7 +43,7 @@
                 </li>
             @endcan
             {{-- Permissions Menu --}}
-{{--            @can('permissions.view')--}}
+            @can('permissions.view')
             <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">
                 <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
                     <i class="la la-shield"></i>
@@ -49,7 +60,7 @@
 {{--                           href="{{ route('permissions.index') }}">Permissions</a></li>--}}
                 </ul>
             </li>
-{{--            @endcan--}}
+            @endcan
         </ul>
     </div>
 </div>

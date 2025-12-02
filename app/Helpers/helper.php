@@ -1,17 +1,17 @@
 <?php
 use Illuminate\Support\Facades\Auth;
-if (!function_exists('getLoggedInInstitute')) {
+if (!function_exists('institute')) {
     /**
      * Get the institute for the currently logged-in admin user
      *
      * @return \App\Models\Institute|null
      */
-    function getLoggedInInstitute()
+    function institute()
     {
         $user = Auth::user();
 
         // Make sure user is logged in and has admin role
-        if ($user && $user->hasRole('admin')) {
+        if ($user && $user->hasRole('Admin')) {
             return $user->institute; // Returns the Institute model
         }
 

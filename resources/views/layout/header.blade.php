@@ -44,6 +44,13 @@
     <link href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css')  }}" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+    <link href="{{asset('vendor/bootstrap-daterangepicker/daterangepicker.css')}}" rel="stylesheet">
+    <link href="{{asset('vendor/clockpicker/css/bootstrap-clockpicker.min.css')}}" rel="stylesheet">
+    <link href="{{asset('vendor/jquery-ascolorpicker/css/ascolorpicker.min.cs')}}s" rel="stylesheet">
+    <link href="{{asset('vendor/bootstrap-material-datetimepicker/css/bootstrap-material-datetimepicker.css')}}" rel="stylesheet">
+    <link rel="stylesheet" href="{{asset('vendor/pickadate/themes/default.css')}}">
+    <link rel="stylesheet" href="{{asset('vendor/pickadate/themes/default.date.css')}}">
+    <link href="{{ asset('https://fonts.googleapis.com/icon?family=Material+Icons')  }}" rel="stylesheet">
     <style>
         .select2-selection{
             border: 2px solid #e0e7ff !important;

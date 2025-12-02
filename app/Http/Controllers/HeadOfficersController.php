@@ -38,7 +38,7 @@ class HeadOfficersController extends BaseController
             'address'   => $request->address,
             'password'  => Hash::make($request->password),
         ]);
-
+        $user->assignRole('Head Officer');
         return response()->json([
             'status'  => true,
             'message' => 'Head Officer created successfully!',

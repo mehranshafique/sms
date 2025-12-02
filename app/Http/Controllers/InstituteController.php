@@ -62,7 +62,7 @@ class InstituteController extends BaseController
         ];
 
         $user = User::create($adminData);
-
+        $user->assignRole('Admin');
         // ✅ Return JSON success for AJAX
         return response()->json([
             'status' => 'success',
@@ -157,6 +157,7 @@ class InstituteController extends BaseController
 
     public function destroy(Institute $institute)
     {
+        User::where('institute_id',$institute->id)->delete();
         $institute->delete();
         return redirect()->route('institutes.index')->with('success', 'Institute deleted successfully.');
     }

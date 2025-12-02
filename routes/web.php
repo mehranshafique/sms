@@ -9,6 +9,7 @@ use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\InstituteController;
 use App\Http\Controllers\HeadOfficersController;
+use App\Http\Controllers\StudentController;
 
 Route::redirect('/','/login' );
 
@@ -47,6 +48,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('institutes', InstituteController::class);
 
     Route::resource('header-officers', HeadOfficersController::class);
+
+    Route::resource('students', StudentController::class);
 
 });
 

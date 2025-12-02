@@ -39,7 +39,17 @@
     <div class="fix-wrapper">
         <div class="container">
             <div class="row justify-content-center">
+
                 <div class="col-lg-5 col-md-6">
+                    @if ($errors->any())
+                        <div class="alert alert-danger">
+                            <ul class="mb-0">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                     <div class="card mb-0 h-auto">
                         <div class="card-body">
                             <div class="text-center mb-2">
@@ -67,12 +77,13 @@
                                 @csrf
                                 <div class="form-group">
                                     <label class="form-label" for="username">Username</label>
-                                    <input class="form-control" placeholder="Email" type="email" name="email" :value="old('email')" required autofocus id="email">
+                                    <input class="form-control" placeholder="Email" type="email" name="email" value="{{ old('email')  }}" required autofocus id="email">
                                 </div>
                                 <div class="mb-4 position-relative">
                                     <label class="form-label" for="dlabPassword">Password</label>
-                                    <input type="password" id="password" class="form-control" placeholder="Password"
+                                    <input type="password" id="password" class="form-control @error('password') is-invalid @enderror" placeholder="Password"
                                         type="password"
+
                                         name="password"
                                         required autocomplete="current-password">
                                     <span class="show-pass eye">
