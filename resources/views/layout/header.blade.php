@@ -56,11 +56,11 @@
             border: 2px solid #e0e7ff !important;
             border-radius: 4px !important;
             transition: all 0.3s ease !important;
-            padding: 9px 4px !important;
-            height: 48px !important;
+            padding: 4px 4px !important;
+            height: 38px !important;
         }
         .select2-selection__arrow{
-            margin: 12px !important;
+            margin: 4px !important;
         }
     </style>
 </head>

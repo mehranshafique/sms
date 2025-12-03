@@ -10,6 +10,7 @@ use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\InstituteController;
 use App\Http\Controllers\HeadOfficersController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StaffController;
 
 Route::redirect('/','/login' );
 
@@ -50,6 +51,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('header-officers', HeadOfficersController::class);
 
     Route::resource('students', StudentController::class);
+
+    Route::resource('staff', StaffController::class);
 
 });
 

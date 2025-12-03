@@ -16,7 +16,7 @@ class StudentController extends BaseController
     }
     public function index()
     {
-        $students = Student::with('institute')->paginate(100000);
+        $students = Student::with('institute')->where('institute_id', institute()->id)->get();
         return view('students.index', compact('students'));
     }
 
@@ -29,8 +29,7 @@ class StudentController extends BaseController
 
     public function store(Request $request)
     {
-        $request->validate([
-
+        $data = $request->validate([
             'first_name' => 'required|max:100',
             'last_name' => 'required|max:100',
             'gender' => 'required|in:male,female,other',
@@ -58,6 +57,9 @@ class StudentController extends BaseController
         $student->gender = $request->input('gender');
         $student->date_of_birth = $request->input('date_of_birth');
         $student->status = $request->input('status');
+        $student->national_id = $request->input('national_id');
+        $student->nfc_tag_uid = $request->input('nfc_tag_uid');
+        $student->qr_code_token = $request->input('qr_code_token');
         $student->institute_id  = institute()->id;
         $student->registration_no  = $registration_no;
         $student->save();
@@ -74,19 +76,50 @@ class StudentController extends BaseController
         return view('students.edit', compact('student','institutes'));
     }
 
+//    public function update(Request $request, Student $student)
+//    {
+//        $request->validate([
+//            'institute_id' => 'required|exists:institutes,id',
+//            'registration_no' => 'required|max:50',
+//            'first_name' => 'required|max:100',
+//            'last_name' => 'required|max:100',
+//            'gender' => 'required|in:male,female,other',
+//            'date_of_birth' => 'required|date',
+//            'status' => 'required|in:active,transferred,withdrawn,graduated',
+//        ]);
+//
+//        $student->update($request->all());
+//
+//        return response()->json([
+//            'message' => 'Student updated successfully',
+//            'redirect' => route('students.index')
+//        ]);
+//    }
+
     public function update(Request $request, Student $student)
     {
-        $request->validate([
-            'institute_id' => 'required|exists:institutes,id',
-            'registration_no' => 'required|max:50',
+        $data = $request->validate([
             'first_name' => 'required|max:100',
             'last_name' => 'required|max:100',
             'gender' => 'required|in:male,female,other',
             'date_of_birth' => 'required|date',
             'status' => 'required|in:active,transferred,withdrawn,graduated',
+            'national_id' => 'nullable|max:255',
+            'nfc_tag_uid' => 'nullable|max:255',
+            'qr_code_token' => 'nullable|max:255',
         ]);
 
-        $student->update($request->all());
+        // Update fields manually for safety
+        $student->first_name = $request->first_name;
+        $student->last_name = $request->last_name;
+        $student->gender = $request->gender;
+        $student->date_of_birth = $request->date_of_birth;
+        $student->status = $request->status;
+        $student->national_id = $request->national_id;
+        $student->nfc_tag_uid = $request->nfc_tag_uid;
+        $student->qr_code_token = $request->qr_code_token;
+
+        $student->save();
 
         return response()->json([
             'message' => 'Student updated successfully',

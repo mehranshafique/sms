@@ -38,9 +38,9 @@
                                             <td>{{ $student->date_of_birth }}</td>
                                             <td>{{ ucfirst($student->status) }}</td>
                                             <td>
-{{--                                                <a href="{{ route('students.edit', $student->id) }}" class="btn btn-xs sharp btn-primary">--}}
-{{--                                                    <i class="fa fa-pencil"></i>--}}
-{{--                                                </a>--}}
+                                                <a href="{{ route('students.edit', $student->id) }}" class="btn btn-xs sharp btn-primary">
+                                                    <i class="fa fa-pencil"></i>
+                                                </a>
 
                                                 <form action="{{ route('students.destroy', $student->id) }}" method="POST" class="d-inline deleteForm">
                                                     @csrf
@@ -55,7 +55,7 @@
                                     </tbody>
                                 </table>
 
-                                {{ $students->links() }}
+{{--                                {{ $students->links() }}--}}
                             </div>
                         </div>
                     </div>

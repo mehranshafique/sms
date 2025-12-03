@@ -14,11 +14,21 @@
             </li>
 
             @can('students.view')
-                <li class="{{ isActive(['students.index','students.create']) }}">
+                <li class="{{ isActive(['students.index','students.create','students.create']) }}">
                     <a class="ai-icon {{ isActive('students.index') }}"
                        href="{{ route('students.index') }}" aria-expanded="false">
-                        <i class="la la-calendar"></i>
+                        <i class="la la-user-graduate"></i>
                         <span class="nav-text">Students</span>
+                    </a>
+                </li>
+            @endcan
+
+            @can('staff.view')
+                <li class="{{ isActive(['staff.index','staff.create']) }}">
+                    <a class="ai-icon {{ isActive('students.index') }}"
+                       href="{{ route('staff.index') }}" aria-expanded="false">
+                        <i class="la la-user-tie"></i>
+                        <span class="nav-text">Staff</span>
                     </a>
                 </li>
             @endcan
