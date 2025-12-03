@@ -11,15 +11,16 @@ return new class extends Migration
         Schema::create('staff', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')
-                ->unique()
-                ->constrained('users')
-                ->onDelete('cascade');
+//            $table->foreignId('user_id')
+//                ->unique()
+//                ->constrained('users')
+//                ->onDelete('cascade');
 
-            $table->foreignId('campus_id')
-                ->constrained('campuses')
-                ->onDelete('cascade');
-
+//            $table->foreignId('campus_id')
+//                ->constrained('campuses')
+//                ->onDelete('cascade');
+            $table->unsignedBigInteger('institute_id');
+            $table->unsignedBigInteger('users_id');
             $table->string('employee_no', 50); // UNIQUE per campus
             $table->string('designation', 100)->nullable();
             $table->string('department', 100)->nullable();
@@ -28,7 +29,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['campus_id', 'employee_no']); // unique per campus
+            $table->unique(['institute_id', 'employee_no']); // unique per campus
         });
     }
 
