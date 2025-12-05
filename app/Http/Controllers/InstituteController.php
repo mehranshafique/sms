@@ -6,6 +6,8 @@ use App\Models\Institute;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
 class InstituteController extends BaseController
 {
     public function index()
@@ -27,7 +29,6 @@ class InstituteController extends BaseController
             'name' => 'required|string|max:150',
             'plan_password' => 'required|string|max:150',
             'email' => 'required|string|email|max:150|unique:institutes',
-            'code' => 'required|string|max:30|unique:institutes,code',
             'type' => 'required|in:primary,secondary,university,mixed',
             'phone' => 'required|string|max:30',
         ]);
@@ -44,7 +45,7 @@ class InstituteController extends BaseController
         $institute = new Institute();
         $institute->name = $request->name;
         $institute->email = $request->email;
-        $institute->code = $request->code;
+        $institute->code = mt_rand(100000, 999999);
         $institute->type = $request->type;
         $institute->phone = $request->phone;
         $institute->plan_password = $request->plan_password;
@@ -77,46 +78,11 @@ class InstituteController extends BaseController
         return view('institutes.edit', compact('institute'));
     }
 
-//    public function update(Request $request, Institute $institute)
-//    {
-//        $request->validate([
-//            'name' => 'required|string|max:150',
-//            'email' => 'required|string|email|max:150',
-//            'code' => 'required|string|max:30|unique:institutes,code,' . $institute->id,
-//            'type' => 'required|in:primary,secondary,university,mixed',
-//            'phone' => 'required|string|max:30',
-//        ]);
-//
-//        $institute->update($request->all());
-//        $adminUser = User::where('institute_id', $institute->id)->first();
-//        $adminData = [
-//            'name' => $request->name,
-//            'email' => $request->email,
-//        ];
-//
-//        if($request->plan_password){
-//            $adminData['password'] = Hash::make($request->password);
-//        }
-//
-//        $adminUser = User::where('institute_id', $institute->id)->first();
-//
-//        if ($adminUser) {
-//            $adminUser->update($adminData);
-//        } else {
-//            $adminData['institute_id'] = $institute->id;
-//            $adminUser = User::create($adminData);
-//        }
-//
-//
-//        return redirect()->route('institutes.index')->with('success', 'Institute updated successfully.');
-//    }
-
     public function update(Request $request, Institute $institute)
     {
         $validator = \Validator::make($request->all(), [
             'name' => 'required|string|max:150',
             'email' => 'required|string|email|max:150|unique:institutes,email,' . $institute->id,
-            'code' => 'required|string|max:30|unique:institutes,code,' . $institute->id,
             'type' => 'required|in:primary,secondary,university,mixed',
             'phone' => 'required|string|max:30',
         ]);
@@ -128,7 +94,7 @@ class InstituteController extends BaseController
             ], 422);
         }
 
-        $institute->update($request->only(['name','email','code','type','phone','city','country','address','is_active']));
+        $institute->update($request->only(['name','email','type','phone','city','country','address','is_active']));
 
         $adminUser = User::where('institute_id', $institute->id)->first();
 

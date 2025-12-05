@@ -1,17 +1,9 @@
 @extends('layout.layout')
 
 @section('content')
+
     <style>
-        input{
-            height: 48px !important;
-        }
-    </style>
-    <style>
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
+
 
         .card {
             overflow: hidden;
@@ -19,18 +11,6 @@
 
         .card-header {
             border: none;
-        }
-
-        .form-control,
-        .form-select {
-            border: 2px solid #e0e7ff;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:hover,
-        .form-select:hover {
-            border-color: #667eea;
         }
 
         .text-primary {
@@ -83,20 +63,12 @@
                                         <i class="bi bi-info-circle me-2"></i>Basic Information
                                     </h5>
                                     <div class="row g-3">
-                                        <div class="col-md-6">
+                                        <div class="col-12">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-building me-1"></i>Institute Name
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="name" class="form-control form-control-lg" placeholder="Enter institute name" required>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold">
-                                                <i class="bi bi-hash me-1"></i>Institute Code
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text" name="code" class="form-control form-control-lg" placeholder="Enter unique code" required>
+                                            <input type="text" name="name" class="form-control" placeholder="Enter institute name" required>
                                         </div>
 
                                         <div class="col-md-6">
@@ -143,21 +115,21 @@
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-flag me-1"></i>Country
                                             </label>
-                                            <input type="text" name="country" class="form-control form-control-lg" placeholder="Enter country">
+                                            <input type="text" name="country" class="form-control " placeholder="Enter country">
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-pin-map me-1"></i>City
                                             </label>
-                                            <input type="text" name="city" class="form-control form-control-lg" placeholder="Enter city">
+                                            <input type="text" name="city" class="form-control " placeholder="Enter city">
                                         </div>
 
                                         <div class="col-12">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-house me-1"></i>Full Address
                                             </label>
-                                            <textarea name="address" class="form-control form-control-lg" rows="2" placeholder="Enter complete address"></textarea>
+                                            <textarea name="address" class="form-control " rows="2" placeholder="Enter complete address"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -182,21 +154,21 @@
                                                 <i class="bi bi-phone me-1"></i>Admin Email
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="email" class="form-control form-control-lg" placeholder="Enter Admin Email" required>
+                                            <input type="text" name="email" class="form-control " placeholder="Enter Admin Email" required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-phone me-1"></i>Password
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="plan_password" class="form-control form-control-lg" placeholder="Enter Password" required>
+                                            <input type="text" name="plan_password" class="form-control " placeholder="Enter Password" required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-phone me-1"></i>Phone Number
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="phone" class="form-control form-control-lg" placeholder="+1 234 567 8900" required>
+                                            <input type="text" name="phone" class="form-control " placeholder="+1 234 567 8900" required>
                                         </div>
                                     </div>
 

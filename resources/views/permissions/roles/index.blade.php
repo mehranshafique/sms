@@ -131,17 +131,104 @@
     </div>
 
     <script>
-        // Load role info into edit modal
+        // ---------------------------
+        // CREATE ROLE (AJAX)
+        // ---------------------------
+        $('#addRoleModal form').submit(function (e) {
+            e.preventDefault();
+
+            let form = $(this);
+            let url = form.attr('action');
+
+            $.ajax({
+                url: url,
+                type: "POST",
+                data: form.serialize(),
+                success: function (res) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Success",
+                        text: res.message,
+                    }).then(() => {
+                        location.reload();
+                    });
+                },
+                error: function (xhr) {
+                    if (xhr.status === 422) {
+                        let errors = xhr.responseJSON.errors;
+                        let msg = Object.values(errors).join("<br>");
+
+                        Swal.fire({
+                            icon: "error",
+                            title: "Validation Error",
+                            html: msg
+                        });
+                    }
+                }
+            });
+        });
+
+
+        // ---------------------------
+        // UPDATE ROLE (AJAX)
+        // ---------------------------
+        $('#editRoleForm').submit(function (e) {
+            e.preventDefault();
+
+            let id = $('#editRoleId').val();
+            let url = "/roles/" + id;
+
+            $.ajax({
+                url: url,
+                type: "POST",
+                data: $('#editRoleForm').serialize(),
+                success: function (res) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Updated",
+                        text: res.message,
+                    }).then(() => {
+                        location.reload();
+                    });
+                },
+                error: function (xhr) {
+                    if (xhr.status === 422) {
+                        let errors = xhr.responseJSON.errors;
+                        let msg = Object.values(errors).join("<br>");
+
+                        Swal.fire({
+                            icon: "error",
+                            title: "Validation Error",
+                            html: msg
+                        });
+                    }
+                }
+            });
+        });
+
+
+        // ---------------------------
+        // LOAD ROLE DATA IN EDIT MODAL
+        // ---------------------------
         $(document).on('click', '.editRoleBtn', function () {
             let id = $(this).data('id');
             let name = $(this).data('name');
 
             $('#editRoleId').val(id);
             $('#editRoleName').val(name);
-
-            let action = "{{ url('roles') }}/" + id;
-            $('#editRoleForm').attr('action', action);
         });
+
+        {{--// Load role info into edit modal--}}
+        {{--$(document).on('click', '.editRoleBtn', function () {--}}
+        {{--    let id = $(this).data('id');--}}
+        {{--    let name = $(this).data('name');--}}
+
+        {{--    $('#editRoleId').val(id);--}}
+        {{--    $('#editRoleName').val(name);--}}
+
+        {{--    let action = "{{ url('roles') }}/" + id;--}}
+        {{--    $('#editRoleForm').attr('action', action);--}}
+        {{--});--}}
     </script>
 
 @endsection

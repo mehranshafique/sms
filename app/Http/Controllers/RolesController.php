@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use App\Http\Controllers\BaseController;
+use Illuminate\Support\Facades\Validator;
 class RolesController extends BaseController
 {
     public function index()
@@ -16,27 +17,39 @@ class RolesController extends BaseController
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => 'required|unique:roles,name',
         ]);
 
-        Role::create(['name' => $request->name]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-        return redirect()->back()->with('success', 'Role created successfully');
+        $role = Role::create(['name' => $request->name]);
+
+        return response()->json([
+            'message' => 'Role created successfully',
+            'data' => $role
+        ]);
     }
 
     public function update(Request $request, $id)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => 'required|unique:roles,name,' . $id,
         ]);
 
-        $role = Role::findOrFail($id);
-        $role->update([
-            'name' => $request->name
-        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-        return redirect()->back()->with('success', 'Role updated successfully');
+        $role = Role::findOrFail($id);
+        $role->update(['name' => $request->name]);
+
+        return response()->json([
+            'message' => 'Role updated successfully',
+            'data' => $role
+        ]);
     }
 
     public function destroy($id)

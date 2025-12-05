@@ -1,17 +1,8 @@
 @extends('layout.layout')
 
 @section('content')
+
     <style>
-        input{
-            height: 48px !important;
-        }
-    </style>
-    <style>
-        .form-control:focus,
-        .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
 
         .card {
             overflow: hidden;
@@ -19,18 +10,6 @@
 
         .card-header {
             border: none;
-        }
-
-        .form-control,
-        .form-select {
-            border: 2px solid #e0e7ff;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:hover,
-        .form-select:hover {
-            border-color: #667eea;
         }
 
         .text-primary {
@@ -90,7 +69,7 @@
                                                 <i class="bi bi-building me-1"></i>Institute Name
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="name" value="{{ $institute->name }}" class="form-control form-control-lg" required>
+                                            <input type="text" name="name" value="{{ $institute->name }}" class="form-control " required>
                                         </div>
 
                                         <div class="col-md-6">
@@ -98,7 +77,7 @@
                                                 <i class="bi bi-hash me-1"></i>Institute Code
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="code" value="{{ $institute->code }}" class="form-control form-control-lg" required>
+                                            <input type="text" name="code" value="{{ $institute->code }}" class="form-control " required>
                                         </div>
 
                                         <div class="col-md-6">
@@ -145,21 +124,21 @@
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-flag me-1"></i>Country
                                             </label>
-                                            <input type="text" name="country" value="{{ $institute->country }}" class="form-control form-control-lg">
+                                            <input type="text" name="country" value="{{ $institute->country }}" class="form-control ">
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-pin-map me-1"></i>City
                                             </label>
-                                            <input type="text" name="city" value="{{ $institute->city }}" class="form-control form-control-lg">
+                                            <input type="text" name="city" value="{{ $institute->city }}" class="form-control ">
                                         </div>
 
                                         <div class="col-12">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-house me-1"></i>Full Address
                                             </label>
-                                            <textarea name="address" class="form-control form-control-lg" rows="2">{{ $institute->address }}</textarea>
+                                            <textarea name="address" class="form-control " rows="2">{{ $institute->address }}</textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -184,20 +163,20 @@
                                                 <i class="bi bi-phone me-1"></i>Admin Email
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="email" value="{{ $institute->email }}" class="form-control form-control-lg" required>
+                                            <input type="text" name="email" value="{{ $institute->email }}" class="form-control " required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-phone me-1"></i>Password (leave blank to keep current)
                                             </label>
-                                            <input type="text" name="plan_password" class="form-control form-control-lg">
+                                            <input type="text" name="plan_password" class="form-control ">
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
                                                 <i class="bi bi-phone me-1"></i>Phone Number
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="phone" value="{{ $institute->phone }}" class="form-control form-control-lg" required>
+                                            <input type="text" name="phone" value="{{ $institute->phone }}" class="form-control " required>
                                         </div>
                                     </div>
 

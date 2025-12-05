@@ -11,7 +11,7 @@ use App\Http\Controllers\InstituteController;
 use App\Http\Controllers\HeadOfficersController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StaffController;
-
+use App\Http\Controllers\AcademicSessionController;
 Route::redirect('/','/login' );
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
@@ -54,6 +54,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('staff', StaffController::class);
 
+    Route::resource('academic-sessions', AcademicSessionController::class);
 });
 
 

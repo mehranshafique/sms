@@ -16,7 +16,7 @@
                 </div>
             </div>
 
-            <form action="{{ route('staff.store') }}" method="POST" id="createForm">
+            <form  method="POST" id="createForm">
                 @csrf
 
                 <!-- User Details -->
@@ -28,21 +28,32 @@
                                     <i class="bi bi-person me-2"></i>User Details
                                 </h5>
                                 <div class="row g-3">
-                                    <div class="col-6">
+                                    <div class="col-12">
                                         <label class="form-label fw-semibold">Name</label>
-                                        <input type="text" name="name" class="form-control mt-2" placeholder="Full Name">
+                                        <input type="text" name="name" class="form-control " placeholder="Full Name">
                                     </div>
+
                                     <div class="col-6">
                                         <label class="form-label fw-semibold">Email</label>
-                                        <input type="email" name="email" class="form-control mt-2" placeholder="Email">
+                                        <input type="email" name="email" class="form-control" placeholder="Email">
                                     </div>
+
                                     <div class="col-6">
                                         <label class="form-label fw-semibold">Phone</label>
-                                        <input type="text" name="phone" class="form-control mt-2" placeholder="Phone (optional)">
+                                        <input type="text" name="phone" class="form-control " placeholder="Phone (optional)">
                                     </div>
+
                                     <div class="col-6">
                                         <label class="form-label fw-semibold">Password</label>
-                                        <input type="password" name="password" class="form-control mt-2" placeholder="Password">
+                                        <input type="password" name="password" class="form-control " placeholder="Password">
+                                    </div>
+
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Role</label>
+                                        <select name="role" class="form-control single-select-placeholder">
+                                            <option value="Finance">Finance</option>
+                                            <option value="Teacher">Teacher</option>
+                                        </select>
                                     </div>
 
                                     <div class="col-12">

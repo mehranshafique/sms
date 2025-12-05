@@ -48,7 +48,7 @@ class StudentController extends BaseController
         }
 
         // Format registration number: INSTITUTEID-0001
-        $registration_no = institute()->id . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        $registration_no = institute()->id . str_pad($number, 4, '0', STR_PAD_LEFT);
 
         $student = new Student();
 

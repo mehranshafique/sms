@@ -24,11 +24,21 @@
             @endcan
 
             @can('staff.view')
-                <li class="{{ isActive(['staff.index','staff.create']) }}">
+                <li class="{{ isActive(['staff.index','staff.create','staff.edit']) }}">
                     <a class="ai-icon {{ isActive('students.index') }}"
                        href="{{ route('staff.index') }}" aria-expanded="false">
                         <i class="la la-user-tie"></i>
                         <span class="nav-text">Staff</span>
+                    </a>
+                </li>
+            @endcan
+
+            @can('sessions.view')
+                <li class="{{ isActive(['academic-sessions.index']) }}">
+                    <a class="ai-icon {{ isActive('academic-sessions.index') }}"
+                       href="{{ route('academic-sessions.index') }}" aria-expanded="false">
+                        <i class="la la-user-tie"></i>
+                        <span class="nav-text">Sessions</span>
                     </a>
                 </li>
             @endcan

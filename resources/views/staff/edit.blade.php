@@ -16,7 +16,7 @@
                 </div>
             </div>
 
-            <form action="{{ route('staff.update', $staff->id) }}" method="POST" id="editForm">
+            <form action="" method="POST" id="editForm">
                 @csrf
                 @method('PUT')
 
@@ -29,21 +29,30 @@
                                     <i class="bi bi-person me-2"></i>User Details
                                 </h5>
                                 <div class="row g-3">
-                                    <div class="col-6">
+                                    <div class="col-12">
                                         <label class="form-label fw-semibold">Name</label>
-                                        <input type="text" name="name" class="form-control mt-2" placeholder="Full Name" value="{{ $staff->user->name }}">
+                                        <input type="text" name="name" class="form-control" placeholder="Full Name" value="{{ $staff->user->name }}">
                                     </div>
                                     <div class="col-6">
                                         <label class="form-label fw-semibold">Email</label>
-                                        <input type="email" name="email" class="form-control mt-2" placeholder="Email" value="{{ $staff->user->email }}">
+                                        <input type="email" name="email" class="form-control" placeholder="Email" value="{{ $staff->user->email }}">
                                     </div>
                                     <div class="col-6">
                                         <label class="form-label fw-semibold">Phone</label>
-                                        <input type="text" name="phone" class="form-control mt-2" placeholder="Phone (optional)" value="{{ $staff->user->phone ?? '' }}">
+                                        <input type="text" name="phone" class="form-control" placeholder="Phone (optional)" value="{{ $staff->user->phone ?? '' }}">
                                     </div>
+
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Role</label>
+                                        <select name="role" class="form-control single-select-placeholder" disabled>
+                                            <option value="Finance" {{ $user->role_name == 'Finance' ? 'selected' : '' }}>Finance</option>
+                                            <option value="Teacher" {{ $user->role_name == 'Teacher' ? 'selected' : '' }}>Teacher</option>
+                                        </select>
+                                    </div>
+
                                     <div class="col-6">
                                         <label class="form-label fw-semibold">Password</label>
-                                        <input type="password" name="password" class="form-control mt-2" placeholder="Password (leave blank to keep current)">
+                                        <input type="password" name="password" class="form-control " placeholder="Password (leave blank to keep current)">
                                     </div>
 
                                     <div class="col-12">

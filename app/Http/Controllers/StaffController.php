@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Spatie\Permission\Models\Role;
+
 class StaffController extends BaseController
 {
     public function __construct()
@@ -52,6 +54,7 @@ class StaffController extends BaseController
             'department' => 'nullable|max:100',
             'hire_date'  => 'nullable|date',
             'status'     => 'required|in:active,on_leave,terminated',
+            'role'       => 'required|in:Finance,Teacher,Student',
         ];
 
         $validated = $request->validate($rules);
@@ -76,7 +79,7 @@ class StaffController extends BaseController
                 // PRODUCTION: don't return plaintext passwords in responses.
                 // Instead: queue an email (password reset link or set-password flow).
                 // Example: dispatch a job to email the user with a "set password" link.
-                // dispatch(new SendNewUserWelcomeEmail($user, $passwordPlain)); // optional
+//                dispatch(new \App\Jobs\SendUserWelcomeEmail($user, $passwordPlain));
 
                 $userId = $user->id;
             }
@@ -104,8 +107,12 @@ class StaffController extends BaseController
                 'status' => $request->status,
             ]);
 
-            // $user = User::find($userId);
-            // $user->assignRole('staff'); // ensure role exists
+            if(Role::where('name', $request->role)->exists()) {
+                 $user = User::find($userId);
+                 $user->assignRole($request->role); // ensure role exists
+                Log::info('Role Assigned to Staff', ['staff_id' => $staff->id, 'Role Name'=>$request->role]);
+            }
+
 
             DB::commit();
 
@@ -132,6 +139,10 @@ class StaffController extends BaseController
     public function edit(Staff $staff)
     {
         $user = User::find($staff->user_id);
+        $user->role_name = '';
+        if(isset($user->roles->pluck('name')->toArray()[0])){
+            $user->role_name = $user->roles->pluck('name')->toArray()[0];
+        }
 
         return view('staff.edit', compact('staff', 'user'));
     }
@@ -147,6 +158,7 @@ class StaffController extends BaseController
             'department' => 'nullable|max:100',
             'hire_date'  => 'nullable|date',
             'status'     => 'required|in:active,on_leave,terminated',
+            'role'       => 'nullable|in:Finance,Teacher,Student',
         ];
 
         $validated = $request->validate($rules);
@@ -193,6 +205,12 @@ class StaffController extends BaseController
                 'status'     => $request->status,
                 'institute_id'  => institute()->id,
             ]);
+
+            if(Role::where('name', $request->role)->exists()) {
+                $user = User::find($userId);
+                $user->assignRole($request->role); // ensure role exists
+                Log::info('Role Assigned to Staff', ['staff_id' => $staff->id, 'Role Name'=>$request->role]);
+            }
 
             DB::commit();
 
