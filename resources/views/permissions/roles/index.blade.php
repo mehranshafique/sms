@@ -12,26 +12,25 @@
                         <form action="{{ route('roles.store') }}" method="POST">
                             @csrf
                             <div class="modal-header">
-                                <h5 class="modal-title">Add Role</h5>
+                                <h5 class="modal-title">{{ __('role.add_role') }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
 
                             <div class="modal-body">
                                 <div class="form-group mb-3">
-                                    <label>Role Name</label>
+                                    <label>{{ __('role.role_name') }}</label>
                                     <input type="text" name="name" class="form-control" required>
                                 </div>
                             </div>
 
                             <div class="modal-footer">
-                                <button class="btn btn-primary">Save</button>
+                                <button class="btn btn-primary">{{ __('role.save') }}</button>
                             </div>
 
                         </form>
                     </div>
                 </div>
             </div>
-
 
             <!-- Edit Role Modal -->
             <div class="modal fade" id="editRoleModal" tabindex="-1">
@@ -44,19 +43,19 @@
                             <input type="hidden" id="editRoleId">
 
                             <div class="modal-header">
-                                <h5 class="modal-title">Edit Role</h5>
+                                <h5 class="modal-title">{{ __('role.edit_role') }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
 
                             <div class="modal-body">
                                 <div class="form-group mb-3">
-                                    <label>Role Name</label>
+                                    <label>{{ __('role.role_name') }}</label>
                                     <input type="text" name="name" id="editRoleName" class="form-control" required>
                                 </div>
                             </div>
 
                             <div class="modal-footer">
-                                <button class="btn btn-primary">Update</button>
+                                <button class="btn btn-primary">{{ __('role.update') }}</button>
                             </div>
 
                         </form>
@@ -64,11 +63,10 @@
                 </div>
             </div>
 
-
             <div class="row mb-3">
                 <div class="col-12">
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRoleModal">
-                        Add Role
+                        {{ __('role.add_role_button') }}
                     </button>
                 </div>
             </div>
@@ -81,9 +79,9 @@
                                 <table id="example" class="display" style="min-width: 845px">
                                     <thead>
                                     <tr>
-                                        <th>#</th>
-                                        <th>Name</th>
-                                        <th width="150">Action</th>
+                                        <th>{{ __('role.table_id') }}</th>
+                                        <th>{{ __('role.table_name') }}</th>
+                                        <th>{{ __('role.table_action') }}</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -111,7 +109,7 @@
                                                         @csrf
                                                         @method('DELETE')
 
-                                                        <button class="btn btn-xs sharp btn-danger" onclick="return confirm('Delete role?')">
+                                                        <button class="btn btn-xs sharp btn-danger" onclick="return confirm('{{ __('role.delete_confirmation') }}')">
                                                             <i class="fa fa-trash"></i>
                                                         </button>
                                                     </form>
@@ -147,7 +145,7 @@
                 success: function (res) {
                     Swal.fire({
                         icon: "success",
-                        title: "Success",
+                        title: "{{ __('role.success') }}",
                         text: res.message,
                     }).then(() => {
                         location.reload();
@@ -160,7 +158,7 @@
 
                         Swal.fire({
                             icon: "error",
-                            title: "Validation Error",
+                            title: "{{ __('role.validation_error') }}",
                             html: msg
                         });
                     }
@@ -185,7 +183,7 @@
                 success: function (res) {
                     Swal.fire({
                         icon: "success",
-                        title: "Updated",
+                        title: "{{ __('role.updated') }}",
                         text: res.message,
                     }).then(() => {
                         location.reload();
@@ -198,7 +196,7 @@
 
                         Swal.fire({
                             icon: "error",
-                            title: "Validation Error",
+                            title: "{{ __('role.validation_error') }}",
                             html: msg
                         });
                     }
@@ -217,22 +215,6 @@
             $('#editRoleId').val(id);
             $('#editRoleName').val(name);
         });
-
-        {{--// Load role info into edit modal--}}
-        {{--$(document).on('click', '.editRoleBtn', function () {--}}
-        {{--    let id = $(this).data('id');--}}
-        {{--    let name = $(this).data('name');--}}
-
-        {{--    $('#editRoleId').val(id);--}}
-        {{--    $('#editRoleName').val(name);--}}
-
-        {{--    let action = "{{ url('roles') }}/" + id;--}}
-        {{--    $('#editRoleForm').attr('action', action);--}}
-        {{--});--}}
     </script>
 
 @endsection
-
-{{--@section('scripts')--}}
-
-{{--@endsection--}}

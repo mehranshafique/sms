@@ -3,8 +3,6 @@
 @section('content')
 
     <style>
-
-
         .card {
             overflow: hidden;
         }
@@ -44,8 +42,8 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="mb-0 fw-bold">Add New Institute</h3>
-                            <small class="text-black">Fill in the details to register a new institute</small>
+                            <h3 class="mb-0 fw-bold">{{ __('institute.add_new_institute') }}</h3>
+                            <small class="text-black">{{ __('institute.add_new_institute_subtitle') }}</small>
                         </div>
                     </div>
                 </div>
@@ -60,38 +58,38 @@
                             <div class="card-body">
                                 <div class="mb-4">
                                     <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                        <i class="bi bi-info-circle me-2"></i>Basic Information
+                                        <i class="bi bi-info-circle me-2"></i>{{ __('institute.basic_information') }}
                                     </h5>
                                     <div class="row g-3">
                                         <div class="col-12">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-building me-1"></i>Institute Name
+                                                <i class="bi bi-building me-1"></i>{{ __('institute.institute_name') }}
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="name" class="form-control" placeholder="Enter institute name" required>
+                                            <input type="text" name="name" class="form-control" placeholder="{{ __('institute.enter_institute_name') }}" required>
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-diagram-3 me-1"></i>Institute Type
+                                                <i class="bi bi-diagram-3 me-1"></i>{{ __('institute.institute_type') }}
                                                 <span class="text-danger">*</span>
                                             </label>
                                             <select id="single-select" name="type" class="form-select form-select-lg" required>
-                                                <option value="">-- Select Institute Type --</option>
-                                                <option value="primary">🎒 Primary School</option>
-                                                <option value="secondary">📚 Secondary School</option>
-                                                <option value="university">🎓 University</option>
-                                                <option value="mixed">🏫 Mixed Level</option>
+                                                <option value="">{{ __('institute.select_institute_type') }}</option>
+                                                <option value="primary">🎒 {{ __('institute.primary_school') }}</option>
+                                                <option value="secondary">📚 {{ __('institute.secondary_school') }}</option>
+                                                <option value="university">🎓 {{ __('institute.university') }}</option>
+                                                <option value="mixed">🏫 {{ __('institute.mixed_level') }}</option>
                                             </select>
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-toggle-on me-1"></i>Status
+                                                <i class="bi bi-toggle-on me-1"></i>{{ __('institute.status') }}
                                             </label>
                                             <select name="is_active" class="form-select form-select-lg single-select-placeholder js-states">
-                                                <option value="1" selected>✅ Active</option>
-                                                <option value="0">❌ Inactive</option>
+                                                <option value="1" selected>✅ {{ __('institute.active') }}</option>
+                                                <option value="0">❌ {{ __('institute.inactive') }}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -108,28 +106,28 @@
                             <div class="card-body">
                                 <div class="mb-4">
                                     <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                        <i class="bi bi-geo-alt me-2"></i>Location Details
+                                        <i class="bi bi-geo-alt me-2"></i>{{ __('institute.location_details') }}
                                     </h5>
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-flag me-1"></i>Country
+                                                <i class="bi bi-flag me-1"></i>{{ __('institute.country') }}
                                             </label>
-                                            <input type="text" name="country" class="form-control " placeholder="Enter country">
+                                            <input type="text" name="country" class="form-control" placeholder="{{ __('institute.enter_country') }}">
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-pin-map me-1"></i>City
+                                                <i class="bi bi-pin-map me-1"></i>{{ __('institute.city') }}
                                             </label>
-                                            <input type="text" name="city" class="form-control " placeholder="Enter city">
+                                            <input type="text" name="city" class="form-control" placeholder="{{ __('institute.enter_city') }}">
                                         </div>
 
                                         <div class="col-12">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-house me-1"></i>Full Address
+                                                <i class="bi bi-house me-1"></i>{{ __('institute.full_address') }}
                                             </label>
-                                            <textarea name="address" class="form-control " rows="2" placeholder="Enter complete address"></textarea>
+                                            <textarea name="address" class="form-control" rows="2" placeholder="{{ __('institute.enter_full_address') }}"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -145,30 +143,30 @@
                             <div class="card-body">
                                 <div class="mb-4">
                                     <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                        <i class="bi bi-telephone me-2"></i>Contact Information
+                                        <i class="bi bi-telephone me-2"></i>{{ __('institute.contact_information') }}
                                     </h5>
                                     <div class="row g-3">
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-phone me-1"></i>Admin Email
+                                                <i class="bi bi-phone me-1"></i>{{ __('institute.admin_email') }}
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="email" class="form-control " placeholder="Enter Admin Email" required>
+                                            <input type="text" name="email" class="form-control" placeholder="{{ __('institute.enter_admin_email') }}" required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-phone me-1"></i>Password
+                                                <i class="bi bi-phone me-1"></i>{{ __('institute.password') }}
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="plan_password" class="form-control " placeholder="Enter Password" required>
+                                            <input type="text" name="plan_password" class="form-control" placeholder="{{ __('institute.enter_password') }}" required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-phone me-1"></i>Phone Number
+                                                <i class="bi bi-phone me-1"></i>{{ __('institute.phone_number') }}
                                                 <span class="text-danger">*</span>
                                             </label>
-                                            <input type="text" name="phone" class="form-control " placeholder="+1 234 567 8900" required>
+                                            <input type="text" name="phone" class="form-control" placeholder="{{ __('institute.enter_phone_number') }}" required>
                                         </div>
                                     </div>
 
@@ -180,7 +178,7 @@
 
                 <div class="d-flex justify-content-start gap-3">
                     <button type="submit" class="btn btn-lg btn-primary shadow-sm">
-                        <i class="bi bi-check-circle me-2"></i>Save Institute
+                        <i class="bi bi-check-circle me-2"></i>{{ __('institute.save_institute') }}
                     </button>
                 </div>
             </form>
@@ -189,11 +187,21 @@
     </div>
 
     {{-- jQuery + SweetAlert --}}
-{{--    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>--}}
-{{--    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>--}}
+    {{-- <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script> --}}
+    {{-- <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> --}}
 
     <script>
         $(document).ready(function(){
+
+            // map form field names to user-friendly translated labels
+            const fieldLabels = {
+                name: '{{ __("institute.institute_name") }}',
+                code: '{{ __("institute.code") }}',
+                type: '{{ __("institute.institute_type") }}',
+                email: '{{ __("institute.admin_email") }}',
+                plan_password: '{{ __("institute.password") }}',
+                phone: '{{ __("institute.phone_number") }}',
+            };
 
             $('#createForm').submit(function(e){
                 e.preventDefault();
@@ -210,8 +218,8 @@
                         hasError = true;
                         Swal.fire({
                             icon: 'error',
-                            title: 'Validation Error',
-                            text: `${field.replace('_',' ').toUpperCase()} is required`
+                            title: '{{ __("institute.validation_error") }}',
+                            text: (fieldLabels[field] ?? field).toString() + ' {{ __("institute.is_required") }}'
                         });
                         return false; // break loop
                     }
@@ -234,7 +242,7 @@
                     success: function(response){
                         Swal.fire({
                             icon: 'success',
-                            title: 'Success!',
+                            title: '{{ __("institute.success") }}',
                             text: response.message
                         }).then(() => {
                             window.location.href = response.redirect;
@@ -249,14 +257,14 @@
                             });
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Validation Error',
+                                title: '{{ __("institute.validation_error") }}',
                                 html: messages
                             });
                         } else {
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Error Occurred',
-                                text: 'Something went wrong!'
+                                title: '{{ __("institute.error_occurred") }}',
+                                text: '{{ __("institute.something_went_wrong") }}'
                             });
                         }
                     }

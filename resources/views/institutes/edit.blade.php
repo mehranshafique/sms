@@ -3,32 +3,18 @@
 @section('content')
 
     <style>
-
-        .card {
-            overflow: hidden;
-        }
-
-        .card-header {
-            border: none;
-        }
-
-        .text-primary {
-            color: #667eea !important;
-        }
-
+        .card { overflow: hidden; }
+        .card-header { border: none; }
+        .text-primary { color: #667eea !important; }
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 15px rgba(102, 126, 234, 0.3) !important;
         }
-
         .btn-light:hover {
             background-color: #f8f9fa;
             border-color: #dee2e6;
         }
-
-        textarea.form-control {
-            resize: vertical;
-        }
+        textarea.form-control { resize: vertical; }
     </style>
 
     <div class="content-body">
@@ -43,8 +29,8 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="mb-0 fw-bold">Edit Institute</h3>
-                            <small class="text-black">Update institute details</small>
+                            <h3 class="mb-0 fw-bold">{{ __('institute.edit_institute') }}</h3>
+                            <small class="text-black">{{ __('institute.update_institute_details') }}</small>
                         </div>
                     </div>
                 </div>
@@ -61,12 +47,12 @@
                             <div class="card-body">
                                 <div class="mb-4">
                                     <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                        <i class="bi bi-info-circle me-2"></i>Basic Information
+                                        <i class="bi bi-info-circle me-2"></i>{{ __('institute.basic_information') }}
                                     </h5>
                                     <div class="row g-3">
-                                        <div class="col-md-6">
+                                        <div class="col-md-12">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-building me-1"></i>Institute Name
+                                                <i class="bi bi-building me-1"></i>{{ __('institute.institute_name') }}
                                                 <span class="text-danger">*</span>
                                             </label>
                                             <input type="text" name="name" value="{{ $institute->name }}" class="form-control " required>
@@ -74,33 +60,25 @@
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-hash me-1"></i>Institute Code
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input type="text" name="code" value="{{ $institute->code }}" class="form-control " required>
-                                        </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold">
-                                                <i class="bi bi-diagram-3 me-1"></i>Institute Type
+                                                <i class="bi bi-diagram-3 me-1"></i>{{ __('institute.institute_type') }}
                                                 <span class="text-danger">*</span>
                                             </label>
                                             <select id="single-select" name="type" class="form-select form-select-lg" required>
-                                                <option value="">-- Select Institute Type --</option>
-                                                <option value="primary" {{ $institute->type == 'primary' ? 'selected' : '' }}>🎒 Primary School</option>
-                                                <option value="secondary" {{ $institute->type == 'secondary' ? 'selected' : '' }}>📚 Secondary School</option>
-                                                <option value="university" {{ $institute->type == 'university' ? 'selected' : '' }}>🎓 University</option>
-                                                <option value="mixed" {{ $institute->type == 'mixed' ? 'selected' : '' }}>🏫 Mixed Level</option>
+                                                <option value="">{{ __('institute.select_institute_type') }}</option>
+                                                <option value="primary" {{ $institute->type == 'primary' ? 'selected' : '' }}>🎒 {{ __('institute.primary_school') }}</option>
+                                                <option value="secondary" {{ $institute->type == 'secondary' ? 'selected' : '' }}>📚 {{ __('institute.secondary_school') }}</option>
+                                                <option value="university" {{ $institute->type == 'university' ? 'selected' : '' }}>🎓 {{ __('institute.university') }}</option>
+                                                <option value="mixed" {{ $institute->type == 'mixed' ? 'selected' : '' }}>🏫 {{ __('institute.mixed_level') }}</option>
                                             </select>
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-toggle-on me-1"></i>Status
+                                                <i class="bi bi-toggle-on me-1"></i>{{ __('institute.status') }}
                                             </label>
                                             <select name="is_active" class="form-select form-select-lg single-select-placeholder js-states">
-                                                <option value="1" {{ $institute->is_active ? 'selected' : '' }}>✅ Active</option>
-                                                <option value="0" {{ !$institute->is_active ? 'selected' : '' }}>❌ Inactive</option>
+                                                <option value="1" {{ $institute->is_active ? 'selected' : '' }}>✅ {{ __('institute.active') }}</option>
+                                                <option value="0" {{ !$institute->is_active ? 'selected' : '' }}>❌ {{ __('institute.inactive') }}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -117,26 +95,26 @@
                             <div class="card-body">
                                 <div class="mb-4">
                                     <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                        <i class="bi bi-geo-alt me-2"></i>Location Details
+                                        <i class="bi bi-geo-alt me-2"></i>{{ __('institute.location_details') }}
                                     </h5>
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-flag me-1"></i>Country
+                                                <i class="bi bi-flag me-1"></i>{{ __('institute.enter_country') }}
                                             </label>
                                             <input type="text" name="country" value="{{ $institute->country }}" class="form-control ">
                                         </div>
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-pin-map me-1"></i>City
+                                                <i class="bi bi-pin-map me-1"></i>{{ __('institute.city') }}
                                             </label>
                                             <input type="text" name="city" value="{{ $institute->city }}" class="form-control ">
                                         </div>
 
                                         <div class="col-12">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-house me-1"></i>Full Address
+                                                <i class="bi bi-house me-1"></i>{{ __('institute.full_address') }}
                                             </label>
                                             <textarea name="address" class="form-control " rows="2">{{ $institute->address }}</textarea>
                                         </div>
@@ -154,26 +132,26 @@
                             <div class="card-body">
                                 <div class="mb-4">
                                     <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                        <i class="bi bi-telephone me-2"></i>Contact Information
+                                        <i class="bi bi-telephone me-2"></i>{{ __('institute.contact_information') }}
                                     </h5>
                                     <div class="row g-3">
 
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-phone me-1"></i>Admin Email
+                                                <i class="bi bi-phone me-1"></i>{{ __('institute.admin_email') }}
                                                 <span class="text-danger">*</span>
                                             </label>
                                             <input type="text" name="email" value="{{ $institute->email }}" class="form-control " required>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-phone me-1"></i>Password (leave blank to keep current)
+                                                <i class="bi bi-phone me-1"></i>{{ __('institute.password') }} ({{ __('institute.leave_blank_to_keep_current') }})
                                             </label>
                                             <input type="text" name="plan_password" class="form-control ">
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-semibold">
-                                                <i class="bi bi-phone me-1"></i>Phone Number
+                                                <i class="bi bi-phone me-1"></i>{{ __('institute.phone_number') }}
                                                 <span class="text-danger">*</span>
                                             </label>
                                             <input type="text" name="phone" value="{{ $institute->phone }}" class="form-control " required>
@@ -188,7 +166,7 @@
 
                 <div class="d-flex justify-content-start gap-3">
                     <button type="submit" class="btn btn-lg btn-primary shadow-sm">
-                        <i class="bi bi-check-circle me-2"></i>Update Institute
+                        <i class="bi bi-check-circle me-2"></i>{{ __('institute.update_institute') }}
                     </button>
                 </div>
             </form>
@@ -196,19 +174,23 @@
         </div>
     </div>
 
-    {{-- jQuery + SweetAlert --}}
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
         $(document).ready(function(){
 
+            const fieldLabels = {
+                name: '{{ __("institute.institute_name") }}',
+                code: '{{ __("institute.institute_code") }}',
+                type: '{{ __("institute.institute_type") }}',
+                email: '{{ __("institute.admin_email") }}',
+                phone: '{{ __("institute.phone_number") }}',
+            };
+
             $('#editForm').submit(function(e){
                 e.preventDefault();
 
-                // ------------------------------
-                // FRONTEND JS VALIDATION
-                // ------------------------------
                 let requiredFields = ['name','code','type','email','phone'];
                 let hasError = false;
 
@@ -218,18 +200,15 @@
                         hasError = true;
                         Swal.fire({
                             icon: 'error',
-                            title: 'Validation Error',
-                            text: `${field.replace('_',' ').toUpperCase()} is required`
+                            title: '{{ __("institute.validation_error") }}',
+                            text: (fieldLabels[field] ?? field) + ' {{ __("institute.is_required") }}'
                         });
-                        return false; // break loop
+                        return false;
                     }
                 });
 
                 if(hasError) return;
 
-                // ------------------------------
-                // AJAX SUBMIT
-                // ------------------------------
                 let formData = new FormData(this);
 
                 $.ajax({
@@ -242,7 +221,7 @@
                     success: function(response){
                         Swal.fire({
                             icon: 'success',
-                            title: 'Success!',
+                            title: '{{ __("institute.success") }}',
                             text: response.message
                         }).then(() => {
                             window.location.href = response.redirect;
@@ -257,14 +236,14 @@
                             });
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Validation Error',
+                                title: '{{ __("institute.validation_error") }}',
                                 html: messages
                             });
                         } else {
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Error Occurred',
-                                text: 'Something went wrong!'
+                                title: '{{ __("institute.error_occurred") }}',
+                                text: '{{ __("institute.something_went_wrong") }}'
                             });
                         }
                     }

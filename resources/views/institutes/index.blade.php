@@ -6,7 +6,9 @@
 
             <div class="row mb-3">
                 <div class="col-12">
-                    <a href="{{ route('institutes.create') }}" class="btn btn-primary">Add Institute</a>
+                    <a href="{{ route('institutes.create') }}" class="btn btn-primary">
+                        {{ __('institute.add_institute') }}
+                    </a>
                 </div>
             </div>
 
@@ -18,14 +20,14 @@
                                 <table id="example" class="display" style="min-width: 845px">
                                     <thead>
                                     <tr>
-                                        <th>#</th>
-                                        <th>Name</th>
-                                        <th>Code</th>
-                                        <th>Type</th>
-                                        <th>City</th>
-                                        <th>Phone</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
+                                        <th>{{ __('institute.table_no') }}</th>
+                                        <th>{{ __('institute.name') }}</th>
+                                        <th>{{ __('institute.code') }}</th>
+                                        <th>{{ __('institute.type') }}</th>
+                                        <th>{{ __('institute.city') }}</th>
+                                        <th>{{ __('institute.phone') }}</th>
+                                        <th>{{ __('institute.status') }}</th>
+                                        <th>{{ __('institute.action') }}</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -37,7 +39,9 @@
                                             <td>{{ ucfirst($institute->type) }}</td>
                                             <td>{{ $institute->city }}</td>
                                             <td>{{ $institute->phone }}</td>
-                                            <td>{{ $institute->is_active ? 'Active' : 'Inactive' }}</td>
+                                            <td>
+                                                {{ $institute->is_active ? __('institute.active') : __('institute.inactive') }}
+                                            </td>
                                             <td>
                                                 <a href="{{ route('institutes.edit', $institute->id) }}" class="btn btn-xs sharp btn-primary">
                                                     <i class="fa fa-pencil"></i>
@@ -65,6 +69,7 @@
 
         </div>
     </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const deleteButtons = document.querySelectorAll('.deleteBtn');
@@ -74,13 +79,13 @@
                     let form = this.closest('form');
 
                     Swal.fire({
-                        title: 'Are you sure?',
-                        text: "You won't be able to revert this!",
+                        title: "{{ __('institute.are_you_sure') }}",
+                        text: "{{ __('institute.delete_warning') }}",
                         icon: 'warning',
                         showCancelButton: true,
                         confirmButtonColor: '#3085d6',
                         cancelButtonColor: '#d33',
-                        confirmButtonText: 'Yes, delete it!'
+                        confirmButtonText: "{{ __('institute.yes_delete') }}"
                     }).then((result) => {
                         if (result.isConfirmed) {
                             form.submit();
@@ -92,4 +97,3 @@
     </script>
 
 @endsection
-

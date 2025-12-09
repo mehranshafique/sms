@@ -12,25 +12,20 @@
                         <form action="{{ route('permissions.store') }}" method="POST">
                             @csrf
                             <div class="modal-header">
-                                <h5 class="modal-title">Add Permission</h5>
+                                <h5 class="modal-title">{{ __('modules.add_permission') }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
 
                             <div class="modal-body">
-
-
                                 <div class="form-group mb-3">
-                                    <label>Permission Name</label>
+                                    <label>{{ __('modules.permission_name') }}</label>
                                     <input type="text" name="name" class="form-control" required>
                                 </div>
-                                <div class="form-group mb-3">
-{{--                                    <label>Module ID</label>--}}
-                                    <input type="hidden" name="module_id" value="{{ $module->id  }}" class="form-control" required>
-                                </div>
+                                <input type="hidden" name="module_id" value="{{ $module->id  }}">
                             </div>
 
                             <div class="modal-footer">
-                                <button class="btn btn-primary">Save</button>
+                                <button class="btn btn-primary">{{ __('modules.add_permission_button') }}</button>
                             </div>
 
                         </form>
@@ -49,24 +44,20 @@
                             <input type="hidden" id="editPermissionId">
 
                             <div class="modal-header">
-                                <h5 class="modal-title">Edit Permission</h5>
+                                <h5 class="modal-title">{{ __('modules.edit_permission') }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
 
                             <div class="modal-body">
+                                <input type="hidden" value="{{ $module->id  }}" name="module_id">
                                 <div class="form-group mb-3">
-                                    <label>Module</label>
-                                    <input type="hidden" value="{{ $module->id  }}" name="module_id">
-                                </div>
-
-                                <div class="form-group mb-3">
-                                    <label>Permission Name</label>
+                                    <label>{{ __('modules.permission_name') }}</label>
                                     <input type="text" name="name" id="editPermissionName" class="form-control" required>
                                 </div>
                             </div>
 
                             <div class="modal-footer">
-                                <button class="btn btn-primary">Update</button>
+                                <button class="btn btn-primary">{{ __('modules.update_permission_button') }}</button>
                             </div>
 
                         </form>
@@ -79,13 +70,11 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <h4>{{ $module->name }}</h4>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPermissionModal">
-                            Add Permission
+                            {{ __('modules.add_permission_button') }}
                         </button>
                     </div>
                 </div>
             </div>
-
-
 
             <!-- Permissions Table -->
             <div class="row">
@@ -97,9 +86,9 @@
                                     <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Permission Name</th>
-                                        <th>Module</th>
-                                        <th width="150">Action</th>
+                                        <th>{{ __('modules.permission_name') }}</th>
+                                        <th>{{ __('modules.module_name') }}</th>
+                                        <th>{{ __('modules.actions') }}</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -117,14 +106,14 @@
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#editPermissionModal"
                                                 >
-                                                    <i class="fa fa-pencil"></i>
+                                                    <i class="fa fa-pencil"></i> {{ __('modules.edit_button') }}
                                                 </button>
 
                                                 <form action="{{ route('permissions.destroy', $permission->id) }}" method="POST" class="d-inline delete-form">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button class="btn btn-xs sharp btn-danger delete-btn" type="button">
-                                                        <i class="fa fa-trash"></i>
+                                                        <i class="fa fa-trash"></i> {{ __('modules.delete_button') }}
                                                     </button>
                                                 </form>
                                             </td>
@@ -161,12 +150,12 @@
         $(document).on('click', '.delete-btn', function () {
             let form = $(this).closest('form');
             Swal.fire({
-                title: 'Are you sure?',
-                text: "This permission will be deleted!",
+                title: '{{ __("modules.delete_confirmation_title") }}',
+                text: '{{ __("modules.delete_permission_text") }}',
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Yes, delete!',
-                cancelButtonText: 'Cancel'
+                confirmButtonText: '{{ __("modules.delete_confirm_button") }}',
+                cancelButtonText: '{{ __("modules.delete_cancel_button") }}'
             }).then((result) => {
                 if (result.isConfirmed) {
                     form.submit();

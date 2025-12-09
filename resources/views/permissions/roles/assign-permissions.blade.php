@@ -4,23 +4,13 @@
     <div class="content-body">
         <div class="container-fluid">
 
-{{--            <div class="row mb-3">--}}
-{{--                <div class="col-12">--}}
-{{--                    <h4>Assign Permissions to Role: <strong>{{ $role->name }}</strong></h4>--}}
-{{--                </div>--}}
-{{--            </div>--}}
-
             <div class="row page-titles mx-0 py-4">
                 <div class="col-sm-6 p-md-0 ">
                     <div class="d-flex align-items-center">
-{{--                        <div class="bg-white rounded-circle p-2 me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">--}}
-{{--                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">--}}
-{{--                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>--}}
-{{--                                <polyline points="9 22 9 12 15 12 15 22"></polyline>--}}
-{{--                            </svg>--}}
-{{--                        </div>--}}
                         <div>
-                            <h5 class="mb-0 fw-bold text-black">Assign Permissions to Role: <strong>{{ $role->name }}</strong></h5>
+                            <h5 class="mb-0 fw-bold text-black">
+                                {{ __('role.assign_permissions_to_role') }}: <strong>{{ $role->name }}</strong>
+                            </h5>
                         </div>
                     </div>
                 </div>
@@ -49,7 +39,7 @@
                                                         {{ in_array($permission->id, $rolePermissions) ? 'checked' : '' }}
                                                     >
                                                     <label class="form-check-label" for="perm-{{ $permission->id }}">
-                                                        {{ explode('.', $permission->name)[1]; }}
+                                                        {{ explode('.', $permission->name)[1] }}
                                                     </label>
                                                 </div>
                                             </div>
@@ -63,8 +53,8 @@
 
                 <div class="row mt-3">
                     <div class="col-12">
-                        <button class="btn btn-success">Assign Permissions</button>
-                        <a href="{{ route('roles.index') }}" class="btn btn-secondary">Back</a>
+                        <button class="btn btn-success">{{ __('role.assign_permissions') }}</button>
+                        <a href="{{ route('roles.index') }}" class="btn btn-secondary">{{ __('role.back') }}</a>
                     </div>
                 </div>
             </form>

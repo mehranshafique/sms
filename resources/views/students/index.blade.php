@@ -5,7 +5,7 @@
         <div class="container-fluid">
             <div class="row mb-3">
                 <div class="col-12">
-                    <a href="{{ route('students.create') }}" class="btn btn-primary">Add Student</a>
+                    <a href="{{ route('students.create') }}" class="btn btn-primary">{{ __('students.add_student') }}</a>
                 </div>
             </div>
 
@@ -18,13 +18,13 @@
                                     <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Institute</th>
-                                        <th>Registration No</th>
-                                        <th>Name</th>
-                                        <th>Gender</th>
-                                        <th>DOB</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
+                                        <th>{{ __('students.institute') }}</th>
+                                        <th>{{ __('students.registration_no') }}</th>
+                                        <th>{{ __('students.name') }}</th>
+                                        <th>{{ __('students.gender') }}</th>
+                                        <th>{{ __('students.dob') }}</th>
+                                        <th>{{ __('students.status') }}</th>
+                                        <th>{{ __('students.actions') }}</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -39,14 +39,14 @@
                                             <td>{{ ucfirst($student->status) }}</td>
                                             <td>
                                                 <a href="{{ route('students.edit', $student->id) }}" class="btn btn-xs sharp btn-primary">
-                                                    <i class="fa fa-pencil"></i>
+                                                    <i class="fa fa-pencil"></i> {{ __('students.edit') }}
                                                 </a>
 
                                                 <form action="{{ route('students.destroy', $student->id) }}" method="POST" class="d-inline deleteForm">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="button" class="btn btn-xs sharp btn-danger deleteBtn">
-                                                        <i class="fa fa-trash"></i>
+                                                        <i class="fa fa-trash"></i> {{ __('students.delete') }}
                                                     </button>
                                                 </form>
                                             </td>
@@ -55,7 +55,7 @@
                                     </tbody>
                                 </table>
 
-{{--                                {{ $students->links() }}--}}
+                                {{--                            {{ $students->links() }}--}}
                             </div>
                         </div>
                     </div>
@@ -64,22 +64,24 @@
         </div>
     </div>
 
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('.deleteBtn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        let form = this.closest('form');
-                        Swal.fire({
-                            title: 'Are you sure?',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonText: 'Yes, delete it!'
-                        }).then(result => {
-                            if (result.isConfirmed) form.submit();
-                        });
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.deleteBtn').forEach(button => {
+                button.addEventListener('click', function() {
+                    let form = this.closest('form');
+                    Swal.fire({
+                        title: '{{ __("students.delete_confirmation_title") }}',
+                        text: '{{ __("students.delete_confirmation_text") }}',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: '{{ __("students.delete_confirm_button") }}',
+                        cancelButtonText: '{{ __("students.delete_cancel_button") }}'
+                    }).then(result => {
+                        if (result.isConfirmed) form.submit();
                     });
                 });
             });
-        </script>
+        });
+    </script>
 
 @endsection

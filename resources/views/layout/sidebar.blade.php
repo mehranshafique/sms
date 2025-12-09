@@ -14,7 +14,7 @@
             </li>
 
             @can('students.view')
-                <li class="{{ isActive(['students.index','students.create','students.create']) }}">
+                <li class="{{ isActive(['students.index','students.create','students.create','students.edit']) }}">
                     <a class="ai-icon {{ isActive('students.index') }}"
                        href="{{ route('students.index') }}" aria-expanded="false">
                         <i class="la la-user-graduate"></i>

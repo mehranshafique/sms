@@ -2,18 +2,7 @@
 
 @section('content')
     <style>
-        input, select { height: 48px !important; }
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
         .card { overflow: hidden; }
-        .form-control, .form-select {
-            border: 2px solid #e0e7ff;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-        }
-        .form-control:hover, .form-select:hover { border-color: #667eea; }
         .text-primary { color: #667eea !important; }
     </style>
 
@@ -22,13 +11,12 @@
             <div class="row page-titles mx-0">
                 <div class="col-sm-6 p-md-0">
                     <div class="d-flex align-items-center">
-                        <div class="bg-white rounded-circle p-2 me-3"
-                             style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
-                            <i class="fa fa-user-edit text-primary" style="font-size: 24px;"></i>
+                        <div class="bg-white rounded-circle p-2 me-3" style="width:50px;height:50px;display:flex;align-items:center;justify-content:center;">
+                            <i class="fa fa-user-edit text-primary" style="font-size:24px;"></i>
                         </div>
                         <div>
-                            <h3 class="mb-0 fw-bold">Edit Student</h3>
-                            <small class="text-black">Update student information</small>
+                            <h3 class="mb-0 fw-bold">{{ __('students.edit_student_title') }}</h3>
+                            <small class="text-black">{{ __('students.edit_student_subtitle') }}</small>
                         </div>
                     </div>
                 </div>
@@ -44,48 +32,43 @@
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                    <i class="bi bi-person me-2"></i>Personal Details
+                                    <i class="bi bi-person me-2"></i>{{ __('students.personal_details') }}
                                 </h5>
 
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">First Name <span class="text-danger">*</span></label>
-                                        <input type="text" name="first_name" class="form-control"
-                                               value="{{ $student->first_name }}">
+                                        <label class="form-label fw-semibold">{{ __('students.first_name') }} <span class="text-danger">*</span></label>
+                                        <input type="text" name="first_name" class="form-control" value="{{ $student->first_name }}">
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Last Name <span class="text-danger">*</span></label>
-                                        <input type="text" name="last_name" class="form-control"
-                                               value="{{ $student->last_name }}">
+                                        <label class="form-label fw-semibold">{{ __('students.last_name') }} <span class="text-danger">*</span></label>
+                                        <input type="text" name="last_name" class="form-control" value="{{ $student->last_name }}">
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Gender <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-semibold">{{ __('students.gender') }} <span class="text-danger">*</span></label>
                                         <select name="gender" class="form-select required single-select-placeholder">
-                                            <option value="male" {{ $student->gender == 'male' ? 'selected' : '' }}>Male</option>
-                                            <option value="female" {{ $student->gender == 'female' ? 'selected' : '' }}>Female</option>
-                                            <option value="other" {{ $student->gender == 'other' ? 'selected' : '' }}>Other</option>
+                                            <option value="male" {{ $student->gender == 'male' ? 'selected' : '' }}>{{ __('students.male') }}</option>
+                                            <option value="female" {{ $student->gender == 'female' ? 'selected' : '' }}>{{ __('students.female') }}</option>
+                                            <option value="other" {{ $student->gender == 'other' ? 'selected' : '' }}>{{ __('students.other') }}</option>
                                         </select>
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Date of Birth</label>
-                                        <input type="text" name="date_of_birth" id="mdate"
-                                               class="form-control"
-                                               value="{{ $student->date_of_birth }}">
+                                        <label class="form-label fw-semibold">{{ __('students.date_of_birth') }}</label>
+                                        <input type="text" name="date_of_birth" id="mdate" class="form-control" value="{{ $student->date_of_birth }}">
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">Status <span class="text-danger">*</span></label>
+                                        <label class="form-label fw-semibold">{{ __('students.status') }} <span class="text-danger">*</span></label>
                                         <select name="status" class="form-select required single-select-placeholder">
-                                            <option value="active" {{ $student->status == 'active' ? 'selected' : '' }}>Active</option>
-                                            <option value="transferred" {{ $student->status == 'transferred' ? 'selected' : '' }}>Transferred</option>
-                                            <option value="withdrawn" {{ $student->status == 'withdrawn' ? 'selected' : '' }}>Withdrawn</option>
-                                            <option value="graduated" {{ $student->status == 'graduated' ? 'selected' : '' }}>Graduated</option>
+                                            <option value="active" {{ $student->status == 'active' ? 'selected' : '' }}>{{ __('students.active') }}</option>
+                                            <option value="transferred" {{ $student->status == 'transferred' ? 'selected' : '' }}>{{ __('students.transferred') }}</option>
+                                            <option value="withdrawn" {{ $student->status == 'withdrawn' ? 'selected' : '' }}>{{ __('students.withdrawn') }}</option>
+                                            <option value="graduated" {{ $student->status == 'graduated' ? 'selected' : '' }}>{{ __('students.graduated') }}</option>
                                         </select>
                                     </div>
-
                                 </div>
                             </div>
                         </div>
@@ -98,29 +81,25 @@
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                    <i class="bi bi-card-list me-2"></i>Optional Details
+                                    <i class="bi bi-card-list me-2"></i>{{ __('students.optional_details') }}
                                 </h5>
 
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">National ID</label>
-                                        <input type="text" name="national_id" class="form-control"
-                                               value="{{ $student->national_id }}">
+                                        <label class="form-label fw-semibold">{{ __('students.national_id') }}</label>
+                                        <input type="text" name="national_id" class="form-control" value="{{ $student->national_id }}">
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">NFC Tag UID</label>
-                                        <input type="text" name="nfc_tag_uid" class="form-control"
-                                               value="{{ $student->nfc_tag_uid }}">
+                                        <label class="form-label fw-semibold">{{ __('students.nfc_tag_uid') }}</label>
+                                        <input type="text" name="nfc_tag_uid" class="form-control" value="{{ $student->nfc_tag_uid }}">
                                     </div>
 
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold">QR Code Token</label>
-                                        <input type="text" name="qr_code_token" class="form-control"
-                                               value="{{ $student->qr_code_token }}">
+                                        <label class="form-label fw-semibold">{{ __('students.qr_code_token') }}</label>
+                                        <input type="text" name="qr_code_token" class="form-control" value="{{ $student->qr_code_token }}">
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>
@@ -129,7 +108,7 @@
                 <!-- Button -->
                 <div class="d-flex justify-content-start gap-3 mt-3">
                     <button type="submit" class="btn btn-lg btn-primary">
-                        <i class="bi bi-check-circle me-2"></i>Update Student
+                        <i class="bi bi-check-circle me-2"></i>{{ __('students.update_student_button') }}
                     </button>
                 </div>
 
@@ -139,14 +118,9 @@
 
     <script>
         $(document).ready(function(){
-
             $('#editForm').submit(function(e){
                 e.preventDefault();
-
-                let hasError = false;
-
                 $('.invalid-class').removeClass('invalid-class');
-
 
                 let formData = new FormData(this);
 
@@ -160,7 +134,7 @@
                     success: function(response){
                         Swal.fire({
                             icon: 'success',
-                            title: 'Updated!',
+                            title: '{{ __("students.updated_title") }}',
                             text: response.message
                         }).then(() => {
                             window.location.href = response.redirect;
@@ -172,30 +146,26 @@
                             $.each(errors, function(key, value){
                                 $(`[name="${key}"]`).addClass('invalid-class');
                             });
-
                             let messages = '';
                             $.each(errors, function(k, v){
                                 messages += v.join('<br>') + '<br>';
                             });
-
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Validation Error',
+                                title: '{{ __("students.validation_error_title") }}',
                                 html: messages
                             });
                         } else {
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Error',
-                                text: 'Something went wrong!'
+                                title: '{{ __("students.error_title") }}',
+                                text: '{{ __("students.something_went_wrong") }}'
                             });
                         }
                     }
                 });
 
             });
-
         });
     </script>
-
 @endsection
