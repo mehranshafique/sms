@@ -27,7 +27,8 @@
                 <li class="{{ isActive(['staff.index','staff.create','staff.edit']) }}">
                     <a class="ai-icon {{ isActive('staff.index') }}"
                        href="{{ route('staff.index') }}" aria-expanded="false">
-                        <i class="la la-user-tie"></i>
+                        <i class="la la-globe" aria-hidden="true" title="Website"></i>
+
                         <span class="nav-text">{{ __('sidebar.staff.title') }}</span>
                     </a>
                 </li>

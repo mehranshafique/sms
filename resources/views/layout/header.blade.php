@@ -62,6 +62,17 @@
         .select2-selection__arrow{
             margin: 4px !important;
         }
+
+        .word-icon {
+            margin-top: 0px;
+            padding: 6px;
+            font-size: 22px;
+        }
+        .language-select {
+            width: 140px;
+            padding-left: 30px;
+            
+        }
     </style>
 </head>
 <body>
@@ -135,24 +146,24 @@
                         </div>
 
                         <ul class="navbar-nav header-right">
-{{--                            <li class="nav-item dropdown notification_dropdown">--}}
-{{--                                <a class="nav-link bell dlab-theme-mode p-0" href="javascript:void(0);">--}}
-{{--									<i id="icon-light" class="fas fa-sun"></i>--}}
-{{--                                    <i id="icon-dark" class="fas fa-moon"></i>--}}
-{{--                                </a>--}}
-{{--							</li>--}}
-							{{-- <li class="nav-item dropdown notification_dropdown">
-                                <a class="nav-link bell-link " href="javascript:void(0);">
-								<svg xmlns="http://www.w3.org/2000/svg" width="24" height="22.871" viewBox="0 0 24 22.871">
-								  <g  data-name="Layer 2" transform="translate(-2 -2)">
-									<path id="Path_9" data-name="Path 9" d="M23.268,2H4.73A2.733,2.733,0,0,0,2,4.73V17.471A2.733,2.733,0,0,0,4.73,20.2a.911.911,0,0,1,.91.91v1.94a1.82,1.82,0,0,0,2.83,1.514l6.317-4.212a.9.9,0,0,1,.5-.153h4.436a2.742,2.742,0,0,0,2.633-2L25.9,5.462A2.735,2.735,0,0,0,23.268,2Zm.879,2.978-3.539,12.74a.915.915,0,0,1-.88.663H15.292a2.718,2.718,0,0,0-1.514.459L7.46,23.051v-1.94a2.733,2.733,0,0,0-2.73-2.73.911.911,0,0,1-.91-.91V4.73a.911.911,0,0,1,.91-.91H23.268a.914.914,0,0,1,.879,1.158Z" transform="translate(0 0)"/>
-									<path id="Path_10" data-name="Path 10" d="M7.91,10.82h4.55a.91.91,0,1,0,0-1.82H7.91a.91.91,0,1,0,0,1.82Z" transform="translate(-0.45 -0.63)"/>
-									<path id="Path_11" data-name="Path 11" d="M16.1,13H7.91a.91.91,0,1,0,0,1.82H16.1a.91.91,0,1,0,0-1.82Z" transform="translate(-0.45 -0.99)"/>
-								  </g>
-								</svg>
-									<span class="badge light text-white bg-primary rounded-circle">76</span>
-                                </a>
-							</li> --}}
+                            
+							<li class="nav-item dropdown notification_dropdown">
+                               <form action="{{ url('/change-language') }}" method="GET">
+                                    <div class="d-flex position-relative">
+                                        <i class="text-muted fas fa-globe word-icon position-absolute"></i>
+                                        <select name="language" onchange="this.form.submit()" class="form-control form-control-sm language-select" style="width: 140px;">
+                                            <option value="en" {{ app()->getLocale() === 'en' ? 'selected' : '' }}>English</option>
+                                            <option value="fr" {{ app()->getLocale() === 'fr' ? 'selected' : '' }}>Français</option>
+                                        </select>
+                                    </div>
+                                </form>
+							</li>
+                            <li class="nav-item dropdown notification_dropdown">
+                               <a class="nav-link bell dlab-theme-mode p-0" href="javascript:void(0);">
+									<i id="icon-light" class="fas fa-sun"></i>
+                                   <i id="icon-dark" class="fas fa-moon"></i>
+                               </a>
+							</li>
                             {{-- <li class="nav-item dropdown notification_dropdown">
                                 <a class="nav-link bell ai-icon" href="javascript:void(0);" role="button" data-bs-toggle="dropdown">
                                     <svg id="icon-user" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-bell">

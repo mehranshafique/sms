@@ -14,6 +14,16 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\AcademicSessionController;
 Route::redirect('/','/login' );
 
+Route::get('/change-language', function (\Illuminate\Http\Request $request) {
+
+    $locale = $request->query('language');
+    
+    if (!in_array($locale, ['en', 'fr'])) abort(400);
+    app()->setLocale($locale);
+    session(['locale' => $locale]);
+    return redirect()->back();
+});
+
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
