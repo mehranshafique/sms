@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'page_title' => 'Student Management',
+    'messages' => [
+        'success_create' => 'Student created successfully.',
+        'success_update' => 'Student updated successfully.',
+        'success_delete' => 'Student deleted successfully.',
+        'error_create' => 'An error occurred while creating student. Please try again or contact support.',
+        'error_update' => 'An error occurred while updating student. Please try again or contact support.',
+    ],
     'add_student' => 'Add Student',
     'registration_no' => 'Registration No',
     'name' => 'Name',

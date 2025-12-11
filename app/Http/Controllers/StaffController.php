@@ -16,11 +16,12 @@ class StaffController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
-        $this->setPageTitle('Staff');
+        $this->setPageTitle(__('staff.page_title'));
     }
 
     public function index()
     {
+        authorize('staff.view');
         $institute_id = institute()->id; // your helper like institute()
         $staff = Staff::with(['user', 'institute'])
             ->where('institute_id', $institute_id)
@@ -31,7 +32,8 @@ class StaffController extends BaseController
 
     public function create()
     {
-        $this->setPageTitle('Add Staff');
+        authorize('staff.create');
+        $this->setPageTitle(__('staff.create_page_title'));
 
 //        $users = User::doesntHave('staff')->get();
 
@@ -40,6 +42,7 @@ class StaffController extends BaseController
 
     public function store(Request $request)
     {
+        authorize('staff.create');
         $request->merge([
             // Normalize campus_id if you use helper like campus()->id
             // 'campus_id' => $request->campus_id ?? campus()->id,
@@ -117,7 +120,7 @@ class StaffController extends BaseController
             DB::commit();
 
             return response()->json([
-                'message' => 'Staff created successfully',
+                'message' => __('staff.messages.success_create'),
                 'redirect' => route('staff.index'),
                 // Do NOT return passwordPlain in production responses.
             ]);
@@ -130,7 +133,7 @@ class StaffController extends BaseController
             ]);
 
             return response()->json([
-                'message' => 'An error occurred while creating staff. Please try again or contact support.'
+                'message' => __('staff.messages.error_create')
             ], 500);
         }
     }
@@ -138,6 +141,8 @@ class StaffController extends BaseController
 
     public function edit(Staff $staff)
     {
+        authorize('staff.edit');
+        $this->setPageTitle(__('staff.edit_page_title'));
         $user = User::find($staff->user_id);
         $user->role_name = '';
         if(isset($user->roles->pluck('name')->toArray()[0])){
@@ -149,6 +154,7 @@ class StaffController extends BaseController
 
     public function update(Request $request, Staff $staff)
     {
+        authorize('staff.edit');
         $rules = [
             'user_id'    => 'nullable|exists:users,id',
             'name'       => 'required_without:user_id|string|max:255',
@@ -215,7 +221,7 @@ class StaffController extends BaseController
             DB::commit();
 
             return response()->json([
-                'message' => 'Staff updated successfully',
+                'message' => __('staff.messages.success_update'),
                 'redirect' => route('staff.index'),
             ]);
         } catch (\Exception $e) {
@@ -226,14 +232,15 @@ class StaffController extends BaseController
             ]);
 
             return response()->json([
-                'message' => 'An error occurred while updating staff. Please try again or contact support.'
+                'message' => __('staff.messages.error_update')
             ], 500);
         }
     }
 
     public function destroy(Staff $staff)
     {
+        authorize('staff.delete');
         $staff->delete();
-        return back()->with('success', 'Staff deleted successfully');
+        return back()->with('success', __('staff.messages.success_delete'));
     }
 }

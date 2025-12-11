@@ -3,6 +3,12 @@
 
 return [
 
+    'page_title' => 'Head Officers',
+    'messages' => [
+        'created' => 'Head Officer created successfully!',
+        'updated' => 'Head Officer updated successfully!',
+        'deleted' => 'Head Officer deleted successfully!',
+    ],
     // Table
     'name' => 'Name',
     'email' => 'Email',

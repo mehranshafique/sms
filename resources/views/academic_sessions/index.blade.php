@@ -8,7 +8,9 @@
                 <div class="alert alert-success">{{ session('success') }}</div>
             @endif
 
-            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addSessionModal">Add Academic Session</button>
+            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#addSessionModal">
+                @lang('academic_session.index.add_session')
+            </button>
 
             <div class="row">
                 <div class="col-12">
@@ -18,12 +20,12 @@
                                 <table id="example" class="display" style="min-width: 845px">
                                     <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Start Year</th>
-                                        <th>End Year</th>
-                                        <th>Status</th>
-                                        <th>Current</th>
-                                        <th>Actions</th>
+                                        <th>@lang('academic_session.index.name')</th>
+                                        <th>@lang('academic_session.index.start_year')</th>
+                                        <th>@lang('academic_session.index.end_year')</th>
+                                        <th>@lang('academic_session.index.status')</th>
+                                        <th>@lang('academic_session.index.current')</th>
+                                        <th>@lang('academic_session.index.actions')</th>
                                     </tr>
                                     </thead>
 
@@ -36,9 +38,9 @@
                                             <td>{{ ucfirst($session->status) }}</td>
                                             <td>
                                                 @if($session->is_current)
-                                                    <span class="badge bg-success">Yes</span>
+                                                    <span class="badge bg-success">@lang('academic_session.index.yes')</span>
                                                 @else
-                                                    <span class="badge bg-secondary">No</span>
+                                                    <span class="badge bg-secondary">@lang('academic_session.index.no')</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -74,32 +76,38 @@
                     <form action="{{ route('academic-sessions.store') }}" method="POST" class="modal-content">
                         @csrf
                         <div class="modal-header">
-                            <h5 class="modal-title">Add Academic Session</h5>
+                            <h5 class="modal-title">@lang('academic_session.create.title')</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
 
                         <div class="modal-body">
 
-                            <input type="text" name="name" class="form-control mb-2" placeholder="Session Name (e.g. 2025-2026)" required>
+                            <input type="text" name="name" class="form-control mb-2"
+                                   placeholder="@lang('academic_session.create.name_placeholder')" required>
 
-                            <input type="number" name="start_year" class="form-control mb-2" placeholder="Start Year" required>
+                            <input type="number" name="start_year" class="form-control mb-2"
+                                   placeholder="@lang('academic_session.create.start_year')" required>
 
-                            <input type="number" name="end_year" class="form-control mb-2" placeholder="End Year" required>
+                            <input type="number" name="end_year" class="form-control mb-2"
+                                   placeholder="@lang('academic_session.create.end_year')" required>
 
                             <select name="status" class="form-control mb-2">
-                                <option value="planned">Planned</option>
-                                <option value="active">Active</option>
-                                <option value="closed">Closed</option>
+                                <option value="planned">@lang('academic_session.status.planned')</option>
+                                <option value="active">@lang('academic_session.status.active')</option>
+                                <option value="closed">@lang('academic_session.status.closed')</option>
                             </select>
 
                             <label class="mt-2">
-                                <input type="checkbox" name="is_current" value="1"> Set as Current Session
+                                <input type="checkbox" name="is_current" value="1">
+                                @lang('academic_session.create.set_current')
                             </label>
 
                         </div>
 
                         <div class="modal-footer">
-                            <button type="submit" class="btn btn-primary">Create Session</button>
+                            <button type="submit" class="btn btn-primary">
+                                @lang('academic_session.create.create_btn')
+                            </button>
                         </div>
 
                     </form>
@@ -114,7 +122,7 @@
                         @method('PUT')
 
                         <div class="modal-header">
-                            <h5 class="modal-title">Edit Academic Session</h5>
+                            <h5 class="modal-title">@lang('academic_session.edit.title')</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
 
@@ -127,19 +135,22 @@
                             <input type="number" name="end_year" id="editEndYear" class="form-control mb-2" required>
 
                             <select name="status" id="editStatus" class="form-control mb-2">
-                                <option value="planned">Planned</option>
-                                <option value="active">Active</option>
-                                <option value="closed">Closed</option>
+                                <option value="planned">@lang('academic_session.status.planned')</option>
+                                <option value="active">@lang('academic_session.status.active')</option>
+                                <option value="closed">@lang('academic_session.status.closed')</option>
                             </select>
 
                             <label class="mt-2">
-                                <input type="checkbox" name="is_current" id="editIsCurrent" value="1"> Set as Current Session
+                                <input type="checkbox" name="is_current" id="editIsCurrent" value="1">
+                                @lang('academic_session.edit.set_current')
                             </label>
 
                         </div>
 
                         <div class="modal-footer">
-                            <button type="submit" class="btn btn-primary">Update Session</button>
+                            <button type="submit" class="btn btn-primary">
+                                @lang('academic_session.edit.update_btn')
+                            </button>
                         </div>
 
                     </form>
@@ -160,12 +171,12 @@
                 let form = $(this).closest('form');
 
                 Swal.fire({
-                    title: 'Are you sure?',
-                    text: "This session will be deleted!",
+                    title: "@lang('academic_session.alert.delete_title')",
+                    text: "@lang('academic_session.alert.delete_text')",
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'Yes, delete!',
-                    cancelButtonText: 'Cancel'
+                    confirmButtonText: "@lang('academic_session.alert.delete_confirm')",
+                    cancelButtonText: "@lang('academic_session.alert.cancel')"
                 }).then((result) => {
                     if (result.isConfirmed) {
                         form.submit();

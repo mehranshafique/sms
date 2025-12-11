@@ -1,6 +1,13 @@
 <?php
 
 return [
+
+    'page_title' => 'Modules',
+    'messages' => [
+        'success_create' => 'Module créé avec succès.',
+        'success_update' => 'Module mis à jour avec succès.',
+        'success_delete' => 'Module supprimé avec succès.',
+    ],
     'add_module' => 'Ajouter un module',
     'edit_module' => 'Modifier le module',
     'module_name' => 'Nom du module',
@@ -24,4 +31,12 @@ return [
     'add_permission_button' => 'Ajouter une permission',
     'update_permission_button' => 'Mettre à jour la permission',
     'delete_permission_text' => 'Cette permission sera supprimée!',
+    'permissions_page_title' => 'Permissions',
+    'permission_messages' => [
+        'success_create' => 'Permission créée avec succès.',
+        'success_update' => 'Permission mise à jour avec succès.',
+        'success_delete' => 'Permission supprimée avec succès.',
+    ],
+    'role_permissions_page_title' => 'Permissions de rôles',
+    'permission_assigned_successfully' => 'Permissions attribuées avec succès.',
 ];

@@ -11,11 +11,12 @@ class AcademicSessionController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->setPageTitle('Academic Sessions');
+        $this->setPageTitle(__('academic_session.page_title'));
     }
 
     public function index()
     {
+        authorize('academic_session.view');
         $sessions = AcademicSession::where('institution_id', institute()->id)
             ->orderBy('start_year', 'desc')
             ->get();
@@ -25,6 +26,7 @@ class AcademicSessionController extends BaseController
 
     public function store(Request $request)
     {
+        authorize('academic_session.create');
         $request->validate([
             'name'        => ['required', Rule::unique('academic_sessions', 'name')->where('institution_id', institute()->id)],
             'start_year'  => 'required|integer|min:2000|max:3000',
@@ -48,16 +50,18 @@ class AcademicSessionController extends BaseController
             'is_current'     => $request->is_current ?? false,
         ]);
 
-        return redirect()->back()->with('success', 'Academic Session created successfully.');
+        return redirect()->back()->with('success', __('academic_session.success_create'));
     }
 
     public function edit(AcademicSession $academic_session)
     {
+        authorize('academic_session.edit');
         return response()->json($academic_session);
     }
 
     public function update(Request $request, AcademicSession $academic_session)
     {
+        authorize('academic_session.edit');
         $request->validate([
             'name'        => ['required', Rule::unique('academic_sessions', 'name')
                 ->ignore($academic_session->id)
@@ -81,12 +85,13 @@ class AcademicSessionController extends BaseController
             'is_current'    => $request->is_current ?? false,
         ]);
 
-        return redirect()->back()->with('success', 'Academic Session updated successfully.');
+        return redirect()->back()->with('success', __('academic_session.success_update'));
     }
 
     public function destroy(AcademicSession $academic_session)
     {
+        authorize('academic_session.delete');
         $academic_session->delete();
-        return redirect()->back()->with('success', 'Academic Session deleted successfully.');
+        return redirect()->back()->with('success', __('academic_session.success_delete'));
     }
 }

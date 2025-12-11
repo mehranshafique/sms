@@ -3,6 +3,7 @@
 
 return [
 
+    'page_title' => 'Responsables principaux',
     // Table
     'name' => 'Nom',
     'email' => 'E-mail',

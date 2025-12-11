@@ -11,17 +11,19 @@ class HeadOfficersController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
-        $this->setPageTitle('Head Officers');
+        $this->setPageTitle(__('head_officers.page_title'));
     }
 
     public function index()
     {
+        authorize('head_officers.view');
         $head_officers = User::where('user_type', 2)->get();
         return view('head_officers.index', compact('head_officers'));
     }
 
     public function store(Request $request)
     {
+        authorize('head_officers.create');
         $validated = $request->validate([
             'name'     => 'required|string|max:150',
             'email'    => 'required|email|unique:users,email',
@@ -41,7 +43,7 @@ class HeadOfficersController extends BaseController
         $user->assignRole('Head Officer');
         return response()->json([
             'status'  => true,
-            'message' => 'Head Officer created successfully!',
+            'message' => __('head_officers.messages.created'),
             'data'    => $user
         ]);
     }
@@ -54,7 +56,7 @@ class HeadOfficersController extends BaseController
 
     public function update(Request $request, $id)
     {
-
+        authorize('head_officers.update');
         $officer = User::findOrFail($id);
 
         $request->validate([
@@ -78,18 +80,19 @@ class HeadOfficersController extends BaseController
 
         return response()->json([
             'status'  => true,
-            'message' => 'Head Officer updated successfully!',
+            'message' => __('head_officers.messages.updated'),
         ]);
     }
 
     public function destroy($id)
     {
+        authorize('head_officers.delete');
         $officer = User::findOrFail($id);
         $officer->delete();
 
         return response()->json([
             'status'  => true,
-            'message' => 'Head Officer deleted successfully!',
+            'message' => __('head_officers.messages.deleted'),
         ]);
     }
 }

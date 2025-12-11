@@ -13,7 +13,7 @@ class RolePermissionController extends BaseController
 {
     public  function __construct(){
         parent::__construct();
-        $this->setPageTitle('Role Permissions');
+        $this->setPageTitle(__('modules.role_permissions_page_title'));
     }
     // Show assignment page
     public function edit(Role $role)
@@ -35,6 +35,6 @@ class RolePermissionController extends BaseController
 
 //        $role->syncPermissions($request->permissions ?? []);
 
-        return redirect()->route('roles.index')->with('success', 'Permissions assigned successfully.');
+        return redirect()->route('roles.index')->with('success', __('modules.permission_messages.permission_assigned_successfully'));
     }
 }

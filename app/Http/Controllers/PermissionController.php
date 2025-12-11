@@ -11,10 +11,11 @@ class PermissionController extends BaseController
 {
     public function __construct(){
         parent::__construct();
-        $this->setPageTitle('Permissions');
+        $this->setPageTitle(__('modules.permissions_page_title'));
     }
     public function index($id)
     {
+        authorize('permissions.view');
         $module = Module::find($id);
         $permissions = Permission::with('module')->where('module_id',$id)->get();
         return view('permissions.permissions.index', compact('permissions','module'));
@@ -22,6 +23,7 @@ class PermissionController extends BaseController
 
     public function store(Request $request)
     {
+        authorize('permissions.create');
         $request->validate([
             'name' => 'required',
             'module_id' => 'required|exists:modules,id'
@@ -34,7 +36,7 @@ class PermissionController extends BaseController
             'guard_name' => 'web'
         ]);
 
-        return redirect()->back()->with('success', 'Permission created successfully.');
+        return redirect()->back()->with('success', __('modules.permission_messages.success_create'));
     }
 
     public function edit(Permission $permission)
@@ -45,6 +47,7 @@ class PermissionController extends BaseController
 
     public function update(Request $request, Permission $permission)
     {
+        authorize('permissions.edit');
         $request->validate([
             'name' => 'required|unique:permissions,name,' . $permission->id,
             'module_id' => 'required|exists:modules,id'
@@ -55,12 +58,13 @@ class PermissionController extends BaseController
             'module_id' => $request->module_id
         ]);
 
-        return redirect()->back()->with('success', 'Permission updated successfully.');
+        return redirect()->back()->with('success', __('modules.permission_messages.success_update'));
     }
 
     public function destroy(Permission $permission)
     {
+        authorize('permissions.delete');
         $permission->delete();
-        return redirect()->back()->with('success', 'Permission deleted successfully.');
+        return redirect()->back()->with('success', __('modules.permission_messages.success_delete'));
     }
 }

@@ -10,16 +10,18 @@ class ModuleController extends BaseController
 {
     public  function __construct(){
         parent::__construct();
-        $this->setPageTitle('Modules');
+        $this->setPageTitle(__('modules.page_title'));
     }
     public function index()
     {
+        authorize('module.view');
         $modules = Module::all();
         return view('permissions.modules.index', compact('modules'));
     }
 
     public function store(Request $request)
     {
+        authorize('module.create');
         $request->validate([
             'name' => 'required|unique:modules,name'
         ]);
@@ -29,7 +31,7 @@ class ModuleController extends BaseController
             'slug' => Str::slug($request->name)
         ]);
 
-        return redirect()->back()->with('success', 'Module created successfully.');
+        return redirect()->back()->with('success', __('modules.messages.success_create'));
     }
 
     public function edit(Module $module)
@@ -39,6 +41,7 @@ class ModuleController extends BaseController
 
     public function update(Request $request, Module $module)
     {
+        authorize('module.edit');
         $request->validate([
             'name' => 'required|unique:modules,name,' . $module->id,
         ]);
@@ -48,12 +51,13 @@ class ModuleController extends BaseController
             'slug' => Str::slug($request->name)
         ]);
 
-        return redirect()->back()->with('success', 'Module updated successfully.');
+        return redirect()->back()->with('success', __('modules.messages.success_update'));
     }
 
     public function destroy(Module $module)
     {
+        authorize('module.delete');
         $module->delete();
-        return redirect()->back()->with('success', 'Module deleted successfully.');
+        return redirect()->back()->with('success', __('modules.messages.success_delete'));
     }
 }

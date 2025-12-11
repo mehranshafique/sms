@@ -10,21 +10,27 @@ use Illuminate\Support\Str;
 
 class InstituteController extends BaseController
 {
+    public function __construct()
+    {
+        $this->setPageTitle(__('institute.page_title'));
+    }
     public function index()
     {
-        $this->setPageTitle('Institutes');
+        authorize('institute.view');
         $institutes = Institute::latest()->paginate(10);
         return view('institutes.index', compact('institutes'));
     }
 
     public function create()
     {
-        $this->setPageTitle('Add Institute');
+        authorize('institute.create');
+        $this->setPageTitle(__('institutes.add_institute'));
         return view('institutes.create');
     }
 
     public function store(Request $request)
     {
+        authorize('institute.create');
         $validator = \Validator::make($request->all(), [
             'name' => 'required|string|max:150',
             'plan_password' => 'required|string|max:150',
@@ -67,19 +73,21 @@ class InstituteController extends BaseController
         // ✅ Return JSON success for AJAX
         return response()->json([
             'status' => 'success',
-            'message' => 'Institute created successfully.',
+            'message' => __('institutes.messages.success_create'),
             'redirect' => route('institutes.index')
         ], 200);
     }
 
     public function edit(Institute $institute)
     {
-        $this->setPageTitle('Edit Institute');
+        authorize('institute.edit');
+        $this->setPageTitle(__('institutes.edit_institute'));
         return view('institutes.edit', compact('institute'));
     }
 
     public function update(Request $request, Institute $institute)
     {
+        authorize('institute.edit');
         $validator = \Validator::make($request->all(), [
             'name' => 'required|string|max:150',
             'email' => 'required|string|email|max:150|unique:institutes,email,' . $institute->id,
@@ -116,15 +124,16 @@ class InstituteController extends BaseController
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Institute updated successfully.',
+            'message' => __('institutes.messages.success_update'),
             'redirect' => route('institutes.index')
         ], 200);
     }
 
     public function destroy(Institute $institute)
     {
+        authorize('institute.delete');
         User::where('institute_id',$institute->id)->delete();
         $institute->delete();
-        return redirect()->route('institutes.index')->with('success', 'Institute deleted successfully.');
+        return redirect()->route('institutes.index')->with('success', __('institutes.messages.success_delete'));
     }
 }

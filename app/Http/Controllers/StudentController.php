@@ -12,23 +12,26 @@ class StudentController extends BaseController
 {
     public function __construct(){
         $this->middleware('auth');
-        $this->setPageTitle('Students');
+        $this->setPageTitle(__('student.page_title'));
     }
     public function index()
     {
+        authorize('students.view');
         $students = Student::with('institute')->where('institute_id', institute()->id)->get();
         return view('students.index', compact('students'));
     }
 
     public function create()
     {
-        $this->setPageTitle('Add Student');
+        authorize('students.create');
+        $this->setPageTitle(__('student.add_student'));
 
         return view('students.create');
     }
 
     public function store(Request $request)
     {
+        authorize('students.create');
         $data = $request->validate([
             'first_name' => 'required|max:100',
             'last_name' => 'required|max:100',
@@ -65,13 +68,14 @@ class StudentController extends BaseController
         $student->save();
 
         return response()->json([
-            'message' => 'Student created successfully',
+            'message' => __('student.messages.success_create'),
             'redirect' => route('students.index')
         ]);
     }
 
     public function edit(Student $student)
     {
+        authorize('students.edit');
         $institutes = Institute::where('is_active',1)->get();
         return view('students.edit', compact('student','institutes'));
     }
@@ -98,6 +102,7 @@ class StudentController extends BaseController
 
     public function update(Request $request, Student $student)
     {
+        authorize('students.edit');
         $data = $request->validate([
             'first_name' => 'required|max:100',
             'last_name' => 'required|max:100',
@@ -122,14 +127,15 @@ class StudentController extends BaseController
         $student->save();
 
         return response()->json([
-            'message' => 'Student updated successfully',
+            'message' => __('student.messages.success_update'),
             'redirect' => route('students.index')
         ]);
     }
 
     public function destroy(Student $student)
     {
+        authorize('students.delete');
         $student->delete();
-        return back()->with('success','Student deleted successfully');
+        return back()->with('success', __('student.messages.success_delete'));
     }
 }

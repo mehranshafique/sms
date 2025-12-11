@@ -7,7 +7,7 @@ use App\Http\Controllers\BaseController;
 class DashboardController extends BaseController
 {
     public function index(){
-        $this->setPageTitle('Dashboard');
+        $this->setPageTitle(__('dashboard.page_title'));
         return view('dashboard.dashboard');
     }
 }

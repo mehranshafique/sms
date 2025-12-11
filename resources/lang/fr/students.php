@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'page_title' => 'Gestion des Étudiants',
+    'messages' => [
+        'success_create' => 'Étudiant créé avec succès.',
+        'success_update' => 'Étudiant mis à jour avec succès.',
+        'success_delete' => 'Étudiant supprimé avec succès.',
+        'error_create' => 'Une erreur est survenue lors de la création de l\'étudiant. Veuillez réessayer ou contacter le support.',
+        'error_update' => 'Une erreur est survenue lors de la mise à jour de l\'étudiant. Veuillez réessayer ou contacter le support.',
+    ],
     'add_student' => 'Ajouter un étudiant',
     'registration_no' => 'Numéro d\'inscription',
     'name' => 'Nom',

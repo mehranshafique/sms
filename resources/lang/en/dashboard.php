@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'page_title' => 'Dashboard',
     'total_students' => 'Total Students',
     'new_students' => 'New Students',
     'total_course' => 'Total Course',

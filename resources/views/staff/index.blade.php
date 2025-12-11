@@ -6,7 +6,9 @@
 
             <div class="row mb-3">
                 <div class="col-12">
-                    <a href="{{ route('staff.create') }}" class="btn btn-primary">Add Staff</a>
+                    <a href="{{ route('staff.create') }}" class="btn btn-primary">
+                        {{ __('staff.index.add') }}
+                    </a>
                 </div>
             </div>
 
@@ -19,15 +21,15 @@
                                 <table id="example" class="display" style="min-width: 845px">
                                     <thead>
                                     <tr>
-                                        <th>#</th>
-                                        <th>Employee No</th>
-                                        <th>User</th>
-                                        <th>Campus</th>
-                                        <th>Designation</th>
-                                        <th>Department</th>
-                                        <th>Hire Date</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
+                                        <th>{{ __('staff.index.table.serial') }}</th>
+                                        <th>{{ __('staff.index.table.employee_no') }}</th>
+                                        <th>{{ __('staff.index.table.user') }}</th>
+                                        <th>{{ __('staff.index.table.campus') }}</th>
+                                        <th>{{ __('staff.index.table.designation') }}</th>
+                                        <th>{{ __('staff.index.table.department') }}</th>
+                                        <th>{{ __('staff.index.table.hire_date') }}</th>
+                                        <th>{{ __('staff.index.table.status') }}</th>
+                                        <th>{{ __('staff.index.table.action') }}</th>
                                     </tr>
                                     </thead>
 
@@ -55,7 +57,8 @@
                                                     @csrf
                                                     @method('DELETE')
 
-                                                    <button type="button" class="btn btn-xs sharp btn-danger deleteBtn">
+                                                    <button type="button"
+                                                            class="btn btn-xs sharp btn-danger deleteBtn">
                                                         <i class="fa fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -83,10 +86,10 @@
                     let form = this.closest('form');
 
                     Swal.fire({
-                        title: 'Are you sure?',
+                        title: '{{ __("staff.index.confirm_delete_title") }}',
                         icon: 'warning',
                         showCancelButton: true,
-                        confirmButtonText: 'Yes, delete it!'
+                        confirmButtonText: '{{ __("staff.index.confirm_delete_button") }}'
                     }).then(result => {
                         if (result.isConfirmed) form.submit();
                     });

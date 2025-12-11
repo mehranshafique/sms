@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'page_title' => 'Tableau de bord',
     'total_students' => 'Nombre total d\'étudiants',
     'new_students' => 'Nouveaux étudiants',
     'total_course' => 'Total des cours',

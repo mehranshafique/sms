@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'page_title' => 'Rôles',
+    'messages' => [
+        'success' => 'Rôle créé avec succès',
+        'updated' => 'Rôle mis à jour avec succès',
+        'deleted' => 'Rôle supprimé avec succès',
+    ],
     // Modals
     'add_role' => 'Ajouter un rôle',
     'edit_role' => 'Modifier le rôle',

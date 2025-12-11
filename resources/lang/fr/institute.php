@@ -2,6 +2,12 @@
 
 
 return [
+    'page_title' => 'Instituts',
+    'messages' => [
+        'success_create' => 'Institut créé avec succès.',
+        'success_update' => 'Institut mis à jour avec succès.',
+        'success_delete' => 'Institut supprimé avec succès.',
+    ],
     'add_institute' => 'Ajouter un institut',
     'table_no' => '#',
     'name' => 'Nom',

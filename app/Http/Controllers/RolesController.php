@@ -10,13 +10,15 @@ class RolesController extends BaseController
 {
     public function index()
     {
-        $this->setPageTitle('Roles');
+        authorize('roles.view');
+        $this->setPageTitle(__('role.page_title'));
         $roles = Role::latest()->get();
         return view('permissions.roles.index', compact('roles'));
     }
 
     public function store(Request $request)
     {
+        authorize('roles.create');
         $validator = Validator::make($request->all(), [
             'name' => 'required|unique:roles,name',
         ]);
@@ -28,13 +30,14 @@ class RolesController extends BaseController
         $role = Role::create(['name' => $request->name]);
 
         return response()->json([
-            'message' => 'Role created successfully',
+            'message' => __('role.messages.success'),
             'data' => $role
         ]);
     }
 
     public function update(Request $request, $id)
     {
+        authorize('roles.edit');
         $validator = Validator::make($request->all(), [
             'name' => 'required|unique:roles,name,' . $id,
         ]);
@@ -47,14 +50,15 @@ class RolesController extends BaseController
         $role->update(['name' => $request->name]);
 
         return response()->json([
-            'message' => 'Role updated successfully',
+            'message' => __('role.messages.updated'),
             'data' => $role
         ]);
     }
 
     public function destroy($id)
     {
+        authorize('roles.delete');
         Role::findOrFail($id)->delete();
-        return redirect()->back()->with('success', 'Role deleted successfully');
+        return redirect()->back()->with('success', __('role.messages.deleted'));
     }
 }
