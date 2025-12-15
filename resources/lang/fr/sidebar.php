@@ -25,7 +25,7 @@ return [
     ],
 
     'header_officers' => [
-        'title' => 'Officiers Principaux',
+        'title' => 'Responsables principaux',
     ],
 
     'permissions' => [

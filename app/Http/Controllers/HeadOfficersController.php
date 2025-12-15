@@ -169,7 +169,7 @@ class HeadOfficersController extends BaseController
 
     public function update(Request $request, $id)
     {
-        authorize('head_officers.update');
+        authorize('head-officers.update');
         $officer = User::findOrFail($id);
 
         $request->validate([
@@ -204,7 +204,7 @@ class HeadOfficersController extends BaseController
 
     public function destroy($id)
     {
-        authorize('head_officers.delete');
+        authorize('head-officers.delete');
         $officer = User::findOrFail($id);
         
         // Delete related staff record first or rely on cascade
