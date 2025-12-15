@@ -24,4 +24,20 @@ class Institute extends Model
     {
         return $this->hasMany(User::class, 'institute_id'); // Assuming users table has institute_id
     }
+
+    /**
+     * Get all staff members for the institute.
+     */
+    public function staff()
+    {
+        return $this->hasMany(Staff::class);
+    }
+
+    /**
+     * Get all students for the institute.
+     */
+    public function students()
+    {
+        return $this->hasMany(Student::class);
+    }
 }

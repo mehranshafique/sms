@@ -1,6 +1,7 @@
 @extends('layout.layout')
 
 @section('styles')
+    {{-- DataTables Buttons & Select CSS --}}
     <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css" rel="stylesheet">
     
@@ -42,18 +43,18 @@
 <div class="content-body">
     <div class="container-fluid">
         
-        {{-- TITLE BAR --}}
+        {{-- TITLE BAR - Removed hardcoded bg-white for Night Mode compatibility --}}
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4>{{ __('academic_session.session_management') }}</h4>
-                    <p class="mb-0">{{ __('academic_session.manage_list_subtitle') }}</p>
+                    <h4>{{ __('campus.campus_management') }}</h4>
+                    <p class="mb-0">{{ __('campus.manage_list_subtitle') }}</p>
                 </div>
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
-                @can('create', App\Models\AcademicSession::class)
-                <a href="{{ route('academic-sessions.create') }}" class="btn btn-primary btn-rounded">
-                    <i class="fa fa-plus me-2"></i> {{ __('academic_session.create_new') }}
+                @can('create', App\Models\Campus::class)
+                <a href="{{ route('campuses.create') }}" class="btn btn-primary btn-rounded">
+                    <i class="fa fa-plus me-2"></i> {{ __('campus.create_new') }}
                 </a>
                 @endcan
             </div>
@@ -61,21 +62,24 @@
 
         {{-- STATS CARDS --}}
         <div class="row">
+            {{-- Total Campuses --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
                         <div class="media ai-icon">
                             <span class="me-3 bgl-primary text-primary">
-                                <i class="la la-calendar"></i>
+                                <i class="la la-building"></i>
                             </span>
                             <div class="media-body">
-                                <p class="mb-1">{{ __('academic_session.total_sessions') }}</p>
-                                <h4 class="mb-0">{{ $totalSessions ?? 0 }}</h4>
+                                <p class="mb-1">{{ __('campus.total_campuses') }}</p>
+                                <h4 class="mb-0">{{ $totalCampuses ?? 0 }}</h4>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {{-- Active Campuses --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
@@ -84,28 +88,15 @@
                                 <i class="la la-check-circle"></i>
                             </span>
                             <div class="media-body">
-                                <p class="mb-1">{{ __('academic_session.active_sessions') }}</p>
-                                <h4 class="mb-0">{{ $activeSessions ?? 0 }}</h4>
+                                <p class="mb-1">{{ __('campus.active_campuses') }}</p>
+                                <h4 class="mb-0">{{ $activeCampuses ?? 0 }}</h4>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
-                <div class="widget-stat card">
-                    <div class="card-body p-4">
-                        <div class="media ai-icon">
-                            <span class="me-3 bgl-info text-info">
-                                <i class="la la-calendar-plus-o"></i>
-                            </span>
-                            <div class="media-body">
-                                <p class="mb-1">{{ __('academic_session.planned_sessions') }}</p>
-                                <h4 class="mb-0">{{ $plannedSessions ?? 0 }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
+            {{-- Inactive Campuses --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
@@ -114,8 +105,25 @@
                                 <i class="la la-times-circle"></i>
                             </span>
                             <div class="media-body">
-                                <p class="mb-1">{{ __('academic_session.closed_sessions') }}</p>
-                                <h4 class="mb-0">{{ $closedSessions ?? 0 }}</h4>
+                                <p class="mb-1">{{ __('campus.inactive') }}</p>
+                                <h4 class="mb-0">{{ $inactiveCampuses ?? 0 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- New This Month --}}
+            <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
+                <div class="widget-stat card">
+                    <div class="card-body p-4">
+                        <div class="media ai-icon">
+                            <span class="me-3 bgl-info text-info">
+                                <i class="la la-calendar-plus-o"></i>
+                            </span>
+                            <div class="media-body">
+                                <p class="mb-1">{{ __('campus.new_this_month') }}</p>
+                                <h4 class="mb-0">{{ $newCampuses ?? 0 }}</h4>
                             </div>
                         </div>
                     </div>
@@ -128,14 +136,14 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 class="card-title">{{ __('academic_session.session_list') }}</h4>
+                        <h4 class="card-title">{{ __('campus.campus_list') }}</h4>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table id="sessionTable" class="display" style="width:100%">
+                            <table id="campusTable" class="display" style="width:100%">
                                 <thead>
                                     <tr>
-                                        @can('deleteAny', App\Models\AcademicSession::class)
+                                        @can('deleteAny', App\Models\Campus::class)
                                         <th style="width: 50px;" class="no-sort">
                                             <div class="form-check custom-checkbox checkbox-primary check-lg me-3">
                                                 <input type="checkbox" class="form-check-input" id="checkAll">
@@ -143,14 +151,14 @@
                                             </div>
                                         </th>
                                         @endcan
-                                        <th>{{ __('academic_session.table_no') }}</th>
-                                        <th>{{ __('academic_session.name') }}</th>
-                                        <th>{{ __('academic_session.institution') }}</th>
-                                        <th>{{ __('academic_session.start_date') }}</th>
-                                        <th>{{ __('academic_session.end_date') }}</th>
-                                        <th>{{ __('academic_session.status') }}</th>
-                                        <th>{{ __('academic_session.is_current') }}</th>
-                                        <th class="text-end no-sort">{{ __('academic_session.action') }}</th>
+                                        <th>{{ __('campus.table_no') }}</th>
+                                        <th>{{ __('campus.name') }}</th>
+                                        <th>{{ __('campus.code') }}</th>
+                                        <th>{{ __('campus.institution') }}</th>
+                                        <th>{{ __('campus.city') }}</th>
+                                        <th>{{ __('campus.phone') }}</th>
+                                        <th>{{ __('campus.status') }}</th>
+                                        <th class="text-end no-sort">{{ __('campus.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -179,16 +187,16 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const table = $('#sessionTable').DataTable({
+        const table = $('#campusTable').DataTable({
             processing: true,
             serverSide: true,
-            ajax: "{{ route('academic-sessions.index') }}",
+            ajax: "{{ route('campuses.index') }}",
             dom: '<"row me-2"<"col-md-2"<"me-3"l>><"col-md-10"<"dt-action-buttons text-xl-end text-lg-start text-md-end text-start d-flex align-items-center justify-content-end flex-md-row flex-column mb-3 mb-md-0"fB>>>t<"row mx-2"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
             buttons: [
                 {
                     extend: 'collection',
                     className: 'btn btn-outline-secondary dropdown-toggle me-2',
-                    text: '<i class="fa fa-download me-1"></i> {{ __("academic_session.export") }}',
+                    text: '<i class="fa fa-download me-1"></i> {{ __("campus.export") }}',
                     buttons: [
                         { extend: 'print', text: '<i class="fa fa-print me-2"></i> Print', className: 'dropdown-item' },
                         { extend: 'csv', text: '<i class="fa fa-file-text-o me-2"></i> CSV', className: 'dropdown-item' },
@@ -197,9 +205,9 @@
                         { extend: 'copy', text: '<i class="fa fa-copy me-2"></i> Copy', className: 'dropdown-item' }
                     ]
                 },
-                @can('deleteAny', App\Models\AcademicSession::class)
+                @can('deleteAny', App\Models\Campus::class)
                 {
-                    text: '<i class="fa fa-trash me-0 me-sm-1"></i><span class="d-none d-sm-inline-block">{{ __("academic_session.bulk_delete") }}</span>',
+                    text: '<i class="fa fa-trash me-0 me-sm-1"></i><span class="d-none d-sm-inline-block">{{ __("campus.bulk_delete") }}</span>',
                     className: 'bulk-delete-btn btn btn-danger',
                     enabled: false,
                     action: function () {
@@ -215,22 +223,22 @@
             ordering: true,
             order: [[1, 'desc']], 
             columns: [
-                @can('deleteAny', App\Models\AcademicSession::class)
+                @can('deleteAny', App\Models\Campus::class)
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endcan
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
                 { data: 'name', name: 'name' },
+                { data: 'code', name: 'code' },
                 { data: 'institution_name', name: 'institution.name' },
-                { data: 'start_date', name: 'start_date' },
-                { data: 'end_date', name: 'end_date' },
-                { data: 'status', name: 'status' },
-                { data: 'is_current', name: 'is_current' },
+                { data: 'city', name: 'city' },
+                { data: 'phone', name: 'phone' },
+                { data: 'is_active', name: 'is_active' },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
             ],
             language: {
                 search: "",
-                searchPlaceholder: "{{ __('academic_session.search_placeholder') }}",
-                emptyTable: "{{ __('academic_session.no_records_found') }}",
+                searchPlaceholder: "{{ __('campus.search_placeholder') }}",
+                emptyTable: "{{ __('campus.no_records_found') }}",
                 processing: '<i class="fa fa-spinner fa-spin fa-2x fa-fw"></i>',
                 lengthMenu: "_MENU_",
                 paginate: { next: '<i class="fa fa-angle-right"></i>', previous: '<i class="fa fa-angle-left"></i>' }
@@ -247,7 +255,7 @@
             updateBulkDeleteState();
         });
 
-        $('#sessionTable').on('change', '.single-checkbox', function() {
+        $('#campusTable').on('change', '.single-checkbox', function() {
             updateBulkDeleteState();
             if ($('.single-checkbox:checked').length === $('.single-checkbox').length) {
                 $('#checkAll').prop('checked', true);
@@ -261,60 +269,53 @@
             const btn = table.button('.bulk-delete-btn');
             if (count > 0) {
                 btn.enable();
-                $(btn.node()).html(`<i class="fa fa-trash me-1"></i> {{ __('academic_session.bulk_delete') }} (${count})`);
+                $(btn.node()).html(`<i class="fa fa-trash me-1"></i> {{ __('campus.bulk_delete') }} (${count})`);
             } else {
                 btn.disable();
-                $(btn.node()).html(`<i class="fa fa-trash me-1"></i> {{ __('academic_session.bulk_delete') }}`);
+                $(btn.node()).html(`<i class="fa fa-trash me-1"></i> {{ __('campus.bulk_delete') }}`);
             }
         }
 
         function handleBulkDelete(ids) {
             if (ids.length === 0) return;
             Swal.fire({
-                title: "{{ __('academic_session.are_you_sure_bulk') }}",
-                text: "{{ __('academic_session.bulk_delete_warning') }}",
+                title: "{{ __('campus.are_you_sure_bulk') }}",
+                text: "{{ __('campus.bulk_delete_warning') }}",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
-                confirmButtonText: "{{ __('academic_session.yes_bulk_delete') }}",
-                cancelButtonText: "{{ __('academic_session.cancel') }}"
+                confirmButtonText: "{{ __('campus.yes_bulk_delete') }}",
+                cancelButtonText: "{{ __('campus.cancel') }}"
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
-                        url: "{{ route('academic-sessions.destroy', 'bulk') }}".replace('bulk', 'bulk-delete') , // NOTE: Route needs explicit define if standard resource doesn't cover bulk
-                        type: 'POST', // Using POST for bulk delete convention in this project
-                        data: { 
-                            _method: 'DELETE', // Spoof DELETE if route expects it, or check web.php
-                            ids: ids, 
-                            _token: "{{ csrf_token() }}" 
-                        },
-                        // Wait, previous examples used explicit bulk-delete route. 
-                        // Let's assume web.php has Route::delete('academic-sessions/bulk-delete', ...)
-                        url: "/academic-sessions/bulk-delete", // Direct URL to match pattern
+                        url: "{{ route('campuses.bulkDelete') }}",
+                        type: 'DELETE',
+                        data: { ids: ids, _token: "{{ csrf_token() }}" },
                         success: function(response) {
-                            Swal.fire("{{ __('academic_session.success') }}", response.success || response.message, 'success');
+                            Swal.fire("{{ __('campus.success') }}", response.success || response.message, 'success');
                             table.ajax.reload();
                             $('#checkAll').prop('checked', false);
                         },
                         error: function() {
-                            Swal.fire("{{ __('academic_session.error_occurred') }}", "{{ __('academic_session.something_went_wrong') }}", 'error');
+                            Swal.fire("{{ __('campus.error_occurred') }}", "{{ __('campus.something_went_wrong') }}", 'error');
                         }
                     });
                 }
             });
         }
 
-        $('#sessionTable tbody').on('click', '.delete-btn', function() {
+        $('#campusTable tbody').on('click', '.delete-btn', function() {
             let id = $(this).data('id');
-            let url = "{{ route('academic-sessions.destroy', ':id') }}".replace(':id', id);
+            let url = "{{ route('campuses.destroy', ':id') }}".replace(':id', id);
             Swal.fire({
-                title: "{{ __('academic_session.are_you_sure') }}",
-                text: "{{ __('academic_session.delete_warning') }}",
+                title: "{{ __('campus.are_you_sure') }}",
+                text: "{{ __('campus.delete_warning') }}",
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
-                confirmButtonText: "{{ __('academic_session.yes_delete') }}",
-                cancelButtonText: "{{ __('academic_session.cancel') }}"
+                confirmButtonText: "{{ __('campus.yes_delete') }}",
+                cancelButtonText: "{{ __('campus.cancel') }}"
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -322,11 +323,11 @@
                         type: 'DELETE',
                         headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
                         success: function(response) {
-                            Swal.fire("{{ __('academic_session.success') }}", response.message, 'success');
+                            Swal.fire("{{ __('campus.success') }}", response.message, 'success');
                             table.ajax.reload();
                         },
                         error: function() {
-                            Swal.fire("{{ __('academic_session.error_occurred') }}", "{{ __('academic_session.something_went_wrong') }}", 'error');
+                            Swal.fire("{{ __('campus.error_occurred') }}", "{{ __('campus.something_went_wrong') }}", 'error');
                         }
                     });
                 }

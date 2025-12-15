@@ -51,6 +51,7 @@
     <link rel="stylesheet" href="{{asset('vendor/pickadate/themes/default.css')}}">
     <link rel="stylesheet" href="{{asset('vendor/pickadate/themes/default.date.css')}}">
     <link href="{{ asset('https://fonts.googleapis.com/icon?family=Material+Icons')  }}" rel="stylesheet">
+    @yield('styles')
     <style>
         .select2-selection{
             border: 2px solid #e0e7ff !important;

@@ -24,7 +24,9 @@ return [
     'institutes' => [
         'title' => 'Institutes',
     ],
-
+    'campuses' => [
+        'title' => 'Campuses',
+    ],
     'header_officers' => [
         'title' => 'Header Officers',
     ],

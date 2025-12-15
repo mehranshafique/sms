@@ -56,4 +56,20 @@ class User extends Authenticatable
         return $this->belongsTo(Institute::class);
     }
 
+    /**
+     * Get the staff profile associated with the user.
+     */
+    public function staff()
+    {
+        return $this->hasOne(Staff::class);
+    }
+
+    /**
+     * Get the student profile associated with the user.
+     */
+    public function student()
+    {
+        return $this->hasOne(Student::class);
+    }
+
 }

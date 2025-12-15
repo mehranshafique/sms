@@ -12,16 +12,16 @@ class AcademicSession extends Model
     protected $fillable = [
         'institution_id',
         'name',
-        'start_year',
-        'end_year',
+        'start_date',
+        'end_date',
         'status',
         'is_current',
     ];
 
     protected $casts = [
         'is_current' => 'boolean',
-        'start_year' => 'integer',
-        'end_year'   => 'integer',
+        'start_date' => 'date',
+        'end_date'   => 'date',
     ];
 
     /*
@@ -32,7 +32,7 @@ class AcademicSession extends Model
 
     public function institution()
     {
-        return $this->belongsTo(Institute::class, 'institution_id');
+        return $this->belongsTo(Institution::class, 'institution_id');
     }
 
     /*
@@ -41,13 +41,11 @@ class AcademicSession extends Model
     |--------------------------------------------------------------------------
     */
 
-    // Get only active sessions
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
     }
 
-    // Get current session for an institute
     public function scopeCurrent($query)
     {
         return $query->where('is_current', true);

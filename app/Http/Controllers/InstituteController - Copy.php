@@ -6,13 +6,15 @@ use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Institute;
 
-class InstituteController extends BaseController
+class InstituteController extends Controller
 {
     public function __construct()
     {
-        // Enforce Resource Policy
+        // 1. Use resourcePolicy logic
+        // This maps 'viewAny' -> index, 'create' -> create/store, etc.
+        // Ensure you have an InstitutePolicy registered in AuthServiceProvider
         $this->authorizeResource(Institution::class, 'institute');
     }
 
@@ -22,18 +24,16 @@ class InstituteController extends BaseController
             $data = Institution::select('*');
             return DataTables::of($data)
                 ->addIndexColumn()
+                // Checkbox Column for Bulk Actions
                 ->addColumn('checkbox', function($row){
-                    if(auth()->user()->can('institute.delete', $row)){
+                    // Check if user has permission to delete before showing checkbox
+                    if(auth()->user()->can('delete', $row)){
                         return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
                                     <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
                                     <label class="form-check-label"></label>
                                 </div>';
                     }
                     return '';
-                })
-                ->addColumn('logo', function($row){
-                    $url = $row->logo ? asset('storage/'.$row->logo) : asset('images/no-image.png');
-                    return '<img src="'.$url.'" class="rounded-circle" width="35" alt="">';
                 })
                 ->editColumn('is_active', function($row){
                     return $row->is_active 
@@ -43,13 +43,13 @@ class InstituteController extends BaseController
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    if(auth()->user()->can('institute.edit', $row)){
+                    if(auth()->user()->can('update', $row)){
                         $btn .= '<a href="'.route('institutes.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('institute.edit').'">
                                     <i class="fa fa-pencil"></i>
                                 </a>';
                     }
 
-                    if(auth()->user()->can('institute.delete', $row)){
+                    if(auth()->user()->can('delete', $row)){
                         $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" title="'.__('institute.delete').'">
                                     <i class="fa fa-trash"></i>
                                 </button>';
@@ -58,17 +58,10 @@ class InstituteController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'logo', 'is_active', 'action'])
+                ->rawColumns(['checkbox', 'is_active', 'action'])
                 ->make(true);
         }
-
-        // Stats for Cards
-        $totalInstitutes = Institution::count();
-        $activeInstitutes = Institution::where('is_active', true)->count();
-        $inactiveInstitutes = Institution::where('is_active', false)->count();
-        $newInstitutes = Institution::where('created_at', '>=', now()->subMonth())->count();
-
-        return view('institutions.index', compact('totalInstitutes', 'activeInstitutes', 'inactiveInstitutes', 'newInstitutes'));
+        return view('institutions.index');
     }
 
     public function create()
@@ -86,18 +79,13 @@ class InstituteController extends BaseController
             'city' => 'nullable|string',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:30',
-            'email' => 'nullable|email',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'is_active' => 'boolean',
-            // 'plan_password' => 'nullable' // Logic to create admin user would go here
+            'email' => 'nullable|email', // Added based on view inputs
+            'is_active' => 'boolean'
         ]);
-
-        if ($request->hasFile('logo')) {
-            $validated['logo'] = $request->file('logo')->store('institutes', 'public');
-        }
 
         Institution::create($validated);
 
+        // 2. Use localization keys
         return response()->json(['message' => __('institute.messages.success_create'), 'redirect' => route('institutes.index')]);
     }
 
@@ -117,16 +105,8 @@ class InstituteController extends BaseController
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:30',
             'email' => 'nullable|email',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean'
         ]);
-
-        if ($request->hasFile('logo')) {
-            if ($institute->logo) {
-                Storage::disk('public')->delete($institute->logo);
-            }
-            $validated['logo'] = $request->file('logo')->store('institutes', 'public');
-        }
 
         $institute->update($validated);
 
@@ -135,26 +115,19 @@ class InstituteController extends BaseController
 
     public function destroy(Institution $institute)
     {
-        if ($institute->logo) {
-            Storage::disk('public')->delete($institute->logo);
-        }
         $institute->delete();
         return response()->json(['message' => __('institute.messages.success_delete')]);
     }
 
     public function bulkDelete(Request $request)
     {
+        // For bulk delete, we can check a general permission or loop through
+        // Typically, we check 'deleteAny' or similar, but here manual check
         $this->authorize('deleteAny', Institution::class); 
 
         $ids = $request->ids;
         if (!empty($ids)) {
-            $institutes = Institution::whereIn('id', $ids)->get();
-            foreach ($institutes as $institute) {
-                if ($institute->logo) {
-                    Storage::disk('public')->delete($institute->logo);
-                }
-                $institute->delete();
-            }
+            Institution::whereIn('id', $ids)->delete();
             return response()->json(['success' => __('institute.messages.success_delete')]);
         }
         return response()->json(['error' => __('institute.something_went_wrong')]);

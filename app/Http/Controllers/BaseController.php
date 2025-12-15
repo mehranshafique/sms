@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Routing\Controller as LaravelController;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class BaseController extends LaravelController
 {
+    use AuthorizesRequests;
     public function __construct() {
 
     }

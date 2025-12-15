@@ -20,7 +20,7 @@ return new class extends Migration
 //                ->constrained('campuses')
 //                ->onDelete('cascade');
             $table->unsignedBigInteger('institute_id');
-            $table->unsignedBigInteger('users_id');
+            $table->unsignedBigInteger('user_id'); // updated by mehran users_id to user_id
             $table->string('employee_no', 50); // UNIQUE per campus
             $table->string('designation', 100)->nullable();
             $table->string('department', 100)->nullable();

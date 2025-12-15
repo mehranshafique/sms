@@ -12,6 +12,7 @@ use App\Http\Controllers\HeadOfficersController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\AcademicSessionController;
+use App\Http\Controllers\CampusController;
 Route::redirect('/','/login' );
 
 Route::get('/change-language', function (\Illuminate\Http\Request $request) {
@@ -56,10 +57,16 @@ Route::middleware('auth')->group(function () {
         Route::post('{role}/assign-permissions', [RolePermissionController::class, 'update'])->name('roles.update-permissions');
     });
 
+    Route::delete('institutes/bulk-delete', [InstituteController::class, 'bulkDelete'])->name('institutes.bulkDelete');
     Route::resource('institutes', InstituteController::class);
 
+     // Campuses
+    Route::delete('campuses/bulk-delete', [CampusController::class, 'bulkDelete'])->name('campuses.bulkDelete');
+    Route::resource('campuses', CampusController::class);
+    
     Route::resource('header-officers', HeadOfficersController::class);
-
+    // Bulk Delete Route
+    Route::post('header-officers/bulk-delete', [HeadOfficersController::class, 'bulkDelete'])->name('header-officers.bulkDelete');
     Route::resource('students', StudentController::class);
 
     Route::resource('staff', StaffController::class);

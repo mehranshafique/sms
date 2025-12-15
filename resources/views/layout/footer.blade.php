@@ -59,5 +59,7 @@
     <script src="{{asset('js/plugins-init/bs-daterange-picker-init.js')}}"></script>
     <script src="{{asset('js/plugins-init/material-date-picker-init.js')}}"></script>
     <script src="{{asset('js/plugins-init/pickadate-init.js')}}"></script>
+    @yield('js')
+    
 </body>
 </html>
