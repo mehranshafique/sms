@@ -27,12 +27,18 @@ class RolePermissionSeeder extends Seeder
             'Roles' => ['view', 'create', 'update', 'delete'],
             'Permissions' => ['view', 'create', 'update', 'delete'],
             'Users' => ['view', 'create', 'update', 'delete'],
-            'Institutes' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
+            'Institutions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
             'Campuses' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Head Officers' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Academic Sessions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Grade Levels' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Class Sections' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Modules' => ['view', 'create', 'update', 'delete'],
         ];
 
         // 3. Create Permissions and Assign to Module
@@ -40,7 +46,8 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($modules as $moduleName => $actions) {
             // Create or find Module
-            $module = Module::firstOrCreate(['name' => $moduleName]);
+            $moduleKey = strtolower(str_replace(' ', '_', $moduleName));
+            $module = Module::updateOrCreate(['name' => $moduleName, 'slug'=>$moduleKey]);
 
             foreach ($actions as $action) {
                 // Determine permission name convention
@@ -77,8 +84,8 @@ class RolePermissionSeeder extends Seeder
             [
                 'name' => 'Super Admin User',
                 'password' => Hash::make('password'),
-                // 'user_type' => 1,
-                // 'is_active' => true,
+                'user_type' => 1,
+                'is_active' => true,
             ]
         );
 

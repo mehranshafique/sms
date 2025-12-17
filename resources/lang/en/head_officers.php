@@ -3,71 +3,80 @@
 return [
     'page_title' => 'Head Officers',
     'messages' => [
-        'created' => 'Head Officer created successfully!',
-        'updated' => 'Head Officer updated successfully!',
-        'deleted' => 'Head Officer deleted successfully!',
+        'success_create' => 'Head Officer created successfully!',
+        'success_update' => 'Head Officer updated successfully!',
+        'success_delete' => 'Head Officer deleted successfully!',
     ],
     
-    // Header & Stats
+    // Stats
     'officer_management' => 'Officer Management',
-    'manage_list_subtitle' => 'Manage your head officers list',
-    'create_new' => 'Create New',
+    'manage_list_subtitle' => 'Manage head officers and institute assignments',
     'total_officers' => 'Total Officers',
     'active_officers' => 'Active Officers',
     'inactive' => 'Inactive',
     'new_this_month' => 'New This Month',
 
-    // Table Headers
-    'officer_list' => 'Head Officer List',
-    'search_placeholder' => 'Search...',
+    // Table
+    'officer_list' => 'Officer List',
     'table_no' => '#',
-    'id' => 'ID',
     'details' => 'Details',
     'name' => 'Name',
-    'email' => 'Email',
-    'phone' => 'Phone',
-    'address' => 'Address',
-    'total_institution' => 'Institutes',
+    'contact' => 'Contact',
+    'assigned_institutes' => 'Assigned Institutes',
     'actions' => 'Action',
-    'contact' => 'Contact Info',
+    'search_placeholder' => 'Search...',
+    'no_records_found' => 'No records found',
+    'role' => 'Role',
+
+    // Forms
+    'create_new' => 'Create New',
+    'add_header_officer' => 'Add Head Officer',
+    'edit_head_officer' => 'Edit Head Officer',
+    'basic_information' => 'Basic Information',
+    'contact_information' => 'Contact Information',
+    'assignment_details' => 'Assignment Details',
+    
+    'profile_picture' => 'Profile Picture',
+    'upload' => 'Upload',
+    'select_role' => 'Select Role',
+    
+    'enter_name' => 'Enter Full Name',
+    'enter_email' => 'Enter Email Address',
+    'enter_phone' => 'Enter Phone Number',
+    'enter_address' => 'Enter Physical Address',
+    'enter_password' => 'Enter Password',
+    'leave_blank_to_keep_current' => 'Leave blank to keep current password',
+    'select_institutes' => 'Select Institutes',
+    'status' => 'Status',
+    'active' => 'Active',
+    'inactive_status' => 'Inactive',
+
+    // Show Page
+    'officer_details' => 'Officer Details',
+    'edit' => 'Edit',
+    'profile_details' => 'Profile Details',
+    'account_status' => 'Account Status',
+    'joined_date' => 'Joined Date',
+    'no_institutes_assigned' => 'No institutes assigned yet.',
 
     // Buttons
-    'add_head_officer' => 'Add Head Officer',
+    'save' => 'Save Officer',
+    'update' => 'Update Officer',
     'export' => 'Export',
     'bulk_delete' => 'Bulk Delete',
-    'add' => 'Add',
-    'update' => 'Update',
-    'delete' => 'Delete',
     'cancel' => 'Cancel',
+    'delete' => 'Delete',
 
-    // Modal & Forms
-    'edit_head_officer' => 'Edit Head Officer',
-    'enter_name' => 'Enter Name',
-    'enter_email' => 'Enter Email',
-    'enter_password' => 'Enter Password',
-    'enter_phone' => 'Enter Phone',
-    'enter_address' => 'Enter Address',
-    'password_optional' => 'Password (leave blank to keep current)',
-    'password' => 'Password',
-
-    // Alerts & Confirmations
+    // Alerts
     'are_you_sure' => 'Are you sure?',
-    'officer_deleted_warning' => 'This officer will be permanently deleted!',
-    'yes_delete' => 'Yes, delete it!',
-    'are_you_sure_bulk' => 'Are you sure you want to delete these?',
-    'bulk_delete_warning' => "Selected officers will be permanently deleted!",
+    'are_you_sure_bulk' => 'Delete selected officers?',
+    'delete_warning' => 'This action cannot be undone!',
+    'bulk_delete_warning' => 'Selected officers will be permanently deleted!',
+    'yes_delete' => 'Yes, delete!',
     'yes_bulk_delete' => 'Yes, delete them!',
-    'no_records_found' => 'No records found',
-    
-    // JS Validation & Alerts
-    'validation' => 'Validation Error',
-    'name_required' => 'Name field is required.',
-    'phone_required' => 'Phone field is required.',
-    'email_required' => 'Email field is required.',
-    'password_required' => 'Password field is required.',
-    'address_required' => 'Address field is required.',
     'success' => 'Success!',
-    'error' => 'Error Occurred',
-    'something_went_wrong' => 'Something went wrong!',
     'error_occurred' => 'Error Occurred',
+    'something_went_wrong' => 'Something went wrong!',
+    'validation_error' => 'Validation Error',
+    'is_required' => 'is required',
 ];

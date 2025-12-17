@@ -3,139 +3,165 @@
 namespace App\Http\Controllers;
 
 use App\Models\Student;
-use App\Models\Institute;
+use App\Models\Institution;
+use App\Models\Campus;
+use App\Models\GradeLevel; // Assuming exists or will exist
 use Illuminate\Http\Request;
-use App\Http\Controllers\BaseController;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+
 class StudentController extends BaseController
 {
-    public function __construct(){
-        $this->middleware('auth');
-        $this->setPageTitle(__('student.page_title'));
-    }
-    public function index()
+    public function __construct()
     {
-        authorize('students.view');
-        $students = Student::with('institute')->where('institute_id', institute()->id)->get();
-        return view('students.index', compact('students'));
+        $this->authorizeResource(Student::class, 'student');
+    }
+
+    public function index(Request $request)
+    {
+        if ($request->ajax()) {
+            $data = Student::with(['institution', 'campus', 'gradeLevel'])->select('students.*');
+
+            // Apply Filters if needed (e.g. by Class, Section)
+            if ($request->has('grade_level_id') && $request->grade_level_id) {
+                $data->where('grade_level_id', $request->grade_level_id);
+            }
+
+            return DataTables::of($data)
+                ->addIndexColumn()
+                ->addColumn('checkbox', function($row){
+                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
+                                <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
+                                <label class="form-check-label"></label>
+                            </div>';
+                })
+                ->addColumn('details', function($row){
+                    $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
+                    $initial = strtoupper(substr($row->first_name, 0, 1));
+                    
+                    $avatarHtml = $img 
+                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
+                        : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
+
+                    return '<div class="d-flex align-items-center">
+                                '.$avatarHtml.'
+                                <div>
+                                    <h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6>
+                                    <span class="fs-13 text-muted">ID: '.$row->admission_number.'</span>
+                                </div>
+                            </div>';
+                })
+                ->addColumn('parent_info', function($row){
+                    return '<div><i class="fa fa-user me-1"></i> '.$row->father_name.'</div>
+                            <div class="text-muted"><i class="fa fa-phone me-1"></i> '.$row->father_phone.'</div>';
+                })
+                ->editColumn('status', function($row){
+                    $badges = [
+                        'active' => 'badge-success',
+                        'transferred' => 'badge-warning',
+                        'suspended' => 'badge-danger',
+                        'graduated' => 'badge-info',
+                        'inactive' => 'badge-secondary'
+                    ];
+                    return '<span class="badge '.($badges[$row->status] ?? 'badge-secondary').'">'.ucfirst($row->status).'</span>';
+                })
+                ->addColumn('action', function($row){
+                    $btn = '<div class="d-flex justify-content-end action-buttons">';
+                    $btn .= '<a href="'.route('students.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                    $btn .= '<a href="'.route('students.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
+                    $btn .= '<button class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
+                    $btn .= '</div>';
+                    return $btn;
+                })
+                ->rawColumns(['checkbox', 'details', 'parent_info', 'status', 'action'])
+                ->make(true);
+        }
+
+        return view('students.index');
     }
 
     public function create()
     {
-        authorize('students.create');
-        $this->setPageTitle(__('student.add_student'));
-
-        return view('students.create');
+        $institutes = Institution::pluck('name', 'id');
+        $campuses = Campus::pluck('name', 'id');
+        $gradeLevels = GradeLevel::pluck('name', 'id'); // Assuming model exists
+        
+        return view('students.create', compact('institutes', 'campuses', 'gradeLevels'));
     }
 
     public function store(Request $request)
     {
-        authorize('students.create');
-        $data = $request->validate([
-            'first_name' => 'required|max:100',
-            'last_name' => 'required|max:100',
-            'gender' => 'required|in:male,female,other',
-            'date_of_birth' => 'required|date',
-            'status' => 'required|in:active,transferred,withdrawn,graduated',
+        $request->validate([
+            'institution_id' => 'required',
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'admission_date' => 'required|date',
+            'dob' => 'required|date',
+            'gender' => 'required',
+            'mobile_number' => 'nullable|numeric',
+            'student_photo' => 'nullable|image|max:2048',
+            'qr_code_token' => 'nullable|string|unique:students,qr_code_token',
+            'nfc_tag_uid' => 'nullable|string|unique:students,nfc_tag_uid',
         ]);
 
-        $lastStudent = Student::where('institute_id', institute()->id)
-            ->latest('id')
-            ->first();
+        $data = $request->all();
 
-        if ($lastStudent) {
-            $number = intval(substr($lastStudent->registration_no, -4)) + 1;
-        } else {
-            $number = 1;
+        if ($request->hasFile('student_photo')) {
+            $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
         }
 
-        // Format registration number: INSTITUTEID-0001
-        $registration_no = institute()->id . str_pad($number, 4, '0', STR_PAD_LEFT);
+        // Logic for ID generation is in Model Boot method
+        Student::create($data);
 
-        $student = new Student();
+        return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_create')]);
+    }
 
-        $student->first_name = $request->input('first_name');
-        $student->last_name = $request->input('last_name');
-        $student->gender = $request->input('gender');
-        $student->date_of_birth = $request->input('date_of_birth');
-        $student->status = $request->input('status');
-        $student->national_id = $request->input('national_id');
-        $student->nfc_tag_uid = $request->input('nfc_tag_uid');
-        $student->qr_code_token = $request->input('qr_code_token');
-        $student->institute_id  = institute()->id;
-        $student->registration_no  = $registration_no;
-        $student->save();
-
-        return response()->json([
-            'message' => __('student.messages.success_create'),
-            'redirect' => route('students.index')
-        ]);
+    public function show(Student $student)
+    {
+        return view('students.show', compact('student'));
     }
 
     public function edit(Student $student)
     {
-        authorize('students.edit');
-        $institutes = Institute::where('is_active',1)->get();
-        return view('students.edit', compact('student','institutes'));
-    }
+        $institutes = Institution::pluck('name', 'id');
+        $campuses = Campus::pluck('name', 'id');
+        $gradeLevels = GradeLevel::pluck('name', 'id');
 
-//    public function update(Request $request, Student $student)
-//    {
-//        $request->validate([
-//            'institute_id' => 'required|exists:institutes,id',
-//            'registration_no' => 'required|max:50',
-//            'first_name' => 'required|max:100',
-//            'last_name' => 'required|max:100',
-//            'gender' => 'required|in:male,female,other',
-//            'date_of_birth' => 'required|date',
-//            'status' => 'required|in:active,transferred,withdrawn,graduated',
-//        ]);
-//
-//        $student->update($request->all());
-//
-//        return response()->json([
-//            'message' => 'Student updated successfully',
-//            'redirect' => route('students.index')
-//        ]);
-//    }
+        return view('students.edit', compact('student', 'institutes', 'campuses', 'gradeLevels'));
+    }
 
     public function update(Request $request, Student $student)
     {
-        authorize('students.edit');
-        $data = $request->validate([
-            'first_name' => 'required|max:100',
-            'last_name' => 'required|max:100',
-            'gender' => 'required|in:male,female,other',
-            'date_of_birth' => 'required|date',
-            'status' => 'required|in:active,transferred,withdrawn,graduated',
-            'national_id' => 'nullable|max:255',
-            'nfc_tag_uid' => 'nullable|max:255',
-            'qr_code_token' => 'nullable|max:255',
+        $request->validate([
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'dob' => 'required|date',
+            'student_photo' => 'nullable|image|max:2048',
+            'qr_code_token' => 'nullable|string|unique:students,qr_code_token,' . $student->id,
+            'nfc_tag_uid' => 'nullable|string|unique:students,nfc_tag_uid,' . $student->id,
         ]);
 
-        // Update fields manually for safety
-        $student->first_name = $request->first_name;
-        $student->last_name = $request->last_name;
-        $student->gender = $request->gender;
-        $student->date_of_birth = $request->date_of_birth;
-        $student->status = $request->status;
-        $student->national_id = $request->national_id;
-        $student->nfc_tag_uid = $request->nfc_tag_uid;
-        $student->qr_code_token = $request->qr_code_token;
+        $data = $request->all();
 
-        $student->save();
+        if ($request->hasFile('student_photo')) {
+            if ($student->student_photo) {
+                Storage::disk('public')->delete($student->student_photo);
+            }
+            $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
+        }
 
-        return response()->json([
-            'message' => __('student.messages.success_update'),
-            'redirect' => route('students.index')
-        ]);
+        $student->update($data);
+
+        return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_update')]);
     }
 
     public function destroy(Student $student)
     {
-        authorize('students.delete');
+        if ($student->student_photo) {
+            Storage::disk('public')->delete($student->student_photo);
+        }
         $student->delete();
-        return back()->with('success', __('student.messages.success_delete'));
+        return response()->json(['message' => __('student.messages.success_delete')]);
     }
 }

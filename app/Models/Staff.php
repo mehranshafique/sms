@@ -4,47 +4,50 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Institute;
+
 class Staff extends Model
 {
     use HasFactory;
 
     protected $table = 'staff';
 
-    /**
-     * The attributes that are mass assignable.
-     */
     protected $fillable = [
         'user_id',
-        'institute_id',
-        'employee_no',
+        'institution_id',
+        'campus_id',
+        'employee_id',
         'designation',
         'department',
-        'hire_date',
-        'status',
+        'joining_date',
+        'salary',
+        'gender',
+        'dob',
+        'qualification',
+        'experience',
+        'emergency_contact',
+        'address',
+        'status'
     ];
 
-    /**
-     * The user account associated with this staff member.
-     */
+    protected $casts = [
+        'joining_date' => 'date',
+        'dob' => 'date',
+    ];
+
+    // --- Relationships ---
+
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * The campus this staff member belongs to.
-     */
-    public function institute()
+    public function institution()
     {
-        return $this->belongsTo(Institute::class);
+        return $this->belongsTo(Institution::class);
     }
 
-    /**
-     * Accessor for formatted hire date (optional convenience method).
-     */
-    public function getFormattedHireDateAttribute()
+    public function campus()
     {
-        return $this->hire_date ? $this->hire_date->format('Y-m-d') : null;
+        return $this->belongsTo(Campus::class);
     }
 }

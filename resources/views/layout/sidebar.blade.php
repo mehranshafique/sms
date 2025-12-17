@@ -8,21 +8,10 @@
             <li class="{{ isActive('dashboard') }}">
                 <a class="ai-icon {{ isActive('dashboard') }}"
                    href="{{ route('dashboard') }}" aria-expanded="false">
-                    <i class="la la-home"></i>
+                    <i class="la la-calendar"></i>
                     <span class="nav-text">{{ __('sidebar.dashboard.title') }}</span>
                 </a>
             </li>
-
-            {{-- Academic Sessions --}}
-            @can('academic_session.view')
-                <li class="{{ isActive(['academic-sessions.index','academic-sessions.create','academic-sessions.edit']) }}">
-                    <a class="ai-icon {{ isActive(['academic-sessions.index']) }}"
-                       href="{{ route('academic-sessions.index') }}" aria-expanded="false">
-                        <i class="la la-calendar"></i>
-                        <span class="nav-text">{{ __('sidebar.sessions.title') }}</span>
-                    </a>
-                </li>
-            @endcan
 
             {{-- Institutes --}}
             @can('institute.view')
@@ -48,11 +37,92 @@
 
             {{-- Head Officers --}}
             @can('head_officer.view')
-                <li class="{{ isActive(['header-officers.index','header-officers.create','header-officers.edit']) }}">
+                <li class="{{ isActive(['header-officers.index']) }}">
                     <a class="ai-icon {{ isActive('header-officers.index') }}"
                        href="{{ route('header-officers.index') }}" aria-expanded="false">
                         <i class="la la-user-tie"></i>
                         <span class="nav-text">{{ __('sidebar.header_officers.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            <li class="nav-label">{{ __('sidebar.academics') }}</li>
+
+            {{-- Academic Sessions --}}
+            @can('academic_session.view')
+                <li class="{{ isActive(['academic-sessions.index']) }}">
+                    <a class="ai-icon {{ isActive('academic-sessions.index') }}"
+                       href="{{ route('academic-sessions.index') }}" aria-expanded="false">
+                        <i class="la la-calendar-check-o"></i>
+                        <span class="nav-text">{{ __('sidebar.sessions.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Grade Levels --}}
+            @can('grade_level.view')
+                <li class="{{ isActive(['grade-levels.index']) }}">
+                    <a class="ai-icon {{ isActive('grade-levels.index') }}"
+                       href="{{ route('grade-levels.index') }}" aria-expanded="false">
+                        <i class="la la-graduation-cap"></i>
+                        <span class="nav-text">{{ __('sidebar.grade_levels.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Class Sections --}}
+            @can('class_section.view')
+                <li class="{{ isActive(['class-sections.index','class-sections.create','class-sections.edit']) }}">
+                    <a class="ai-icon {{ isActive('class-sections.index') }}"
+                       href="{{ route('class-sections.index') }}" aria-expanded="false">
+                        <i class="la la-th-list"></i>
+                        <span class="nav-text">{{ __('sidebar.class_sections.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Subjects --}}
+            @can('subject.view')
+                <li class="{{ isActive(['subjects.index','subjects.create','subjects.edit','subjects.show']) }}">
+                    <a class="ai-icon {{ isActive('subjects.index') }}"
+                       href="{{ route('subjects.index') }}" aria-expanded="false">
+                        <i class="la la-book"></i>
+                        <span class="nav-text">{{ __('sidebar.subjects.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Timetables --}}
+            @can('timetable.view')
+                <li class="{{ isActive(['timetables.index','timetables.create','timetables.edit']) }}">
+                    <a class="ai-icon {{ isActive('timetables.index') }}"
+                       href="{{ route('timetables.index') }}" aria-expanded="false">
+                        <i class="la la-clock-o"></i>
+                        <span class="nav-text">{{ __('sidebar.timetables.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            <li class="nav-label">{{ __('sidebar.people') }}</li>
+
+            {{-- Students --}}
+            @can('student.view')
+                <li class="{{ isActive(['students.index','students.create','students.edit']) }}">
+                    <a class="ai-icon {{ isActive('students.index') }}"
+                       href="{{ route('students.index') }}" aria-expanded="false">
+                        <i class="la la-users"></i>
+                        <span class="nav-text">{{ __('sidebar.students.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Enrollments (Class Allocations) --}}
+            @can('student_enrollment.view')
+                <li class="{{ isActive(['enrollments.index','enrollments.create','enrollments.edit']) }}">
+                    <a class="ai-icon {{ isActive('enrollments.index') }}"
+                       href="{{ route('enrollments.index') }}" aria-expanded="false">
+                        <i class="la la-id-card"></i>
+                        <span class="nav-text">{{ __('sidebar.enrollments.title') }}</span>
                     </a>
                 </li>
             @endcan
@@ -68,50 +138,36 @@
                 </li>
             @endcan
 
-            {{-- Students --}}
-            @can('student.view')
-                <li class="{{ isActive(['students.index','students.create','students.edit']) }}">
-                    <a class="ai-icon {{ isActive('students.index') }}"
-                       href="{{ route('students.index') }}" aria-expanded="false">
-                        <i class="la la-user-graduate"></i>
-                        <span class="nav-text">{{ __('sidebar.students.title') }}</span>
-                    </a>
-                </li>
-            @endcan
+            <li class="nav-label">{{ __('sidebar.settings') }}</li>
 
-            {{-- Permissions & Roles --}}
-            @if(auth()->user()->can('role.view') || auth()->user()->can('permission.view'))
-                <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions','modules.index']) }}">
+            {{-- Permissions --}}
+            @can('role.view')
+                <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">
                     <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
                         <i class="la la-shield"></i>
                         <span class="nav-text">{{ __('sidebar.permissions.title') }}</span>
                     </a>
 
                     <ul aria-expanded="false"
-                        class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions','modules.index'], 'mm-show') }}">
+                        class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions'], 'mm-show') }}">
 
-                        @can('role.view')
-                            <li>
-                                <a class="{{ isActive(['roles.index','roles.assign-permissions']) }}"
-                                   href="{{ route('roles.index') }}">
-                                    {{ __('sidebar.permissions.roles') }}
-                                </a>
-                            </li>
-                        @endcan
+                        <li>
+                            <a class="{{ isActive(['roles.index','roles.assign-permissions']) }}"
+                               href="{{ route('roles.index') }}">
+                                {{ __('sidebar.permissions.roles') }}
+                            </a>
+                        </li>
 
-                        {{-- Modules (Optional, usually for dev/superadmin only) --}}
-                        @can('permission.view')
-                            <li>
-                                <a class="{{ isActive(['modules.index','permissions.index']) }}"
-                                   href="{{ route('modules.index') }}">
-                                    {{ __('sidebar.permissions.modules') }}
-                                </a>
-                            </li>
-                        @endcan
+                        <li>
+                            <a class="{{ isActive(['modules.index','permissions.index']) }}"
+                               href="{{ route('modules.index') }}">
+                                {{ __('sidebar.permissions.modules') }}
+                            </a>
+                        </li>
 
                     </ul>
                 </li>
-            @endif
+            @endcan
 
         </ul>
     </div>

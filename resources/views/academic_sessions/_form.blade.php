@@ -30,14 +30,18 @@
                                 <input type="text" name="name" value="{{ old('name', $academic_session->name ?? '') }}" class="form-control" placeholder="{{ __('academic_session.enter_session_name') }}" required>
                             </div>
 
-                            {{-- Dates --}}
+                            {{-- Dates (Fixed Class for DatePicker) --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('academic_session.start_date') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="start_date" value="{{ old('start_date', optional($academic_session->start_date ?? null)->format('Y-m-d')) }}" class="form-control" required>
+                                <input type="text" name="start_date" 
+                                       value="{{ old('start_date', isset($academic_session) && $academic_session->start_date ? $academic_session->start_date->format('d F, Y') : '') }}" 
+                                       class="datepicker-default form-control" placeholder="Select Date" required>
                             </div>
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('academic_session.end_date') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="end_date" value="{{ old('end_date', optional($academic_session->end_date ?? null)->format('Y-m-d')) }}" class="form-control" required>
+                                <input type="text" name="end_date" 
+                                       value="{{ old('end_date', isset($academic_session) && $academic_session->end_date ? $academic_session->end_date->format('d F, Y') : '') }}" 
+                                       class="datepicker-default form-control" placeholder="Select Date" required>
                             </div>
 
                             {{-- Status --}}

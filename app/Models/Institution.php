@@ -20,7 +20,7 @@ class Institution extends Model
         'address',
         'phone',
         'email',
-        'logo', // Added logo to fillable
+        'logo', 
         'is_active',
     ];
 
@@ -40,9 +40,31 @@ class Institution extends Model
         return $this->hasMany(AcademicSession::class);
     }
     
+    /**
+     * Relationship: Get all users directly linked to this institution (One-to-Many).
+     * This fixes the "missing relationships Institution has many user" error.
+     */
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+
+    /**
+     * Relationship: Get admins (users) linked to this institution.
+     */
     public function admins()
     {
         return $this->hasMany(User::class, 'institute_id');
+    }
+
+    /**
+     * Relationship: Get Head Officers assigned to this institution (Many-to-Many).
+     * Required for the Head Officer module to work correctly.
+     */
+    public function headOfficers()
+    {
+        return $this->belongsToMany(User::class, 'institution_head_officers', 'institution_id', 'user_id')
+                    ->withTimestamps();
     }
 
     public function staff()

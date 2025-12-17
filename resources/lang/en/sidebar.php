@@ -1,26 +1,10 @@
 <?php
 
-
 return [
-
     'main_menu' => 'Main Menu',
-
     'dashboard' => [
         'title' => 'Dashboard',
     ],
-
-    'students' => [
-        'title' => 'Students',
-    ],
-
-    'staff' => [
-        'title' => 'Staff',
-    ],
-
-    'sessions' => [
-        'title' => 'Sessions',
-    ],
-
     'institutes' => [
         'title' => 'Institutes',
     ],
@@ -28,13 +12,38 @@ return [
         'title' => 'Campuses',
     ],
     'header_officers' => [
-        'title' => 'Header Officers',
+        'title' => 'Head Officers',
     ],
-
+    'academics' => 'Academics',
+    'sessions' => [
+        'title' => 'Academic Sessions',
+    ],
+    'grade_levels' => [
+        'title' => 'Grade Levels',
+    ],
+    'class_sections' => [
+        'title' => 'Class Sections',
+    ],
+    'subjects' => [
+        'title' => 'Subjects',
+    ],
+    'timetables' => [ // Added
+        'title' => 'Routine',
+    ],
+    'people' => 'People',
+    'students' => [
+        'title' => 'Students',
+    ],
+    'enrollments' => [ // Added
+        'title' => 'Class Enrollments',
+    ],
+    'staff' => [
+        'title' => 'Staff',
+    ],
+    'settings' => 'Settings',
     'permissions' => [
-        'title' => 'Permissions',
+        'title' => 'Roles & Permissions',
         'roles' => 'Roles',
         'modules' => 'Modules',
     ],
-
 ];

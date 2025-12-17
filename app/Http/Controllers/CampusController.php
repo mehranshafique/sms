@@ -42,7 +42,7 @@ class CampusController extends BaseController
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    if(auth()->user()->can('edit', $row)){
+                    if(auth()->user()->can('update', $row)){
                         $btn .= '<a href="'.route('campuses.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('campus.edit').'">
                                     <i class="fa fa-pencil"></i>
                                 </a>';

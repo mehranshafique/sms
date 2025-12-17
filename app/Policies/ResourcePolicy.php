@@ -11,7 +11,7 @@ class ResourcePolicy
     use HandlesAuthorization;
 
     /**
-     * Helper: Get permission name (e.g., "institute")
+     * Helper: Get permission name (e.g., "institution")
      */
     private function getPermissionName($modelOrClass)
     {
@@ -23,13 +23,15 @@ class ResourcePolicy
         // 2. If we have an object, get its class name
         $className = is_object($modelOrClass) ? get_class($modelOrClass) : $modelOrClass;
         
-        // 3. Convert "App\Models\Institute" -> "institute"
-        return Str::snake(class_basename($className));
+        // 3. Handle case where string might not be a valid class path or needs normalization
+        $baseName = class_basename($className);
+        
+        // 4. Convert "Institution" -> "institution"
+        return Str::snake($baseName);
     }
 
     /**
      * Helper: Guess the model based on the current Controller
-     * e.g., "InstituteController" -> "App\Models\Institute"
      */
     private function guessModelFromRoute()
     {
@@ -39,34 +41,32 @@ class ResourcePolicy
             return null;
         }
 
-        // Get Controller Class (e.g., App\Http\Controllers\InstituteController)
         $controllerClass = get_class($route->controller);
-        
-        // Get Base Name (e.g., InstituteController)
         $baseName = class_basename($controllerClass);
-        
-        // Remove "Controller" (e.g., Institute)
         $modelName = str_replace('Controller', '', $baseName);
 
-        // Return full Model Class
+        // Special Mapping for known discrepancies (InstituteController -> Institution)
+        if ($modelName === 'Institute') {
+            return "App\\Models\\Institution";
+        }
+
         return "App\\Models\\{$modelName}";
     }
 
     // --- Updated Methods ---
 
-    // 1. Make $modelClass optional (= null)
     public function viewAny(User $user, $modelClass = null)
     {
+        // Checks 'institution.view' (or .viewAny if your seeder used that)
+        // Standardizing on '.view' as per your sidebar logic
         return $user->hasPermissionTo($this->getPermissionName($modelClass) . '.view');
     }
 
-    // 2. Make $modelClass optional (= null)
     public function create(User $user, $modelClass = null)
     {
         return $user->hasPermissionTo($this->getPermissionName($modelClass) . '.create');
     }
 
-    // Standard methods (These receive the $model instance, so they are fine)
     public function view(User $user, $model)
     {
         return $user->hasPermissionTo($this->getPermissionName($model) . '.view');
@@ -74,7 +74,8 @@ class ResourcePolicy
 
     public function update(User $user, $model)
     {
-        return $user->hasPermissionTo($this->getPermissionName($model) . '.edit');
+        // FIXED: Changed from '.edit' to '.update' to match Seeder
+        return $user->hasPermissionTo($this->getPermissionName($model) . '.update');
     }
 
     public function delete(User $user, $model)
