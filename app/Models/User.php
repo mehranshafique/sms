@@ -6,6 +6,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Institution; // Fixed: Import Institution Model
 
 class User extends Authenticatable
 {
@@ -21,12 +22,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        // 'institute_id', // Removed from fillable for Head Officers as they use the relationship
+        'institute_id', // Useful for non-head officer users
         'user_type',
         'phone',
         'address',
         'is_active',
-        'language'
+        'language',
+        'profile_picture' // Fixed: Added profile_picture to allowed mass assignment fields
     ];
 
     /**
@@ -61,12 +63,12 @@ class User extends Authenticatable
 
     /**
      * For Head Officers: Manage MULTIPLE Institutes.
-     * Uses pivot table 'institution_head_officers' created in the migration above.
+     * Uses pivot table 'institution_head_officers'.
      */
     public function institutes()
     {
         return $this->belongsToMany(
-            Institute::class, 
+            Institution::class, // Fixed: Changed from Institute to Institution
             'institution_head_officers', 
             'user_id', 
             'institution_id'
@@ -74,13 +76,11 @@ class User extends Authenticatable
     }
 
     /**
-     * For Regular Staff/Students: Direct link to ONE institute (if applicable).
-     * Usually, this data is better accessed via the Staff or Student profile models,
-     * but if a direct column exists on users, this remains valid.
+     * For Regular Staff/Students: Direct link to ONE institute.
      */
     public function institute()
     {
-        return $this->belongsTo(Institute::class);
+        return $this->belongsTo(Institution::class); // Fixed: Changed from Institute to Institution
     }
 
     /**

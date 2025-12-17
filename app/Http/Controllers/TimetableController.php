@@ -7,6 +7,7 @@ use App\Models\ClassSection;
 use App\Models\Subject;
 use App\Models\Staff;
 use App\Models\AcademicSession;
+use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -26,8 +27,11 @@ class TimetableController extends BaseController
 
         if ($request->ajax()) {
             $data = Timetable::with(['classSection', 'subject', 'teacher.user'])
-                ->where('institution_id', $institutionId)
                 ->select('timetables.*');
+
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
 
             if ($request->has('class_section_id') && $request->class_section_id) {
                 $data->where('class_section_id', $request->class_section_id);
@@ -75,7 +79,11 @@ class TimetableController extends BaseController
         }
 
         // Dropdown for filtering
-        $classSections = ClassSection::where('institution_id', $institutionId)->pluck('name', 'id');
+        $classSectionsQuery = ClassSection::query();
+        if ($institutionId) {
+            $classSectionsQuery->where('institution_id', $institutionId);
+        }
+        $classSections = $classSectionsQuery->pluck('name', 'id');
 
         return view('timetables.index', compact('classSections'));
     }
@@ -83,24 +91,58 @@ class TimetableController extends BaseController
     public function create()
     {
         $institutionId = Auth::user()->institute_id;
+        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         
-        $classes = ClassSection::where('institution_id', $institutionId)->pluck('name', 'id');
+        // Helper to fetch data with optional Institute label for Super Admins
+        $fetchData = function($model) use ($institutionId) {
+            $query = $model::query();
+            if ($institutionId) {
+                $query->where('institution_id', $institutionId);
+                return $query->pluck('name', 'id');
+            } else {
+                return $query->with('institution')->get()->mapWithKeys(function($item) {
+                    return [$item->id => $item->name . ' (' . ($item->institution->code ?? 'N/A') . ')'];
+                });
+            }
+        };
+
+        // Fetch Classes
+        $classes = $fetchData(ClassSection::class);
+
+        // Fetch Subjects
+        $subjects = $fetchData(Subject::class);
         
-        // Load subjects (could be filtered by class via AJAX later)
-        $subjects = Subject::where('institution_id', $institutionId)->pluck('name', 'id');
-        
-        // Load Staff
-        $teachers = Staff::with('user')->where('institution_id', $institutionId)->get()->mapWithKeys(function($item){
-            return [$item->id => $item->user->name];
+        // Fetch Staff (Teachers)
+        $teachersQuery = Staff::with(['user', 'institution']);
+        if ($institutionId) {
+            $teachersQuery->where('institution_id', $institutionId);
+        }
+        $teachers = $teachersQuery->get()->mapWithKeys(function($item) use ($institutionId){
+            $label = $item->user->name;
+            if (!$institutionId && $item->institution) {
+                $label .= ' (' . $item->institution->code . ')';
+            }
+            return [$item->id => $label];
         });
 
-        return view('timetables.create', compact('classes', 'subjects', 'teachers'));
+        return view('timetables.create', compact('classes', 'subjects', 'teachers', 'institutions'));
     }
 
     public function store(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
-        $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        $userInstituteId = Auth::user()->institute_id;
+        
+        // Determine Institution ID (From Request for Super Admin, Auth for others)
+        $targetInstituteId = $userInstituteId ?? $request->institution_id;
+
+        // Ensure we have an institution ID before finding session
+        if (!$targetInstituteId) {
+             // Try to infer from class section if not provided explicitly
+             $class = ClassSection::find($request->class_section_id);
+             $targetInstituteId = $class ? $class->institution_id : null;
+        }
+
+        $currentSession = AcademicSession::where('institution_id', $targetInstituteId)->where('is_current', true)->first();
 
         if(!$currentSession) {
             throw ValidationException::withMessages(['general' => __('timetable.no_active_session')]);
@@ -116,13 +158,14 @@ class TimetableController extends BaseController
             'room_number'      => 'nullable|string|max:50',
         ]);
 
-        $validated['institution_id'] = $institutionId;
+        $validated['institution_id'] = $targetInstituteId;
         $validated['academic_session_id'] = $currentSession->id;
 
-        // Check conflicts (Basic: Teacher overlap)
+        // Check conflicts (Teacher overlap)
         if ($validated['staff_id']) {
             $conflict = Timetable::where('staff_id', $validated['staff_id'])
                 ->where('day', $validated['day'])
+                ->where('academic_session_id', $currentSession->id) // Scope to session
                 ->where(function($q) use ($validated) {
                     $q->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
                       ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']]);
@@ -142,13 +185,37 @@ class TimetableController extends BaseController
     public function edit(Timetable $timetable)
     {
         $institutionId = Auth::user()->institute_id;
-        $classes = ClassSection::where('institution_id', $institutionId)->pluck('name', 'id');
-        $subjects = Subject::where('institution_id', $institutionId)->pluck('name', 'id');
-        $teachers = Staff::with('user')->where('institution_id', $institutionId)->get()->mapWithKeys(function($item){
-            return [$item->id => $item->user->name];
+        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+
+        // Helper to fetch data
+        $fetchData = function($model) use ($institutionId) {
+            $query = $model::query();
+            if ($institutionId) {
+                $query->where('institution_id', $institutionId);
+                return $query->pluck('name', 'id');
+            } else {
+                return $query->with('institution')->get()->mapWithKeys(function($item) {
+                    return [$item->id => $item->name . ' (' . ($item->institution->code ?? 'N/A') . ')'];
+                });
+            }
+        };
+
+        $classes = $fetchData(ClassSection::class);
+        $subjects = $fetchData(Subject::class);
+        
+        $teachersQuery = Staff::with(['user', 'institution']);
+        if ($institutionId) {
+            $teachersQuery->where('institution_id', $institutionId);
+        }
+        $teachers = $teachersQuery->get()->mapWithKeys(function($item) use ($institutionId){
+            $label = $item->user->name;
+            if (!$institutionId && $item->institution) {
+                $label .= ' (' . $item->institution->code . ')';
+            }
+            return [$item->id => $label];
         });
 
-        return view('timetables.edit', compact('timetable', 'classes', 'subjects', 'teachers'));
+        return view('timetables.edit', compact('timetable', 'classes', 'subjects', 'teachers', 'institutions'));
     }
 
     public function update(Request $request, Timetable $timetable)
@@ -168,6 +235,7 @@ class TimetableController extends BaseController
             $conflict = Timetable::where('staff_id', $validated['staff_id'])
                 ->where('id', '!=', $timetable->id)
                 ->where('day', $validated['day'])
+                ->where('academic_session_id', $timetable->academic_session_id)
                 ->where(function($q) use ($validated) {
                     $q->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
                       ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']]);

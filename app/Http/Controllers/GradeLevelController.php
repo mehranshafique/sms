@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\GradeLevel;
+use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Auth; // Required for Auth::user()
+use Illuminate\Support\Facades\Auth;
 
 class GradeLevelController extends BaseController
 {
@@ -18,13 +19,15 @@ class GradeLevelController extends BaseController
 
     public function index(Request $request)
     {
-        // FIX: Replaced institute()->id with Auth::user()->institute_id
-        $institutionId = Auth::user()->institute_id; 
+        $institutionId = Auth::user()->institute_id;
 
         if ($request->ajax()) {
-            $data = GradeLevel::where('institution_id', $institutionId)
-                ->orderBy('order_index', 'asc')
-                ->select('*');
+            $data = GradeLevel::query()->select('grade_levels.*');
+
+            // Filter by Institution if user is restricted
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -36,6 +39,9 @@ class GradeLevelController extends BaseController
                                 </div>';
                     }
                     return '';
+                })
+                ->addColumn('institution_name', function($row){
+                    return $row->institution->name ?? 'N/A';
                 })
                 ->editColumn('education_cycle', function($row){
                     return ucfirst($row->education_cycle);
@@ -55,11 +61,16 @@ class GradeLevelController extends BaseController
                 ->make(true);
         }
 
-        // Stats
-        $totalGrades = GradeLevel::where('institution_id', $institutionId)->count();
-        $primaryGrades = GradeLevel::where('institution_id', $institutionId)->where('education_cycle', 'primary')->count();
-        $secondaryGrades = GradeLevel::where('institution_id', $institutionId)->where('education_cycle', 'secondary')->count();
-        $universityGrades = GradeLevel::where('institution_id', $institutionId)->where('education_cycle', 'university')->count();
+        // Stats (Adjusted for Super Admin view)
+        $query = GradeLevel::query();
+        if ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        }
+        
+        $totalGrades = (clone $query)->count();
+        $primaryGrades = (clone $query)->where('education_cycle', 'primary')->count();
+        $secondaryGrades = (clone $query)->where('education_cycle', 'secondary')->count();
+        $universityGrades = (clone $query)->where('education_cycle', 'university')->count();
 
         return view('grade_levels.index', compact('totalGrades', 'primaryGrades', 'secondaryGrades', 'universityGrades'));
     }
@@ -67,26 +78,39 @@ class GradeLevelController extends BaseController
     public function create()
     {
         $institutionId = Auth::user()->institute_id;
+        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         
         // Auto-suggest next order index
-        $lastOrder = GradeLevel::where('institution_id', $institutionId)->max('order_index') ?? 0;
+        $query = GradeLevel::query();
+        if ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        }
+        $lastOrder = $query->max('order_index') ?? 0;
         $nextOrder = $lastOrder + 1;
         
-        return view('grade_levels.create', compact('nextOrder'));
+        return view('grade_levels.create', compact('nextOrder', 'institutions'));
     }
 
     public function store(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        $userInstituteId = Auth::user()->institute_id;
 
         $validated = $request->validate([
-            'name'            => ['required', 'string', 'max:100', Rule::unique('grade_levels')->where('institution_id', $institutionId)],
+            // If user has no institute (Super Admin), require selection. Else, verify it matches auth user.
+            'institution_id' => $userInstituteId ? 'nullable' : 'required|exists:institutions,id',
+            'name'           => [
+                'required', 'string', 'max:100', 
+                Rule::unique('grade_levels')->where('institution_id', $request->institution_id ?? $userInstituteId)
+            ],
             'code'            => 'nullable|string|max:30',
             'order_index'     => 'required|integer|min:0',
             'education_cycle' => 'required|in:primary,secondary,university,vocational',
         ]);
 
-        $validated['institution_id'] = $institutionId;
+        // Force Institution ID if user is not Super Admin
+        if ($userInstituteId) {
+            $validated['institution_id'] = $userInstituteId;
+        }
 
         GradeLevel::create($validated);
 
@@ -95,19 +119,30 @@ class GradeLevelController extends BaseController
 
     public function edit(GradeLevel $grade_level)
     {
-        return view('grade_levels.edit', compact('grade_level'));
+        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        return view('grade_levels.edit', compact('grade_level', 'institutions'));
     }
 
     public function update(Request $request, GradeLevel $grade_level)
     {
-        $institutionId = Auth::user()->institute_id;
+        $userInstituteId = Auth::user()->institute_id;
 
         $validated = $request->validate([
-            'name'            => ['required', 'string', 'max:100', Rule::unique('grade_levels')->ignore($grade_level->id)->where('institution_id', $institutionId)],
+            'institution_id' => $userInstituteId ? 'nullable' : 'required|exists:institutions,id',
+            'name'           => [
+                'required', 'string', 'max:100', 
+                Rule::unique('grade_levels')
+                    ->ignore($grade_level->id)
+                    ->where('institution_id', $request->institution_id ?? $userInstituteId)
+            ],
             'code'            => 'nullable|string|max:30',
             'order_index'     => 'required|integer|min:0',
             'education_cycle' => 'required|in:primary,secondary,university,vocational',
         ]);
+
+        if ($userInstituteId) {
+            $validated['institution_id'] = $userInstituteId;
+        }
 
         $grade_level->update($validated);
 

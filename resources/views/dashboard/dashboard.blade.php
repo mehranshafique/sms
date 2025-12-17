@@ -141,7 +141,8 @@
                                                     {{ $student->first_name }} {{ $student->last_name }}
                                                 </div>
                                             </td>
-                                            <td>{{ $student->institute->name ?? 'N/A' }}</td>
+                                            {{-- Fixed: Changed $student->institute to $student->institution --}}
+                                            <td>{{ $student->institution->name ?? 'N/A' }}</td>
                                             <td>
                                                 @if($student->status == 'active')
                                                     <span class="badge light badge-success">Active</span>

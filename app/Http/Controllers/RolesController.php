@@ -13,7 +13,7 @@ class RolesController extends BaseController
     public function __construct()
     {
         // Enforce Resource Policy
-        // $this->authorizeResource(Role::class, 'role');
+        $this->authorizeResource(Role::class, 'role');
         $this->setPageTitle(__('roles.page_title'));
     }
 

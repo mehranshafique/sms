@@ -27,18 +27,36 @@ class RolePermissionSeeder extends Seeder
             'Roles' => ['view', 'create', 'update', 'delete'],
             'Permissions' => ['view', 'create', 'update', 'delete'],
             'Users' => ['view', 'create', 'update', 'delete'],
-            'Institutions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
+            'Modules' => ['view', 'create', 'update', 'delete'],
+            
+            // Core Structure
+            'Institutes' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
             'Campuses' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Head Officers' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            
+            // Academics
             'Academic Sessions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Grade Levels' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Class Sections' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Modules' => ['view', 'create', 'update', 'delete'],
+            
+            // People & Students
+            'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Student Attendance' => ['view', 'create', 'update', 'delete'], 
+            'Student Promotion' => ['view', 'create'], // Special Tool
+            'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            
+            // Examinations
+            'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Exam Marks' => ['create', 'update', 'view'],
+
+            // Finance
+            'Fee Structures' => ['view', 'create', 'update', 'delete'],
+            'Fee Types' => ['view', 'create', 'update', 'delete'],
+            'Invoices' => ['view', 'create', 'update', 'delete'],
+            'Payments' => ['view', 'create'],
         ];
 
         // 3. Create Permissions and Assign to Module

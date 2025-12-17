@@ -14,7 +14,7 @@
             </li>
 
             {{-- Institutes --}}
-            @can('institute.view')
+            @can('institution.view')
                 <li class="{{ isActive(['institutes.index','institutes.create','institutes.edit']) }}">
                     <a class="ai-icon {{ isActive('institutes.index') }}"
                        href="{{ route('institutes.index') }}" aria-expanded="false">
@@ -103,6 +103,30 @@
                 </li>
             @endcan
 
+            <li class="nav-label">Examinations</li>
+
+            {{-- Exams --}}
+            @can('exam.view')
+                <li class="{{ isActive(['exams.index','exams.create','exams.edit','exams.show']) }}">
+                    <a class="ai-icon {{ isActive('exams.index') }}"
+                       href="{{ route('exams.index') }}" aria-expanded="false">
+                        <i class="la la-file-text"></i>
+                        <span class="nav-text">Exams</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Exam Marks --}}
+            @can('exam_mark.create')
+                <li class="{{ isActive(['marks.create']) }}">
+                    <a class="ai-icon {{ isActive('marks.create') }}"
+                       href="{{ route('marks.create') }}" aria-expanded="false">
+                        <i class="la la-edit"></i>
+                        <span class="nav-text">Enter Marks</span>
+                    </a>
+                </li>
+            @endcan
+
             <li class="nav-label">{{ __('sidebar.people') }}</li>
 
             {{-- Students --}}
@@ -116,13 +140,35 @@
                 </li>
             @endcan
 
-            {{-- Enrollments (Class Allocations) --}}
+            {{-- Enrollments --}}
             @can('student_enrollment.view')
                 <li class="{{ isActive(['enrollments.index','enrollments.create','enrollments.edit']) }}">
                     <a class="ai-icon {{ isActive('enrollments.index') }}"
                        href="{{ route('enrollments.index') }}" aria-expanded="false">
                         <i class="la la-id-card"></i>
                         <span class="nav-text">{{ __('sidebar.enrollments.title') }}</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Attendance --}}
+            @can('student_attendance.view')
+                <li class="{{ isActive(['attendance.index','attendance.create']) }}">
+                    <a class="ai-icon {{ isActive(['attendance.index','attendance.create']) }}"
+                       href="{{ route('attendance.index') }}" aria-expanded="false">
+                        <i class="la la-check-square"></i>
+                        <span class="nav-text">Attendance</span>
+                    </a>
+                </li>
+            @endcan
+
+            {{-- Promotions --}}
+            @can('student_promotion.view')
+                <li class="{{ isActive(['promotions.index']) }}">
+                    <a class="ai-icon {{ isActive('promotions.index') }}"
+                       href="{{ route('promotions.index') }}" aria-expanded="false">
+                        <i class="la la-level-up"></i>
+                        <span class="nav-text">Promotions</span>
                     </a>
                 </li>
             @endcan
@@ -135,6 +181,22 @@
                         <i class="la la-chalkboard-teacher"></i>
                         <span class="nav-text">{{ __('sidebar.staff.title') }}</span>
                     </a>
+                </li>
+            @endcan
+
+            {{-- Finance (New) --}}
+            <li class="nav-label">Finance</li>
+            @can('fee_structure.view')
+                <li class="{{ isActive(['fees.index','fees.create']) }}">
+                    <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
+                        <i class="la la-money"></i>
+                        <span class="nav-text">Finance</span>
+                    </a>
+                    <ul aria-expanded="false">
+                        <li><a href="{{ route('fee-types.index') }}">Fee Types</a></li> {{-- Added --}}
+                        <li><a href="{{ route('fees.index') }}">Fee Structures</a></li>
+                        {{-- <li><a href="{{ route('invoices.index') }}">Invoices</a></li> --}}
+                    </ul>
                 </li>
             @endcan
 

@@ -7,7 +7,7 @@
     <div class="row">
         <div class="col-xl-12 col-lg-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header border-0 pb-0">
                     <h4 class="card-title">{{ __('timetable.basic_information') }}</h4>
                 </div>
                 <div class="card-body">
@@ -18,9 +18,11 @@
                                 <label class="form-label">{{ __('timetable.select_class') }} <span class="text-danger">*</span></label>
                                 <select name="class_section_id" class="form-control default-select" required>
                                     <option value="">{{ __('timetable.select_class') }}</option>
-                                    @foreach($classes as $id => $name)
-                                        <option value="{{ $id }}" {{ (old('class_section_id', isset($timetable) ? $timetable->class_section_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
-                                    @endforeach
+                                    @if(isset($classes))
+                                        @foreach($classes as $id => $name)
+                                            <option value="{{ $id }}" {{ (old('class_section_id', isset($timetable) ? $timetable->class_section_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                        @endforeach
+                                    @endif
                                 </select>
                             </div>
                             
@@ -29,9 +31,11 @@
                                 <label class="form-label">{{ __('timetable.select_subject') }} <span class="text-danger">*</span></label>
                                 <select name="subject_id" class="form-control default-select" required>
                                     <option value="">{{ __('timetable.select_subject') }}</option>
-                                    @foreach($subjects as $id => $name)
-                                        <option value="{{ $id }}" {{ (old('subject_id', isset($timetable) ? $timetable->subject_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
-                                    @endforeach
+                                    @if(isset($subjects))
+                                        @foreach($subjects as $id => $name)
+                                            <option value="{{ $id }}" {{ (old('subject_id', isset($timetable) ? $timetable->subject_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                        @endforeach
+                                    @endif
                                 </select>
                             </div>
 
@@ -40,9 +44,11 @@
                                 <label class="form-label">{{ __('timetable.select_teacher') }}</label>
                                 <select name="staff_id" class="form-control default-select">
                                     <option value="">{{ __('timetable.select_teacher') }}</option>
-                                    @foreach($teachers as $id => $name)
-                                        <option value="{{ $id }}" {{ (old('staff_id', isset($timetable) ? $timetable->staff_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
-                                    @endforeach
+                                    @if(isset($teachers))
+                                        @foreach($teachers as $id => $name)
+                                            <option value="{{ $id }}" {{ (old('staff_id', isset($timetable) ? $timetable->staff_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                        @endforeach
+                                    @endif
                                 </select>
                             </div>
 

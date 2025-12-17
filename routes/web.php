@@ -10,7 +10,7 @@ use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\InstituteController;
 use App\Http\Controllers\HeadOfficersController;
 use App\Http\Controllers\StudentController;
-use App\Http\Controllers\StudentEnrollmentController; // Added
+use App\Http\Controllers\StudentEnrollmentController; 
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\AcademicSessionController;
 use App\Http\Controllers\CampusController;
@@ -18,6 +18,11 @@ use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\TimetableController;
+use App\Http\Controllers\StudentAttendanceController;
+use App\Http\Controllers\ExamController;
+use App\Http\Controllers\ExamMarkController;
+use App\Http\Controllers\StudentPromotionController;
+use App\Http\Controllers\Finance\FeeStructureController; // Added
 
 Route::redirect('/','/login' );
 
@@ -77,7 +82,7 @@ Route::middleware('auth')->group(function () {
     // Core Modules
     Route::resource('students', StudentController::class);
     
-    // Student Enrollments (NEW)
+    // Student Enrollments
     Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
     Route::resource('enrollments', StudentEnrollmentController::class);
 
@@ -96,6 +101,30 @@ Route::middleware('auth')->group(function () {
 
     Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
     Route::resource('timetables', TimetableController::class);
+
+    // Attendance
+    Route::get('attendance/create', [StudentAttendanceController::class, 'create'])->name('attendance.create');
+    Route::post('attendance', [StudentAttendanceController::class, 'store'])->name('attendance.store');
+    Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');
+
+    // Exams
+    Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
+    Route::resource('exams', ExamController::class);
+
+    // Exam Marks
+    Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
+    Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
+
+    // Promotions
+    Route::get('promotions', [StudentPromotionController::class, 'index'])->name('promotions.index');
+    Route::post('promotions', [StudentPromotionController::class, 'store'])->name('promotions.store');
+
+    // Finance Module
+    Route::prefix('finance')->group(function () {
+        Route::resource('fee-types', \App\Http\Controllers\Finance\FeeTypeController::class); // Added
+        Route::resource('fees', FeeStructureController::class);
+        // Add Invoice and Payment routes here later
+    });
 });
 
 require __DIR__.'/auth.php';

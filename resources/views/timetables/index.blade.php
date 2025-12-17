@@ -92,13 +92,12 @@
                                         </th>
                                         @endcan
                                         <th>{{ __('timetable.table_no') }}</th>
-                                        <th>{{ __('timetable.day') }}</th>
-                                        <th>{{ __('timetable.time') }}</th>
                                         <th>{{ __('timetable.class') }}</th>
                                         <th>{{ __('timetable.subject') }}</th>
                                         <th>{{ __('timetable.teacher') }}</th>
-                                        <th>{{ __('timetable.room') }}</th>
-                                        <th class="text-end no-sort">{{ __('timetable.action') }}</th>
+                                        <th>{{ __('timetable.day') }}</th>
+                                        <th>{{ __('timetable.time') }}</th>
+                                        <th class="text-end">{{ __('timetable.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -168,18 +167,18 @@
                 @endcan
             ],
             ordering: true,
-            order: [[2, 'asc']], // Order by Day/Time
+            order: [[4, 'asc']], // Order by Day
             columns: [
                 @can('timetable.delete')
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endcan
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
-                { data: 'day', name: 'day' },
-                { data: 'time', name: 'start_time' },
                 { data: 'class', name: 'classSection.name' },
                 { data: 'subject', name: 'subject.name' },
                 { data: 'teacher', name: 'teacher.user.name' },
-                { data: 'room_number', name: 'room_number' },
+                // FIX: Changed 'day_of_week' to 'day' to match database/controller
+                { data: 'day', name: 'day' },
+                { data: 'time', name: 'start_time' }, 
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
             ],
             language: {

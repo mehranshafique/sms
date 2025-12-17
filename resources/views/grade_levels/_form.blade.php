@@ -7,12 +7,27 @@
     <div class="row">
         <div class="col-xl-12 col-lg-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header border-0 pb-0">
                     <h4 class="card-title">{{ __('grade_level.basic_information') }}</h4>
                 </div>
                 <div class="card-body">
                     <div class="basic-form">
                         <div class="row">
+                            {{-- Institution Selection (Visible only if user has no fixed institute) --}}
+                            @if(!auth()->user()->institute_id)
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label">Institution <span class="text-danger">*</span></label>
+                                    <select name="institution_id" class="form-control default-select" required>
+                                        <option value="">Select Institution</option>
+                                        @foreach($institutions as $id => $name)
+                                            <option value="{{ $id }}" {{ (old('institution_id', $grade_level->institution_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @else
+                                <input type="hidden" name="institution_id" value="{{ auth()->user()->institute_id }}">
+                            @endif
+
                             {{-- Name --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('grade_level.grade_name') }} <span class="text-danger">*</span></label>
@@ -29,7 +44,7 @@
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('grade_level.order_index') }} <span class="text-danger">*</span></label>
                                 <input type="number" name="order_index" value="{{ old('order_index', $grade_level->order_index ?? ($nextOrder ?? 0)) }}" class="form-control" required>
-                                <small class="text-muted">Used for sorting (1, 2, 3...)</small>
+                                <small class="text-muted d-block mt-1">Used for sorting (1, 2, 3...)</small>
                             </div>
 
                             {{-- Education Cycle --}}

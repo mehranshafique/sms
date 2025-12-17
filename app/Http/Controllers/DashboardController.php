@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Institute;
+use App\Models\Institution; // Fixed: Changed from Institute to Institution
 use App\Models\Student;
 use App\Models\Staff;
 use App\Models\Campus;
@@ -26,16 +26,16 @@ class DashboardController extends BaseController
         $totalStudents = Student::count();
         $totalStaff = Staff::count();
         $totalCampuses = Campus::count();
-        $totalInstitutes = Institute::count();
+        $totalInstitutes = Institution::count(); // Fixed: Changed Institute to Institution
 
         // 2. Recent Students (Limit 5 for display)
-        $recentStudents = Student::with('institute')
+        // Fixed: Changed relationship from 'institute' to 'institution'
+        $recentStudents = Student::with('institution')
             ->latest()
             ->take(5)
             ->get();
 
         // 3. Current Academic Session
-        // Assuming there is one global current session or per institute (taking first found for dashboard overview)
         $currentSession = AcademicSession::where('is_current', true)->first();
 
         // 4. Chart Data: Student Registrations (Last 7 Days)

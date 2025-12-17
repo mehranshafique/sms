@@ -1,0 +1,58 @@
+<?php
+
+return [
+    'page_title' => 'Student Attendance',
+    'attendance_management' => 'Attendance Management',
+    'manage_list_subtitle' => 'Track daily student attendance',
+    'messages' => [
+        'success_marked' => 'Attendance marked successfully.',
+    ],
+    
+    // Index
+    'attendance_list' => 'Attendance Log',
+    'mark_attendance' => 'Mark Attendance',
+    'filter_class' => 'Filter Class',
+    'filter_date' => 'Filter Date',
+    'export' => 'Export',
+    
+    // Table
+    'table_no' => '#',
+    'student' => 'Student Name',
+    'roll_no' => 'Roll / ID',
+    'class' => 'Class',
+    'status' => 'Status',
+    'date' => 'Date',
+    'search_placeholder' => 'Search records...',
+    'no_records_found' => 'No records found',
+
+    // Create / Mark
+    'mark_attendance_title' => 'Mark Class Attendance',
+    'select_criteria' => 'Select Criteria',
+    'select_class' => 'Select Class Section',
+    'select_date' => 'Select Date',
+    'load_students' => 'Load Students',
+    'student_list' => 'Student List',
+    
+    'present' => 'Present',
+    'absent' => 'Absent',
+    'late' => 'Late',
+    'excused' => 'Excused',
+    'half_day' => 'Half Day',
+    
+    'mark_all_present' => 'Mark All Present',
+    'mark_all_absent' => 'Mark All Absent',
+    'save_attendance' => 'Save Attendance',
+    'update_attendance' => 'Update Attendance',
+    'not_enrolled' => 'No active students found in this class.',
+    'no_active_session' => 'No active academic session found.',
+    
+    // Lock Logic
+    'attendance_locked' => 'Attendance Locked',
+    'attendance_locked_desc' => 'Attendance for this date cannot be modified as it is older than 7 days.',
+    'attendance_locked_error' => 'Action Forbidden: Attendance cannot be modified after 7 days.',
+    'locked' => 'Locked',
+
+    'error_occurred' => 'Error Occurred',
+    'validation_error' => 'Validation Error',
+    'success' => 'Success!',
+];

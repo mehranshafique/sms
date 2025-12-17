@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Subject;
 use App\Models\GradeLevel;
+use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
@@ -22,9 +23,12 @@ class SubjectController extends BaseController
         $institutionId = Auth::user()->institute_id;
 
         if ($request->ajax()) {
-            $data = Subject::with('gradeLevel')
-                ->where('institution_id', $institutionId)
+            $data = Subject::with(['gradeLevel', 'institution'])
                 ->select('subjects.*');
+
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
 
             if ($request->has('grade_level_id') && $request->grade_level_id) {
                 $data->where('grade_level_id', $request->grade_level_id);
@@ -73,8 +77,14 @@ class SubjectController extends BaseController
                 ->make(true);
         }
 
-        $totalSubjects = Subject::where('institution_id', $institutionId)->count();
-        $activeSubjects = Subject::where('institution_id', $institutionId)->where('is_active', true)->count();
+        // Stats Logic
+        $query = Subject::query();
+        if ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        }
+        
+        $totalSubjects = (clone $query)->count();
+        $activeSubjects = (clone $query)->where('is_active', true)->count();
         
         return view('subjects.index', compact('totalSubjects', 'activeSubjects'));
     }
@@ -82,22 +92,40 @@ class SubjectController extends BaseController
     public function create()
     {
         $institutionId = Auth::user()->institute_id;
-        // Fix: Ensure gradeLevels is fetched and passed
-        $gradeLevels = GradeLevel::where('institution_id', $institutionId)
-            ->orderBy('order_index')
-            ->pluck('name', 'id');
+        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        
+        $gradeLevelsQuery = GradeLevel::query();
+        if ($institutionId) {
+            $gradeLevelsQuery->where('institution_id', $institutionId);
+        } else {
+            // Super Admin view: Eager load institution to show in dropdown
+            $gradeLevelsQuery->with('institution');
+        }
+        
+        $gradeLevelsCollection = $gradeLevelsQuery->orderBy('order_index')->get();
+        
+        // Format Grade Levels for Dropdown: "Grade 1" or "Grade 1 (School Name)"
+        $gradeLevels = $gradeLevelsCollection->mapWithKeys(function($item) use ($institutionId) {
+            $label = $item->name;
+            if (!$institutionId && $item->institution) {
+                $label .= ' (' . $item->institution->name . ')';
+            }
+            return [$item->id => $label];
+        });
             
-        return view('subjects.create', compact('gradeLevels'));
+        return view('subjects.create', compact('gradeLevels', 'institutions'));
     }
 
     public function store(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        $userInstituteId = Auth::user()->institute_id;
 
         $validated = $request->validate([
+            'institution_id' => $userInstituteId ? 'nullable' : 'required|exists:institutions,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
             'name'           => ['required', 'string', 'max:100', 
-                Rule::unique('subjects')->where('grade_level_id', $request->grade_level_id)
+                Rule::unique('subjects')
+                    ->where('grade_level_id', $request->grade_level_id)
             ],
             'code'           => 'nullable|string|max:30',
             'type'           => 'required|in:theory,practical,both',
@@ -107,7 +135,10 @@ class SubjectController extends BaseController
             'is_active'      => 'boolean'
         ]);
 
-        $validated['institution_id'] = $institutionId;
+        // Auto-assign Institution if user is restricted
+        if ($userInstituteId) {
+            $validated['institution_id'] = $userInstituteId;
+        }
 
         Subject::create($validated);
 
@@ -116,24 +147,40 @@ class SubjectController extends BaseController
 
     public function show(Subject $subject)
     {
-        $subject->load('gradeLevel');
+        $subject->load('gradeLevel', 'institution');
         return view('subjects.show', compact('subject'));
     }
 
     public function edit(Subject $subject)
     {
         $institutionId = Auth::user()->institute_id;
-        // Fix: Ensure gradeLevels is fetched and passed for edit too
-        $gradeLevels = GradeLevel::where('institution_id', $institutionId)
-            ->orderBy('order_index')
-            ->pluck('name', 'id');
+        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
 
-        return view('subjects.edit', compact('subject', 'gradeLevels'));
+        $gradeLevelsQuery = GradeLevel::query();
+        if ($institutionId) {
+            $gradeLevelsQuery->where('institution_id', $institutionId);
+        } else {
+            $gradeLevelsQuery->with('institution');
+        }
+        
+        $gradeLevelsCollection = $gradeLevelsQuery->orderBy('order_index')->get();
+        $gradeLevels = $gradeLevelsCollection->mapWithKeys(function($item) use ($institutionId) {
+            $label = $item->name;
+            if (!$institutionId && $item->institution) {
+                $label .= ' (' . $item->institution->name . ')';
+            }
+            return [$item->id => $label];
+        });
+
+        return view('subjects.edit', compact('subject', 'gradeLevels', 'institutions'));
     }
 
     public function update(Request $request, Subject $subject)
     {
+        $userInstituteId = Auth::user()->institute_id;
+
         $validated = $request->validate([
+            'institution_id' => $userInstituteId ? 'nullable' : 'required|exists:institutions,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
             'name'           => ['required', 'string', 'max:100', 
                 Rule::unique('subjects')
@@ -147,6 +194,10 @@ class SubjectController extends BaseController
             'passing_marks'  => 'required|integer|min:0|lte:total_marks',
             'is_active'      => 'boolean'
         ]);
+
+        if ($userInstituteId) {
+            $validated['institution_id'] = $userInstituteId;
+        }
 
         $subject->update($validated);
 

@@ -6,6 +6,7 @@ use App\Models\StudentEnrollment;
 use App\Models\Student;
 use App\Models\ClassSection;
 use App\Models\AcademicSession;
+use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -23,19 +24,32 @@ class StudentEnrollmentController extends BaseController
     public function index(Request $request)
     {
         $institutionId = Auth::user()->institute_id;
-        $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        
+        // Fetch active session based on user's institute or request
+        $querySession = AcademicSession::query();
+        if($institutionId) {
+            $querySession->where('institution_id', $institutionId);
+        }
+        $currentSession = $querySession->where('is_current', true)->first();
 
         if ($request->ajax()) {
+            // FIX: Select specific columns to avoid ID collision if joins happen
             $data = StudentEnrollment::with(['student', 'classSection', 'gradeLevel'])
-                ->where('institution_id', $institutionId)
-                // Default to current session unless filtered
-                ->when($currentSession, function($q) use ($currentSession) {
-                    $q->where('academic_session_id', $currentSession->id);
-                })
                 ->select('student_enrollments.*');
 
+            // FIX: Qualify column name to avoid ambiguity (student_enrollments.institution_id)
+            if ($institutionId) {
+                $data->where('student_enrollments.institution_id', $institutionId);
+            }
+
+            // Filter by Session (Default to current if active)
+            // FIX: Qualify academic_session_id as well
+            if ($currentSession) {
+                $data->where('student_enrollments.academic_session_id', $currentSession->id);
+            }
+
             if ($request->has('class_section_id') && $request->class_section_id) {
-                $data->where('class_section_id', $request->class_section_id);
+                $data->where('student_enrollments.class_section_id', $request->class_section_id);
             }
 
             return DataTables::of($data)
@@ -83,7 +97,13 @@ class StudentEnrollmentController extends BaseController
                 ->make(true);
         }
 
-        $classSections = ClassSection::where('institution_id', $institutionId)->pluck('name', 'id');
+        // Dropdowns for Filter
+        $classSectionsQuery = ClassSection::query();
+        if ($institutionId) {
+            $classSectionsQuery->where('institution_id', $institutionId);
+        }
+        $classSections = $classSectionsQuery->pluck('name', 'id');
+        
         $sessionName = $currentSession ? $currentSession->name : __('enrollment.no_active_session');
 
         return view('enrollments.index', compact('classSections', 'sessionName'));
@@ -93,25 +113,47 @@ class StudentEnrollmentController extends BaseController
     {
         $institutionId = Auth::user()->institute_id;
         
-        $classes = ClassSection::with('gradeLevel')
-            ->where('institution_id', $institutionId)
-            ->get()
-            ->mapWithKeys(function($item){
-                return [$item->id => $item->name . ' (' . $item->gradeLevel->name . ')'];
-            });
+        // Classes
+        $classesQuery = ClassSection::with(['gradeLevel', 'institution']);
+        if ($institutionId) {
+            $classesQuery->where('institution_id', $institutionId);
+        }
+        $classes = $classesQuery->get()->mapWithKeys(function($item) use ($institutionId){
+            $label = $item->name . ' (' . $item->gradeLevel->name . ')';
+            if (!$institutionId && $item->institution) {
+                $label .= ' - ' . $item->institution->code;
+            }
+            return [$item->id => $label];
+        });
 
-        // Get students NOT enrolled in current session
-        $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        // Current Session Check
+        $querySession = AcademicSession::where('is_current', true);
+        if($institutionId) {
+            $querySession->where('institution_id', $institutionId);
+        }
+        $currentSession = $querySession->first();
+        
         $sessionId = $currentSession ? $currentSession->id : 0;
 
-        $students = Student::where('institution_id', $institutionId)
-            ->whereDoesntHave('enrollments', function($q) use ($sessionId) {
-                $q->where('academic_session_id', $sessionId);
-            })
-            ->select('id', 'first_name', 'last_name', 'admission_number')
+        // Students (Not yet enrolled in this session)
+        $studentsQuery = Student::whereDoesntHave('enrollments', function($q) use ($sessionId) {
+            $q->where('academic_session_id', $sessionId);
+        });
+        
+        if ($institutionId) {
+            $studentsQuery->where('institution_id', $institutionId);
+        } else {
+            $studentsQuery->with('institution');
+        }
+
+        $students = $studentsQuery->select('id', 'first_name', 'last_name', 'admission_number', 'institution_id')
             ->get()
-            ->mapWithKeys(function($item){
-                return [$item->id => $item->full_name . ' (' . $item->admission_number . ')'];
+            ->mapWithKeys(function($item) use ($institutionId){
+                $label = $item->full_name . ' (' . $item->admission_number . ')';
+                if (!$institutionId && $item->institution) {
+                    $label .= ' - ' . $item->institution->code;
+                }
+                return [$item->id => $label];
             });
 
         return view('enrollments.create', compact('classes', 'students'));
@@ -119,18 +161,34 @@ class StudentEnrollmentController extends BaseController
 
     public function store(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
-        $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        $userInstituteId = Auth::user()->institute_id;
+        
+        // 1. Determine Target Institution (From Student or Class)
+        $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
+        $targetInstituteId = $classSection->institution_id;
+
+        // 2. Get Current Session for THAT Institution
+        $currentSession = AcademicSession::where('institution_id', $targetInstituteId)
+            ->where('is_current', true)
+            ->first();
 
         if(!$currentSession) {
             return response()->json(['message' => __('enrollment.no_active_session_error')], 422);
         }
 
         $validated = $request->validate([
-            'student_id'       => 'required|exists:students,id',
+            'student_id'       => [
+                'required', 
+                'exists:students,id',
+                // Rule: Student unique per session
+                Rule::unique('student_enrollments')->where(function ($query) use ($currentSession) {
+                    return $query->where('academic_session_id', $currentSession->id);
+                })
+            ],
             'class_section_id' => 'required|exists:class_sections,id',
             'roll_number'      => [
                 'nullable', 'string', 'max:20',
+                // Rule: Roll number unique per section per session
                 Rule::unique('student_enrollments')
                     ->where('academic_session_id', $currentSession->id)
                     ->where('class_section_id', $request->class_section_id)
@@ -139,9 +197,7 @@ class StudentEnrollmentController extends BaseController
             'enrolled_at'      => 'required|date',
         ]);
 
-        $classSection = ClassSection::find($request->class_section_id);
-
-        $validated['institution_id'] = $institutionId;
+        $validated['institution_id'] = $targetInstituteId;
         $validated['academic_session_id'] = $currentSession->id;
         $validated['grade_level_id'] = $classSection->grade_level_id;
 
@@ -154,14 +210,14 @@ class StudentEnrollmentController extends BaseController
     {
         $institutionId = Auth::user()->institute_id;
         
-        $classes = ClassSection::with('gradeLevel')
-            ->where('institution_id', $institutionId)
-            ->get()
-            ->mapWithKeys(function($item){
-                return [$item->id => $item->name . ' (' . $item->gradeLevel->name . ')'];
-            });
+        $classesQuery = ClassSection::with('gradeLevel');
+        if ($institutionId) {
+            $classesQuery->where('institution_id', $institutionId);
+        }
+        $classes = $classesQuery->get()->mapWithKeys(function($item){
+            return [$item->id => $item->name . ' (' . $item->gradeLevel->name . ')'];
+        });
 
-        // For edit, we just show the current student
         $students = [$enrollment->student_id => $enrollment->student->full_name];
 
         return view('enrollments.edit', compact('enrollment', 'classes', 'students'));

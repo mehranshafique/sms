@@ -60,92 +60,71 @@
     <script src="{{asset('js/plugins-init/material-date-picker-init.js')}}"></script>
     <script src="{{asset('js/plugins-init/pickadate-init.js')}}"></script>
 
-    <!-- Global Button Processing Script -->
+   <!-- Global Button Processing Script -->
     <script>
         $(document).ready(function() {
-            // Keep track of the last clicked button for AJAX requests
             var $lastClickedBtn = null;
-            $(document).on('click', 'button, a.btn, input[type="submit"]', function() {
+
+            // Track clicks to identify the trigger button
+            $(document).on('click', 'button[type="submit"], input[type="submit"], a.btn', function() {
                 $lastClickedBtn = $(this);
             });
 
-            // 1. Handle Global AJAX Requests (Start)
+            // Handle AJAX Start
             $(document).ajaxSend(function(event, jqXHR, settings) {
-                // Use activeElement or last clicked button if activeElement isn't specific
-                var $trigger = $(document.activeElement);
-                if (!$trigger.length || (!$trigger.is('button') && !$trigger.is('a.btn') && !$trigger.is('input[type="submit"]'))) {
-                    if ($lastClickedBtn) {
-                        $trigger = $lastClickedBtn;
-                    }
+                var $trigger = null;
+
+                // 1. Try finding based on active element
+                var $active = $(document.activeElement);
+                if ($active.length && ($active.is('button') || $active.is('input[type="submit"]'))) {
+                    $trigger = $active;
+                }
+                
+                // 2. Fallback to last clicked
+                if ((!$trigger || !$trigger.length) && $lastClickedBtn) {
+                    $trigger = $lastClickedBtn;
                 }
 
-                // If it's a button/link/input and not already loading
-                if (($trigger.is('button') || $trigger.is('a.btn') || $trigger.is('input[type="submit"]')) && !$trigger.data('is-loading')) {
-                    
-                    // Ignore buttons inside DataTables pagination/sorting as they handle themselves differently usually,
-                    // but if you want them to show loading, keep this. 
-                    // Ignore bulk delete if handled separately, but this makes it safer.
-                    
-                    // Mark as loading
+                // If valid trigger found and not already loading
+                if ($trigger && $trigger.length && !$trigger.data('is-loading')) {
+                    // Save original state
                     $trigger.data('is-loading', true);
-                    $trigger.data('original-html', $trigger.html()); // Store original content
-                    
-                    // Add disabled state
+                    $trigger.data('original-html', $trigger.html());
+                    if ($trigger.is('input')) $trigger.data('original-val', $trigger.val());
+
+                    // Set loading state
                     $trigger.addClass('disabled').attr('disabled', true);
                     
-                    // Add Spinner
-                    // Check if it's an input button (value attribute) or regular button (html)
                     if ($trigger.is('input')) {
-                        $trigger.data('original-val', $trigger.val());
                         $trigger.val('Processing...');
                     } else {
                         $trigger.html('<i class="fas fa-circle-notch fa-spin me-2"></i> Processing...');
                     }
-                    
-                    // Attach the trigger to the xhr object so we can revert it later
+
+                    // Attach to settings so we can find it in ajaxComplete
                     settings.triggerElement = $trigger;
                 }
             });
 
-            // 2. Handle Global AJAX Requests (Complete)
+            // Handle AJAX Complete (fires on Success AND Error)
             $(document).ajaxComplete(function(event, jqXHR, settings) {
                 var $trigger = settings.triggerElement;
                 if ($trigger && $trigger.length) {
-                    setTimeout(function() { // Small delay to ensure user sees the completion if it was super fast
-                        // Revert HTML/Value
-                        if ($trigger.is('input')) {
-                            $trigger.val($trigger.data('original-val'));
-                        } else {
-                            $trigger.html($trigger.data('original-html'));
-                        }
-                        
-                        // Re-enable
-                        $trigger.removeClass('disabled').attr('disabled', false);
-                        $trigger.data('is-loading', false);
-                        $lastClickedBtn = null; // Reset
-                    }, 300);
-                }
-            });
-
-            // 3. Handle Standard Form Submits (Non-AJAX)
-            $('form').on('submit', function() {
-                var $btn = $(this).find('button[type="submit"], input[type="submit"]');
-                
-                // If form is valid (if using browser validation)
-                if (this.checkValidity()) {
-                    if ($btn.length && !$btn.hasClass('disabled')) {
-                        $btn.data('original-html', $btn.html());
-                        $btn.addClass('disabled').attr('disabled', true);
-                        if ($btn.is('input')) {
-                            $btn.val('Processing...');
-                        } else {
-                            $btn.html('<i class="fas fa-circle-notch fa-spin me-2"></i> Processing...');
-                        }
+                    // IMMEDIATE RESET: No setTimeout needed if you want it to stop before alert
+                    if ($trigger.is('input')) {
+                        $trigger.val($trigger.data('original-val'));
+                    } else {
+                        $trigger.html($trigger.data('original-html'));
                     }
+                    
+                    $trigger.removeClass('disabled').attr('disabled', false);
+                    $trigger.data('is-loading', false);
+                    $lastClickedBtn = null;
                 }
             });
         });
     </script>
+
 
     @yield('js')
     

@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\Institution;
 use App\Models\Campus;
-use App\Models\GradeLevel; // Assuming exists or will exist
+use App\Models\GradeLevel;
+use App\Models\AcademicSession; // Added
+use App\Services\IdGeneratorService; // Added
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StudentController extends BaseController
 {
@@ -23,7 +26,6 @@ class StudentController extends BaseController
         if ($request->ajax()) {
             $data = Student::with(['institution', 'campus', 'gradeLevel'])->select('students.*');
 
-            // Apply Filters if needed (e.g. by Class, Section)
             if ($request->has('grade_level_id') && $request->grade_level_id) {
                 $data->where('grade_level_id', $request->grade_level_id);
             }
@@ -85,7 +87,7 @@ class StudentController extends BaseController
     {
         $institutes = Institution::pluck('name', 'id');
         $campuses = Campus::pluck('name', 'id');
-        $gradeLevels = GradeLevel::pluck('name', 'id'); // Assuming model exists
+        $gradeLevels = GradeLevel::pluck('name', 'id');
         
         return view('students.create', compact('institutes', 'campuses', 'gradeLevels'));
     }
@@ -93,9 +95,9 @@ class StudentController extends BaseController
     public function store(Request $request)
     {
         $request->validate([
-            'institution_id' => 'required',
-            'first_name' => 'required',
-            'last_name' => 'required',
+            'institution_id' => 'required|exists:institutions,id',
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
             'admission_date' => 'required|date',
             'dob' => 'required|date',
             'gender' => 'required',
@@ -107,11 +109,27 @@ class StudentController extends BaseController
 
         $data = $request->all();
 
+        // 1. Get Institution
+        $institution = Institution::findOrFail($request->institution_id);
+
+        // 2. Get Current Active Academic Session for YY Logic
+        $currentSession = AcademicSession::where('institution_id', $institution->id)
+            ->where('is_current', true)
+            ->first();
+
+        if (!$currentSession) {
+            throw ValidationException::withMessages(['institution_id' => 'No active academic session found for this institution. Cannot generate Student ID.']);
+        }
+
+        // 3. Generate Permanent ID
+        $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
+
+        // 4. Handle Photo
         if ($request->hasFile('student_photo')) {
             $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
         }
 
-        // Logic for ID generation is in Model Boot method
+        // 5. Create Student
         Student::create($data);
 
         return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_create')]);
@@ -119,6 +137,7 @@ class StudentController extends BaseController
 
     public function show(Student $student)
     {
+        $student->load(['institution', 'campus', 'gradeLevel', 'enrollments.academicSession', 'enrollments.classSection']);
         return view('students.show', compact('student'));
     }
 
@@ -143,6 +162,10 @@ class StudentController extends BaseController
         ]);
 
         $data = $request->all();
+
+        // Prevent ID Change
+        unset($data['admission_number']); 
+        unset($data['institution_id']);
 
         if ($request->hasFile('student_photo')) {
             if ($student->student_photo) {

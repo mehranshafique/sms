@@ -32,7 +32,7 @@
             let formData = new FormData(this);
             $.ajax({
                 url: $(this).attr('action'),
-                type: "POST", 
+                type: "POST", // Method handled by _method input
                 data: formData,
                 processData: false,
                 contentType: false,
