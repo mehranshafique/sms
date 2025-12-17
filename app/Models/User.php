@@ -1,9 +1,8 @@
 <?php
 
 namespace App\Models;
-use Spatie\Permission\Traits\HasRoles;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -22,10 +21,12 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'institute_id',
+        // 'institute_id', // Removed from fillable for Head Officers as they use the relationship
         'user_type',
         'phone',
-        'address'
+        'address',
+        'is_active',
+        'language'
     ];
 
     /**
@@ -48,9 +49,35 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONSHIPS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * For Head Officers: Manage MULTIPLE Institutes.
+     * Uses pivot table 'institution_head_officers' created in the migration above.
+     */
+    public function institutes()
+    {
+        return $this->belongsToMany(
+            Institute::class, 
+            'institution_head_officers', 
+            'user_id', 
+            'institution_id'
+        )->withTimestamps();
+    }
+
+    /**
+     * For Regular Staff/Students: Direct link to ONE institute (if applicable).
+     * Usually, this data is better accessed via the Staff or Student profile models,
+     * but if a direct column exists on users, this remains valid.
+     */
     public function institute()
     {
         return $this->belongsTo(Institute::class);
@@ -71,5 +98,4 @@ class User extends Authenticatable
     {
         return $this->hasOne(Student::class);
     }
-
 }

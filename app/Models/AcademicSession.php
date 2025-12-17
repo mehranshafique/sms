@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class AcademicSession extends Model
 {
@@ -23,6 +24,23 @@ class AcademicSession extends Model
         'start_date' => 'date',
         'end_date'   => 'date',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | MUTATORS (Fixes MySQL Date Format Error)
+    |--------------------------------------------------------------------------
+    | The DatePicker submits "1 January, 2025". We must convert to "2025-01-01".
+    */
+
+    public function setStartDateAttribute($value)
+    {
+        $this->attributes['start_date'] = $value ? Carbon::parse($value)->format('Y-m-d') : null;
+    }
+
+    public function setEndDateAttribute($value)
+    {
+        $this->attributes['end_date'] = $value ? Carbon::parse($value)->format('Y-m-d') : null;
+    }
 
     /*
     |--------------------------------------------------------------------------

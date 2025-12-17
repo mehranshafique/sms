@@ -25,6 +25,7 @@ return [
     'id' => 'ID',
     'details' => 'Details',
     'name' => 'Name',
+    'logo' => 'Logo',
     'code' => 'Code',
     'type' => 'Type',
     'contact' => 'Contact',
@@ -33,12 +34,14 @@ return [
     'status' => 'Status',
     'action' => 'Action',
     'active' => 'Active',
-    'inactive_status' => 'Inactive', // Renamed to avoid conflict with stats title if needed, or reuse 'inactive'
+    'inactive_status' => 'Inactive',
 
     // Form Labels
     'add_institute' => 'Add Institute',
     'institute_name' => 'Institute Name',
+    'institute_code' => 'Institute Code',
     'institute_type' => 'Institute Type',
+    'institute_logo' => 'Institute Logo',
     'full_address' => 'Full Address',
     'admin_email' => 'Admin Email',
     'password' => 'Password',
@@ -62,6 +65,7 @@ return [
 
     // Buttons
     'save_institute' => 'Save Institute',
+    'update_institute' => 'Update Institute',
     'export' => 'Export',
     'bulk_delete' => 'Bulk Delete',
     'edit' => 'Edit',
@@ -93,5 +97,4 @@ return [
     'edit_institute' => 'Edit Institute',
     'update_institute_details' => 'Update institute details',
     'leave_blank_to_keep_current' => 'Leave blank to keep current institute password',
-    'update_institute' => 'Update Institute',
 ];

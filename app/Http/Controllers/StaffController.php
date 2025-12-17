@@ -4,243 +4,221 @@ namespace App\Http\Controllers;
 
 use App\Models\Staff;
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log;
+use App\Models\Institution;
+use App\Models\Campus;
 use Spatie\Permission\Models\Role;
+use Illuminate\Http\Request;
+use Yajra\DataTables\Facades\DataTables;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class StaffController extends BaseController
 {
     public function __construct()
     {
-        $this->middleware('auth');
-        $this->setPageTitle(__('staff.page_title'));
+        $this->authorizeResource(Staff::class, 'staff');
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        authorize('staff.view');
-        $institute_id = institute()->id; // your helper like institute()
-        $staff = Staff::with(['user', 'institute'])
-            ->where('institute_id', $institute_id)
-            ->get();
+        if ($request->ajax()) {
+            $data = Staff::with(['user', 'institution', 'campus'])->select('staff.*');
 
-        return view('staff.index', compact('staff'));
+            return DataTables::of($data)
+                ->addIndexColumn()
+                ->addColumn('checkbox', function($row){
+                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
+                                <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
+                                <label class="form-check-label"></label>
+                            </div>';
+                })
+                ->addColumn('details', function($row){
+                    $img = $row->user->profile_picture ? asset('storage/' . $row->user->profile_picture) : null;
+                    $name = $row->user->name;
+                    $email = $row->user->email;
+                    $initial = strtoupper(substr($name, 0, 1));
+                    
+                    $avatarHtml = $img 
+                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
+                        : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
+
+                    return '<div class="d-flex align-items-center">
+                                '.$avatarHtml.'
+                                <div>
+                                    <h6 class="fs-16 font-w600 mb-0"><a href="'.route('staff.show', $row->id).'" class="text-black">'.$name.'</a></h6>
+                                    <span class="fs-13 text-muted">'.$email.'</span>
+                                </div>
+                            </div>';
+                })
+                ->addColumn('role', function($row){
+                    return $row->user->roles->pluck('name')->join(', ');
+                })
+                ->editColumn('status', function($row){
+                    $badges = [
+                        'active' => 'badge-success',
+                        'on_leave' => 'badge-warning',
+                        'resigned' => 'badge-secondary',
+                        'terminated' => 'badge-danger'
+                    ];
+                    return '<span class="badge '.($badges[$row->status] ?? 'badge-light').'">'.ucfirst(str_replace('_', ' ', $row->status)).'</span>';
+                })
+                ->addColumn('action', function($row){
+                    $btn = '<div class="d-flex justify-content-end action-buttons">';
+                    $btn .= '<a href="'.route('staff.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                    $btn .= '<a href="'.route('staff.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
+                    $btn .= '<button class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
+                    $btn .= '</div>';
+                    return $btn;
+                })
+                ->rawColumns(['checkbox', 'details', 'role', 'status', 'action'])
+                ->make(true);
+        }
+
+        return view('staff.index');
     }
 
     public function create()
     {
-        authorize('staff.create');
-        $this->setPageTitle(__('staff.create_page_title'));
-
-//        $users = User::doesntHave('staff')->get();
-
-        return view('staff.create');
+        $institutes = Institution::pluck('name', 'id');
+        $campuses = Campus::pluck('name', 'id');
+        $roles = Role::where('name', '!=', 'Super Admin')->get();
+        return view('staff.create', compact('institutes', 'campuses', 'roles'));
     }
 
     public function store(Request $request)
     {
-        authorize('staff.create');
-        $request->merge([
-            // Normalize campus_id if you use helper like campus()->id
-            // 'campus_id' => $request->campus_id ?? campus()->id,
+        $request->validate([
+            // User Fields
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|min:6',
+            'role' => 'required|exists:roles,name',
+            'phone' => 'nullable|string',
+            'profile_picture' => 'nullable|image|max:2048',
+            
+            // Staff Fields
+            'institution_id' => 'required|exists:institutions,id',
+            'campus_id' => 'nullable|exists:campuses,id',
+            'designation' => 'nullable|string',
+            'joining_date' => 'nullable|date',
+            'gender' => 'required|in:male,female,other',
         ]);
 
-        $rules = [
-            // Either provide user_id OR provide name+email to create a user
-            'name'       => 'required_without:user_id|string|max:255',
-            'email'      => 'required_without:user_id|email|max:255|unique:users,email',
-            'password'   => 'required|string|min:8', // optional; if not present we'll generate one
-            'designation'=> 'nullable|max:100',
-            'department' => 'nullable|max:100',
-            'hire_date'  => 'nullable|date',
-            'status'     => 'required|in:active,on_leave,terminated',
-            'role'       => 'required|in:Finance,Teacher,Student',
-        ];
+        DB::transaction(function () use ($request) {
+            // 1. Create User
+            $userData = [
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'phone' => $request->phone,
+                'user_type' => 4, // 4 = Staff
+                'is_active' => true,
+            ];
 
-        $validated = $request->validate($rules);
-
-        DB::beginTransaction();
-
-        try {
-            // 1) Resolve or create user
-            if ($request->filled('user_id')) {
-                $userId = $request->user_id;
-            } else {
-                // create new user
-                $passwordPlain = $request->password ?? Str::random(12); // random if not provided
-                $user = User::create([
-                    'name' => $request->name,
-                    'email' => $request->email,
-                    'address' => $request->address,
-                    'phone'  => $request->phone,
-                    'password' => Hash::make($passwordPlain),
-                ]);
-
-                // PRODUCTION: don't return plaintext passwords in responses.
-                // Instead: queue an email (password reset link or set-password flow).
-                // Example: dispatch a job to email the user with a "set password" link.
-//                dispatch(new \App\Jobs\SendUserWelcomeEmail($user, $passwordPlain));
-
-                $userId = $user->id;
+            if ($request->hasFile('profile_picture')) {
+                $userData['profile_picture'] = $request->file('profile_picture')->store('profile-photos', 'public');
             }
 
-            // 2) Generate employee_no unique per campus (use DB locking to avoid race)
-            // lockForUpdate requires being inside a transaction and supported by DB (MySQL/InnoDB, Postgres)
-            $campusId = institute()->id;
+            $user = User::create($userData);
+            $user->assignRole($request->role);
 
-            $last = Staff::where('institute_id', $campusId)
-                ->lockForUpdate()
-                ->latest('id')
-                ->first();
-
-            $number = $last ? intval(substr($last->employee_no, -4)) + 1 : 1;
-            $employee_no = $campusId . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
-
-            // 3) Create staff record
-            $staff = Staff::create([
-                'user_id' => $userId,
-                'institute_id' => $campusId,
-                'employee_no' => $employee_no,
+            // 2. Create Staff Profile
+            Staff::create([
+                'user_id' => $user->id,
+                'institution_id' => $request->institution_id,
+                'campus_id' => $request->campus_id,
+                'employee_id' => $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT),
                 'designation' => $request->designation,
                 'department' => $request->department,
-                'hire_date' => $request->hire_date,
-                'status' => $request->status,
+                'joining_date' => $request->joining_date,
+                'gender' => $request->gender,
+                'address' => $request->address,
+                'status' => 'active',
             ]);
+        });
 
-            if(Role::where('name', $request->role)->exists()) {
-                 $user = User::find($userId);
-                 $user->assignRole($request->role); // ensure role exists
-                Log::info('Role Assigned to Staff', ['staff_id' => $staff->id, 'Role Name'=>$request->role]);
-            }
-
-
-            DB::commit();
-
-            return response()->json([
-                'message' => __('staff.messages.success_create'),
-                'redirect' => route('staff.index'),
-                // Do NOT return passwordPlain in production responses.
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            // log detailed error for debugging; keep client response generic
-            Log::error('Staff store error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'message' => __('staff.messages.error_create')
-            ], 500);
-        }
+        return response()->json(['redirect' => route('staff.index'), 'message' => __('staff.messages.success_create')]);
     }
 
+    public function show(Staff $staff)
+    {
+        $staff->load(['user', 'institution', 'campus']);
+        return view('staff.show', compact('staff'));
+    }
 
     public function edit(Staff $staff)
     {
-        authorize('staff.edit');
-        $this->setPageTitle(__('staff.edit_page_title'));
-        $user = User::find($staff->user_id);
-        $user->role_name = '';
-        if(isset($user->roles->pluck('name')->toArray()[0])){
-            $user->role_name = $user->roles->pluck('name')->toArray()[0];
-        }
-
-        return view('staff.edit', compact('staff', 'user'));
+        $staff->load('user');
+        $institutes = Institution::pluck('name', 'id');
+        $campuses = Campus::pluck('name', 'id');
+        $roles = Role::where('name', '!=', 'Super Admin')->get();
+        
+        return view('staff.edit', compact('staff', 'institutes', 'campuses', 'roles'));
     }
 
     public function update(Request $request, Staff $staff)
     {
-        authorize('staff.edit');
-        $rules = [
-            'user_id'    => 'nullable|exists:users,id',
-            'name'       => 'required_without:user_id|string|max:255',
-            'email'      => 'required_without:user_id|email|max:255|unique:users,email,' . ($staff->user_id ?? 'NULL'),
-            'password'   => 'nullable|string|min:8',
-            'designation'=> 'nullable|max:100',
-            'department' => 'nullable|max:100',
-            'hire_date'  => 'nullable|date',
-            'status'     => 'required|in:active,on_leave,terminated',
-            'role'       => 'nullable|in:Finance,Teacher,Student',
-        ];
+        $user = $staff->user;
 
-        $validated = $request->validate($rules);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,'.$user->id,
+            'role' => 'required|exists:roles,name',
+            'profile_picture' => 'nullable|image|max:2048',
+            'institution_id' => 'required|exists:institutions,id',
+        ]);
 
-        DB::beginTransaction();
+        DB::transaction(function () use ($request, $staff, $user) {
+            // Update User
+            $userData = [
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+            ];
 
-        try {
-            // 1) Update or create user
-            if ($request->filled('user_id')) {
-                $userId = $request->user_id;
-            } else {
-                $user = User::find($staff->user_id);
+            if ($request->password) {
+                $userData['password'] = Hash::make($request->password);
+            }
 
-                if ($user) {
-                    // Update existing user
-                    $user->update([
-                        'name' => $request->name,
-                        'email' => $request->email,
-                        'address' => $request->address,
-                        'phone' => $request->phone,
-                        'password' => $request->filled('password') ? Hash::make($request->password) : $user->password,
-                    ]);
-                    $userId = $user->id;
-                } else {
-                    // Create new user if somehow missing
-                    $passwordPlain = $request->password ?? Str::random(12);
-                    $user = User::create([
-                        'name' => $request->name,
-                        'email' => $request->email,
-                        'address' => $request->address,
-                        'phone' => $request->phone,
-                        'password' => Hash::make($passwordPlain),
-                    ]);
-                    $userId = $user->id;
+            if ($request->hasFile('profile_picture')) {
+                if ($user->profile_picture) {
+                    Storage::disk('public')->delete($user->profile_picture);
                 }
+                $userData['profile_picture'] = $request->file('profile_picture')->store('profile-photos', 'public');
             }
 
-            // 2) Update staff record
+            $user->update($userData);
+            $user->syncRoles([$request->role]);
+
+            // Update Staff
             $staff->update([
-                'user_id'    => $userId,
-                'designation'=> $request->designation,
+                'institution_id' => $request->institution_id,
+                'campus_id' => $request->campus_id,
+                'employee_id' => $request->employee_id,
+                'designation' => $request->designation,
                 'department' => $request->department,
-                'hire_date'  => $request->hire_date,
-                'status'     => $request->status,
-                'institute_id'  => institute()->id,
+                'joining_date' => $request->joining_date,
+                'gender' => $request->gender,
+                'address' => $request->address,
+                'status' => $request->status ?? $staff->status,
             ]);
+        });
 
-            if(Role::where('name', $request->role)->exists()) {
-                $user = User::find($userId);
-                $user->assignRole($request->role); // ensure role exists
-                Log::info('Role Assigned to Staff', ['staff_id' => $staff->id, 'Role Name'=>$request->role]);
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'message' => __('staff.messages.success_update'),
-                'redirect' => route('staff.index'),
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            Log::error('Staff update error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'message' => __('staff.messages.error_update')
-            ], 500);
-        }
+        return response()->json(['redirect' => route('staff.index'), 'message' => __('staff.messages.success_update')]);
     }
 
     public function destroy(Staff $staff)
     {
-        authorize('staff.delete');
-        $staff->delete();
-        return back()->with('success', __('staff.messages.success_delete'));
+        $user = $staff->user;
+        
+        if ($user->profile_picture) {
+            Storage::disk('public')->delete($user->profile_picture);
+        }
+        
+        $staff->delete(); // Delete profile
+        $user->delete();  // Delete login
+        
+        return response()->json(['message' => __('staff.messages.success_delete')]);
     }
 }

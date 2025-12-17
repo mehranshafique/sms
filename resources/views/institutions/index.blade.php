@@ -36,7 +36,6 @@
             margin-left: 0.5em;
             outline: none;
         }
-        /* Institute Icon */
         .institute-icon {
             width: 40px;
             height: 40px;
@@ -55,26 +54,26 @@
 <div class="content-body">
     <div class="container-fluid">
         
-        {{-- 1. TITLE BAR & BREADCRUMB --}}
-        <div class="row page-titles mx-0">
-            <div class="col-sm-6 p-md-0">
+        {{-- TITLE BAR --}}
+        <div class="row page-titles mx-0 mb-4 p-4 bg-white rounded shadow-sm align-items-center">
+            <div class="col-sm-6 p-0">
                 <div class="welcome-text">
-                    <h4>{{ __('institute.institute_management') }}</h4>
-                    <p class="mb-0">{{ __('institute.manage_list_subtitle') }}</p>
+                    <h4 class="text-primary fw-bold fs-20">{{ __('institute.institute_management') }}</h4>
+                    <p class="mb-0 text-muted fs-14">{{ __('institute.manage_list_subtitle') }}</p>
                 </div>
             </div>
-            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+            <div class="col-sm-6 p-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
                 @can('create', App\Models\Institution::class)
-                <a href="{{ route('institutes.create') }}" class="btn btn-primary btn-rounded">
+                <a href="{{ route('institutes.create') }}" class="btn btn-primary btn-rounded shadow-sm fw-bold px-4 py-2">
                     <i class="fa fa-plus me-2"></i> {{ __('institute.create_new') }}
                 </a>
                 @endcan
             </div>
         </div>
 
-        {{-- 2. STATS CARDS --}}
+        {{-- STATS CARDS --}}
         <div class="row">
-            {{-- Total Institutes --}}
+            {{-- Total --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
@@ -91,7 +90,7 @@
                 </div>
             </div>
 
-            {{-- Active Institutes --}}
+            {{-- Active --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
@@ -108,7 +107,7 @@
                 </div>
             </div>
 
-            {{-- Inactive Institutes --}}
+            {{-- Inactive --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
@@ -125,7 +124,7 @@
                 </div>
             </div>
 
-            {{-- New This Month --}}
+            {{-- New --}}
             <div class="col-xl-3 col-xxl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card">
                     <div class="card-body p-4">
@@ -143,14 +142,14 @@
             </div>
         </div>
 
-        {{-- 3. MAIN TABLE SECTION --}}
+        {{-- TABLE SECTION --}}
         <div class="row">
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">{{ __('institute.institute_list') }}</h4>
+                <div class="card shadow-sm border-0" style="border-radius: 15px;">
+                    <div class="card-header border-0 pb-0 pt-4 px-4 bg-white" style="border-radius: 15px 15px 0 0;">
+                        <h4 class="card-title mb-0 fw-bold fs-18">{{ __('institute.institute_list') }}</h4>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body px-4 pb-4">
                         <div class="table-responsive">
                             <table id="instituteTable" class="display" style="width:100%">
                                 <thead>
@@ -239,6 +238,8 @@
                 @can('deleteAny', App\Models\Institution::class)
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endcan
+                // Changed from 'id_display' to 'id' which typically exists as DT_RowIndex or 'id'
+                // Using DT_RowIndex for serial number is standard practice
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
                 { data: 'logo', name: 'logo', orderable: false, searchable: false },
                 { data: 'name', name: 'name' },

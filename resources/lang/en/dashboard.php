@@ -2,13 +2,25 @@
 
 return [
     'page_title' => 'Dashboard',
+    'welcome_back' => 'Welcome Back',
+    'current_session' => 'Current Session',
+    
+    // Stats Cards
     'total_students' => 'Total Students',
+    'total_staff' => 'Total Staff',
+    'campuses' => 'Campuses',
+    'institutes' => 'Institutes',
+    
+    // Charts & Tables
+    'new_student_registrations' => 'New Student Registrations (Last 7 Days)',
+    'recent_students' => 'Recent Students',
     'new_students' => 'New Students',
-    'total_course' => 'Total Course',
-    'fees_collection' => 'Fees Collection',
-
-    '80_increase_20_days' => '80% Increase in 20 Days',
-    '50_increase_25_days' => '50% Increase in 25 Days',
-    '76_increase_20_days' => '76% Increase in 20 Days',
-    '30_increase_30_days' => '30% Increase in 30 Days',
+    'view_all_students' => 'View All Students',
+    'no_recent_students' => 'No recent students found.',
+    
+    // Table Headers
+    'name' => 'Name',
+    'institute' => 'Institute',
+    'status' => 'Status',
+    'date' => 'Date',
 ];

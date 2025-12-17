@@ -3,16 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Institution;
+use App\Models\User; // Added User model
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash; // Added Hash
 
 class InstituteController extends BaseController
 {
     public function __construct()
     {
-        // Enforce Resource Policy
         $this->authorizeResource(Institution::class, 'institute');
     }
 
@@ -23,7 +24,7 @@ class InstituteController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
-                    if(auth()->user()->can('institute.delete', $row)){
+                    if(auth()->user()->can('delete', $row)){
                         return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
                                     <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
                                     <label class="form-check-label"></label>
@@ -32,8 +33,15 @@ class InstituteController extends BaseController
                     return '';
                 })
                 ->addColumn('logo', function($row){
+                    // Ensure the 'public' disk is linked: php artisan storage:link
                     $url = $row->logo ? asset('storage/'.$row->logo) : asset('images/no-image.png');
                     return '<img src="'.$url.'" class="rounded-circle" width="35" alt="">';
+                })
+                ->addColumn('contact', function($row){ // FIXED: Added missing 'contact' column
+                    return '<div class="d-flex flex-column">
+                                <span class="fs-14">'.$row->phone.'</span>
+                                <span class="fs-12 text-muted">'.$row->email.'</span>
+                            </div>';
                 })
                 ->editColumn('is_active', function($row){
                     return $row->is_active 
@@ -43,13 +51,18 @@ class InstituteController extends BaseController
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    if(auth()->user()->can('institute.edit', $row)){
+                    // Show Button
+                    if(auth()->user()->can('view', $row)){
+                         $btn .= '<a href="'.route('institutes.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                    }
+
+                    if(auth()->user()->can('update', $row)){
                         $btn .= '<a href="'.route('institutes.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('institute.edit').'">
                                     <i class="fa fa-pencil"></i>
                                 </a>';
                     }
 
-                    if(auth()->user()->can('institute.delete', $row)){
+                    if(auth()->user()->can('delete', $row)){
                         $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" title="'.__('institute.delete').'">
                                     <i class="fa fa-trash"></i>
                                 </button>';
@@ -58,11 +71,11 @@ class InstituteController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'logo', 'is_active', 'action'])
+                ->rawColumns(['checkbox', 'logo', 'contact', 'is_active', 'action']) // Added 'contact'
                 ->make(true);
         }
 
-        // Stats for Cards
+        // Stats Logic
         $totalInstitutes = Institution::count();
         $activeInstitutes = Institution::where('is_active', true)->count();
         $inactiveInstitutes = Institution::where('is_active', false)->count();
@@ -89,16 +102,32 @@ class InstituteController extends BaseController
             'email' => 'nullable|email',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            // 'plan_password' => 'nullable' // Logic to create admin user would go here
+            'password' => 'nullable|string|min:6', // Validate password if provided for admin creation
         ]);
 
         if ($request->hasFile('logo')) {
             $validated['logo'] = $request->file('logo')->store('institutes', 'public');
         }
 
-        Institution::create($validated);
+        $institute = Institution::create($validated);
+
+        // Optional: Create an Admin User for this Institute
+        if($request->filled('email') && $request->filled('password')) {
+            User::create([
+                'name' => 'Admin ' . $institute->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'institute_id' => $institute->id, // Assuming direct link exists or pivot needed
+                'user_type' => 3, // Branch/Institute Admin
+            ]);
+        }
 
         return response()->json(['message' => __('institute.messages.success_create'), 'redirect' => route('institutes.index')]);
+    }
+
+    public function show(Institution $institute)
+    {
+        return view('institutions.show', compact('institute'));
     }
 
     public function edit(Institution $institute)
@@ -118,7 +147,8 @@ class InstituteController extends BaseController
             'phone' => 'nullable|string|max:30',
             'email' => 'nullable|email',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
+            'password' => 'nullable|string|min:6', // Optional password update
         ]);
 
         if ($request->hasFile('logo')) {
@@ -129,6 +159,14 @@ class InstituteController extends BaseController
         }
 
         $institute->update($validated);
+
+        // Update Admin Password if provided (Assumes we find the admin by email)
+        if($request->filled('password') && $request->filled('email')) {
+            $admin = User::where('email', $request->email)->first();
+            if($admin) {
+                $admin->update(['password' => Hash::make($request->password)]);
+            }
+        }
 
         return response()->json(['message' => __('institute.messages.success_update'), 'redirect' => route('institutes.index')]);
     }

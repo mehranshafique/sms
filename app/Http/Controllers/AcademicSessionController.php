@@ -50,15 +50,15 @@ class AcademicSessionController extends BaseController
                     return '<span class="badge '.$class.'">'.ucfirst($row->status).'</span>';
                 })
                 ->editColumn('start_date', function($row){
-                    return $row->start_date ? $row->start_date->format('Y-m-d') : '-';
+                    return $row->start_date ? $row->start_date->format('d F, Y') : '-';
                 })
                 ->editColumn('end_date', function($row){
-                    return $row->end_date ? $row->end_date->format('Y-m-d') : '-';
+                    return $row->end_date ? $row->end_date->format('d F, Y') : '-';
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    if(auth()->user()->can('update', $row)){
+                    if(auth()->user()->can('edit', $row)){
                         $btn .= '<a href="'.route('academic-sessions.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('academic_session.edit').'">
                                     <i class="fa fa-pencil"></i>
                                 </a>';
@@ -97,8 +97,9 @@ class AcademicSessionController extends BaseController
         $validated = $request->validate([
             'institution_id' => 'required|exists:institutions,id',
             'name'           => ['required', 'string', 'max:50', Rule::unique('academic_sessions')->where('institution_id', $request->institution_id)],
-            'start_date'     => 'required|date',
-            'end_date'       => 'required|date|after:start_date',
+            // Use 'required' instead of 'date' to allow flexibility for the picker format; Mutator handles parsing
+            'start_date'     => 'required', 
+            'end_date'       => 'required', 
             'status'         => 'required|in:planned,active,closed',
             'is_current'     => 'boolean',
         ]);
@@ -127,8 +128,8 @@ class AcademicSessionController extends BaseController
         $validated = $request->validate([
             'institution_id' => 'required|exists:institutions,id',
             'name'           => ['required', 'string', 'max:50', Rule::unique('academic_sessions')->ignore($academic_session->id)->where('institution_id', $request->institution_id)],
-            'start_date'     => 'required|date',
-            'end_date'       => 'required|date|after:start_date',
+            'start_date'     => 'required',
+            'end_date'       => 'required',
             'status'         => 'required|in:planned,active,closed',
             'is_current'     => 'boolean',
         ]);

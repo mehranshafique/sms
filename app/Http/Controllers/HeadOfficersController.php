@@ -4,233 +4,176 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
-use App\Models\Staff;
+use App\Models\Institution;
+use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
 use Yajra\DataTables\Facades\DataTables;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class HeadOfficersController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
-        $this->setPageTitle(__('head_officers.page_title'));
     }
 
     public function index(Request $request)
     {
-        authorize('head_officers.view');
-
         if ($request->ajax()) {
-            // Eager load relationships to avoid N+1 and access sub-table data
-            $data = User::where('user_type', 2)->with(['institute', 'staff'])->select('users.*');
+            $data = User::where('user_type', 2)->with(['institutes', 'roles'])->select('users.*');
 
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
-                    if(auth()->user()->can('head_officers.delete')){
-                        return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
-                                    <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
-                                    <label class="form-check-label"></label>
-                                </div>';
-                    }
-                    return '';
+                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
+                                <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
+                                <label class="form-check-label"></label>
+                            </div>';
                 })
                 ->addColumn('details', function($row){
+                    $img = $row->profile_picture ? asset('storage/' . $row->profile_picture) : null;
                     $initial = strtoupper(substr($row->name, 0, 1));
-                    // Check staff status if available, otherwise fallback
-                    $statusDot = '';
-                    if ($row->staff) {
-                        $statusClass = $row->staff->status == 1 ? 'border-success' : 'border-danger';
-                        $statusDot = '<span class="position-absolute bottom-0 end-0 p-1 bg-white border '.$statusClass.' border-2 rounded-circle"></span>';
-                    }
+                    
+                    $avatarHtml = $img 
+                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
+                        : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
 
                     return '<div class="d-flex align-items-center">
-                                <div class="head-officer-icon bgl-primary text-primary position-relative">
-                                    '.$initial.'
-                                    '.$statusDot.'
-                                </div>
+                                '.$avatarHtml.'
                                 <div>
-                                    <h6 class="fs-16 font-w600 mb-0"><a href="javascript:void(0)" class="text-black">'.$row->name.'</a></h6>
+                                    <h6 class="fs-16 font-w600 mb-0"><a href="'.route('header-officers.show', $row->id).'" class="text-black">'.$row->name.'</a></h6>
                                     <span class="fs-13 text-muted">'.$row->email.'</span>
                                 </div>
                             </div>';
                 })
                 ->addColumn('contact', function($row){
-                    return '<div class="d-flex flex-column">
-                                <span class="fs-13">'.$row->phone.'</span>
-                                <span class="fs-12 text-muted">'.Str::limit($row->address, 20).'</span>
-                            </div>';
+                    return '<div>'.$row->phone.'</div>';
                 })
-                ->addColumn('total_institution', function($row){
-                    // Show assigned institute name
-                    $instituteName = $row->institute ? $row->institute->name : 'N/A';
-                    return '<span class="badge badge-pill badge-secondary">'.$instituteName.'</span>';
+                ->addColumn('assigned_institutes', function($row){
+                    return $row->institutes->pluck('code')->join(', ');
                 })
-                ->addColumn('status', function($row){
-                    // Status comes from the Staff sub-table
-                    if ($row->staff) {
-                        if ($row->staff->status == 1) {
-                            return '<span class="badge badge-success">Active</span>';
-                        }
-                        return '<span class="badge badge-danger">Inactive</span>';
-                    }
-                    return '<span class="badge badge-warning">N/A</span>';
+                ->addColumn('role', function($row){
+                    return $row->roles->pluck('name')->join(', ');
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
-                    
-                    if(auth()->user()->can('head_officers.update')){
-                        $btn .= '<button type="button" class="btn btn-primary shadow btn-xs sharp me-1 edit-btn" data-id="'.$row->id.'" data-bs-toggle="modal" data-bs-target="#editHeaderOfficerModal" title="'.__('head_officers.edit_head_officer').'">
-                                    <i class="fa fa-pencil"></i>
-                                </button>';
-                    }
-
-                    if(auth()->user()->can('head_officers.delete')){
-                        $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" title="'.__('head_officers.delete').'">
-                                    <i class="fa fa-trash"></i>
-                                </button>';
-                    }
-                    
+                    $btn .= '<a href="'.route('header-officers.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                    $btn .= '<a href="'.route('header-officers.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
+                    $btn .= '<button class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'details', 'contact', 'total_institution', 'status', 'action'])
+                ->rawColumns(['checkbox', 'details', 'contact', 'assigned_institutes', 'role', 'action'])
                 ->make(true);
         }
 
-        // Stats Logic using relationships
-        // Note: Ensure User model has public function staff() { return $this->hasOne(Staff::class); }
         $totalOfficers = User::where('user_type', 2)->count();
-        
-        $activeOfficers = User::where('user_type', 2)
-            ->whereHas('staff', function($q) {
-                $q->where('status', 1);
-            })->count();
-
-        $inactiveOfficers = User::where('user_type', 2)
-            ->whereHas('staff', function($q) {
-                $q->where('status', 0);
-            })->count();
-
-        $newThisMonth = User::where('user_type', 2)
-            ->where('created_at', '>=', now()->subMonth())
-            ->count();
+        $activeOfficers = User::where('user_type', 2)->where('is_active', true)->count();
+        $inactiveOfficers = User::where('user_type', 2)->where('is_active', false)->count();
+        $newThisMonth = User::where('user_type', 2)->where('created_at', '>=', now()->subMonth())->count();
 
         return view('head_officers.index', compact('totalOfficers', 'activeOfficers', 'inactiveOfficers', 'newThisMonth'));
     }
 
+    public function create()
+    {
+        $institutes = Institution::where('is_active', true)->pluck('name', 'id');
+        $roles = Role::where('name', '!=', 'Super Admin')->get(); 
+        return view('head_officers.create', compact('institutes', 'roles'));
+    }
+
     public function store(Request $request)
     {
-        authorize('head_officers.create');
         $request->validate([
-            'name'     => 'required|string|max:150',
-            'email'    => 'required|email|unique:users,email',
-            'phone'    => 'required|string|max:20',
-            'password' => 'required|string|min:6',
-            'address'  => 'required|string',
-            // 'institute_id' => 'required|exists:institutes,id', // Recommended to add this
+            'name' => 'required',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|min:6',
+            'institute_ids' => 'array',
+            'role' => 'required|exists:roles,name',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', 
         ]);
 
-        // 1. Create User
-        $user = User::create([
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'phone'     => $request->phone,
-            'user_type' => 2, // Head Officer
-            'address'   => $request->address,
-            'password'  => Hash::make($request->password),
-            // 'institute_id' => $request->institute_id, 
-        ]);
-        
-        // 2. Create associated Staff record for Status/Profile management
-        Staff::create([
-            'user_id' => $user->id,
-            'institute_id' => $user->institute_id, // Sync institute if applicable
-            'status' => 1, // Default Active
-            'designation' => 'Head Officer',
-            'hire_date' => now(),
-        ]);
+        $userData = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'user_type' => 2,
+            'phone' => $request->phone,
+            'address' => $request->address,
+            'is_active' => $request->is_active ?? 1
+        ];
 
-        // $user->assignRole('Head Officer');
+        if ($request->hasFile('profile_picture')) {
+            $userData['profile_picture'] = $request->file('profile_picture')->store('head_officers', 'public');
+        }
 
-        return response()->json([
-            'status'  => true,
-            'message' => __('head_officers.messages.created'),
-            'data'    => $user
-        ]);
+        $user = User::create($userData);
+
+        // Correctly handle array input for sync
+        $user->institutes()->sync($request->input('institute_ids', []));
+
+        $user->assignRole($request->role);
+
+        return response()->json(['redirect' => route('header-officers.index'), 'message' => __('head_officers.messages.success_create')]);
+    }
+
+    public function show($id)
+    {
+        $head_officer = User::with(['institutes', 'roles'])->findOrFail($id);
+        return view('head_officers.show', compact('head_officer'));
     }
 
     public function edit($id)
     {
-        $officer = User::with('staff')->findOrFail($id);
-        return response()->json($officer);
+        $head_officer = User::with(['institutes', 'roles'])->findOrFail($id);
+        $institutes = Institution::where('is_active', true)->pluck('name', 'id');
+        $assignedIds = $head_officer->institutes->pluck('id')->toArray();
+        $roles = Role::where('name', '!=', 'Super Admin')->get();
+
+        return view('head_officers.edit', compact('head_officer', 'institutes', 'assignedIds', 'roles'));
     }
 
     public function update(Request $request, $id)
     {
-        authorize('head-officers.update');
-        $officer = User::findOrFail($id);
-
+        $user = User::findOrFail($id);
+        
         $request->validate([
-            'name'     => 'required|string|max:150',
-            'email'    => 'required|email|unique:users,email,' . $officer->id,
-            'phone'    => 'required|string|max:20',
-            'address'  => 'required|string',
-            'password' => 'nullable|min:6',
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email,'.$id,
+            'role' => 'required|exists:roles,name',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $officer->name    = $request->name;
-        $officer->email   = $request->email;
-        $officer->phone   = $request->phone;
-        $officer->address = $request->address;
-
-        if ($request->password) {
-            $officer->password = Hash::make($request->password);
+        $updateData = $request->only('name', 'email', 'phone', 'address', 'is_active');
+        
+        if($request->password){
+            $updateData['password'] = Hash::make($request->password);
         }
 
-        $officer->save();
-        
-        // Optionally update staff details/status here if form supports it
-        // if ($request->has('status')) {
-        //     $officer->staff()->update(['status' => $request->status]);
-        // }
+        if ($request->hasFile('profile_picture')) {
+            if ($user->profile_picture) {
+                Storage::disk('public')->delete($user->profile_picture);
+            }
+            $updateData['profile_picture'] = $request->file('profile_picture')->store('head_officers', 'public');
+        }
 
-        return response()->json([
-            'status'  => true,
-            'message' => __('head_officers.messages.updated'),
-        ]);
+        $user->update($updateData);
+        // Correctly handle array input for sync (defaults to empty array if unchecked)
+        $user->institutes()->sync($request->input('institute_ids', []));
+
+        $user->syncRoles([$request->role]);
+
+        return response()->json(['redirect' => route('header-officers.index'), 'message' => __('head_officers.messages.success_update')]);
     }
 
     public function destroy($id)
     {
-        authorize('head-officers.delete');
-        $officer = User::findOrFail($id);
-        
-        // Delete related staff record first or rely on cascade
-        if($officer->staff) {
-            $officer->staff()->delete();
+        $user = User::findOrFail($id);
+        if ($user->profile_picture) {
+            Storage::disk('public')->delete($user->profile_picture);
         }
-        
-        $officer->delete();
-
-        return response()->json([
-            'status'  => true,
-            'message' => __('head_officers.messages.deleted'),
-        ]);
-    }
-
-    public function bulkDelete(Request $request)
-    {
-        authorize('head_officers.delete');
-        $ids = $request->ids;
-        if (!empty($ids)) {
-            // Delete Staff records first
-            Staff::whereIn('user_id', $ids)->delete();
-            // Delete Users
-            User::whereIn('id', $ids)->delete();
-            return response()->json(['success' => __('head_officers.messages.deleted')]);
-        }
-        return response()->json(['error' => __('head_officers.something_went_wrong')]);
+        $user->institutes()->detach();
+        $user->delete();
+        return response()->json(['message' => __('head_officers.messages.success_delete')]);
     }
 }

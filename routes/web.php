@@ -10,15 +10,19 @@ use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\InstituteController;
 use App\Http\Controllers\HeadOfficersController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudentEnrollmentController; // Added
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\AcademicSessionController;
 use App\Http\Controllers\CampusController;
+use App\Http\Controllers\GradeLevelController;
+use App\Http\Controllers\ClassSectionController;
+use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\TimetableController;
+
 Route::redirect('/','/login' );
 
 Route::get('/change-language', function (\Illuminate\Http\Request $request) {
-
     $locale = $request->query('language');
-    
     if (!in_array($locale, ['en', 'fr'])) abort(400);
     app()->setLocale($locale);
     session(['locale' => $locale]);
@@ -34,8 +38,9 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    // Access Control
     Route::resource('roles', RolesController::class);
-
+    
     Route::prefix('modules')->group(function () {
         Route::get('/', [ModuleController::class, 'index'])->name('modules.index');
         Route::post('/', [ModuleController::class, 'store'])->name('modules.store');
@@ -57,23 +62,40 @@ Route::middleware('auth')->group(function () {
         Route::post('{role}/assign-permissions', [RolePermissionController::class, 'update'])->name('roles.update-permissions');
     });
 
+    // Institutes
     Route::delete('institutes/bulk-delete', [InstituteController::class, 'bulkDelete'])->name('institutes.bulkDelete');
     Route::resource('institutes', InstituteController::class);
 
-     // Campuses
+    // Campuses
     Route::delete('campuses/bulk-delete', [CampusController::class, 'bulkDelete'])->name('campuses.bulkDelete');
     Route::resource('campuses', CampusController::class);
-    
-    Route::resource('header-officers', HeadOfficersController::class);
-    // Bulk Delete Route
+
+    // Head Officers
     Route::post('header-officers/bulk-delete', [HeadOfficersController::class, 'bulkDelete'])->name('header-officers.bulkDelete');
+    Route::resource('header-officers', HeadOfficersController::class);
+    
+    // Core Modules
     Route::resource('students', StudentController::class);
+    
+    // Student Enrollments (NEW)
+    Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
+    Route::resource('enrollments', StudentEnrollmentController::class);
 
     Route::resource('staff', StaffController::class);
-
     Route::resource('academic-sessions', AcademicSessionController::class);
+    
+    // Academic Structure
+    Route::post('grade-levels/bulk-delete', [GradeLevelController::class, 'bulkDelete'])->name('grade-levels.bulkDelete');
+    Route::resource('grade-levels', GradeLevelController::class);
+
+    Route::post('class-sections/bulk-delete', [ClassSectionController::class, 'bulkDelete'])->name('class-sections.bulkDelete');
+    Route::resource('class-sections', ClassSectionController::class);
+
+    Route::post('subjects/bulk-delete', [SubjectController::class, 'bulkDelete'])->name('subjects.bulkDelete');
+    Route::resource('subjects', SubjectController::class);
+
+    Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
+    Route::resource('timetables', TimetableController::class);
 });
-
-
 
 require __DIR__.'/auth.php';

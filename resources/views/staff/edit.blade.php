@@ -1,188 +1,64 @@
 @extends('layout.layout')
 
 @section('content')
-    <div class="content-body">
-        <div class="container-fluid">
-
-            <div class="row page-titles mx-0 mb-3">
-                <div class="col-sm-6 p-md-0 d-flex align-items-center">
-                    <div class="bg-white rounded-circle p-2 me-3"
-                         style="width:50px; height:50px; display:flex; align-items:center; justify-content:center;">
-                        <i class="fa fa-user text-primary" style="font-size:24px;"></i>
-                    </div>
-                    <div>
-                        <h3 class="mb-0 fw-bold">{{ __('staff.edit.title') }}</h3>
-                        <small class="text-black">{{ __('staff.edit.subtitle') }}</small>
-                    </div>
+<div class="content-body">
+    <div class="container-fluid">
+        <div class="row page-titles mx-0">
+            <div class="col-sm-6 p-md-0">
+                <div class="welcome-text">
+                    <h4>{{ __('staff.edit_staff') }}</h4>
                 </div>
             </div>
-
-            <form method="POST" id="editForm">
-                @csrf
-                @method('PUT')
-
-                <!-- User Details -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                    <i class="bi bi-person me-2"></i>{{ __('staff.edit.section_user') }}
-                                </h5>
-
-                                <div class="row g-3">
-
-                                    <div class="col-12">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.name') }}</label>
-                                        <input type="text" name="name" class="form-control"
-                                               placeholder="{{ __('staff.edit.name') }}"
-                                               value="{{ $staff->user->name }}">
-                                    </div>
-
-                                    <div class="col-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.email') }}</label>
-                                        <input type="email" name="email" class="form-control"
-                                               placeholder="{{ __('staff.edit.email') }}"
-                                               value="{{ $staff->user->email }}">
-                                    </div>
-
-                                    <div class="col-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.phone') }}</label>
-                                        <input type="text" name="phone" class="form-control"
-                                               placeholder="{{ __('staff.edit.phone') }}"
-                                               value="{{ $staff->user->phone ?? '' }}">
-                                    </div>
-
-                                    <div class="col-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.role') }}</label>
-                                        <select name="role" class="form-control single-select-placeholder" disabled>
-                                            <option value="Finance" {{ $user->role_name == 'Finance' ? 'selected' : '' }}>Finance</option>
-                                            <option value="Teacher" {{ $user->role_name == 'Teacher' ? 'selected' : '' }}>Teacher</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="col-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.password') }}</label>
-                                        <input type="password" name="password" class="form-control"
-                                               placeholder="{{ __('staff.edit.password_placeholder') }}">
-                                    </div>
-
-                                    <div class="col-12">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.address') }}</label>
-                                        <textarea class="form-control"
-                                                  name="address" cols="30" rows="4"
-                                                  placeholder="{{ __('staff.edit.address') }}">{{ $staff->user->address ?? '' }}</textarea>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Staff Details -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card mb-3">
-                            <div class="card-body">
-
-                                <h5 class="text-primary mb-3 pb-2 border-bottom">
-                                    <i class="bi bi-card-list me-2"></i>{{ __('staff.edit.section_staff') }}
-                                </h5>
-
-                                <div class="row g-3">
-
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.designation') }}</label>
-                                        <input type="text" name="designation" class="form-control"
-                                               placeholder="{{ __('staff.edit.designation') }}"
-                                               value="{{ $staff->designation }}">
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.department') }}</label>
-                                        <input type="text" name="department" class="form-control"
-                                               placeholder="{{ __('staff.edit.department') }}"
-                                               value="{{ $staff->department }}">
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">{{ __('staff.edit.hire_date') }}</label>
-                                        <input type="text" name="hire_date" class="form-control"
-                                               placeholder="{{ __('staff.edit.hire_date_placeholder') }}"
-                                               id="mdate" value="{{ $staff->hire_date }}">
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold">
-                                            {{ __('staff.edit.status') }} <span class="text-danger">*</span>
-                                        </label>
-
-                                        <select name="status" class="form-select single-select-placeholder" required>
-                                            <option value="active" {{ $staff->status=='active'?'selected':'' }}>
-                                                {{ __('staff.edit.status_active') }}
-                                            </option>
-                                            <option value="on_leave" {{ $staff->status=='on_leave'?'selected':'' }}>
-                                                {{ __('staff.edit.status_on_leave') }}
-                                            </option>
-                                            <option value="terminated" {{ $staff->status=='terminated'?'selected':'' }}>
-                                                {{ __('staff.edit.status_terminated') }}
-                                            </option>
-                                        </select>
-                                    </div>
-
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-start gap-3 mt-3">
-                    <button type="submit" class="btn btn-lg btn-primary">
-                        <i class="bi bi-check-circle me-2"></i>{{ __('staff.edit.update_btn') }}
-                    </button>
-                </div>
-
-            </form>
-
+            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ route('staff.index') }}">{{ __('staff.staff_list') }}</a></li>
+                    <li class="breadcrumb-item active"><a href="javascript:void(0)">{{ __('staff.edit_staff') }}</a></li>
+                </ol>
+            </div>
         </div>
+
+        @include('staff._form', ['staff' => $staff])
     </div>
+</div>
+@endsection
 
-    <script>
-        $(document).ready(function(){
-            $('#editForm').submit(function(e){
-                e.preventDefault();
-                let formData = new FormData(this);
-
-                $.ajax({
-                    url: "{{ route('staff.update', $staff->id) }}",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-                    success: function (response) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: response.message
-                        }).then(() => window.location.href = response.redirect);
-                    },
-                    error: function (xhr) {
-                        if (xhr.status === 422) {
-                            let errors = xhr.responseJSON.errors;
-                            let messages = '';
-                            $.each(errors, function (key, value) {
-                                messages += value.join('<br>') + '<br>';
-                            });
-                            Swal.fire({icon: 'error', title: 'Validation Error', html: messages});
-                        } else {
-                            Swal.fire({icon: 'error', title: 'Error', text: 'Something went wrong!'});
-                        }
+@section('js')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    $(document).ready(function(){
+        $('#staffForm').submit(function(e){
+            e.preventDefault();
+            let formData = new FormData(this);
+            $.ajax({
+                url: $(this).attr('action'),
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+                success: function(response){
+                    Swal.fire({
+                        icon: 'success',
+                        title: '{{ __("staff.success") }}',
+                        text: response.message
+                    }).then(() => {
+                        window.location.href = response.redirect;
+                    });
+                },
+                error: function(xhr){
+                    let msg = '{{ __("staff.error_occurred") }}';
+                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    if(xhr.responseJSON && xhr.responseJSON.errors) {
+                        msg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
                     }
-                });
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        html: msg
+                    });
+                }
             });
         });
-    </script>
+    });
+</script>
 @endsection

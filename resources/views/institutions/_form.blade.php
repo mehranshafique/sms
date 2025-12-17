@@ -76,6 +76,13 @@
                                 <input type="text" name="phone" value="{{ old('phone', $institute->phone ?? '') }}" class="form-control">
                             </div>
                             <div class="mb-3 col-md-4">
+                                <label class="form-label">{{ __('institute.password') }}</label>
+                                <input type="password" name="password" class="form-control" placeholder="{{ __('institute.enter_password') }}">
+                                @if(isset($institute))
+                                    <small class="text-muted">{{ __('institute.leave_blank_to_keep_current') }}</small>
+                                @endif
+                            </div>
+                            <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('institute.enter_country') }}</label>
                                 <input type="text" name="country" value="{{ old('country', $institute->country ?? '') }}" class="form-control">
                             </div>
