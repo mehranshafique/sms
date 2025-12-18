@@ -123,7 +123,13 @@ Route::middleware('auth')->group(function () {
     Route::prefix('finance')->group(function () {
         Route::resource('fee-types', \App\Http\Controllers\Finance\FeeTypeController::class); // Added
         Route::resource('fees', FeeStructureController::class);
-        // Add Invoice and Payment routes here later
+         // Invoices
+       Route::get('invoices/{invoice}/print', [\App\Http\Controllers\Finance\InvoiceController::class, 'print'])->name('invoices.print');
+        Route::get('invoices/{invoice}/download', [\App\Http\Controllers\Finance\InvoiceController::class, 'downloadPdf'])->name('invoices.download'); // New Route
+        Route::resource('invoices', \App\Http\Controllers\Finance\InvoiceController::class);
+        // Payments
+        Route::get('payments/create', [\App\Http\Controllers\Finance\PaymentController::class, 'create'])->name('payments.create');
+        Route::post('payments', [\App\Http\Controllers\Finance\PaymentController::class, 'store'])->name('payments.store');
     });
 });
 

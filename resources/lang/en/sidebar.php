@@ -27,19 +27,49 @@ return [
     'subjects' => [
         'title' => 'Subjects',
     ],
-    'timetables' => [ // Added
+    'timetables' => [
         'title' => 'Routine',
     ],
+    
+    // Examinations
+    'examinations' => 'Examinations',
+    'exams' => [
+        'title' => 'Exams',
+    ],
+    'marks' => [
+        'title' => 'Enter Marks',
+    ],
+
     'people' => 'People',
     'students' => [
         'title' => 'Students',
     ],
-    'enrollments' => [ // Added
+    'enrollments' => [
         'title' => 'Class Enrollments',
+    ],
+    'attendance' => [
+        'title' => 'Attendance',
+    ],
+    'promotions' => [
+        'title' => 'Promotions',
     ],
     'staff' => [
         'title' => 'Staff',
     ],
+    
+    // Finance
+    'finance' => 'Finance',
+    'fee_types' => [
+        'title' => 'Fee Types',
+    ],
+    'fee_structures' => [
+        'title' => 'Fee Structures',
+    ],
+    'invoices' => [
+        'generate' => 'Generate Invoices',
+        'list' => 'Invoices & Payments',
+    ],
+
     'settings' => 'Settings',
     'permissions' => [
         'title' => 'Roles & Permissions',

@@ -1,36 +1,42 @@
 <?php
 
 return [
-    'page_title' => 'Timetable',
+    'page_title' => 'Class Routine',
     'messages' => [
-        'success_create' => 'Routine added successfully.',
-        'success_update' => 'Routine updated successfully.',
-        'success_delete' => 'Routine deleted successfully.',
+        'success_create' => 'Schedule entry added successfully.',
+        'success_update' => 'Schedule updated successfully.',
+        'success_delete' => 'Schedule entry deleted.',
     ],
     
-    // Stats
-    'timetable_management' => 'Class Routine',
-    'manage_list_subtitle' => 'Manage weekly class schedules',
-    'total_classes' => 'Total Scheduled Classes',
+    // Stats & Header
+    'timetable_management' => 'Timetable Management',
+    'manage_list_subtitle' => 'Manage class schedules and routines',
+    'create_new' => 'Add Routine',
+    'filter_by_class' => 'Filter by Class',
+    'class_routine' => 'Class Routine',
+    'weekly_schedule' => 'Weekly Schedule',
+    'print_routine' => 'Print Routine',
+    'class_teacher' => 'Class Teacher',
+    'no_teacher_assigned' => 'No Teacher Assigned',
+    'no_classes' => 'No classes scheduled',
 
     // Table
-    'timetable_list' => 'Routine List',
+    'timetable_list' => 'Timetable List',
     'table_no' => '#',
-    'class' => 'Class/Section',
+    'class' => 'Class',
     'subject' => 'Subject',
     'teacher' => 'Teacher',
     'day' => 'Day',
     'time' => 'Time',
+    'room' => 'Room',
     'action' => 'Action',
     'search_placeholder' => 'Search Routine...',
-    'no_records_found' => 'No routines found',
-    'not_assigned' => 'Not Assigned',
+    'no_records_found' => 'No schedules found',
 
     // Form
-    'create_new' => 'Add Routine',
-    'add_routine' => 'Add Class Routine',
-    'edit_routine' => 'Edit Class Routine',
-    'basic_information' => 'Schedule Information',
+    'add_routine' => 'Add Routine',
+    'edit_routine' => 'Edit Routine',
+    'basic_information' => 'Schedule Details',
     
     'select_class' => 'Select Class',
     'select_subject' => 'Select Subject',
@@ -40,6 +46,7 @@ return [
     'start_time' => 'Start Time',
     'end_time' => 'End Time',
     'room_number' => 'Room Number',
+    'enter_room' => 'e.g. Room 101',
 
     // Days
     'monday' => 'Monday',
@@ -50,8 +57,9 @@ return [
     'saturday' => 'Saturday',
     'sunday' => 'Sunday',
 
-    // Placeholders
-    'enter_room' => 'e.g. Room 101',
+    // Errors
+    'no_active_session' => 'No active academic session found. Please create one first.',
+    'teacher_busy' => 'The selected teacher is already booked for this time slot.',
 
     // Buttons
     'save_routine' => 'Save Routine',

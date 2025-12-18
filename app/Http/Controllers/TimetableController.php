@@ -58,13 +58,17 @@ class TimetableController extends BaseController
                     return $row->teacher ? $row->teacher->user->name : 'N/A';
                 })
                 ->editColumn('day', function($row){
-                    return ucfirst($row->day);
+                    // Model uses day_of_week
+                    return ucfirst($row->day_of_week);
                 })
                 ->addColumn('time', function($row){
                     return $row->start_time->format('h:i A') . ' - ' . $row->end_time->format('h:i A');
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
+                    if(auth()->user()->can('view', $row)){
+                        $btn .= '<a href="'.route('timetables.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                    }
                     if(auth()->user()->can('update', $row)){
                         $btn .= '<a href="'.route('timetables.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
                     }
@@ -78,7 +82,6 @@ class TimetableController extends BaseController
                 ->make(true);
         }
 
-        // Dropdown for filtering
         $classSectionsQuery = ClassSection::query();
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
@@ -93,7 +96,6 @@ class TimetableController extends BaseController
         $institutionId = Auth::user()->institute_id;
         $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         
-        // Helper to fetch data with optional Institute label for Super Admins
         $fetchData = function($model) use ($institutionId) {
             $query = $model::query();
             if ($institutionId) {
@@ -106,13 +108,9 @@ class TimetableController extends BaseController
             }
         };
 
-        // Fetch Classes
         $classes = $fetchData(ClassSection::class);
-
-        // Fetch Subjects
         $subjects = $fetchData(Subject::class);
         
-        // Fetch Staff (Teachers)
         $teachersQuery = Staff::with(['user', 'institution']);
         if ($institutionId) {
             $teachersQuery->where('institution_id', $institutionId);
@@ -131,13 +129,9 @@ class TimetableController extends BaseController
     public function store(Request $request)
     {
         $userInstituteId = Auth::user()->institute_id;
-        
-        // Determine Institution ID (From Request for Super Admin, Auth for others)
         $targetInstituteId = $userInstituteId ?? $request->institution_id;
 
-        // Ensure we have an institution ID before finding session
         if (!$targetInstituteId) {
-             // Try to infer from class section if not provided explicitly
              $class = ClassSection::find($request->class_section_id);
              $targetInstituteId = $class ? $class->institution_id : null;
         }
@@ -148,6 +142,7 @@ class TimetableController extends BaseController
             throw ValidationException::withMessages(['general' => __('timetable.no_active_session')]);
         }
 
+        // Form still sends 'day' and 'staff_id'
         $validated = $request->validate([
             'class_section_id' => 'required|exists:class_sections,id',
             'subject_id'       => 'required|exists:subjects,id',
@@ -158,14 +153,11 @@ class TimetableController extends BaseController
             'room_number'      => 'nullable|string|max:50',
         ]);
 
-        $validated['institution_id'] = $targetInstituteId;
-        $validated['academic_session_id'] = $currentSession->id;
-
-        // Check conflicts (Teacher overlap)
-        if ($validated['staff_id']) {
-            $conflict = Timetable::where('staff_id', $validated['staff_id'])
-                ->where('day', $validated['day'])
-                ->where('academic_session_id', $currentSession->id) // Scope to session
+        if (!empty($validated['staff_id'])) {
+            // Check conflict using teacher_id and day_of_week
+            $conflict = Timetable::where('teacher_id', $validated['staff_id'])
+                ->where('day_of_week', $validated['day'])
+                ->where('academic_session_id', $currentSession->id)
                 ->where(function($q) use ($validated) {
                     $q->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
                       ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']]);
@@ -177,9 +169,40 @@ class TimetableController extends BaseController
             }
         }
 
-        Timetable::create($validated);
+        $timetable = new Timetable();
+        // Fill safe attributes (start_time, end_time, room_number, etc.)
+        $timetable->fill($validated);
+        
+        $timetable->institution_id = $targetInstituteId;
+        $timetable->academic_session_id = $currentSession->id;
+        
+        // Map form fields to model columns
+        $timetable->day_of_week = $validated['day']; 
+        $timetable->teacher_id = $validated['staff_id'] ?? null; 
+        
+        $timetable->save();
 
         return response()->json(['message' => __('timetable.messages.success_create'), 'redirect' => route('timetables.index')]);
+    }
+
+    public function show(Timetable $timetable)
+    {
+        $timetable->load(['classSection.classTeacher.user', 'subject', 'teacher.user', 'academicSession', 'institution']);
+
+        // Fetch full schedule for the class using day_of_week
+        $schedules = Timetable::with(['subject', 'teacher.user'])
+            ->where('class_section_id', $timetable->class_section_id)
+            ->where('academic_session_id', $timetable->academic_session_id)
+            ->orderBy('start_time')
+            ->get()
+            ->groupBy('day_of_week'); // Group by correct column
+            
+        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $weeklySchedule = collect($days)->mapWithKeys(function($day) use ($schedules) {
+            return [$day => $schedules->get($day) ?? collect()];
+        });
+
+        return view('timetables.show', compact('timetable', 'weeklySchedule'));
     }
 
     public function edit(Timetable $timetable)
@@ -187,7 +210,6 @@ class TimetableController extends BaseController
         $institutionId = Auth::user()->institute_id;
         $institutions = Institution::where('is_active', true)->pluck('name', 'id');
 
-        // Helper to fetch data
         $fetchData = function($model) use ($institutionId) {
             $query = $model::query();
             if ($institutionId) {
@@ -230,11 +252,10 @@ class TimetableController extends BaseController
             'room_number'      => 'nullable|string|max:50',
         ]);
 
-        // Conflict check excluding self
-        if ($validated['staff_id']) {
-            $conflict = Timetable::where('staff_id', $validated['staff_id'])
+        if (!empty($validated['staff_id'])) {
+            $conflict = Timetable::where('teacher_id', $validated['staff_id']) // Use teacher_id
                 ->where('id', '!=', $timetable->id)
-                ->where('day', $validated['day'])
+                ->where('day_of_week', $validated['day']) // Use day_of_week
                 ->where('academic_session_id', $timetable->academic_session_id)
                 ->where(function($q) use ($validated) {
                     $q->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
@@ -247,7 +268,11 @@ class TimetableController extends BaseController
             }
         }
 
-        $timetable->update($validated);
+        $timetable->fill($validated);
+        // Map form fields to model columns
+        $timetable->day_of_week = $validated['day']; 
+        $timetable->teacher_id = $validated['staff_id'] ?? null; 
+        $timetable->save();
 
         return response()->json(['message' => __('timetable.messages.success_update'), 'redirect' => route('timetables.index')]);
     }

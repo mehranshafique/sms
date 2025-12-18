@@ -56,7 +56,7 @@ class RolePermissionSeeder extends Seeder
             'Fee Structures' => ['view', 'create', 'update', 'delete'],
             'Fee Types' => ['view', 'create', 'update', 'delete'],
             'Invoices' => ['view', 'create', 'update', 'delete'],
-            'Payments' => ['view', 'create'],
+            'Payments' => ['view', 'create'], // Added payments permission
         ];
 
         // 3. Create Permissions and Assign to Module

@@ -193,9 +193,10 @@
                         <span class="nav-text">Finance</span>
                     </a>
                     <ul aria-expanded="false">
-                        <li><a href="{{ route('fee-types.index') }}">Fee Types</a></li> {{-- Added --}}
+                        <li><a href="{{ route('fee-types.index') }}">Fee Types</a></li>
                         <li><a href="{{ route('fees.index') }}">Fee Structures</a></li>
-                        {{-- <li><a href="{{ route('invoices.index') }}">Invoices</a></li> --}}
+                        <li><a href="{{ route('invoices.create') }}">Generate Invoices</a></li>
+                        <li><a href="{{ route('invoices.index') }}">Invoices & Payments</a></li>
                     </ul>
                 </li>
             @endcan
