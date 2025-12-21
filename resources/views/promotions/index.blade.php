@@ -16,7 +16,8 @@
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm border-0" style="border-radius: 15px;">
-                    <div class="card-header border-0 pb-0 pt-4 px-4 bg-white">
+                    {{-- Removed bg-white for Dark Mode compatibility --}}
+                    <div class="card-header border-0 pb-0 pt-4 px-4">
                         <h4 class="card-title">{{ __('promotion.select_criteria') }}</h4>
                     </div>
                     <div class="card-body p-4">
@@ -28,8 +29,9 @@
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">{{ __('promotion.current_session') }}</label>
-                                            <select name="from_session_id" class="form-control default-select" required>
-                                                <option value="">Select Session</option>
+                                            {{-- Added data-live-search="true" --}}
+                                            <select name="from_session_id" class="form-control default-select" data-live-search="true" required>
+                                                <option value="">{{ __('promotion.select_session') }}</option>
                                                 @foreach($sessions as $id => $name)
                                                     <option value="{{ $id }}" {{ (request('from_session_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                                 @endforeach
@@ -37,8 +39,8 @@
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">{{ __('promotion.current_class') }}</label>
-                                            <select name="from_class_id" class="form-control default-select" required>
-                                                <option value="">Select Class</option>
+                                            <select name="from_class_id" class="form-control default-select" data-live-search="true" required>
+                                                <option value="">{{ __('promotion.select_class') }}</option>
                                                 @foreach($classes as $id => $name)
                                                     <option value="{{ $id }}" {{ (request('from_class_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                                 @endforeach
@@ -58,8 +60,8 @@
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">{{ __('promotion.target_session') }}</label>
-                                            <select name="to_session_id" class="form-control default-select" form="promotionForm" required>
-                                                <option value="">Select Session</option>
+                                            <select name="to_session_id" class="form-control default-select" data-live-search="true" form="promotionForm" required>
+                                                <option value="">{{ __('promotion.select_session') }}</option>
                                                 @foreach($sessions as $id => $name)
                                                     <option value="{{ $id }}">{{ $name }}</option>
                                                 @endforeach
@@ -67,8 +69,8 @@
                                         </div>
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">{{ __('promotion.target_class') }}</label>
-                                            <select name="to_class_id" class="form-control default-select" form="promotionForm" required>
-                                                <option value="">Select Class</option>
+                                            <select name="to_class_id" class="form-control default-select" data-live-search="true" form="promotionForm" required>
+                                                <option value="">{{ __('promotion.select_class') }}</option>
                                                 @foreach($classes as $id => $name)
                                                     <option value="{{ $id }}">{{ $name }}</option>
                                                 @endforeach
@@ -99,7 +101,8 @@
             <div class="row">
                 <div class="col-12">
                     <div class="card shadow-sm border-0" style="border-radius: 15px;">
-                        <div class="card-header border-0 pb-0 pt-4 px-4 bg-white d-flex justify-content-between align-items-center">
+                        {{-- Removed bg-white --}}
+                        <div class="card-header border-0 pb-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                             <h4 class="card-title mb-0 fw-bold fs-18">{{ __('promotion.student_list') }}</h4>
                             <div class="form-check custom-checkbox">
                                 <input type="checkbox" class="form-check-input" id="checkAll">
@@ -125,7 +128,7 @@
                                                 <td class="fw-bold text-primary">{{ $enrollment->student->full_name }}</td>
                                                 <td>{{ $enrollment->student->admission_number }}</td>
                                                 <td>
-                                                    <span class="badge badge-info light">Pending</span> 
+                                                    <span class="badge badge-info light">{{ __('promotion.eligible') }}</span> 
                                                 </td>
                                                 <td class="text-end pe-4">
                                                     <div class="form-check custom-checkbox d-inline-block">
@@ -138,7 +141,8 @@
                                 </table>
                             </div>
                         </div>
-                        <div class="card-footer border-0 bg-white text-end pb-4 pe-4">
+                        {{-- Removed bg-white --}}
+                        <div class="card-footer border-0 text-end pb-4 pe-4">
                             <button type="submit" class="btn btn-success btn-lg shadow-sm px-5">
                                 <i class="fa fa-level-up me-2"></i> {{ __('promotion.promote_students') }}
                             </button>
@@ -160,9 +164,10 @@
 <script>
     $(document).ready(function(){
         
-        // Initialize Select2 manually if needed (ensure default-select class targets it)
-        if ($.fn.select2) {
-            $('.default-select').select2();
+        // Fix: Use selectpicker manually to ensure search works
+        // (Select2 removed to prevent conflict with theme's bootstrap-select)
+        if(jQuery().selectpicker) {
+            $('.default-select').selectpicker('refresh');
         }
 
         // Check All Logic
@@ -173,28 +178,36 @@
         $('#promotionForm').submit(function(e){
             e.preventDefault();
             
-            // Basic Frontend Validation: Ensure TO fields are selected
-            // We select elements by name attribute, checking if they exist and have value
-            let toSession = $('[name="to_session_id"]').val();
-            let toClass = $('[name="to_class_id"]').val();
+            // Get values manually from filter form
+            let toSession = $('select[name="to_session_id"]').val();
+            let toClass = $('select[name="to_class_id"]').val();
 
             if(!toSession || !toClass) {
                 Swal.fire({
                     icon: 'warning', 
-                    title: 'Missing Information', 
-                    text: 'Please select Target Session and Target Class in the "Promote To" section.'
+                    title: "{{ __('promotion.missing_info') }}", 
+                    text: "{{ __('promotion.select_target_warning') }}"
+                });
+                return;
+            }
+
+            // Verify selection
+            if ($('.student-check:checked').length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: "{{ __('promotion.no_selection') }}",
+                    text: "{{ __('promotion.select_student_warning') }}"
                 });
                 return;
             }
 
             let formData = new FormData(this);
-            // Append the selects outside the form manually
             formData.append('to_session_id', toSession);
             formData.append('to_class_id', toClass);
 
             let btn = $(this).find('button[type="submit"]');
             let originalText = btn.html();
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Processing...');
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> ' + "{{ __('promotion.processing') }}");
 
             $.ajax({
                 url: $(this).attr('action'),
@@ -206,7 +219,7 @@
                 success: function(response){
                     Swal.fire({
                         icon: 'success',
-                        title: 'Success',
+                        title: "{{ __('promotion.success') }}",
                         text: response.message
                     }).then(() => {
                         window.location.href = response.redirect;
@@ -214,7 +227,7 @@
                 },
                 error: function(xhr){
                     btn.prop('disabled', false).html(originalText);
-                    let msg = 'Error Occurred';
+                    let msg = "{{ __('promotion.error_occurred') }}";
                     if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
                     Swal.fire({ icon: 'error', title: 'Error', html: msg });
                 }

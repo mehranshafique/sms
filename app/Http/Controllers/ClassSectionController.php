@@ -10,6 +10,7 @@ use App\Models\Staff;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 class ClassSectionController extends BaseController
 {
@@ -21,9 +22,17 @@ class ClassSectionController extends BaseController
 
     public function index(Request $request)
     {
+        // 1. Get Context
+        $institutionId = $this->getInstitutionId();
+
         if ($request->ajax()) {
             $data = ClassSection::with(['gradeLevel', 'classTeacher.user', 'campus'])
                 ->select('class_sections.*');
+
+            // 2. Strict Scoping
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -68,37 +77,67 @@ class ClassSectionController extends BaseController
                 ->make(true);
         }
 
-        // Stats
-        $totalClasses = ClassSection::count();
-        $activeClasses = ClassSection::where('is_active', true)->count();
-        // Assuming GradeLevel scopes can be used or raw counts
-        // Just generic stats for now
-        $totalCapacity = ClassSection::sum('capacity');
+        // Stats - Scoped
+        $query = ClassSection::query();
+        if ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        }
+        
+        $totalClasses = (clone $query)->count();
+        $activeClasses = (clone $query)->where('is_active', true)->count();
+        $totalCapacity = (clone $query)->sum('capacity');
 
         return view('class_sections.index', compact('totalClasses', 'activeClasses', 'totalCapacity'));
     }
 
     public function create()
     {
-        $campuses = Campus::where('is_active', true)->pluck('name', 'id');
-        $gradeLevels = GradeLevel::orderBy('order_index')->pluck('name', 'id');
+        $institutionId = $this->getInstitutionId();
         
-        // Fetch staff with 'Teacher' role if possible, or just all staff for now
-        // Assuming Staff model has user relation loaded for names
-        $staff = Staff::with('user')->get()->mapWithKeys(function ($item) {
+        $institutions = [];
+        if ($institutionId) {
+            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
+        } elseif (Auth::user()->hasRole('Super Admin')) {
+            $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        }
+
+        // Filter Campuses
+        $campusesQuery = Campus::where('is_active', true);
+        if ($institutionId) {
+            $campusesQuery->where('institution_id', $institutionId);
+        }
+        $campuses = $campusesQuery->pluck('name', 'id');
+
+        // Filter Grade Levels
+        $gradeLevelsQuery = GradeLevel::orderBy('order_index');
+        if ($institutionId) {
+            $gradeLevelsQuery->where('institution_id', $institutionId);
+        }
+        $gradeLevels = $gradeLevelsQuery->pluck('name', 'id');
+        
+        // Filter Staff
+        $staffQuery = Staff::with('user');
+        if ($institutionId) {
+            $staffQuery->where('institution_id', $institutionId);
+        }
+        $staff = $staffQuery->get()->mapWithKeys(function ($item) {
             return [$item->id => $item->user->name . ' (' . ($item->employee_id ?? 'N/A') . ')'];
         });
 
-        return view('class_sections.create', compact('campuses', 'gradeLevels', 'staff'));
+        return view('class_sections.create', compact('campuses', 'gradeLevels', 'staff', 'institutions', 'institutionId'));
     }
 
     public function store(Request $request)
     {
+        // 1. Resolve ID
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+
         $validated = $request->validate([
-            'institution_id' => 'required|exists:institutions,id', // Usually set hidden or via middleware
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'campus_id'      => 'nullable|exists:campuses,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
             'name'           => ['required', 'string', 'max:100', 
+                // Rule: Unique Name per Grade Level
                 Rule::unique('class_sections')->where('grade_level_id', $request->grade_level_id)
             ],
             'code'           => 'nullable|string|max:30',
@@ -107,6 +146,8 @@ class ClassSectionController extends BaseController
             'staff_id'       => 'nullable|exists:staff,id',
             'is_active'      => 'boolean'
         ]);
+        
+        $validated['institution_id'] = $institutionId;
 
         ClassSection::create($validated);
 
@@ -115,18 +156,45 @@ class ClassSectionController extends BaseController
 
     public function edit(ClassSection $class_section)
     {
-        $campuses = Campus::where('is_active', true)->pluck('name', 'id');
-        $gradeLevels = GradeLevel::orderBy('order_index')->pluck('name', 'id');
-        $staff = Staff::with('user')->get()->mapWithKeys(function ($item) {
-            return [$item->id => $item->user->name . ' (' . ($item->employee_id ?? 'N/A') . ')'];
-        });
+        $institutionId = $this->getInstitutionId();
 
-        return view('class_sections.edit', compact('class_section', 'campuses', 'gradeLevels', 'staff'));
+        // Strict Check
+        if ($institutionId && $class_section->institution_id != $institutionId) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $institutions = Institution::where('id', $class_section->institution_id)->pluck('name', 'id');
+
+        $campuses = Campus::where('is_active', true)
+            ->where('institution_id', $class_section->institution_id)
+            ->pluck('name', 'id');
+            
+        $gradeLevels = GradeLevel::orderBy('order_index')
+            ->where('institution_id', $class_section->institution_id)
+            ->pluck('name', 'id');
+            
+        $staff = Staff::with('user')
+            ->where('institution_id', $class_section->institution_id)
+            ->get()
+            ->mapWithKeys(function ($item) {
+                return [$item->id => $item->user->name . ' (' . ($item->employee_id ?? 'N/A') . ')'];
+            });
+
+        return view('class_sections.edit', compact('class_section', 'campuses', 'gradeLevels', 'staff', 'institutions', 'institutionId'));
     }
 
     public function update(Request $request, ClassSection $class_section)
     {
+        $institutionId = $this->getInstitutionId();
+
+        if ($institutionId && $class_section->institution_id != $institutionId) {
+            abort(403);
+        }
+        
+        $targetId = $institutionId ?? $request->institution_id ?? $class_section->institution_id;
+
         $validated = $request->validate([
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'campus_id'      => 'nullable|exists:campuses,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
             'name'           => ['required', 'string', 'max:100', 
@@ -141,6 +209,10 @@ class ClassSectionController extends BaseController
             'is_active'      => 'boolean'
         ]);
 
+        if ($institutionId) {
+            $validated['institution_id'] = $institutionId;
+        }
+
         $class_section->update($validated);
 
         return response()->json(['message' => __('class_section.messages.success_update'), 'redirect' => route('class-sections.index')]);
@@ -148,6 +220,9 @@ class ClassSectionController extends BaseController
 
     public function destroy(ClassSection $class_section)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $class_section->institution_id != $institutionId) abort(403);
+
         $class_section->delete();
         return response()->json(['message' => __('class_section.messages.success_delete')]);
     }
@@ -155,9 +230,19 @@ class ClassSectionController extends BaseController
     public function bulkDelete(Request $request)
     {
         $this->authorize('deleteAny', ClassSection::class); 
+
         $ids = $request->ids;
         if (!empty($ids)) {
-            ClassSection::whereIn('id', $ids)->delete();
+            $institutionId = $this->getInstitutionId();
+            
+            $query = ClassSection::whereIn('id', $ids);
+            
+            // Secure Bulk Delete
+            if ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            }
+            
+            $query->delete();
             return response()->json(['success' => __('class_section.messages.success_delete')]);
         }
         return response()->json(['error' => __('class_section.something_went_wrong')]);

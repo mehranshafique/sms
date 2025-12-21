@@ -7,14 +7,14 @@
     <div class="row">
         <div class="col-xl-12 col-lg-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header border-0 pb-0">
                     <h4 class="card-title">{{ __('enrollment.basic_information') }}</h4>
                 </div>
                 <div class="card-body">
                     <div class="basic-form">
                         <div class="row">
                             
-                            {{-- Student Selection (Disabled on Edit usually) --}}
+                            {{-- Student Selection (Disabled on Edit to prevent ID swap) --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('enrollment.select_student') }} <span class="text-danger">*</span></label>
                                 <select name="student_id" class="form-control default-select" required {{ isset($enrollment) ? 'disabled' : '' }}>
@@ -36,16 +36,19 @@
                                 </select>
                             </div>
 
+                            {{-- Roll Number --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('enrollment.roll_number') }}</label>
                                 <input type="text" name="roll_number" class="form-control" value="{{ old('roll_number', $enrollment->roll_number ?? '') }}" placeholder="{{ __('enrollment.enter_roll') }}">
                             </div>
 
+                            {{-- Date Picker (Fixed Style using 'datepicker' class) --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('enrollment.enrolled_at') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="enrolled_at" class="form-control" value="{{ old('enrolled_at', isset($enrollment) && $enrollment->enrolled_at ? $enrollment->enrolled_at->format('Y-m-d') : date('Y-m-d')) }}" required>
+                                <input type="text" name="enrolled_at" class="form-control datepicker" value="{{ old('enrolled_at', isset($enrollment) && $enrollment->enrolled_at ? $enrollment->enrolled_at->format('Y-m-d') : date('Y-m-d')) }}" placeholder="YYYY-MM-DD" required>
                             </div>
 
+                            {{-- Status --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('enrollment.status_label') }}</label>
                                 <select name="status" class="form-control default-select">

@@ -7,15 +7,15 @@
     
     <style>
         .dt-buttons .dropdown-toggle {
-            background-color: #fff !important;
-            color: #697a8d !important;
-            border-color: #d9dee3 !important;
-            box-shadow: 0 0.125rem 0.25rem 0 rgba(105, 122, 141, 0.1);
+            background-color: var(--card-bg) !important;
+            color: var(--text-color) !important;
+            border-color: var(--border-color) !important;
             border-radius: 0.375rem; 
             padding: 0.4375rem 1rem;
         }
         .dt-buttons .dropdown-toggle:hover {
-            background-color: #f8f9fa !important;
+            background-color: var(--primary) !important;
+            color: #fff !important;
         }
         .dt-buttons .btn-danger {
             background-color: #ff3e1d !important;
@@ -35,6 +35,8 @@
             padding: 0.4375rem 0.875rem;
             margin-left: 0.5em;
             outline: none;
+            background-color: inherit;
+            color: inherit;
         }
     </style>
 @endsection
@@ -44,16 +46,19 @@
     <div class="container-fluid">
         
         {{-- TITLE BAR --}}
-        <div class="row page-titles mx-0 mb-4 p-4 bg-white rounded shadow-sm align-items-center">
-            <div class="col-sm-6 p-0">
+        <div class="row page-titles mx-0">
+            <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4 class="text-primary fw-bold fs-20">{{ __('timetable.timetable_management') }}</h4>
-                    <p class="mb-0 text-muted fs-14">{{ __('timetable.manage_list_subtitle') }}</p>
+                    <h4>{{ __('timetable.timetable_management') }}</h4>
+                    <p class="mb-0">{{ __('timetable.manage_list_subtitle') }}</p>
                 </div>
             </div>
-            <div class="col-sm-6 p-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+                <a href="{{ route('timetables.routine') }}" class="btn btn-outline-primary btn-rounded fw-bold px-4 py-2 me-2">
+                    <i class="fa fa-calendar me-2"></i> {{ __('timetable.view') }}
+                </a>
                 @can('timetable.create')
-                <a href="{{ route('timetables.create') }}" class="btn btn-primary btn-rounded shadow-sm fw-bold px-4 py-2">
+                <a href="{{ route('timetables.create') }}" class="btn btn-primary btn-rounded fw-bold px-4 py-2">
                     <i class="fa fa-plus me-2"></i> {{ __('timetable.create_new') }}
                 </a>
                 @endcan
@@ -63,22 +68,26 @@
         {{-- Filter Row --}}
         <div class="row mb-4">
             <div class="col-xl-4 col-lg-6">
-                <select id="filter_class" class="form-control default-select shadow-sm">
-                    <option value="">{{ __('timetable.filter_by_class') }}</option>
-                    @foreach($classSections as $id => $name)
-                        <option value="{{ $id }}">{{ $name }}</option>
-                    @endforeach
-                </select>
+                <div class="form-group">
+                    <select id="filter_class" class="form-control default-select">
+                        <option value="">{{ __('timetable.filter_by_class') }}</option>
+                        @if(isset($classSections))
+                            @foreach($classSections as $id => $name)
+                                <option value="{{ $id }}">{{ $name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                </div>
             </div>
         </div>
 
         <div class="row">
             <div class="col-12">
-                <div class="card shadow-sm border-0" style="border-radius: 15px;">
-                    <div class="card-header border-0 pb-0 pt-4 px-4 bg-white" style="border-radius: 15px 15px 0 0;">
-                        <h4 class="card-title mb-0 fw-bold fs-18">{{ __('timetable.timetable_list') }}</h4>
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">{{ __('timetable.timetable_list') }}</h4>
                     </div>
-                    <div class="card-body px-4 pb-4">
+                    <div class="card-body">
                         <div class="table-responsive">
                             <table id="timetableTable" class="display" style="width:100%">
                                 <thead>
@@ -128,6 +137,12 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        
+        // Refresh SelectPicker for Filter Dropdown
+        if(jQuery().selectpicker) {
+            $('.default-select').selectpicker('refresh');
+        }
+
         const table = $('#timetableTable').DataTable({
             processing: true,
             serverSide: true,
@@ -176,7 +191,6 @@
                 { data: 'class', name: 'classSection.name' },
                 { data: 'subject', name: 'subject.name' },
                 { data: 'teacher', name: 'teacher.user.name' },
-                // FIX: Changed 'day_of_week' to 'day' to match database/controller
                 { data: 'day', name: 'day' },
                 { data: 'time', name: 'start_time' }, 
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }

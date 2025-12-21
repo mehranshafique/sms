@@ -3,29 +3,11 @@
 <head>
 	<!-- Title -->
 	<title>{{ $pageTitle ?? ''  }}</title>
-
-	<!-- Meta -->
+<!-- Meta -->
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="author" content="dexignlabs">
 	<meta name="robots" content="index, follow">
-
-	<meta name="keywords" content="admin, dashboard, admin dashboard, admin template, template, admin panel, administration, analytics, bootstrap, modern, responsive, creative, retina ready, modern Dashboard responsive dashboard, responsive template, user experience, user interface, Bootstrap Dashboard, Analytics Dashboard, Customizable Admin Panel, EduMin template, ui kit, web app, EduMin, School Management,Dashboard Template, academy, course, courses, e-learning, education, learning, learning management system, lms, school, student, teacher">
-
-	<meta name="description" content="EduMin - Empower your educational institution with the all-in-one Education Admin Dashboard Template. Streamline administrative tasks, manage courses, track student performance, and gain valuable insights with ease. Elevate your education management experience with a modern, responsive, and feature-packed solution. Explore EduMin now for a smarter, more efficient approach to education administration.">
-
-	<meta property="og:title" content="EduMin - Education Admin Dashboard Template | dexignlabs">
-	<meta property="og:description" content="EduMin - Empower your educational institution with the all-in-one Education Admin Dashboard Template. Streamline administrative tasks, manage courses, track student performance, and gain valuable insights with ease. Elevate your education management experience with a modern, responsive, and feature-packed solution. Explore EduMin now for a smarter, more efficient approach to education administration.">
-
-	<meta property="og:image" content="https://edumin.dexignlab.com/xhtml/social-image.png">
-
-	<meta name="format-detection" content="telephone=no">
-
-	<meta name="twitter:title" content="EduMin - Education Admin Dashboard Template | dexignlabs">
-	<meta name="twitter:description" content="EduMin - Empower your educational institution with the all-in-one Education Admin Dashboard Template. Streamline administrative tasks, manage courses, track student performance, and gain valuable insights with ease. Elevate your education management experience with a modern, responsive, and feature-packed solution. Explore EduMin now for a smarter, more efficient approach to education administration.">
-
-	<meta name="twitter:image" content="https://edumin.dexignlab.com/xhtml/social-image.png">
-	<meta name="twitter:card" content="summary_large_image">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon.png">
 
@@ -39,31 +21,31 @@
 
 	<link rel="stylesheet" href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css') }}">
     <link class="" rel="stylesheet" href="{{ asset('css/style.css') }}">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="{{ asset('vendor/select2/css/select2.min.css')  }}">
-    <link href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css')  }}" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Select2 CSS Removed -->
 
+    <!-- Date & Time Picker CSS -->
     <link href="{{asset('vendor/bootstrap-daterangepicker/daterangepicker.css')}}" rel="stylesheet">
     <link href="{{asset('vendor/clockpicker/css/bootstrap-clockpicker.min.css')}}" rel="stylesheet">
-    <link href="{{asset('vendor/jquery-ascolorpicker/css/ascolorpicker.min.cs')}}s" rel="stylesheet">
+    <link href="{{asset('vendor/jquery-ascolorpicker/css/ascolorpicker.min.css')}}" rel="stylesheet">
     <link href="{{asset('vendor/bootstrap-material-datetimepicker/css/bootstrap-material-datetimepicker.css')}}" rel="stylesheet">
+    
     <link rel="stylesheet" href="{{asset('vendor/pickadate/themes/default.css')}}">
     <link rel="stylesheet" href="{{asset('vendor/pickadate/themes/default.date.css')}}">
-    <link href="{{ asset('https://fonts.googleapis.com/icon?family=Material+Icons')  }}" rel="stylesheet">
     
-    <!-- Font Awesome for Spinner -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     @yield('styles')
     <style>
         .select2-selection{
-            border: 2px solid #e0e7ff !important;
+            border: 1px solid #d9dee3 !important;
             border-radius: 4px !important;
-            transition: all 0.3s ease !important;
-            padding: 4px 4px !important;
             height: 38px !important;
         }
+        /* Fix Material Datepicker z-index issue if inside modals */
+        .dtp { z-index: 9999 !important; }
+
         .select2-selection__arrow{
             margin: 4px !important;
         }
@@ -156,6 +138,74 @@
 
                         <ul class="navbar-nav header-right">
                             
+                            {{-- NEW: Institution Context Switcher --}}
+                            @php
+                                $user = Auth::user();
+                                $showSwitcher = false;
+                                $activeInstitutionName = 'Select Institute';
+                                $allowedInstitutions = collect();
+
+                                if ($user) {
+                                    // If user manages multiple institutes OR is Super Admin
+                                    if ($user->hasRole('Super Admin')) {
+                                        $allowedInstitutions = \App\Models\Institution::select('id', 'name', 'code')->get();
+                                        $showSwitcher = true;
+                                    } elseif ($user->institutes->count() > 0) {
+                                        $allowedInstitutions = $user->institutes;
+                                        $showSwitcher = true;
+                                    } else {
+                                        // Single institute user
+                                        $activeInstitutionName = $user->institute->name ?? 'My Institute';
+                                    }
+                                    
+                                    // Determine Active Name from Session
+                                    $activeId = session('active_institution_id', $user->institute_id);
+                                    if($activeId) {
+                                        $activeInst = $allowedInstitutions->where('id', $activeId)->first();
+                                        if (!$activeInst && $user->institute) $activeInst = $user->institute;
+                                        
+                                        if ($activeInst) {
+                                            $activeInstitutionName = $activeInst->name;
+                                        }
+                                    }
+                                }
+                            @endphp
+
+                            @if($showSwitcher)
+                            <li class="nav-item dropdown notification_dropdown">
+                                <a class="nav-link bell ai-icon bg-primary text-white rounded px-3" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="fa fa-university me-2"></i>
+                                    <span class="font-w600">{{ \Illuminate\Support\Str::limit($activeInstitutionName, 15) }}</span>
+                                    <i class="fa fa-caret-down ms-2"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <div id="DZ_W_Notification1" class="widget-media dz-scroll p-3" style="height:auto; max-height:380px; overflow-y:auto;">
+                                        <ul class="timeline">
+                                            @foreach($allowedInstitutions as $inst)
+                                                <li>
+                                                    <div class="timeline-panel">
+                                                        <div class="media-body">
+                                                            <h6 class="mb-1">
+                                                                <a href="{{ route('institution.switch', $inst->id) }}" class="{{ session('active_institution_id') == $inst->id ? 'text-primary fw-bold' : 'text-dark' }}">
+                                                                    {{ $inst->name }}
+                                                                </a>
+                                                            </h6>
+                                                            <small class="d-block text-muted">{{ $inst->code }}</small>
+                                                        </div>
+                                                        @if(session('active_institution_id') == $inst->id)
+                                                            <i class="fa fa-check-circle text-success fs-18"></i>
+                                                        @endif
+                                                    </div>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                </div>
+                            </li>
+                            @endif
+                            {{-- END Switcher --}}
+
+
 							<li class="nav-item dropdown notification_dropdown">
                                <form action="{{ url('/change-language') }}" method="GET">
                                     <div class="d-flex position-relative">

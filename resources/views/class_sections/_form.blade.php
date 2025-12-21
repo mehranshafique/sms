@@ -4,9 +4,6 @@
         @method('PUT')
     @endif
     
-    {{-- Hidden Institution ID --}}
-    <input type="hidden" name="institution_id" value="{{ auth()->user()->institute_id ?? 1 }}">
-
     <div class="row">
         <div class="col-xl-12">
             <div class="card">
@@ -16,6 +13,31 @@
                 <div class="card-body">
                     <div class="basic-form">
                         <div class="row">
+                            
+                            {{-- LOGIC: Auto-Assign vs Select Institute --}}
+                            @php
+                                $hasContext = isset($institutionId) && $institutionId;
+                                $isSuperAdmin = auth()->user()->hasRole('Super Admin');
+                            @endphp
+
+                            @if($hasContext && !$isSuperAdmin)
+                                {{-- Standard User / Head Officer with Context: Auto-Fill --}}
+                                <input type="hidden" name="institution_id" value="{{ $institutionId }}">
+                            @else
+                                {{-- Super Admin / No Context: Show Dropdown --}}
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label">Institution <span class="text-danger">*</span></label>
+                                    <select name="institution_id" class="form-control default-select" required>
+                                        <option value="">Select Institution</option>
+                                        @foreach($institutions as $id => $name)
+                                            <option value="{{ $id }}" {{ (old('institution_id', $class_section->institution_id ?? ($hasContext ? $institutionId : '')) == $id) ? 'selected' : '' }}>
+                                                {{ $name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('class_section.select_grade') }} <span class="text-danger">*</span></label>
                                 <select name="grade_level_id" class="form-control default-select" required>

@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class TimetableController extends BaseController
 {
@@ -23,21 +24,53 @@ class TimetableController extends BaseController
 
     public function index(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
+        $user = Auth::user();
 
         if ($request->ajax()) {
-            $data = Timetable::with(['classSection', 'subject', 'teacher.user'])
+            // FIX: Select only timetable columns to prevent ambiguity with joined tables
+            $query = Timetable::with(['classSection', 'subject', 'teacher.user'])
                 ->select('timetables.*');
 
+            // 1. Institution Scoping (Strictly prefixed)
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $query->where('timetables.institution_id', $institutionId);
+            }
+
+            // 2. Role-Based Scoping
+            if ($user->hasRole('Teacher')) {
+                // Teachers see only their own schedule
+                $staff = $user->staff; 
+                if ($staff) {
+                    // FIX: Column is 'staff_id', not 'teacher_id'
+                    $query->where('timetables.staff_id', $staff->id);
+                } else {
+                    $query->whereRaw('1 = 0'); 
+                }
+            } elseif ($user->hasRole('Student')) {
+                // Students see only their class schedule
+                $student = $user->student; 
+                if ($student) {
+                    $currentClassId = $student->enrollments()
+                        ->where('status', 'active')
+                        ->latest('created_at')
+                        ->value('class_section_id');
+                        
+                    if($currentClassId) {
+                        $query->where('timetables.class_section_id', $currentClassId);
+                    } else {
+                        $query->whereRaw('1 = 0');
+                    }
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             }
 
             if ($request->has('class_section_id') && $request->class_section_id) {
-                $data->where('class_section_id', $request->class_section_id);
+                $query->where('timetables.class_section_id', $request->class_section_id);
             }
 
-            return DataTables::of($data)
+            return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
                     if(auth()->user()->can('delete', $row)){
@@ -58,8 +91,7 @@ class TimetableController extends BaseController
                     return $row->teacher ? $row->teacher->user->name : 'N/A';
                 })
                 ->editColumn('day', function($row){
-                    // Model uses day_of_week
-                    return ucfirst($row->day_of_week);
+                    return ucfirst($row->day);
                 })
                 ->addColumn('time', function($row){
                     return $row->start_time->format('h:i A') . ' - ' . $row->end_time->format('h:i A');
@@ -82,133 +114,178 @@ class TimetableController extends BaseController
                 ->make(true);
         }
 
-        $classSectionsQuery = ClassSection::query();
-        if ($institutionId) {
-            $classSectionsQuery->where('institution_id', $institutionId);
+        $classSections = [];
+        if (!$user->hasRole(['Student', 'Teacher'])) {
+            $classSectionsQuery = ClassSection::query();
+            if ($institutionId) {
+                $classSectionsQuery->where('institution_id', $institutionId);
+            }
+            $classSections = $classSectionsQuery->pluck('name', 'id');
         }
-        $classSections = $classSectionsQuery->pluck('name', 'id');
 
         return view('timetables.index', compact('classSections'));
     }
 
-    public function create()
+    public function classRoutine(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
-        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        $institutionId = $this->getInstitutionId();
+        $user = Auth::user();
         
-        $fetchData = function($model) use ($institutionId) {
-            $query = $model::query();
-            if ($institutionId) {
-                $query->where('institution_id', $institutionId);
-                return $query->pluck('name', 'id');
-            } else {
-                return $query->with('institution')->get()->mapWithKeys(function($item) {
-                    return [$item->id => $item->name . ' (' . ($item->institution->code ?? 'N/A') . ')'];
-                });
-            }
-        };
+        $filters = [];
+        $selectedClass = null;
 
-        $classes = $fetchData(ClassSection::class);
-        $subjects = $fetchData(Subject::class);
+        if ($user->hasRole('Teacher')) {
+            $staff = $user->staff;
+            if ($staff) {
+                // FIX: Use 'staff_id'
+                $filters['teacher_id'] = $staff->id;
+                $request->request->remove('class_section_id'); 
+                $request->request->remove('room_number');
+            }
+        } elseif ($user->hasRole('Student')) {
+            $student = $user->student;
+            if ($student) {
+                $currentClassId = $student->enrollments()
+                    ->where('status', 'active')
+                    ->latest('created_at')
+                    ->value('class_section_id');
+                
+                if ($currentClassId) {
+                    $selectedClass = ClassSection::with(['classTeacher.user', 'institution', 'gradeLevel'])->find($currentClassId);
+                    $request->merge(['class_section_id' => $currentClassId]); 
+                }
+                $request->request->remove('teacher_id');
+                $request->request->remove('room_number');
+            }
+        } else {
+            if ($request->has('class_section_id') && $request->class_section_id) {
+                $selectedClass = ClassSection::with(['classTeacher.user', 'institution', 'gradeLevel'])->find($request->class_section_id);
+            }
+            if ($request->has('teacher_id') && $request->teacher_id) {
+                $filters['teacher_id'] = $request->teacher_id;
+            }
+            if ($request->has('room_number') && $request->room_number) {
+                $filters['room_number'] = $request->room_number;
+            }
+        }
         
-        $teachersQuery = Staff::with(['user', 'institution']);
+        $classes = collect();
+        $teachers = collect();
+        $rooms = collect();
+
+        if (!$user->hasRole(['Student', 'Teacher'])) {
+            $classesQuery = ClassSection::query();
+            if ($institutionId) $classesQuery->where('institution_id', $institutionId);
+            $classes = $classesQuery->pluck('name', 'id');
+
+            $teachersQuery = Staff::with('user');
+            if ($institutionId) $teachersQuery->where('institution_id', $institutionId);
+            $teachers = $teachersQuery->get()->mapWithKeys(fn($t)=>[$t->id => $t->user->name]);
+
+            $roomsQuery = Timetable::select('room_number')->distinct()->whereNotNull('room_number');
+            if ($institutionId) $roomsQuery->where('institution_id', $institutionId);
+            $rooms = $roomsQuery->pluck('room_number', 'room_number');
+        }
+
+        if ($selectedClass || !empty($filters)) {
+            return $this->generateWeeklyView($selectedClass, true, null, $classes, $teachers, $rooms, $filters);
+        }
+
+        return view('timetables.viewer', compact('classes', 'teachers', 'rooms'));
+    }
+
+    private function getScheduleData($classSection = null, $filters = [])
+    {
+        $institutionId = $this->getInstitutionId();
+
+        if (!$institutionId) {
+            if ($classSection) {
+                $institutionId = $classSection->institution_id;
+            } elseif (isset($filters['teacher_id'])) {
+                $teacher = Staff::find($filters['teacher_id']);
+                if ($teacher) $institutionId = $teacher->institution_id;
+            }
+        }
+        
+        $session = null;
         if ($institutionId) {
-            $teachersQuery->where('institution_id', $institutionId);
+            $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         }
-        $teachers = $teachersQuery->get()->mapWithKeys(function($item) use ($institutionId){
-            $label = $item->user->name;
-            if (!$institutionId && $item->institution) {
-                $label .= ' (' . $item->institution->code . ')';
-            }
-            return [$item->id => $label];
+
+        $query = Timetable::with(['subject', 'teacher.user', 'classSection', 'academicSession'])
+            ->select('timetables.*')
+            ->orderBy('timetables.start_time'); // Qualified order to match select
+
+        if ($session) {
+            $query->where('timetables.academic_session_id', $session->id);
+        } else {
+            $query->whereHas('academicSession', function($q) {
+                $q->where('is_current', true);
+            });
+        }
+
+        if ($classSection) {
+            $query->where('timetables.class_section_id', $classSection->id);
+        }
+        if (isset($filters['teacher_id'])) {
+            // FIX: Use 'staff_id'
+            $query->where('timetables.staff_id', $filters['teacher_id']);
+        }
+        if (isset($filters['room_number'])) {
+            $query->where('timetables.room_number', $filters['room_number']);
+        }
+
+        $rawSchedules = $query->get();
+
+        $schedules = $rawSchedules->groupBy(function($item) {
+            return strtolower($item->day);
         });
-
-        return view('timetables.create', compact('classes', 'subjects', 'teachers', 'institutions'));
-    }
-
-    public function store(Request $request)
-    {
-        $userInstituteId = Auth::user()->institute_id;
-        $targetInstituteId = $userInstituteId ?? $request->institution_id;
-
-        if (!$targetInstituteId) {
-             $class = ClassSection::find($request->class_section_id);
-             $targetInstituteId = $class ? $class->institution_id : null;
-        }
-
-        $currentSession = AcademicSession::where('institution_id', $targetInstituteId)->where('is_current', true)->first();
-
-        if(!$currentSession) {
-            throw ValidationException::withMessages(['general' => __('timetable.no_active_session')]);
-        }
-
-        // Form still sends 'day' and 'staff_id'
-        $validated = $request->validate([
-            'class_section_id' => 'required|exists:class_sections,id',
-            'subject_id'       => 'required|exists:subjects,id',
-            'staff_id'         => 'nullable|exists:staff,id',
-            'day'              => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'start_time'       => 'required',
-            'end_time'         => 'required|after:start_time',
-            'room_number'      => 'nullable|string|max:50',
-        ]);
-
-        if (!empty($validated['staff_id'])) {
-            // Check conflict using teacher_id and day_of_week
-            $conflict = Timetable::where('teacher_id', $validated['staff_id'])
-                ->where('day_of_week', $validated['day'])
-                ->where('academic_session_id', $currentSession->id)
-                ->where(function($q) use ($validated) {
-                    $q->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
-                      ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']]);
-                })
-                ->exists();
-            
-            if ($conflict) {
-                throw ValidationException::withMessages(['staff_id' => __('timetable.teacher_busy')]);
-            }
-        }
-
-        $timetable = new Timetable();
-        // Fill safe attributes (start_time, end_time, room_number, etc.)
-        $timetable->fill($validated);
-        
-        $timetable->institution_id = $targetInstituteId;
-        $timetable->academic_session_id = $currentSession->id;
-        
-        // Map form fields to model columns
-        $timetable->day_of_week = $validated['day']; 
-        $timetable->teacher_id = $validated['staff_id'] ?? null; 
-        
-        $timetable->save();
-
-        return response()->json(['message' => __('timetable.messages.success_create'), 'redirect' => route('timetables.index')]);
-    }
-
-    public function show(Timetable $timetable)
-    {
-        $timetable->load(['classSection.classTeacher.user', 'subject', 'teacher.user', 'academicSession', 'institution']);
-
-        // Fetch full schedule for the class using day_of_week
-        $schedules = Timetable::with(['subject', 'teacher.user'])
-            ->where('class_section_id', $timetable->class_section_id)
-            ->where('academic_session_id', $timetable->academic_session_id)
-            ->orderBy('start_time')
-            ->get()
-            ->groupBy('day_of_week'); // Group by correct column
             
         $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $weeklySchedule = collect($days)->mapWithKeys(function($day) use ($schedules) {
             return [$day => $schedules->get($day) ?? collect()];
         });
 
-        return view('timetables.show', compact('timetable', 'weeklySchedule'));
+        $headerTitle = "Class Routine";
+        if ($classSection) {
+            $headerTitle = $classSection->name;
+        } elseif (isset($filters['teacher_id'])) {
+            $t = Staff::with('user')->find($filters['teacher_id']);
+            $headerTitle = $t ? "Teacher: " . $t->user->name : "Teacher Schedule";
+        } elseif (isset($filters['room_number'])) {
+            $headerTitle = "Room: " . $filters['room_number'];
+        }
+
+        $institution = $session ? $session->institution : ($rawSchedules->first() ? $rawSchedules->first()->institution : Institution::find($institutionId));
+        $timetable = $rawSchedules->first();
+
+        return compact('weeklySchedule', 'headerTitle', 'session', 'institution', 'timetable');
     }
 
-    public function edit(Timetable $timetable)
+    private function generateWeeklyView($classSection = null, $isViewer = false, $timetable = null, $classes = null, $teachers = null, $rooms = null, $filters = [])
     {
-        $institutionId = Auth::user()->institute_id;
-        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        $data = $this->getScheduleData($classSection, $filters);
+        
+        $viewName = $isViewer ? 'timetables.viewer' : 'timetables.show';
+        $timetable = $timetable ?? ($data['timetable'] ?? null);
+
+        $classes = $classes ?? collect();
+        $teachers = $teachers ?? collect();
+        $rooms = $rooms ?? collect();
+
+        return view($viewName, array_merge($data, compact('classSection', 'classes', 'teachers', 'rooms', 'timetable')));
+    }
+
+    public function create()
+    {
+        $institutionId = $this->getInstitutionId();
+        
+        $institutions = [];
+        if ($institutionId) {
+            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
+        } elseif (Auth::user()->hasRole('Super Admin')) {
+            $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        }
 
         $fetchData = function($model) use ($institutionId) {
             $query = $model::query();
@@ -237,41 +314,55 @@ class TimetableController extends BaseController
             return [$item->id => $label];
         });
 
-        return view('timetables.edit', compact('timetable', 'classes', 'subjects', 'teachers', 'institutions'));
+        return view('timetables.create', compact('classes', 'subjects', 'teachers', 'institutions', 'institutionId'));
+    }
+
+    public function store(Request $request)
+    {
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+        $this->validateTimetable($request, null, $institutionId);
+
+        if (!$institutionId) {
+             $class = ClassSection::find($request->class_section_id);
+             $institutionId = $class ? $class->institution_id : null;
+        }
+
+        $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+
+        $timetable = new Timetable();
+        $timetable->fill($request->all());
+        $timetable->institution_id = $institutionId;
+        $timetable->academic_session_id = $currentSession->id;
+        $timetable->day = strtolower($request->day);
+        // FIX: Use 'staff_id'
+        $timetable->staff_id = $request->staff_id;
+        $timetable->save();
+
+        return response()->json(['message' => __('timetable.messages.success_create'), 'redirect' => route('timetables.index')]);
+    }
+
+    public function edit(Timetable $timetable)
+    {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $timetable->institution_id != $institutionId) abort(403);
+
+        $institutions = Institution::where('id', $timetable->institution_id)->pluck('name', 'id');
+        $classes = ClassSection::where('institution_id', $timetable->institution_id)->pluck('name', 'id');
+        $subjects = Subject::where('institution_id', $timetable->institution_id)->pluck('name', 'id');
+        $teachers = Staff::with('user')->where('institution_id', $timetable->institution_id)->get()->mapWithKeys(fn($t)=>[$t->id => $t->user->name]);
+
+        return view('timetables.edit', compact('timetable', 'classes', 'subjects', 'teachers', 'institutions', 'institutionId'));
     }
 
     public function update(Request $request, Timetable $timetable)
     {
-        $validated = $request->validate([
-            'class_section_id' => 'required|exists:class_sections,id',
-            'subject_id'       => 'required|exists:subjects,id',
-            'staff_id'         => 'nullable|exists:staff,id',
-            'day'              => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'start_time'       => 'required',
-            'end_time'         => 'required|after:start_time',
-            'room_number'      => 'nullable|string|max:50',
-        ]);
+        $institutionId = $this->getInstitutionId() ?? $timetable->institution_id;
+        $this->validateTimetable($request, $timetable->id, $institutionId);
 
-        if (!empty($validated['staff_id'])) {
-            $conflict = Timetable::where('teacher_id', $validated['staff_id']) // Use teacher_id
-                ->where('id', '!=', $timetable->id)
-                ->where('day_of_week', $validated['day']) // Use day_of_week
-                ->where('academic_session_id', $timetable->academic_session_id)
-                ->where(function($q) use ($validated) {
-                    $q->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
-                      ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']]);
-                })
-                ->exists();
-            
-            if ($conflict) {
-                throw ValidationException::withMessages(['staff_id' => __('timetable.teacher_busy')]);
-            }
-        }
-
-        $timetable->fill($validated);
-        // Map form fields to model columns
-        $timetable->day_of_week = $validated['day']; 
-        $timetable->teacher_id = $validated['staff_id'] ?? null; 
+        $timetable->fill($request->all());
+        $timetable->day = strtolower($request->day);
+        // FIX: Use 'staff_id'
+        $timetable->staff_id = $request->staff_id;
         $timetable->save();
 
         return response()->json(['message' => __('timetable.messages.success_update'), 'redirect' => route('timetables.index')]);
@@ -279,6 +370,9 @@ class TimetableController extends BaseController
 
     public function destroy(Timetable $timetable)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $timetable->institution_id != $institutionId) abort(403);
+
         $timetable->delete();
         return response()->json(['message' => __('timetable.messages.success_delete')]);
     }
@@ -288,9 +382,89 @@ class TimetableController extends BaseController
         $this->authorize('deleteAny', Timetable::class); 
         $ids = $request->ids;
         if (!empty($ids)) {
-            Timetable::whereIn('id', $ids)->delete();
+            $institutionId = $this->getInstitutionId();
+            $query = Timetable::whereIn('id', $ids);
+            if ($institutionId) $query->where('institution_id', $institutionId);
+            $query->delete();
             return response()->json(['success' => __('timetable.messages.success_delete')]);
         }
         return response()->json(['error' => __('timetable.something_went_wrong')]);
+    }
+
+    private function validateTimetable(Request $request, $ignoreId = null, $institutionId = null)
+    {
+        $targetInstituteId = $institutionId ?? $request->institution_id;
+        
+        if (!$targetInstituteId && $request->class_section_id) {
+            $class = ClassSection::find($request->class_section_id);
+            if($class) $targetInstituteId = $class->institution_id;
+        }
+
+        $currentSession = AcademicSession::where('institution_id', $targetInstituteId)->where('is_current', true)->first();
+        if(!$currentSession) {
+            throw ValidationException::withMessages(['general' => __('timetable.no_active_session')]);
+        }
+
+        $request->validate([
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
+            'class_section_id' => 'required|exists:class_sections,id',
+            'subject_id'       => 'required|exists:subjects,id',
+            'staff_id'         => 'nullable|exists:staff,id',
+            'day'              => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+            'start_time'       => 'required',
+            'end_time'         => 'required',
+        ]);
+
+        $day = strtolower($request->day);
+        $start = Carbon::parse($request->start_time)->format('H:i:s');
+        $end = Carbon::parse($request->end_time)->format('H:i:s');
+
+        if($end <= $start) {
+            throw ValidationException::withMessages(['end_time' => 'End time must be after start time.']);
+        }
+
+        // Conflict Checks
+        if ($request->staff_id) {
+            // FIX: Use 'staff_id' and 'day'
+            $conflicts = Timetable::where('staff_id', $request->staff_id)
+                ->where('day', $day)
+                ->where('academic_session_id', $currentSession->id)
+                ->where('id', '!=', $ignoreId)
+                ->get();
+                
+            foreach($conflicts as $conflict) {
+                if ($conflict->start_time->format('H:i:s') < $end && $conflict->end_time->format('H:i:s') > $start) {
+                     throw ValidationException::withMessages(['staff_id' => __('timetable.teacher_busy')]);
+                }
+            }
+        }
+    }
+    
+    public function printFiltered(Request $request) {
+        $this->classRoutine($request); 
+        $data = $this->getScheduleData(null, $request->all()); 
+        if($request->class_section_id && !isset($data['timetable'])) {
+             $data = $this->getScheduleData(ClassSection::find($request->class_section_id));
+        }
+        return view('timetables.print', $data);
+    }
+    
+    public function downloadPdf($id) {
+         $timetable = Timetable::with(['classSection', 'academicSession', 'institution'])->findOrFail($id);
+         $data = $this->getScheduleData($timetable->classSection);
+         $data['timetable'] = $timetable;
+         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('timetables.print', $data);
+            $pdf->setPaper('a4', 'landscape');
+            return $pdf->download('Timetable.pdf');
+        }
+        return back();
+    }
+    
+    public function print($id) {
+        $timetable = Timetable::with(['classSection', 'academicSession', 'institution'])->findOrFail($id);
+        $data = $this->getScheduleData($timetable->classSection);
+        $data['timetable'] = $timetable; 
+        return view('timetables.print', $data);
     }
 }

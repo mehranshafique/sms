@@ -32,14 +32,14 @@
                                 <input type="text" name="name" class="form-control" value="{{ old('name', $exam->name ?? '') }}" placeholder="{{ __('exam.enter_name') }}" required>
                             </div>
 
-                            {{-- Dates --}}
+                            {{-- Dates (Fixed: Using 'datepicker' class instead of type='date') --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('exam.start_date') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="start_date" class="form-control" value="{{ old('start_date', isset($exam) ? $exam->start_date->format('Y-m-d') : '') }}" required>
+                                <input type="text" name="start_date" class="form-control datepicker" value="{{ old('start_date', isset($exam) ? $exam->start_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
                             </div>
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('exam.end_date') }} <span class="text-danger">*</span></label>
-                                <input type="date" name="end_date" class="form-control" value="{{ old('end_date', isset($exam) ? $exam->end_date->format('Y-m-d') : '') }}" required>
+                                <input type="text" name="end_date" class="form-control datepicker" value="{{ old('end_date', isset($exam) ? $exam->end_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
                             </div>
 
                             {{-- Status --}}

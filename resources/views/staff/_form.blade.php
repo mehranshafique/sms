@@ -8,7 +8,7 @@
         <!-- Basic Info -->
         <div class="col-xl-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header border-0 pb-0">
                     <h4 class="card-title">{{ __('staff.basic_information') }}</h4>
                 </div>
                 <div class="card-body">
@@ -78,18 +78,33 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('staff.select_institution') }} <span class="text-danger">*</span></label>
-                            <select name="institution_id" class="form-control default-select" required>
-                                @foreach($institutes as $id => $name)
-                                    <option value="{{ $id }}" {{ (old('institution_id', $staff->institution_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        
+                        {{-- LOGIC: Auto-Assign vs Select Institute --}}
+                        @php
+                            $hasContext = isset($institutionId) && $institutionId;
+                            $isSuperAdmin = auth()->user()->hasRole('Super Admin');
+                        @endphp
+
+                        @if($hasContext && !$isSuperAdmin)
+                            {{-- Standard User or Head Officer with Context Set: Hide & Auto-Fill --}}
+                            <input type="hidden" name="institution_id" value="{{ $institutionId }}">
+                        @else
+                            {{-- Super Admin or No Context Set: Show Dropdown --}}
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ __('staff.select_institution') }} <span class="text-danger">*</span></label>
+                                <select name="institution_id" class="form-control default-select" required {{ isset($staff) ? 'disabled' : '' }}>
+                                    <option value="">{{ __('staff.select_institution') }}</option>
+                                    @foreach($institutions as $id => $name)
+                                        <option value="{{ $id }}" {{ (old('institution_id', $staff->institution_id ?? ($hasContext ? $institutionId : '')) == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.select_campus') }}</label>
                             <select name="campus_id" class="form-control default-select">
-                                <option value="">{{ __('staff.select_campus') }}</option>
+                                <option value="">Select Campus</option>
                                 @foreach($campuses as $id => $name)
                                     <option value="{{ $id }}" {{ (old('campus_id', $staff->campus_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                 @endforeach

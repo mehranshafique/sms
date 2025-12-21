@@ -76,4 +76,13 @@ class Institution extends Model
     {
         return $this->hasMany(Student::class);
     }
+
+    /**
+     * Relationship: An Institution has many Streams (Options).
+     * Added for Option/Stream Module.
+     */
+    // public function streams()
+    // {
+    //     return $this->hasMany(Stream::class);
+    // }
 }

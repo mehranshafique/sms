@@ -6,7 +6,6 @@ use App\Models\StudentEnrollment;
 use App\Models\Student;
 use App\Models\ClassSection;
 use App\Models\AcademicSession;
-use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -17,15 +16,14 @@ class StudentEnrollmentController extends BaseController
 {
     public function __construct()
     {
-        $this->authorizeResource(StudentEnrollment::class, 'student_enrollment');
+        $this->authorizeResource(StudentEnrollment::class, 'enrollment');
         $this->setPageTitle(__('enrollment.page_title'));
     }
 
     public function index(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
         
-        // Fetch active session based on user's institute or request
         $querySession = AcademicSession::query();
         if($institutionId) {
             $querySession->where('institution_id', $institutionId);
@@ -33,17 +31,13 @@ class StudentEnrollmentController extends BaseController
         $currentSession = $querySession->where('is_current', true)->first();
 
         if ($request->ajax()) {
-            // FIX: Select specific columns to avoid ID collision if joins happen
             $data = StudentEnrollment::with(['student', 'classSection', 'gradeLevel'])
                 ->select('student_enrollments.*');
 
-            // FIX: Qualify column name to avoid ambiguity (student_enrollments.institution_id)
             if ($institutionId) {
                 $data->where('student_enrollments.institution_id', $institutionId);
             }
 
-            // Filter by Session (Default to current if active)
-            // FIX: Qualify academic_session_id as well
             if ($currentSession) {
                 $data->where('student_enrollments.academic_session_id', $currentSession->id);
             }
@@ -97,7 +91,6 @@ class StudentEnrollmentController extends BaseController
                 ->make(true);
         }
 
-        // Dropdowns for Filter
         $classSectionsQuery = ClassSection::query();
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
@@ -111,9 +104,8 @@ class StudentEnrollmentController extends BaseController
 
     public function create()
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
         
-        // Classes
         $classesQuery = ClassSection::with(['gradeLevel', 'institution']);
         if ($institutionId) {
             $classesQuery->where('institution_id', $institutionId);
@@ -126,7 +118,6 @@ class StudentEnrollmentController extends BaseController
             return [$item->id => $label];
         });
 
-        // Current Session Check
         $querySession = AcademicSession::where('is_current', true);
         if($institutionId) {
             $querySession->where('institution_id', $institutionId);
@@ -135,7 +126,8 @@ class StudentEnrollmentController extends BaseController
         
         $sessionId = $currentSession ? $currentSession->id : 0;
 
-        // Students (Not yet enrolled in this session)
+        // Fetch students NOT currently enrolled in the *active* session
+        // This is the logic for "Re-Enrollment": Find existing student -> Add to new session
         $studentsQuery = Student::whereDoesntHave('enrollments', function($q) use ($sessionId) {
             $q->where('academic_session_id', $sessionId);
         });
@@ -161,13 +153,15 @@ class StudentEnrollmentController extends BaseController
 
     public function store(Request $request)
     {
-        $userInstituteId = Auth::user()->institute_id;
+        $userInstituteId = $this->getInstitutionId();
         
-        // 1. Determine Target Institution (From Student or Class)
         $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
         $targetInstituteId = $classSection->institution_id;
 
-        // 2. Get Current Session for THAT Institution
+        if ($userInstituteId && $targetInstituteId != $userInstituteId) {
+            abort(403);
+        }
+
         $currentSession = AcademicSession::where('institution_id', $targetInstituteId)
             ->where('is_current', true)
             ->first();
@@ -180,7 +174,7 @@ class StudentEnrollmentController extends BaseController
             'student_id'       => [
                 'required', 
                 'exists:students,id',
-                // Rule: Student unique per session
+                // Enforce: One enrollment per session per student
                 Rule::unique('student_enrollments')->where(function ($query) use ($currentSession) {
                     return $query->where('academic_session_id', $currentSession->id);
                 })
@@ -188,7 +182,6 @@ class StudentEnrollmentController extends BaseController
             'class_section_id' => 'required|exists:class_sections,id',
             'roll_number'      => [
                 'nullable', 'string', 'max:20',
-                // Rule: Roll number unique per section per session
                 Rule::unique('student_enrollments')
                     ->where('academic_session_id', $currentSession->id)
                     ->where('class_section_id', $request->class_section_id)
@@ -208,7 +201,11 @@ class StudentEnrollmentController extends BaseController
 
     public function edit(StudentEnrollment $enrollment)
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
+        
+        if ($institutionId && $enrollment->institution_id != $institutionId) {
+            abort(403);
+        }
         
         $classesQuery = ClassSection::with('gradeLevel');
         if ($institutionId) {
@@ -225,6 +222,11 @@ class StudentEnrollmentController extends BaseController
 
     public function update(Request $request, StudentEnrollment $enrollment)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $enrollment->institution_id != $institutionId) {
+            abort(403);
+        }
+
         $validated = $request->validate([
             'class_section_id' => 'required|exists:class_sections,id',
             'roll_number'      => [
@@ -248,6 +250,11 @@ class StudentEnrollmentController extends BaseController
 
     public function destroy(StudentEnrollment $enrollment)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $enrollment->institution_id != $institutionId) {
+            abort(403);
+        }
+
         $enrollment->delete();
         return response()->json(['message' => __('enrollment.messages.success_delete')]);
     }
@@ -256,8 +263,16 @@ class StudentEnrollmentController extends BaseController
     {
         $this->authorize('deleteAny', StudentEnrollment::class); 
         $ids = $request->ids;
+        
         if (!empty($ids)) {
-            StudentEnrollment::whereIn('id', $ids)->delete();
+            $institutionId = $this->getInstitutionId();
+            $query = StudentEnrollment::whereIn('id', $ids);
+            
+            if ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            }
+            
+            $query->delete();
             return response()->json(['success' => __('enrollment.messages.success_delete')]);
         }
         return response()->json(['error' => __('enrollment.something_went_wrong')]);

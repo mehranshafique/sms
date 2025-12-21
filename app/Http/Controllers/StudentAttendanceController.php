@@ -6,6 +6,7 @@ use App\Models\StudentAttendance;
 use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
 use App\Models\AcademicSession;
+use App\Models\InstitutionSetting;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +18,7 @@ class StudentAttendanceController extends BaseController
 {
     public function __construct()
     {
-        $this->middleware(PermissionMiddleware::class . ':student_attendance.view')->only(['index']);
+        $this->middleware(PermissionMiddleware::class . ':student_attendance.view')->only(['index', 'report']);
         $this->middleware(PermissionMiddleware::class . ':student_attendance.create')->only(['create', 'store']);
         
         $this->setPageTitle(__('attendance.page_title'));
@@ -87,6 +88,52 @@ class StudentAttendanceController extends BaseController
         return view('attendance.index', compact('classSections'));
     }
 
+    /**
+     * Report: Grid View / Register View
+     */
+    public function report(Request $request)
+    {
+        $institutionId = Auth::user()->institute_id;
+
+        // Dropdown Data
+        $classSectionsQuery = ClassSection::with('institution');
+        if ($institutionId) {
+            $classSectionsQuery->where('institution_id', $institutionId);
+        }
+        $classSections = $classSectionsQuery->get()->mapWithKeys(fn($item) => [$item->id => $item->name]);
+
+        $students = [];
+        $attendanceMap = [];
+        $daysInMonth = 0;
+        $year = $request->year ?? now()->year;
+        $month = $request->month ?? now()->month;
+
+        if ($request->filled('class_section_id')) {
+            $startDate = Carbon::createFromDate($year, $month, 1);
+            $endDate = $startDate->copy()->endOfMonth();
+            $daysInMonth = $startDate->daysInMonth;
+
+            // Fetch Students in Class
+            $students = StudentEnrollment::with('student')
+                ->where('class_section_id', $request->class_section_id)
+                ->where('status', 'active')
+                ->get();
+
+            // Fetch Attendance Records for the month
+            $records = StudentAttendance::where('class_section_id', $request->class_section_id)
+                ->whereBetween('attendance_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->get();
+
+            // Map: [student_id][day_number] = status
+            foreach ($records as $record) {
+                $day = (int) $record->attendance_date->format('d');
+                $attendanceMap[$record->student_id][$day] = $record->status;
+            }
+        }
+
+        return view('attendance.report', compact('classSections', 'students', 'attendanceMap', 'daysInMonth', 'year', 'month'));
+    }
+
     public function create(Request $request)
     {
         $institutionId = Auth::user()->institute_id;
@@ -108,19 +155,32 @@ class StudentAttendanceController extends BaseController
         $existingAttendance = [];
         $isUpdate = false;
         $isLocked = false;
+        $lockReason = '';
 
         if ($request->filled('class_section_id') && $request->filled('date')) {
             
             $targetDate = Carbon::parse($request->date);
-            
-            // SRS Requirement: Editing (maximum 7 days)
-            // Allow Super Admin (user_type 1) to bypass lock if needed, otherwise enforce logic
-            if ($targetDate->diffInDays(now()) > 7 && !Auth::user()->hasRole('Super Admin')) {
-                $isLocked = true;
-            }
-
             $selectedClass = ClassSection::find($request->class_section_id);
             $targetInstituteId = $selectedClass ? $selectedClass->institution_id : $institutionId;
+
+            // --- SETTINGS CHECK ---
+            if (!Auth::user()->hasRole('Super Admin')) {
+                // 1. Check Global Block
+                $isBlocked = InstitutionSetting::get($targetInstituteId, 'attendance_locked', 0);
+                
+                if ($isBlocked) {
+                    $isLocked = true;
+                    $lockReason = __('attendance.admin_blocked');
+                } else {
+                    // 2. Check Grace Period
+                    $graceDays = InstitutionSetting::get($targetInstituteId, 'attendance_grace_period', 7);
+                    if ($targetDate->lt(now()->subDays($graceDays)->startOfDay())) {
+                        $isLocked = true;
+                        $lockReason = __('attendance.grace_period_exceeded', ['days' => $graceDays]);
+                    }
+                }
+            }
+            // ---------------------
 
             $currentSession = AcademicSession::where('institution_id', $targetInstituteId)
                 ->where('is_current', true)
@@ -148,7 +208,7 @@ class StudentAttendanceController extends BaseController
             }
         }
 
-        return view('attendance.create', compact('classSections', 'students', 'existingAttendance', 'isUpdate', 'isLocked'));
+        return view('attendance.create', compact('classSections', 'students', 'existingAttendance', 'isUpdate', 'isLocked', 'lockReason'));
     }
 
     public function store(Request $request)
@@ -160,14 +220,23 @@ class StudentAttendanceController extends BaseController
             'attendance.*' => 'in:present,absent,late,excused,half_day',
         ]);
 
-        // SRS Requirement Check: 7 Days Lock
-        $targetDate = Carbon::parse($request->attendance_date);
-        if ($targetDate->diffInDays(now()) > 7 && !Auth::user()->hasRole('Super Admin')) {
-            return response()->json(['message' => __('attendance.attendance_locked_error')], 403);
-        }
-
         $classSection = ClassSection::findOrFail($request->class_section_id);
         $institutionId = $classSection->institution_id;
+
+        // --- SETTINGS ENFORCEMENT ---
+        if (!Auth::user()->hasRole('Super Admin')) {
+            $isBlocked = InstitutionSetting::get($institutionId, 'attendance_locked', 0);
+            if ($isBlocked) {
+                return response()->json(['message' => __('attendance.admin_blocked_error')], 403);
+            }
+
+            $targetDate = Carbon::parse($request->attendance_date);
+            $graceDays = InstitutionSetting::get($institutionId, 'attendance_grace_period', 7);
+            
+            if ($targetDate->lt(now()->subDays($graceDays)->startOfDay())) {
+                return response()->json(['message' => __('attendance.grace_period_error', ['days' => $graceDays])], 403);
+            }
+        }
 
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
 

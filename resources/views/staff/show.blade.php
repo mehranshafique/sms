@@ -66,8 +66,16 @@
                                 <div class="col-9"><span>{{ $staff->institution->name }}</span></div>
                             </div>
                             <div class="row mb-2">
+                                <div class="col-3"><h5 class="f-w-500">Campus:</h5></div>
+                                <div class="col-9"><span>{{ $staff->campus->name ?? 'N/A' }}</span></div>
+                            </div>
+                            <div class="row mb-2">
                                 <div class="col-3"><h5 class="f-w-500">Employee ID:</h5></div>
                                 <div class="col-9"><span>{{ $staff->employee_id ?? 'N/A' }}</span></div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-3"><h5 class="f-w-500">Department:</h5></div>
+                                <div class="col-9"><span>{{ $staff->department ?? 'N/A' }}</span></div>
                             </div>
                             <div class="row mb-2">
                                 <div class="col-3"><h5 class="f-w-500">Joining Date:</h5></div>
@@ -76,7 +84,7 @@
                             <div class="row mb-2">
                                 <div class="col-3"><h5 class="f-w-500">Status:</h5></div>
                                 <div class="col-9">
-                                    <span class="badge badge-{{ $staff->status == 'active' ? 'success' : 'warning' }}">{{ ucfirst($staff->status) }}</span>
+                                    <span class="badge badge-{{ $staff->status == 'active' ? 'success' : 'warning' }}">{{ ucfirst(str_replace('_', ' ', $staff->status)) }}</span>
                                 </div>
                             </div>
                         </div>

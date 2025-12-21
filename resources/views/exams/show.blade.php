@@ -3,6 +3,7 @@
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
+        {{-- Header --}}
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
@@ -15,6 +16,22 @@
                     <li class="breadcrumb-item"><a href="{{ route('exams.index') }}">{{ __('exam.exam_list') }}</a></li>
                     <li class="breadcrumb-item active"><a href="javascript:void(0)">{{ $exam->name }}</a></li>
                 </ol>
+            </div>
+        </div>
+
+        {{-- Actions Toolbar (Finalize / Print) --}}
+        <div class="row">
+            <div class="col-12 text-end mb-3">
+                @if(!$exam->finalized_at && auth()->user()->can('update', $exam))
+                    <form action="{{ route('exams.finalize', $exam->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('exam.lock_warning') }}')">
+                        @csrf
+                        <button type="submit" class="btn btn-warning"><i class="fa fa-lock"></i> {{ __('exam.finalize_publish') }}</button>
+                    </form>
+                @endif
+                
+                <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#printModal">
+                    <i class="fa fa-print"></i> {{ __('exam.print_results') }}
+                </button>
             </div>
         </div>
 
@@ -65,11 +82,13 @@
 
                         <div class="mt-4 pt-3 border-top text-center d-flex flex-wrap justify-content-center">
                             {{-- Edit Button --}}
+                            @if(!$exam->finalized_at || auth()->user()->hasRole('Super Admin'))
                             <a href="{{ route('exams.edit', $exam->id) }}" class="btn btn-outline-primary m-1">
                                 <i class="fa fa-pencil me-1"></i> {{ __('exam.edit_exam') }}
                             </a>
+                            @endif
                             
-                            {{-- Enter Marks Button (Functional Link) --}}
+                            {{-- Enter Marks Button --}}
                             @can('exam_mark.create')
                             <a href="{{ route('marks.create', ['exam_id' => $exam->id]) }}" class="btn btn-primary m-1">
                                 <i class="fa fa-list-alt me-1"></i> {{ __('exam.enter_marks') }}
@@ -80,7 +99,7 @@
                 </div>
             </div>
 
-            {{-- Right Column: Stats or Guidelines --}}
+            {{-- Right Column: Stats --}}
             <div class="col-xl-8 col-lg-6">
                 <div class="card shadow-sm border-0" style="border-radius: 15px;">
                     <div class="card-header border-0 pb-0">
@@ -89,15 +108,15 @@
                     <div class="card-body">
                         <div class="row text-center">
                             <div class="col-sm-4 border-end">
-                                <h3 class="mb-1 text-primary">0</h3>
+                                <h3 class="mb-1 text-primary">{{ $exam->records()->distinct('subject_id')->count() }}</h3>
                                 <span>{{ __('exam.subjects') }}</span>
                             </div>
                             <div class="col-sm-4 border-end">
-                                <h3 class="mb-1 text-warning">0</h3>
+                                <h3 class="mb-1 text-warning">{{ $exam->records()->distinct('student_id')->count() }}</h3>
                                 <span>{{ __('exam.students') }}</span>
                             </div>
                             <div class="col-sm-4">
-                                <h3 class="mb-1 text-success">0%</h3>
+                                <h3 class="mb-1 text-success">{{ $exam->status == 'published' ? '100' : '0' }}%</h3>
                                 <span>{{ __('exam.published_results') }}</span>
                             </div>
                         </div>
@@ -109,6 +128,36 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- Print Modal --}}
+<div class="modal fade" id="printModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ __('exam.print_class_result') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ route('exams.print_result', $exam->id) }}" method="GET" target="_blank">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">{{ __('exam.select_class') }}</label>
+                         <select name="class_section_id" class="form-control default-select" required>
+                             <option value="">{{ __('exam.select_class') }}</option>
+                             @if(isset($classes))
+                                @foreach($classes as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                             @endif
+                         </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">{{ __('exam.print') }}</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

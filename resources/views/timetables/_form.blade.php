@@ -13,6 +13,29 @@
                 <div class="card-body">
                     <div class="basic-form">
                         <div class="row">
+                            
+                            {{-- LOGIC: Auto-Assign vs Select Institute --}}
+                            @php
+                                $hasContext = isset($institutionId) && $institutionId;
+                                $isSuperAdmin = auth()->user()->hasRole('Super Admin');
+                            @endphp
+
+                            @if($hasContext && !$isSuperAdmin)
+                                <input type="hidden" name="institution_id" value="{{ $institutionId }}">
+                            @else
+                                <div class="mb-3 col-md-12">
+                                    <label class="form-label">{{ __('academic_session.select_institution') }} <span class="text-danger">*</span></label>
+                                    <select name="institution_id" class="form-control default-select" required>
+                                        <option value="">-- Select Institution --</option>
+                                        @foreach($institutions as $id => $name)
+                                            <option value="{{ $id }}" {{ (old('institution_id', $timetable->institution_id ?? ($hasContext ? $institutionId : '')) == $id) ? 'selected' : '' }}>
+                                                {{ $name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+
                             {{-- Class Selection --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('timetable.select_class') }} <span class="text-danger">*</span></label>
@@ -72,16 +95,22 @@
                                 <input type="text" name="room_number" class="form-control" value="{{ old('room_number', isset($timetable) ? $timetable->room_number : '') }}" placeholder="{{ __('timetable.enter_room') }}">
                             </div>
 
-                            {{-- Start Time --}}
+                            {{-- Start Time (Using Class 'timepicker') --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.start_time') }} <span class="text-danger">*</span></label>
-                                <input type="time" name="start_time" class="form-control" value="{{ old('start_time', (isset($timetable) && $timetable->start_time) ? $timetable->start_time->format('H:i') : '') }}" required>
+                                <div class="input-group clockpicker">
+                                    <input type="text" name="start_time" class="form-control timepicker" value="{{ old('start_time', (isset($timetable) && $timetable->start_time) ? $timetable->start_time->format('H:i') : '09:00') }}" required>
+                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                </div>
                             </div>
 
-                            {{-- End Time --}}
+                            {{-- End Time (Using Class 'timepicker') --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.end_time') }} <span class="text-danger">*</span></label>
-                                <input type="time" name="end_time" class="form-control" value="{{ old('end_time', (isset($timetable) && $timetable->end_time) ? $timetable->end_time->format('H:i') : '') }}" required>
+                                <div class="input-group clockpicker">
+                                    <input type="text" name="end_time" class="form-control timepicker" value="{{ old('end_time', (isset($timetable) && $timetable->end_time) ? $timetable->end_time->format('H:i') : '10:00') }}" required>
+                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                </div>
                             </div>
                         </div>
                         <div class="mt-4">

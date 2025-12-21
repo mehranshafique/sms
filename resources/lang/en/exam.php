@@ -6,6 +6,11 @@ return [
         'success_create' => 'Exam created successfully.',
         'success_update' => 'Exam details updated successfully.',
         'success_delete' => 'Exam deleted successfully.',
+        'exam_finalized' => 'Exam is finalized.',
+        'exam_finalized_error' => 'Exam is finalized and cannot be edited.',
+        'delete_finalized_error' => 'Cannot delete finalized exam.',
+        'finalized_success' => 'Exam finalized successfully.',
+        'unauthorized' => 'Unauthorized action.',
     ],
     
     // Index
@@ -41,14 +46,36 @@ return [
     'ongoing' => 'Ongoing',
     'completed' => 'Completed',
     'published' => 'Results Published',
+    'finalized' => 'Finalized',
 
-    // Show / Stats (Added Keys)
+    // Show / Stats
     'statistics' => 'Exam Statistics',
     'subjects' => 'Subjects',
     'students' => 'Students',
     'published_results' => 'Published',
     'marks_placeholder' => 'Marks statistics will populate as teachers enter data.',
     'enter_marks' => 'Enter Marks',
+    'finalize_publish' => 'Finalize & Publish',
+    'lock_warning' => 'Are you sure? This will lock marks editing.',
+    'print_results' => 'Print Results',
+
+    // Print Modal
+    'print_class_result' => 'Print Class Result',
+    'select_class' => 'Select Class',
+    'print' => 'Print',
+
+    // Result Sheet
+    'result_sheet' => 'Result Sheet',
+    'class' => 'Class',
+    'student' => 'Student',
+    'total' => 'Total',
+    'average' => 'Avg',
+    'rank' => 'Rank',
+    'absent_short' => 'ABS',
+    'generated_on' => 'Generated on',
+    'authorized_signature' => 'Authorized Signature',
+    'download_pdf' => 'Download PDF',
+    'fail' => 'Fail',
 
     // Buttons
     'save_exam' => 'Save Exam',

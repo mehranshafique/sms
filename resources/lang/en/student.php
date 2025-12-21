@@ -38,7 +38,7 @@ return [
     'contact_details' => 'Contact Details',
     'parents_guardian' => 'Parents / Guardian',
     'documents' => 'Documents',
-    'identity_access' => 'Identity & Access', // Added
+    'identity_access' => 'Identity & Access',
 
     // Fields
     'admission_no' => 'Admission No',
@@ -46,16 +46,21 @@ return [
     'roll_no' => 'Roll No',
     'first_name' => 'First Name',
     'last_name' => 'Last Name',
+    'post_name' => 'Post Name (Optional)',
     'gender' => 'Gender',
     'dob' => 'Date of Birth',
+    'place_of_birth' => 'Place of Birth',
     'blood_group' => 'Blood Group',
     'religion' => 'Religion',
     'category' => 'Category',
     'mobile_no' => 'Mobile Number',
     'email' => 'Email',
+    'province' => 'Province',
+    'avenue' => 'Avenue / Address',
     'current_address' => 'Current Address',
     'permanent_address' => 'Permanent Address',
     
+    'primary_guardian' => 'Primary Guardian',
     'father_name' => 'Father Name',
     'father_phone' => 'Father Phone',
     'father_occ' => 'Father Occupation',
@@ -67,12 +72,6 @@ return [
     'guardian_phone' => 'Guardian Phone',
     
     'photo' => 'Student Photo',
-    'status' => 'Status',
-    'active' => 'Active',
-    'inactive' => 'Inactive',
-    'transferred' => 'Transferred',
-    'suspended' => 'Suspended',
-    'graduated' => 'Graduated',
     
     // Access Fields
     'qr_code_token' => 'QR Code Token',
@@ -85,7 +84,17 @@ return [
     'select_campus' => 'Select Campus',
     'select_class' => 'Select Class',
     'select_gender' => 'Select Gender',
+    'select_option' => 'Select Option',
+    'academic_year' => 'Academic Year',
+    'option_stream' => 'Option / Stream',
     
+    // Dropdown JS States
+    'loading' => 'Loading...',
+    'no_options' => 'No Options Available',
+    'select_option_placeholder' => 'Select Option',
+    'select_class_first' => 'Select Class First',
+    'error_loading' => 'Error Loading Data',
+
     // Buttons
     'save_student' => 'Admit Student',
     'update_student' => 'Update Student',
@@ -96,7 +105,7 @@ return [
     'edit' => 'Edit',
     'view' => 'View',
 
-    // Alerts
+    // Alerts & Errors
     'are_you_sure' => 'Are you sure?',
     'delete_warning' => "This action cannot be undone!",
     'yes_delete' => 'Yes, delete it!',
@@ -107,4 +116,5 @@ return [
     'something_went_wrong' => 'Something went wrong!',
     'validation_error' => 'Validation Error',
     'success' => 'Success!',
+    'no_active_session' => 'No active academic session found for this institution.',
 ];

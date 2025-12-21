@@ -69,7 +69,7 @@
                     </a>
                 </li>
             @endcan
-
+          
             {{-- Class Sections --}}
             @can('class_section.view')
                 <li class="{{ isActive(['class-sections.index','class-sections.create','class-sections.edit']) }}">
@@ -202,7 +202,14 @@
             @endcan
 
             <li class="nav-label">{{ __('sidebar.settings') }}</li>
-
+            @can('institution.view') {{-- Or a specific permission 'settings.manage' --}}
+            <li class="{{ isActive(['settings.index']) }}">
+                <a class="ai-icon {{ isActive('settings.index') }}" href="{{ route('settings.index') }}" aria-expanded="false">
+                    <i class="la la-cogs"></i>
+                    <span class="nav-text">{{ __('settings.page_title') }}</span>
+                </a>
+            </li>
+            @endcan
             {{-- Permissions --}}
             @can('role.view')
                 <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">

@@ -16,6 +16,7 @@ return [
     'class_routine' => 'Class Routine',
     'weekly_schedule' => 'Weekly Schedule',
     'print_routine' => 'Print Routine',
+    'download_pdf' => 'Download PDF',
     'class_teacher' => 'Class Teacher',
     'no_teacher_assigned' => 'No Teacher Assigned',
     'no_classes' => 'No classes scheduled',
@@ -28,6 +29,7 @@ return [
     'teacher' => 'Teacher',
     'day' => 'Day',
     'time' => 'Time',
+    'schedule' => 'Schedule',
     'room' => 'Room',
     'action' => 'Action',
     'search_placeholder' => 'Search Routine...',
@@ -37,6 +39,7 @@ return [
     'add_routine' => 'Add Routine',
     'edit_routine' => 'Edit Routine',
     'basic_information' => 'Schedule Details',
+    'view' => 'View Routine', // Added
     
     'select_class' => 'Select Class',
     'select_subject' => 'Select Subject',
@@ -60,6 +63,7 @@ return [
     // Errors
     'no_active_session' => 'No active academic session found. Please create one first.',
     'teacher_busy' => 'The selected teacher is already booked for this time slot.',
+    'room_busy' => 'The selected room is already booked for this time slot.', // Added
 
     // Buttons
     'save_routine' => 'Save Routine',

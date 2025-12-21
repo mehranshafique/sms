@@ -37,6 +37,7 @@ class RolePermissionSeeder extends Seeder
             // Academics
             'Academic Sessions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Grade Levels' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Streams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Class Sections' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],

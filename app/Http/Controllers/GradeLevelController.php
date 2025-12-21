@@ -19,12 +19,13 @@ class GradeLevelController extends BaseController
 
     public function index(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        // 1. Get Context
+        $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $data = GradeLevel::query()->select('grade_levels.*');
+            $data = GradeLevel::with('institution')->select('grade_levels.*');
 
-            // Filter by Institution if user is restricted
+            // 2. Strict Scoping
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
             }
@@ -61,7 +62,7 @@ class GradeLevelController extends BaseController
                 ->make(true);
         }
 
-        // Stats (Adjusted for Super Admin view)
+        // Stats Logic - Scoped
         $query = GradeLevel::query();
         if ($institutionId) {
             $query->where('institution_id', $institutionId);
@@ -77,40 +78,43 @@ class GradeLevelController extends BaseController
 
     public function create()
     {
-        $institutionId = Auth::user()->institute_id;
-        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        $institutionId = $this->getInstitutionId();
         
-        // Auto-suggest next order index
-        $query = GradeLevel::query();
+        $institutions = [];
+        $nextOrder = 1;
+
         if ($institutionId) {
-            $query->where('institution_id', $institutionId);
+            // Context Set
+            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
+            // Auto-suggest next order index for THIS institution
+            $lastOrder = GradeLevel::where('institution_id', $institutionId)->max('order_index') ?? 0;
+            $nextOrder = $lastOrder + 1;
+        } elseif (Auth::user()->hasRole('Super Admin')) {
+            // Global View
+            $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         }
-        $lastOrder = $query->max('order_index') ?? 0;
-        $nextOrder = $lastOrder + 1;
         
-        return view('grade_levels.create', compact('nextOrder', 'institutions'));
+        return view('grade_levels.create', compact('nextOrder', 'institutions', 'institutionId'));
     }
 
     public function store(Request $request)
     {
-        $userInstituteId = Auth::user()->institute_id;
+        // 1. Resolve ID
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
 
         $validated = $request->validate([
-            // If user has no institute (Super Admin), require selection. Else, verify it matches auth user.
-            'institution_id' => $userInstituteId ? 'nullable' : 'required|exists:institutions,id',
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'name'           => [
                 'required', 'string', 'max:100', 
-                Rule::unique('grade_levels')->where('institution_id', $request->institution_id ?? $userInstituteId)
+                // Rule: Unique name per institution
+                Rule::unique('grade_levels')->where('institution_id', $institutionId)
             ],
             'code'            => 'nullable|string|max:30',
             'order_index'     => 'required|integer|min:0',
             'education_cycle' => 'required|in:primary,secondary,university,vocational',
         ]);
 
-        // Force Institution ID if user is not Super Admin
-        if ($userInstituteId) {
-            $validated['institution_id'] = $userInstituteId;
-        }
+        $validated['institution_id'] = $institutionId;
 
         GradeLevel::create($validated);
 
@@ -119,29 +123,43 @@ class GradeLevelController extends BaseController
 
     public function edit(GradeLevel $grade_level)
     {
-        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
-        return view('grade_levels.edit', compact('grade_level', 'institutions'));
+        $institutionId = $this->getInstitutionId();
+
+        // Strict Check
+        if ($institutionId && $grade_level->institution_id != $institutionId) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $institutions = Institution::where('id', $grade_level->institution_id)->pluck('name', 'id');
+        
+        return view('grade_levels.edit', compact('grade_level', 'institutions', 'institutionId'));
     }
 
     public function update(Request $request, GradeLevel $grade_level)
     {
-        $userInstituteId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
+
+        if ($institutionId && $grade_level->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        $targetId = $institutionId ?? $grade_level->institution_id;
 
         $validated = $request->validate([
-            'institution_id' => $userInstituteId ? 'nullable' : 'required|exists:institutions,id',
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'name'           => [
                 'required', 'string', 'max:100', 
                 Rule::unique('grade_levels')
                     ->ignore($grade_level->id)
-                    ->where('institution_id', $request->institution_id ?? $userInstituteId)
+                    ->where('institution_id', $targetId)
             ],
             'code'            => 'nullable|string|max:30',
             'order_index'     => 'required|integer|min:0',
             'education_cycle' => 'required|in:primary,secondary,university,vocational',
         ]);
 
-        if ($userInstituteId) {
-            $validated['institution_id'] = $userInstituteId;
+        if ($institutionId) {
+            $validated['institution_id'] = $institutionId;
         }
 
         $grade_level->update($validated);
@@ -151,6 +169,9 @@ class GradeLevelController extends BaseController
 
     public function destroy(GradeLevel $grade_level)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $grade_level->institution_id != $institutionId) abort(403);
+
         $grade_level->delete();
         return response()->json(['message' => __('grade_level.messages.success_delete')]);
     }
@@ -158,9 +179,19 @@ class GradeLevelController extends BaseController
     public function bulkDelete(Request $request)
     {
         $this->authorize('deleteAny', GradeLevel::class); 
+
         $ids = $request->ids;
         if (!empty($ids)) {
-            GradeLevel::whereIn('id', $ids)->delete();
+            $institutionId = $this->getInstitutionId();
+            
+            $query = GradeLevel::whereIn('id', $ids);
+            
+            // Secure Bulk Delete
+            if ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            }
+            
+            $query->delete();
             return response()->json(['success' => __('grade_level.messages.success_delete')]);
         }
         return response()->json(['error' => __('grade_level.something_went_wrong')]);

@@ -3,28 +3,46 @@
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use App\Models\User;
 use App\Models\Institution;
 use App\Models\Campus;
 use App\Models\GradeLevel;
-use App\Models\AcademicSession; // Added
-use App\Services\IdGeneratorService; // Added
+use App\Models\AcademicSession;
+use App\Models\ClassSection;
+use App\Models\StudentEnrollment;
+use App\Services\IdGeneratorService;
+use App\Interfaces\SmsGatewayInterface;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class StudentController extends BaseController
 {
-    public function __construct()
+    protected $smsService;
+
+    public function __construct(SmsGatewayInterface $smsService)
     {
         $this->authorizeResource(Student::class, 'student');
+        $this->smsService = $smsService;
     }
 
     public function index(Request $request)
     {
+        // 1. Get Context from BaseController
+        $institutionId = $this->getInstitutionId();
+
         if ($request->ajax()) {
-            $data = Student::with(['institution', 'campus', 'gradeLevel'])->select('students.*');
+            // 2. Strict Scoping
+            $data = Student::with(['institution', 'campus', 'gradeLevel'])
+                ->select('students.*');
+
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
 
             if ($request->has('grade_level_id') && $request->grade_level_id) {
                 $data->where('grade_level_id', $request->grade_level_id);
@@ -33,39 +51,19 @@ class StudentController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
-                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
-                                <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
-                                <label class="form-check-label"></label>
-                            </div>';
+                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3"><input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'"><label class="form-check-label"></label></div>';
                 })
                 ->addColumn('details', function($row){
                     $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
                     $initial = strtoupper(substr($row->first_name, 0, 1));
-                    
-                    $avatarHtml = $img 
-                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
-                        : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
-
-                    return '<div class="d-flex align-items-center">
-                                '.$avatarHtml.'
-                                <div>
-                                    <h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6>
-                                    <span class="fs-13 text-muted">ID: '.$row->admission_number.'</span>
-                                </div>
-                            </div>';
+                    $avatarHtml = $img ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
+                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">ID: '.$row->admission_number.'</span></div></div>';
                 })
                 ->addColumn('parent_info', function($row){
-                    return '<div><i class="fa fa-user me-1"></i> '.$row->father_name.'</div>
-                            <div class="text-muted"><i class="fa fa-phone me-1"></i> '.$row->father_phone.'</div>';
+                    return '<div><i class="fa fa-user me-1"></i> '.$row->father_name.'</div><div class="text-muted"><i class="fa fa-phone me-1"></i> '.$row->father_phone.'</div>';
                 })
                 ->editColumn('status', function($row){
-                    $badges = [
-                        'active' => 'badge-success',
-                        'transferred' => 'badge-warning',
-                        'suspended' => 'badge-danger',
-                        'graduated' => 'badge-info',
-                        'inactive' => 'badge-secondary'
-                    ];
+                    $badges = ['active' => 'badge-success', 'transferred' => 'badge-warning', 'suspended' => 'badge-danger', 'graduated' => 'badge-info', 'inactive' => 'badge-secondary'];
                     return '<span class="badge '.($badges[$row->status] ?? 'badge-secondary').'">'.ucfirst($row->status).'</span>';
                 })
                 ->addColumn('action', function($row){
@@ -85,87 +83,174 @@ class StudentController extends BaseController
 
     public function create()
     {
-        $institutes = Institution::pluck('name', 'id');
-        $campuses = Campus::pluck('name', 'id');
-        $gradeLevels = GradeLevel::pluck('name', 'id');
+        $institutionId = $this->getInstitutionId();
         
-        return view('students.create', compact('institutes', 'campuses', 'gradeLevels'));
+        $institutes = [];
+        $campuses = [];
+        $gradeLevels = [];
+        $currentSession = null;
+
+        if ($institutionId) {
+            // Context Set: Load specific data
+            $institutes = Institution::where('id', $institutionId)->pluck('name', 'id');
+            $campuses = Campus::where('institution_id', $institutionId)->pluck('name', 'id');
+            $gradeLevels = GradeLevel::where('institution_id', $institutionId)->pluck('name', 'id');
+            $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        } elseif (Auth::user()->hasRole('Super Admin')) {
+            // Global View (No context selected): Load ALL options
+            $institutes = Institution::pluck('name', 'id');
+        }
+        
+        return view('students.create', compact('institutes', 'campuses', 'gradeLevels', 'currentSession', 'institutionId'));
+    }
+
+    public function getSections(Request $request) 
+    {
+        $gradeId = $request->grade_id;
+        $institutionId = $this->getInstitutionId();
+
+        // 1. Verify Grade belongs to active Institution
+        $grade = GradeLevel::find($gradeId);
+        if (!$grade || ($institutionId && $grade->institution_id != $institutionId)) {
+            return response()->json([]); // Security: Empty response if mismatch
+        }
+
+        $sections = ClassSection::where('grade_level_id', $gradeId)
+            ->where('is_active', true);
+            
+        if ($institutionId) {
+            $sections->where('institution_id', $institutionId);
+        }
+        
+        return response()->json($sections->pluck('name', 'id'));
     }
 
     public function store(Request $request)
     {
+        // 1. Resolve Institution ID
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+
+        // 2. Validate
         $request->validate([
-            'institution_id' => 'required|exists:institutions,id',
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'first_name' => 'required|string|max:100',
             'last_name' => 'required|string|max:100',
             'admission_date' => 'required|date',
             'dob' => 'required|date',
-            'gender' => 'required',
-            'mobile_number' => 'nullable|numeric',
-            'student_photo' => 'nullable|image|max:2048',
-            'qr_code_token' => 'nullable|string|unique:students,qr_code_token',
-            'nfc_tag_uid' => 'nullable|string|unique:students,nfc_tag_uid',
+            'grade_level_id' => [
+                'required', 
+                'exists:grade_levels,id',
+                // Rule: Grade must belong to institution
+                function($attribute, $value, $fail) use ($institutionId) {
+                    if ($institutionId && GradeLevel::where('id', $value)->where('institution_id', $institutionId)->doesntExist()) {
+                        $fail('Invalid grade level for the current institution.');
+                    }
+                }
+            ],
+            'class_section_id' => 'nullable|exists:class_sections,id',
         ]);
 
-        $data = $request->all();
+        $data = $request->except(['_token', '_method']);
 
-        // 1. Get Institution
-        $institution = Institution::findOrFail($request->institution_id);
+        DB::transaction(function () use ($request, $data, $institutionId) {
+            $institution = Institution::findOrFail($institutionId);
+            
+            $currentSession = AcademicSession::where('institution_id', $institutionId)
+                ->where('is_current', true)
+                ->first();
 
-        // 2. Get Current Active Academic Session for YY Logic
-        $currentSession = AcademicSession::where('institution_id', $institution->id)
-            ->where('is_current', true)
-            ->first();
+            if (!$currentSession) {
+                throw ValidationException::withMessages(['institution_id' => __('student.no_active_session')]);
+            }
 
-        if (!$currentSession) {
-            throw ValidationException::withMessages(['institution_id' => 'No active academic session found for this institution. Cannot generate Student ID.']);
-        }
+            $data['institution_id'] = $institutionId; // Enforce context
+            $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
 
-        // 3. Generate Permanent ID
-        $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
+            if ($request->hasFile('student_photo')) {
+                $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
+            }
 
-        // 4. Handle Photo
-        if ($request->hasFile('student_photo')) {
-            $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
-        }
+            if ($request->email) {
+                $user = User::create([
+                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'email' => $request->email,
+                    'password' => Hash::make('Student123!'),
+                    'user_type' => 5, 
+                    'institute_id' => $institutionId,
+                    'is_active' => true,
+                ]);
+                
+                if (\Spatie\Permission\Models\Role::where('name', 'Student')->exists()) {
+                    $user->assignRole('Student');
+                }
+                $data['user_id'] = $user->id;
+            }
 
-        // 5. Create Student
-        Student::create($data);
+            $student = Student::create($data);
+
+            $sectionId = $request->class_section_id;
+            if (!$sectionId) {
+                $section = ClassSection::where('grade_level_id', $request->grade_level_id)
+                    ->where('institution_id', $institutionId)
+                    ->first();
+                $sectionId = $section ? $section->id : null;
+            }
+
+            if ($sectionId) {
+                StudentEnrollment::create([
+                    'institution_id' => $institutionId,
+                    'academic_session_id' => $currentSession->id,
+                    'student_id' => $student->id,
+                    'grade_level_id' => $request->grade_level_id,
+                    'class_section_id' => $sectionId,
+                    'status' => 'active',
+                    'enrolled_at' => now(),
+                ]);
+            }
+        });
 
         return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_create')]);
     }
 
+    public function edit(Student $student)
+    {
+        $institutionId = $this->getInstitutionId();
+
+        // 1. Strict Access Check
+        if ($institutionId && $student->institution_id != $institutionId) {
+            abort(403, 'This student does not belong to the active institution context.');
+        }
+
+        $institutes = Institution::where('id', $student->institution_id)->pluck('name', 'id');
+        $campuses = Campus::where('institution_id', $student->institution_id)->pluck('name', 'id');
+        $gradeLevels = GradeLevel::where('institution_id', $student->institution_id)->pluck('name', 'id');
+
+        return view('students.edit', compact('student', 'institutes', 'campuses', 'gradeLevels', 'institutionId'));
+    }
+
     public function show(Student $student)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $student->institution_id != $institutionId) abort(403);
+        
         $student->load(['institution', 'campus', 'gradeLevel', 'enrollments.academicSession', 'enrollments.classSection']);
         return view('students.show', compact('student'));
     }
 
-    public function edit(Student $student)
-    {
-        $institutes = Institution::pluck('name', 'id');
-        $campuses = Campus::pluck('name', 'id');
-        $gradeLevels = GradeLevel::pluck('name', 'id');
-
-        return view('students.edit', compact('student', 'institutes', 'campuses', 'gradeLevels'));
-    }
-
     public function update(Request $request, Student $student)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $student->institution_id != $institutionId) abort(403);
+        
         $request->validate([
             'first_name' => 'required',
             'last_name' => 'required',
             'dob' => 'required|date',
-            'student_photo' => 'nullable|image|max:2048',
-            'qr_code_token' => 'nullable|string|unique:students,qr_code_token,' . $student->id,
-            'nfc_tag_uid' => 'nullable|string|unique:students,nfc_tag_uid,' . $student->id,
         ]);
 
         $data = $request->all();
-
-        // Prevent ID Change
         unset($data['admission_number']); 
-        unset($data['institution_id']);
+        unset($data['institution_id']); 
 
         if ($request->hasFile('student_photo')) {
             if ($student->student_photo) {
@@ -175,14 +260,30 @@ class StudentController extends BaseController
         }
 
         $student->update($data);
+        
+        if($student->user_id) {
+            $userLink = User::find($student->user_id);
+            if($userLink) {
+                $userLink->update([
+                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'email' => $request->email,
+                ]);
+            }
+        }
 
         return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_update')]);
     }
 
     public function destroy(Student $student)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $student->institution_id != $institutionId) abort(403);
+        
         if ($student->student_photo) {
             Storage::disk('public')->delete($student->student_photo);
+        }
+        if($student->user_id) {
+            User::destroy($student->user_id);
         }
         $student->delete();
         return response()->json(['message' => __('student.messages.success_delete')]);

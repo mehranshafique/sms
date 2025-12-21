@@ -38,7 +38,7 @@
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">{{ __('attendance.select_date') }} <span class="text-danger">*</span></label>
-                                    <input type="date" name="date" class="form-control" value="{{ request('date', date('Y-m-d')) }}" required>
+                                    <input type="text" name="date" class="form-control datepicker" value="{{ request('date', date('Y-m-d')) }}" required>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <button type="submit" class="btn btn-primary w-100 shadow-sm">{{ __('attendance.load_students') }}</button>

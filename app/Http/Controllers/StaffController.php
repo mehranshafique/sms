@@ -12,26 +12,40 @@ use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class StaffController extends BaseController
 {
     public function __construct()
     {
         $this->authorizeResource(Staff::class, 'staff');
+        $this->setPageTitle(__('staff.page_title'));
     }
 
     public function index(Request $request)
     {
+        // 1. Get Context
+        $institutionId = $this->getInstitutionId();
+
         if ($request->ajax()) {
             $data = Staff::with(['user', 'institution', 'campus'])->select('staff.*');
+
+            // 2. Strict Scoping
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
 
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
-                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
-                                <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
-                                <label class="form-check-label"></label>
-                            </div>';
+                    if(auth()->user()->can('delete', $row)){
+                        return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
+                                    <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
+                                    <label class="form-check-label"></label>
+                                </div>';
+                    }
+                    return '';
                 })
                 ->addColumn('details', function($row){
                     $img = $row->user->profile_picture ? asset('storage/' . $row->user->profile_picture) : null;
@@ -65,9 +79,15 @@ class StaffController extends BaseController
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
-                    $btn .= '<a href="'.route('staff.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
-                    $btn .= '<a href="'.route('staff.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
-                    $btn .= '<button class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
+                    if(auth()->user()->can('view', $row)){
+                        $btn .= '<a href="'.route('staff.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                    }
+                    if(auth()->user()->can('update', $row)){
+                        $btn .= '<a href="'.route('staff.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
+                    }
+                    if(auth()->user()->can('delete', $row)){
+                        $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
+                    }
                     $btn .= '</div>';
                     return $btn;
                 })
@@ -80,14 +100,32 @@ class StaffController extends BaseController
 
     public function create()
     {
-        $institutes = Institution::pluck('name', 'id');
-        $campuses = Campus::pluck('name', 'id');
+        $institutionId = $this->getInstitutionId();
+        
+        $institutions = [];
+        if ($institutionId) {
+            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
+        } elseif (Auth::user()->hasRole('Super Admin')) {
+            $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        }
+        
+        $campusesQuery = Campus::query();
+        if ($institutionId) {
+            $campusesQuery->where('institution_id', $institutionId);
+        }
+        $campuses = $campusesQuery->pluck('name', 'id');
+        
+        // Exclude Super Admin role from selection
         $roles = Role::where('name', '!=', 'Super Admin')->get();
-        return view('staff.create', compact('institutes', 'campuses', 'roles'));
+        
+        return view('staff.create', compact('institutions', 'campuses', 'roles', 'institutionId'));
     }
 
     public function store(Request $request)
     {
+        // 1. Resolve ID
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+
         $request->validate([
             // User Fields
             'name' => 'required|string|max:255',
@@ -98,14 +136,14 @@ class StaffController extends BaseController
             'profile_picture' => 'nullable|image|max:2048',
             
             // Staff Fields
-            'institution_id' => 'required|exists:institutions,id',
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'campus_id' => 'nullable|exists:campuses,id',
             'designation' => 'nullable|string',
             'joining_date' => 'nullable|date',
             'gender' => 'required|in:male,female,other',
         ]);
 
-        DB::transaction(function () use ($request) {
+        DB::transaction(function () use ($request, $institutionId) {
             // 1. Create User
             $userData = [
                 'name' => $request->name,
@@ -114,6 +152,7 @@ class StaffController extends BaseController
                 'phone' => $request->phone,
                 'user_type' => 4, // 4 = Staff
                 'is_active' => true,
+                'institute_id' => $institutionId, // Link User to Institution
             ];
 
             if ($request->hasFile('profile_picture')) {
@@ -124,11 +163,14 @@ class StaffController extends BaseController
             $user->assignRole($request->role);
 
             // 2. Create Staff Profile
+            // Auto-generate Employee ID if not provided: EMP-{USER_ID}-{INST_ID}
+            $empId = $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
+
             Staff::create([
                 'user_id' => $user->id,
-                'institution_id' => $request->institution_id,
+                'institution_id' => $institutionId,
                 'campus_id' => $request->campus_id,
-                'employee_id' => $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT),
+                'employee_id' => $empId,
                 'designation' => $request->designation,
                 'department' => $request->department,
                 'joining_date' => $request->joining_date,
@@ -143,22 +185,36 @@ class StaffController extends BaseController
 
     public function show(Staff $staff)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $staff->institution_id != $institutionId) abort(403);
+
         $staff->load(['user', 'institution', 'campus']);
         return view('staff.show', compact('staff'));
     }
 
     public function edit(Staff $staff)
     {
+        $institutionId = $this->getInstitutionId();
+
+        // Strict Check
+        if ($institutionId && $staff->institution_id != $institutionId) {
+            abort(403, 'Unauthorized access.');
+        }
+
         $staff->load('user');
-        $institutes = Institution::pluck('name', 'id');
-        $campuses = Campus::pluck('name', 'id');
+        
+        $institutions = Institution::where('id', $staff->institution_id)->pluck('name', 'id');
+        $campuses = Campus::where('institution_id', $staff->institution_id)->pluck('name', 'id');
         $roles = Role::where('name', '!=', 'Super Admin')->get();
         
-        return view('staff.edit', compact('staff', 'institutes', 'campuses', 'roles'));
+        return view('staff.edit', compact('staff', 'institutions', 'campuses', 'roles', 'institutionId'));
     }
 
     public function update(Request $request, Staff $staff)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $staff->institution_id != $institutionId) abort(403);
+
         $user = $staff->user;
 
         $request->validate([
@@ -166,10 +222,10 @@ class StaffController extends BaseController
             'email' => 'required|email|unique:users,email,'.$user->id,
             'role' => 'required|exists:roles,name',
             'profile_picture' => 'nullable|image|max:2048',
-            'institution_id' => 'required|exists:institutions,id',
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
         ]);
 
-        DB::transaction(function () use ($request, $staff, $user) {
+        DB::transaction(function () use ($request, $staff, $user, $institutionId) {
             // Update User
             $userData = [
                 'name' => $request->name,
@@ -193,7 +249,7 @@ class StaffController extends BaseController
 
             // Update Staff
             $staff->update([
-                'institution_id' => $request->institution_id,
+                'institution_id' => $institutionId ?? $request->institution_id,
                 'campus_id' => $request->campus_id,
                 'employee_id' => $request->employee_id,
                 'designation' => $request->designation,
@@ -210,6 +266,9 @@ class StaffController extends BaseController
 
     public function destroy(Staff $staff)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $staff->institution_id != $institutionId) abort(403);
+
         $user = $staff->user;
         
         if ($user->profile_picture) {

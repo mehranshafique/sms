@@ -11,6 +11,7 @@ return [
     // Index
     'attendance_list' => 'Attendance Log',
     'mark_attendance' => 'Mark Attendance',
+    'view_register' => 'View Register', // New
     'filter_class' => 'Filter Class',
     'filter_date' => 'Filter Date',
     'export' => 'Export',
@@ -51,6 +52,21 @@ return [
     'attendance_locked_desc' => 'Attendance for this date cannot be modified as it is older than 7 days.',
     'attendance_locked_error' => 'Action Forbidden: Attendance cannot be modified after 7 days.',
     'locked' => 'Locked',
+
+    // Report / Register
+    'register_title' => 'Attendance Register',
+    'register_subtitle' => 'Monthly class attendance view',
+    'back_to_list' => 'Back to List',
+    'month' => 'Month',
+    'year' => 'Year',
+    'print' => 'Print',
+    'no_students_found_class' => 'No students found for this class.',
+
+    // Admin Settings Errors
+    'admin_blocked' => 'Attendance marking is currently blocked by administrator.',
+    'admin_blocked_error' => 'Action Blocked: Attendance marking is disabled.',
+    'grace_period_exceeded' => 'Modification allowed only within :days days.',
+    'grace_period_error' => 'Action Blocked: Cannot modify attendance older than :days days.',
 
     'error_occurred' => 'Error Occurred',
     'validation_error' => 'Validation Error',

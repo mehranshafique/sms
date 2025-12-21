@@ -22,7 +22,7 @@
                                 {{-- 1. Exam --}}
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label">{{ __('marks.select_exam') }}</label>
-                                    <select name="exam_id" class="form-control default-select" onchange="this.form.submit()">
+                                    <select name="exam_id" class="form-control default-select" id="exam_select" onchange="this.form.submit()">
                                         <option value="">-- {{ __('marks.select_exam') }} --</option>
                                         @foreach($exams as $id => $name)
                                             <option value="{{ $id }}" {{ (request('exam_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
@@ -33,7 +33,7 @@
                                 {{-- 2. Class --}}
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label">{{ __('marks.select_class') }}</label>
-                                    <select name="class_section_id" class="form-control default-select" onchange="this.form.submit()">
+                                    <select name="class_section_id" class="form-control default-select" id="class_select" onchange="this.form.submit()" {{ request('exam_id') ? '' : 'disabled' }}>
                                         <option value="">-- {{ __('marks.select_class') }} --</option>
                                         @foreach($classes as $id => $name)
                                             <option value="{{ $id }}" {{ (request('class_section_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
@@ -41,10 +41,10 @@
                                     </select>
                                 </div>
 
-                                {{-- 3. Subject (Dependent on Class) --}}
+                                {{-- 3. Subject --}}
                                 <div class="col-md-3 mb-3">
                                     <label class="form-label">{{ __('marks.select_subject') }}</label>
-                                    <select name="subject_id" class="form-control default-select">
+                                    <select name="subject_id" class="form-control default-select" id="subject_select" {{ request('class_section_id') ? '' : 'disabled' }}>
                                         <option value="">-- {{ __('marks.select_subject') }} --</option>
                                         @if(isset($subjects) && count($subjects) > 0)
                                             @foreach($subjects as $id => $name)
@@ -75,13 +75,13 @@
             <div class="row">
                 <div class="col-12">
                     <div class="card shadow-sm border-0" style="border-radius: 15px;">
-                        <div class="card-header border-0 pb-0 pt-4 px-4 bg-white">
+                        <div class="card-header border-0 pb-0 pt-4 px-4">
                             <h4 class="card-title mb-0 fw-bold fs-18">{{ __('marks.student_list') }}</h4>
                         </div>
                         <div class="card-body p-0 pt-3">
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
-                                    <thead class="bg-light">
+                                    <thead>
                                         <tr>
                                             <th class="ps-4">#</th>
                                             <th>{{ __('marks.student_name') }}</th>
@@ -123,15 +123,15 @@
                                 </table>
                             </div>
                         </div>
-                        <div class="card-footer border-0 bg-white text-end pb-4 pe-4">
-                            <button type="submit" class="btn btn-primary btn-lg shadow-sm px-5">{{ __('marks.save_marks') }}</button>
+                        <div class="card-footer border-0 text-end pb-4 pe-4">
+                            <button type="submit" class="btn btn-primary btn-lg shadow-sm px-5" style="min-width: 160px;">{{ __('marks.save_marks') }}</button>
                         </div>
                     </div>
                 </div>
             </div>
         </form>
         @elseif(request('subject_id'))
-            <div class="alert alert-warning text-center">{{ __('marks.no_students_found') }}</div>
+            <div class="alert alert-warning text-center">{{ __('marks.no_records_found') ?? 'No students found.' }}</div>
         @endif
 
     </div>
@@ -142,7 +142,8 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function(){
-        // Handle Absent Checkbox Toggle
+        
+        // Absent Checkbox Logic
         $('.absent-check').change(function(){
             let row = $(this).closest('tr');
             let input = row.find('.mark-input');
@@ -153,13 +154,15 @@
             }
         });
 
-        // Submit Logic
+        // Submit Logic (Fixed Button State)
         $('#marksForm').submit(function(e){
             e.preventDefault();
             
             let btn = $(this).find('button[type="submit"]');
-            let originalText = btn.html();
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+            let originalText = btn.html(); // Capture original text
+            
+            // Set Loading State
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> Saving...');
 
             $.ajax({
                 url: $(this).attr('action'),
@@ -175,7 +178,9 @@
                     });
                 },
                 error: function(xhr){
+                    // Explicitly restore button state
                     btn.prop('disabled', false).html(originalText);
+                    
                     let msg = 'Error occurred';
                     if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
                     Swal.fire({ icon: 'error', title: 'Error', html: msg });

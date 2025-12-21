@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Gate; // <--- IMPORTANT: Don't forget this!
 use Illuminate\Support\Facades\File;
 use App\Policies\ResourcePolicy;
+use App\Interfaces\SmsGatewayInterface;
+use App\Services\Sms\InfobipService;
+use App\Services\Sms\MobishastraService;
+use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,5 +51,25 @@ class AppServiceProvider extends ServiceProvider
             }
         }
         // --- Dynamic Policy Registration End ---
+
+        // Bind the SMS Interface based on Config
+        $this->app->bind(SmsGatewayInterface::class, function ($app) {
+            $driver = config('sms.default', 'log');
+
+            switch ($driver) {
+                case 'infobip':
+                    return new InfobipService();
+                case 'mobishastra':
+                    return new MobishastraService();
+                default:
+                    // Dummy implementation for testing/log
+                    return new class implements SmsGatewayInterface {
+                        public function send(string $to, string $message): bool {
+                            Log::info("SMS Mock to $to: $message");
+                            return true;
+                        }
+                    };
+            }
+        });
     }
 }

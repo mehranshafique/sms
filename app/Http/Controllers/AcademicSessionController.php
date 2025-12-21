@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class AcademicSessionController extends BaseController
 {
@@ -18,9 +19,17 @@ class AcademicSessionController extends BaseController
 
     public function index(Request $request)
     {
+        // 1. Get Active Context
+        $institutionId = $this->getInstitutionId();
+
         if ($request->ajax()) {
             $data = AcademicSession::with('institution')->select('academic_sessions.*');
             
+            // 2. Strict Scoping
+            if ($institutionId) {
+                $data->where('institution_id', $institutionId);
+            }
+
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
@@ -58,7 +67,7 @@ class AcademicSessionController extends BaseController
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    if(auth()->user()->can('edit', $row)){
+                    if(auth()->user()->can('update', $row)){
                         $btn .= '<a href="'.route('academic-sessions.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('academic_session.edit').'">
                                     <i class="fa fa-pencil"></i>
                                 </a>';
@@ -77,32 +86,55 @@ class AcademicSessionController extends BaseController
                 ->make(true);
         }
 
-        // Stats Logic
-        $totalSessions = AcademicSession::count();
-        $activeSessions = AcademicSession::where('status', 'active')->count();
-        $plannedSessions = AcademicSession::where('status', 'planned')->count();
-        $closedSessions = AcademicSession::where('status', 'closed')->count();
+        // Stats Logic - Scoped
+        $query = AcademicSession::query();
+        if ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        }
+
+        $totalSessions = (clone $query)->count();
+        $activeSessions = (clone $query)->where('status', 'active')->count();
+        $plannedSessions = (clone $query)->where('status', 'planned')->count();
+        $closedSessions = (clone $query)->where('status', 'closed')->count();
 
         return view('academic_sessions.index', compact('totalSessions', 'activeSessions', 'plannedSessions', 'closedSessions'));
     }
 
     public function create()
     {
-        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
-        return view('academic_sessions.create', compact('institutions'));
+        $institutionId = $this->getInstitutionId();
+        
+        $institutions = [];
+        if ($institutionId) {
+            // Context Set: Only load the specific institution (Optional, as we will hide the dropdown)
+            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
+        } elseif (Auth::user()->hasRole('Super Admin')) {
+            // Global View: Load all
+            $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        }
+
+        return view('academic_sessions.create', compact('institutions', 'institutionId'));
     }
 
     public function store(Request $request)
     {
+        // 1. Resolve Institution ID (Context takes priority over Request)
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+
         $validated = $request->validate([
-            'institution_id' => 'required|exists:institutions,id',
-            'name'           => ['required', 'string', 'max:50', Rule::unique('academic_sessions')->where('institution_id', $request->institution_id)],
-            // Use 'required' instead of 'date' to allow flexibility for the picker format; Mutator handles parsing
-            'start_date'     => 'required', 
-            'end_date'       => 'required', 
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
+            'name'           => [
+                'required', 'string', 'max:50', 
+                // Rule: Unique name per institution
+                Rule::unique('academic_sessions')->where('institution_id', $institutionId)
+            ],
+            'start_date'     => 'required|date', 
+            'end_date'       => 'required|date|after:start_date', 
             'status'         => 'required|in:planned,active,closed',
             'is_current'     => 'boolean',
         ]);
+        
+        $validated['institution_id'] = $institutionId;
 
         DB::transaction(function () use ($validated) {
             // Ensure only one current session per institution
@@ -119,24 +151,49 @@ class AcademicSessionController extends BaseController
 
     public function edit(AcademicSession $academic_session)
     {
-        $institutions = Institution::where('is_active', true)->pluck('name', 'id');
-        return view('academic_sessions.edit', compact('academic_session', 'institutions'));
+        $institutionId = $this->getInstitutionId();
+
+        // Strict Check: Cannot edit session from another institute if context is set
+        if ($institutionId && $academic_session->institution_id != $institutionId) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $institutions = Institution::where('id', $academic_session->institution_id)->pluck('name', 'id');
+        return view('academic_sessions.edit', compact('academic_session', 'institutions', 'institutionId'));
     }
 
     public function update(Request $request, AcademicSession $academic_session)
     {
+        $institutionId = $this->getInstitutionId();
+        
+        if ($institutionId && $academic_session->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        // Use context ID or fallback to existing ID
+        $targetId = $institutionId ?? $academic_session->institution_id;
+
         $validated = $request->validate([
-            'institution_id' => 'required|exists:institutions,id',
-            'name'           => ['required', 'string', 'max:50', Rule::unique('academic_sessions')->ignore($academic_session->id)->where('institution_id', $request->institution_id)],
-            'start_date'     => 'required',
-            'end_date'       => 'required',
+            'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
+            'name'           => [
+                'required', 'string', 'max:50', 
+                Rule::unique('academic_sessions')
+                    ->ignore($academic_session->id)
+                    ->where('institution_id', $targetId)
+            ],
+            'start_date'     => 'required|date',
+            'end_date'       => 'required|date|after:start_date',
             'status'         => 'required|in:planned,active,closed',
             'is_current'     => 'boolean',
         ]);
 
+        if ($institutionId) {
+            $validated['institution_id'] = $institutionId;
+        }
+
         DB::transaction(function () use ($validated, $academic_session) {
             if (!empty($validated['is_current']) && $validated['is_current']) {
-                AcademicSession::where('institution_id', $validated['institution_id'])
+                AcademicSession::where('institution_id', $academic_session->institution_id)
                     ->where('id', '!=', $academic_session->id)
                     ->update(['is_current' => false]);
             }
@@ -149,6 +206,9 @@ class AcademicSessionController extends BaseController
 
     public function destroy(AcademicSession $academic_session)
     {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $academic_session->institution_id != $institutionId) abort(403);
+
         $academic_session->delete();
         return response()->json(['message' => __('academic_session.messages.success_delete')]);
     }
@@ -159,7 +219,16 @@ class AcademicSessionController extends BaseController
 
         $ids = $request->ids;
         if (!empty($ids)) {
-            AcademicSession::whereIn('id', $ids)->delete();
+            $institutionId = $this->getInstitutionId();
+            
+            $query = AcademicSession::whereIn('id', $ids);
+            
+            // Secure Bulk Delete
+            if ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            }
+            
+            $query->delete();
             return response()->json(['success' => __('academic_session.messages.success_delete')]);
         }
         return response()->json(['error' => __('academic_session.something_went_wrong')]);
