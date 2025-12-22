@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
         // 3. Run Seeders in Order
         $this->call([
             RolePermissionSeeder::class, // Creates Super Admin & Roles
+            BulkDummyDataSeeder::class,
             // Add other seeders here if you have them
             // InstitutionSeeder::class, 
         ]);

@@ -11,6 +11,9 @@ return new class extends Migration
         Schema::create('students', function (Blueprint $table) {
             $table->id();
             
+            // Link to User Table (Auth)
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
+
             // Core Links
             $table->foreignId('institution_id')->constrained('institutions')->cascadeOnDelete();
             $table->foreignId('campus_id')->nullable()->constrained('campuses')->onDelete('set null');
@@ -20,7 +23,7 @@ return new class extends Migration
             $table->unsignedBigInteger('class_section_id')->nullable();
             
             // Identity
-            $table->string('admission_number', 50)->unique(); // [InstID][YY][XXXXX]
+            $table->string('admission_number', 50)->unique();
             $table->string('roll_number', 20)->nullable();
             $table->date('admission_date');
 

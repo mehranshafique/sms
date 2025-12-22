@@ -20,7 +20,21 @@ class RolePermissionSeeder extends Seeder
 
         // 1. Create Super Admin Role
         $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+        // 2. Define Roles
+        $roles = [
+            // 'Super Admin',      // Developer / System Owner
+            'Head Officer',     // Multi-School Manager
+            'Branch Admin',     // Campus Director
+            'Staff',            // Generic Staff (Accountant, etc.)
+            'Teacher',          // Academic Staff
+            'Student',          // Learner
+            'Parent',           // Guardian
+        ];
 
+        foreach ($roles as $roleName) {
+            Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        }
+        
         // 2. Define Modules and Permissions
         // Format: 'Module Name' => ['permission_1', 'permission_2', ...]
         $modules = [

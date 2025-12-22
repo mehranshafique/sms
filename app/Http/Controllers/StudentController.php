@@ -12,6 +12,8 @@ use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
 use App\Services\IdGeneratorService;
 use App\Interfaces\SmsGatewayInterface;
+use App\Enums\UserType; // Import Enum
+use Spatie\Permission\Models\Role; // Import Role Model
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
@@ -32,11 +34,9 @@ class StudentController extends BaseController
 
     public function index(Request $request)
     {
-        // 1. Get Context from BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            // 2. Strict Scoping
             $data = Student::with(['institution', 'campus', 'gradeLevel'])
                 ->select('students.*');
 
@@ -91,13 +91,11 @@ class StudentController extends BaseController
         $currentSession = null;
 
         if ($institutionId) {
-            // Context Set: Load specific data
             $institutes = Institution::where('id', $institutionId)->pluck('name', 'id');
             $campuses = Campus::where('institution_id', $institutionId)->pluck('name', 'id');
             $gradeLevels = GradeLevel::where('institution_id', $institutionId)->pluck('name', 'id');
             $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         } elseif (Auth::user()->hasRole('Super Admin')) {
-            // Global View (No context selected): Load ALL options
             $institutes = Institution::pluck('name', 'id');
         }
         
@@ -109,10 +107,9 @@ class StudentController extends BaseController
         $gradeId = $request->grade_id;
         $institutionId = $this->getInstitutionId();
 
-        // 1. Verify Grade belongs to active Institution
         $grade = GradeLevel::find($gradeId);
         if (!$grade || ($institutionId && $grade->institution_id != $institutionId)) {
-            return response()->json([]); // Security: Empty response if mismatch
+            return response()->json([]);
         }
 
         $sections = ClassSection::where('grade_level_id', $gradeId)
@@ -127,10 +124,8 @@ class StudentController extends BaseController
 
     public function store(Request $request)
     {
-        // 1. Resolve Institution ID
         $institutionId = $this->getInstitutionId() ?? $request->institution_id;
 
-        // 2. Validate
         $request->validate([
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'first_name' => 'required|string|max:100',
@@ -140,7 +135,6 @@ class StudentController extends BaseController
             'grade_level_id' => [
                 'required', 
                 'exists:grade_levels,id',
-                // Rule: Grade must belong to institution
                 function($attribute, $value, $fail) use ($institutionId) {
                     if ($institutionId && GradeLevel::where('id', $value)->where('institution_id', $institutionId)->doesntExist()) {
                         $fail('Invalid grade level for the current institution.');
@@ -148,6 +142,7 @@ class StudentController extends BaseController
                 }
             ],
             'class_section_id' => 'nullable|exists:class_sections,id',
+            'email' => 'nullable|email|unique:users,email', // Check email uniqueness on USERS table
         ]);
 
         $data = $request->except(['_token', '_method']);
@@ -163,31 +158,38 @@ class StudentController extends BaseController
                 throw ValidationException::withMessages(['institution_id' => __('student.no_active_session')]);
             }
 
-            $data['institution_id'] = $institutionId; // Enforce context
+            $data['institution_id'] = $institutionId; 
             $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
 
             if ($request->hasFile('student_photo')) {
                 $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
             }
 
+            // Create User Account if Email is provided
             if ($request->email) {
                 $user = User::create([
                     'name' => $request->first_name . ' ' . $request->last_name,
                     'email' => $request->email,
-                    'password' => Hash::make('Student123!'),
-                    'user_type' => 5, 
+                    'password' => Hash::make('Student123!'), // Default password
+                    'user_type' => UserType::STUDENT->value, // Use Enum
                     'institute_id' => $institutionId,
                     'is_active' => true,
                 ]);
                 
-                if (\Spatie\Permission\Models\Role::where('name', 'Student')->exists()) {
-                    $user->assignRole('Student');
+                // Assign Role safely
+                $roleName = 'Student';
+                if (Role::where('name', $roleName)->where('guard_name', 'web')->exists()) {
+                    $user->assignRole($roleName);
+                } else {
+                    \Log::warning("Role '$roleName' not found. Student user created without role.");
                 }
+                
                 $data['user_id'] = $user->id;
             }
 
             $student = Student::create($data);
 
+            // Determine Section
             $sectionId = $request->class_section_id;
             if (!$sectionId) {
                 $section = ClassSection::where('grade_level_id', $request->grade_level_id)
@@ -216,7 +218,6 @@ class StudentController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
 
-        // 1. Strict Access Check
         if ($institutionId && $student->institution_id != $institutionId) {
             abort(403, 'This student does not belong to the active institution context.');
         }
@@ -261,9 +262,17 @@ class StudentController extends BaseController
 
         $student->update($data);
         
+        // Sync User Record
         if($student->user_id) {
             $userLink = User::find($student->user_id);
             if($userLink) {
+                // Ensure role is assigned if missing
+                if (!$userLink->hasRole('Student')) {
+                    if (Role::where('name', 'Student')->exists()) {
+                        $userLink->assignRole('Student');
+                    }
+                }
+                
                 $userLink->update([
                     'name' => $request->first_name . ' ' . $request->last_name,
                     'email' => $request->email,
