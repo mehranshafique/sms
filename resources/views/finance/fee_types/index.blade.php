@@ -74,6 +74,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ __('finance.status') }}</label>
+                        {{-- Added default-select class for theme compatibility --}}
                         <select name="is_active" id="is_active" class="form-control default-select">
                             <option value="1">Active</option>
                             <option value="0">Inactive</option>
@@ -98,6 +99,11 @@
 
 <script>
     $(document).ready(function() {
+        // Ensure selectpicker is active
+        if(jQuery().selectpicker) {
+            $('.default-select').selectpicker();
+        }
+
         var table = $('#feeTypeTable').DataTable({
             processing: true,
             serverSide: true,
@@ -124,7 +130,12 @@
             
             $('#name').val(name);
             $('#description').val(desc);
-            $('#is_active').val(status).trigger('change');
+            $('#is_active').val(status);
+            
+            // Refresh selectpicker after value change
+            if(jQuery().selectpicker) {
+                $('#is_active').selectpicker('refresh');
+            }
 
             $('#addFeeTypeModal').modal('show');
         });
@@ -135,7 +146,10 @@
             $('#feeTypeForm').attr('action', "{{ route('fee-types.store') }}");
             $('#formMethod').val('POST');
             $('#feeTypeForm')[0].reset();
-            $('#is_active').val(1).trigger('change');
+            $('#is_active').val(1);
+            if(jQuery().selectpicker) {
+                $('#is_active').selectpicker('refresh');
+            }
         });
 
         // Form Submit

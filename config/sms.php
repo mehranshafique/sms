@@ -7,17 +7,7 @@ return [
     |--------------------------------------------------------------------------
     | Options: 'infobip', 'mobishastra', 'log'
     */
-    'default' => env('SMS_DRIVER', 'log'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Infobip Configuration
-    |--------------------------------------------------------------------------
-    */
-    'infobip' => [
-        'base_url' => env('INFOBIP_BASE_URL'),
-        'api_key' => env('INFOBIP_API_KEY'),
-    ],
+    'default' => env('SMS_DRIVER', 'mobishastra'),
 
     /*
     |--------------------------------------------------------------------------
@@ -25,8 +15,21 @@ return [
     |--------------------------------------------------------------------------
     */
     'mobishastra' => [
-        'user' => env('MOBISHASTRA_USER'),
-        'password' => env('MOBISHASTRA_PASSWORD'),
-        'sender_id' => env('MOBISHASTRA_SENDER_ID', 'Digitex'),
+        'user'       => env('MOBISHASTRA_USER', 'INTEGRALE'),
+        'password'   => env('MOBISHASTRA_PASSWORD', 'yhy6h_6_'),
+        'sender_id'  => env('MOBISHASTRA_SENDER_ID', 'ARCHIDIOKIN'),
+        // Optional headers from your file
+        'app_id'     => env('MOBISHASTRA_APP_ID', 'huidu_liang'),
+        'app_secret' => env('MOBISHASTRA_APP_SECRET', '07431b10-58ca-4546-8f09-08e24be729da'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Infobip Configuration (Alternative)
+    |--------------------------------------------------------------------------
+    */
+    'infobip' => [
+        'base_url' => env('INFOBIP_BASE_URL'),
+        'api_key' => env('INFOBIP_API_KEY'),
     ],
 ];

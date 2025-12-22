@@ -148,10 +148,10 @@ Route::middleware('auth')->group(function () {
         Route::resource('fees', FeeStructureController::class);
         
         // Invoices
+        Route::get('invoices/get-students', [\App\Http\Controllers\Finance\InvoiceController::class, 'getStudents'])->name('invoices.get_students');
         Route::get('invoices/{invoice}/print', [\App\Http\Controllers\Finance\InvoiceController::class, 'print'])->name('invoices.print');
         Route::get('invoices/{invoice}/download', [\App\Http\Controllers\Finance\InvoiceController::class, 'downloadPdf'])->name('invoices.download');
         Route::resource('invoices', \App\Http\Controllers\Finance\InvoiceController::class);
-        
         // Payments
         Route::get('payments/create', [\App\Http\Controllers\Finance\PaymentController::class, 'create'])->name('payments.create');
         Route::post('payments', [\App\Http\Controllers\Finance\PaymentController::class, 'store'])->name('payments.store');

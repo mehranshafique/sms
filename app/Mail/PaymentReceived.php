@@ -4,11 +4,10 @@ namespace App\Mail;
 
 use App\Models\Payment;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class PaymentReceived extends Mailable implements ShouldQueue
+class PaymentReceived extends Mailable
 {
     use Queueable, SerializesModels;
 
@@ -21,7 +20,9 @@ class PaymentReceived extends Mailable implements ShouldQueue
 
     public function build()
     {
-        return $this->subject('Payment Receipt - ' . $this->payment->transaction_id)
-                    ->view('emails.payments.received');
+        $schoolName = $this->payment->invoice->institution->name ?? 'School';
+        
+        return $this->subject("Payment Receipt - {$schoolName}")
+                    ->view('emails.payment_received');
     }
 }

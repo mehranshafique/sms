@@ -28,9 +28,9 @@ class TimetableController extends BaseController
         $user = Auth::user();
 
         if ($request->ajax()) {
-            // FIX: Select only timetable columns to prevent ambiguity with joined tables
+            // FIX: Select 'day_of_week' as 'day' so DataTables can sort/filter
             $query = Timetable::with(['classSection', 'subject', 'teacher.user'])
-                ->select('timetables.*');
+                ->select('timetables.*', 'timetables.day_of_week as day');
 
             // 1. Institution Scoping (Strictly prefixed)
             if ($institutionId) {
@@ -42,9 +42,10 @@ class TimetableController extends BaseController
                 // Teachers see only their own schedule
                 $staff = $user->staff; 
                 if ($staff) {
-                    // FIX: Column is 'staff_id', not 'teacher_id'
-                    $query->where('timetables.staff_id', $staff->id);
+                    // FIX: Column is 'teacher_id', not 'staff_id'
+                    $query->where('timetables.teacher_id', $staff->id);
                 } else {
+                    // If user has Teacher role but no Staff profile, show nothing
                     $query->whereRaw('1 = 0'); 
                 }
             } elseif ($user->hasRole('Student')) {
@@ -91,6 +92,7 @@ class TimetableController extends BaseController
                     return $row->teacher ? $row->teacher->user->name : 'N/A';
                 })
                 ->editColumn('day', function($row){
+                    // Uses the aliased column 'day' (which is day_of_week from DB)
                     return ucfirst($row->day);
                 })
                 ->addColumn('time', function($row){
@@ -115,6 +117,7 @@ class TimetableController extends BaseController
         }
 
         $classSections = [];
+        // UPDATED: Allow non-students to see filters (Admins, Head Officers, etc.)
         if (!$user->hasRole(['Student', 'Teacher'])) {
             $classSectionsQuery = ClassSection::query();
             if ($institutionId) {
@@ -137,7 +140,7 @@ class TimetableController extends BaseController
         if ($user->hasRole('Teacher')) {
             $staff = $user->staff;
             if ($staff) {
-                // FIX: Use 'staff_id'
+                // FIX: Use 'teacher_id'
                 $filters['teacher_id'] = $staff->id;
                 $request->request->remove('class_section_id'); 
                 $request->request->remove('room_number');
@@ -152,16 +155,19 @@ class TimetableController extends BaseController
                 
                 if ($currentClassId) {
                     $selectedClass = ClassSection::with(['classTeacher.user', 'institution', 'gradeLevel'])->find($currentClassId);
+                    // Explicitly set for getScheduleData logic
                     $request->merge(['class_section_id' => $currentClassId]); 
                 }
                 $request->request->remove('teacher_id');
                 $request->request->remove('room_number');
             }
         } else {
+            // Admin/Head Officer Logic: Allow filters from request
             if ($request->has('class_section_id') && $request->class_section_id) {
                 $selectedClass = ClassSection::with(['classTeacher.user', 'institution', 'gradeLevel'])->find($request->class_section_id);
             }
             if ($request->has('teacher_id') && $request->teacher_id) {
+                // Use correct key for filter
                 $filters['teacher_id'] = $request->teacher_id;
             }
             if ($request->has('room_number') && $request->room_number) {
@@ -169,10 +175,12 @@ class TimetableController extends BaseController
             }
         }
         
+        // Dropdowns for Admin View Only
         $classes = collect();
         $teachers = collect();
         $rooms = collect();
 
+        // UPDATED: Hide filters from Student AND Teacher
         if (!$user->hasRole(['Student', 'Teacher'])) {
             $classesQuery = ClassSection::query();
             if ($institutionId) $classesQuery->where('institution_id', $institutionId);
@@ -187,6 +195,7 @@ class TimetableController extends BaseController
             $rooms = $roomsQuery->pluck('room_number', 'room_number');
         }
 
+        // Generate View if filters exist (Teacher/Student always have filters set above)
         if ($selectedClass || !empty($filters)) {
             return $this->generateWeeklyView($selectedClass, true, null, $classes, $teachers, $rooms, $filters);
         }
@@ -214,7 +223,7 @@ class TimetableController extends BaseController
 
         $query = Timetable::with(['subject', 'teacher.user', 'classSection', 'academicSession'])
             ->select('timetables.*')
-            ->orderBy('timetables.start_time'); // Qualified order to match select
+            ->orderBy('timetables.start_time'); // Qualified
 
         if ($session) {
             $query->where('timetables.academic_session_id', $session->id);
@@ -228,8 +237,8 @@ class TimetableController extends BaseController
             $query->where('timetables.class_section_id', $classSection->id);
         }
         if (isset($filters['teacher_id'])) {
-            // FIX: Use 'staff_id'
-            $query->where('timetables.staff_id', $filters['teacher_id']);
+            // FIX: Use 'teacher_id' column
+            $query->where('timetables.teacher_id', $filters['teacher_id']);
         }
         if (isset($filters['room_number'])) {
             $query->where('timetables.room_number', $filters['room_number']);
@@ -238,7 +247,8 @@ class TimetableController extends BaseController
         $rawSchedules = $query->get();
 
         $schedules = $rawSchedules->groupBy(function($item) {
-            return strtolower($item->day);
+            // FIX: Use 'day_of_week' column
+            return strtolower($item->day_of_week);
         });
             
         $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -246,6 +256,7 @@ class TimetableController extends BaseController
             return [$day => $schedules->get($day) ?? collect()];
         });
 
+        // Header Logic
         $headerTitle = "Class Routine";
         if ($classSection) {
             $headerTitle = $classSection->name;
@@ -333,9 +344,10 @@ class TimetableController extends BaseController
         $timetable->fill($request->all());
         $timetable->institution_id = $institutionId;
         $timetable->academic_session_id = $currentSession->id;
-        $timetable->day = strtolower($request->day);
-        // FIX: Use 'staff_id'
-        $timetable->staff_id = $request->staff_id;
+        // FIX: Use 'day_of_week' column
+        $timetable->day_of_week = strtolower($request->day);
+        // FIX: Use 'teacher_id' column (mapped from 'staff_id' input)
+        $timetable->teacher_id = $request->staff_id;
         $timetable->save();
 
         return response()->json(['message' => __('timetable.messages.success_create'), 'redirect' => route('timetables.index')]);
@@ -360,9 +372,8 @@ class TimetableController extends BaseController
         $this->validateTimetable($request, $timetable->id, $institutionId);
 
         $timetable->fill($request->all());
-        $timetable->day = strtolower($request->day);
-        // FIX: Use 'staff_id'
-        $timetable->staff_id = $request->staff_id;
+        $timetable->day_of_week = strtolower($request->day);
+        $timetable->teacher_id = $request->staff_id;
         $timetable->save();
 
         return response()->json(['message' => __('timetable.messages.success_update'), 'redirect' => route('timetables.index')]);
@@ -425,9 +436,9 @@ class TimetableController extends BaseController
 
         // Conflict Checks
         if ($request->staff_id) {
-            // FIX: Use 'staff_id' and 'day'
-            $conflicts = Timetable::where('staff_id', $request->staff_id)
-                ->where('day', $day)
+            // FIX: Use 'teacher_id' and 'day_of_week'
+            $conflicts = Timetable::where('teacher_id', $request->staff_id)
+                ->where('day_of_week', $day)
                 ->where('academic_session_id', $currentSession->id)
                 ->where('id', '!=', $ignoreId)
                 ->get();

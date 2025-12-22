@@ -15,20 +15,20 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Permission\Middleware\PermissionMiddleware;
-use PDF; // Requires barryvdh/laravel-dompdf
+use PDF; 
 
 class InvoiceController extends BaseController
 {
     public function __construct()
     {
         $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'show', 'print', 'downloadPdf']);
-        $this->middleware(PermissionMiddleware::class . ':invoice.create')->only(['create', 'store']);
+        $this->middleware(PermissionMiddleware::class . ':invoice.create')->only(['create', 'store', 'getStudents']);
         $this->setPageTitle(__('invoice.page_title'));
     }
 
     public function index(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
             $data = Invoice::with(['student', 'academicSession'])
@@ -81,7 +81,7 @@ class InvoiceController extends BaseController
 
     public function create()
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
         
         $classesQuery = ClassSection::query();
         $feesQuery = FeeStructure::query();
@@ -97,17 +97,57 @@ class InvoiceController extends BaseController
         return view('finance.invoices.create', compact('classes', 'feeStructures'));
     }
 
+    /**
+     * AJAX: Get Students for a selected Class
+     */
+    public function getStudents(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        $classId = $request->class_section_id;
+
+        if (!$classId) return response()->json([]);
+
+        // If Super Admin/Global, infer institution from class
+        if (!$institutionId) {
+            $class = ClassSection::find($classId);
+            $institutionId = $class ? $class->institution_id : null;
+        }
+
+        $session = AcademicSession::where('institution_id', $institutionId)
+            ->where('is_current', true)
+            ->first();
+
+        if (!$session) return response()->json([]);
+
+        $students = StudentEnrollment::with('student')
+            ->where('class_section_id', $classId)
+            ->where('academic_session_id', $session->id)
+            ->where('status', 'active')
+            ->get()
+            ->map(function($enrollment) {
+                return [
+                    'id' => $enrollment->student_id,
+                    'name' => $enrollment->student->full_name,
+                    'roll_no' => $enrollment->roll_number ?? 'N/A'
+                ];
+            });
+
+        return response()->json($students);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
             'class_section_id' => 'required|exists:class_sections,id',
+            'student_ids' => 'required|array', // Now an array of selected IDs
+            'student_ids.*' => 'exists:students,id',
             'fee_structure_ids' => 'required|array',
             'fee_structure_ids.*' => 'exists:fee_structures,id',
             'due_date' => 'required|date',
             'issue_date' => 'required|date',
         ]);
 
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
         
         if(!$institutionId) {
             $class = ClassSection::find($request->class_section_id);
@@ -117,18 +157,13 @@ class InvoiceController extends BaseController
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         if(!$session) return response()->json(['message' => __('invoice.no_active_session')], 422);
 
-        $students = StudentEnrollment::where('class_section_id', $request->class_section_id)
-            ->where('academic_session_id', $session->id)
-            ->where('status', 'active')
-            ->pluck('student_id');
-
-        if($students->isEmpty()) return response()->json(['message' => __('invoice.no_students_found')], 422);
-
         $fees = FeeStructure::whereIn('id', $request->fee_structure_ids)->get();
         $totalAmount = $fees->sum('amount');
+        
+        $selectedStudentIds = $request->student_ids;
 
-        DB::transaction(function () use ($students, $fees, $totalAmount, $request, $institutionId, $session) {
-            foreach ($students as $studentId) {
+        DB::transaction(function () use ($selectedStudentIds, $fees, $totalAmount, $request, $institutionId, $session) {
+            foreach ($selectedStudentIds as $studentId) {
                 $invoice = Invoice::create([
                     'institution_id' => $institutionId,
                     'academic_session_id' => $session->id,
@@ -151,37 +186,39 @@ class InvoiceController extends BaseController
             }
         });
 
-        return response()->json(['message' => __('invoice.success_generated'), 'redirect' => route('invoices.index')]);
+        $count = count($selectedStudentIds);
+        $msg = $count > 1 ? __('invoice.success_generated_bulk', ['count' => $count]) : __('invoice.success_generated_single');
+
+        return response()->json(['message' => $msg, 'redirect' => route('invoices.index')]);
     }
 
     public function show(Invoice $invoice)
     {
+        $institutionId = $this->getInstitutionId();
+        if($institutionId && $invoice->institution_id != $institutionId) abort(403);
+
         $invoice->load(['student', 'items', 'academicSession', 'institution']);
         return view('finance.invoices.show', compact('invoice'));
     }
 
-    /**
-     * Display a printable version of the invoice.
-     */
     public function print($id)
     {
+        $institutionId = $this->getInstitutionId();
         $invoice = Invoice::with(['student', 'items', 'institution', 'academicSession', 'payments'])->findOrFail($id);
+        
+        if($institutionId && $invoice->institution_id != $institutionId) abort(403);
+
         return view('finance.invoices.print', compact('invoice'));
     }
 
-    /**
-     * Download the invoice as PDF.
-     */
     public function downloadPdf($id)
     {
         $invoice = Invoice::with(['student', 'items', 'institution', 'academicSession', 'payments'])->findOrFail($id);
         
-        // Use DomPDF if available, otherwise fallback to print view
         if (class_exists('PDF')) {
             $pdf = \PDF::loadView('finance.invoices.print', compact('invoice'));
             return $pdf->download('Invoice-'.$invoice->invoice_number.'.pdf');
         } else {
-            // Fallback if package missing
             return redirect()->route('invoices.print', $id);
         }
     }

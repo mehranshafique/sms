@@ -34,7 +34,8 @@
                                     </div>
                                     <div class="mb-3 col-md-6">
                                         <label class="form-label">{{ __('finance.fee_type') }} <span class="text-danger">*</span></label>
-                                        <select name="fee_type_id" class="form-control default-select" required>
+                                        {{-- Added data-live-search for better UX --}}
+                                        <select name="fee_type_id" class="form-control default-select" data-live-search="true" required>
                                             <option value="">{{ __('finance.select_type') }}</option>
                                             @foreach($feeTypes as $id => $name)
                                                 <option value="{{ $id }}">{{ $name }}</option>
@@ -56,7 +57,8 @@
                                     </div>
                                     <div class="mb-3 col-md-4">
                                         <label class="form-label">{{ __('finance.grade_level') }}</label>
-                                        <select name="grade_level_id" class="form-control default-select">
+                                        {{-- Added data-live-search --}}
+                                        <select name="grade_level_id" class="form-control default-select" data-live-search="true">
                                             <option value="">All Grades</option>
                                             @foreach($gradeLevels as $id => $name)
                                                 <option value="{{ $id }}">{{ $name }}</option>
@@ -79,6 +81,12 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function(){
+        
+        // Ensure dropdowns are refreshed
+        if(jQuery().selectpicker) {
+            $('.default-select').selectpicker('refresh');
+        }
+
         $('#feeForm').submit(function(e){
             e.preventDefault();
             $.ajax({

@@ -49,7 +49,7 @@ class Timetable extends Model
 
     public function teacher()
     {
-        return $this->belongsTo(Staff::class, 'teacher_id');
+        return $this->belongsTo(Staff::class, 'teacher_id'); // Correct FK
     }
     
     public function academicSession()

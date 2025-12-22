@@ -23,7 +23,7 @@ class FeeTypeController extends BaseController
 
     public function index(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
             $data = FeeType::select('*');
@@ -74,7 +74,11 @@ class FeeTypeController extends BaseController
             'is_active' => 'boolean',
         ]);
 
-        $institutionId = Auth::user()->institute_id ?? 1; // Default or Auth
+        $institutionId = $this->getInstitutionId();
+
+        if(!$institutionId) {
+             return response()->json(['message' => 'Super Admin must select a context or manually assign ID.'], 422);
+        }
 
         FeeType::create([
             'institution_id' => $institutionId,
@@ -88,13 +92,19 @@ class FeeTypeController extends BaseController
 
     public function update(Request $request, $id)
     {
+        $feeType = FeeType::findOrFail($id);
+        $institutionId = $this->getInstitutionId();
+
+        if ($institutionId && $feeType->institution_id != $institutionId) {
+            abort(403);
+        }
+
         $request->validate([
             'name' => 'required|string|max:100',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
-        $feeType = FeeType::findOrFail($id);
         $feeType->update($request->all());
 
         return response()->json(['message' => __('finance.success_update_type'), 'redirect' => route('fee-types.index')]);
@@ -102,7 +112,14 @@ class FeeTypeController extends BaseController
 
     public function destroy($id)
     {
-        FeeType::destroy($id);
+        $feeType = FeeType::findOrFail($id);
+        $institutionId = $this->getInstitutionId();
+
+        if ($institutionId && $feeType->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        $feeType->delete();
         return response()->json(['message' => __('finance.success_delete_type')]);
     }
 }
