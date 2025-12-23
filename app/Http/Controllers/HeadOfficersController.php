@@ -20,7 +20,10 @@ class HeadOfficersController extends BaseController
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = User::where('user_type', 2)->with(['institutes', 'roles'])->select('users.*');
+            $data = User::where('user_type', 2)
+                ->with(['institutes', 'roles'])
+                ->select('users.*')
+                ->latest(); // Rule 3: Latest First
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -109,7 +112,6 @@ class HeadOfficersController extends BaseController
 
         $user = User::create($userData);
 
-        // Correctly handle array input for sync
         $user->institutes()->sync($request->input('institute_ids', []));
 
         $user->assignRole($request->role);
@@ -158,7 +160,7 @@ class HeadOfficersController extends BaseController
         }
 
         $user->update($updateData);
-        // Correctly handle array input for sync (defaults to empty array if unchecked)
+        
         $user->institutes()->sync($request->input('institute_ids', []));
 
         $user->syncRoles([$request->role]);

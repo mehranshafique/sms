@@ -1,7 +1,6 @@
 @extends('layout.layout')
 
 @section('styles')
-    {{-- DataTables Buttons & Select CSS --}}
     <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css" rel="stylesheet">
     
@@ -13,9 +12,6 @@
             box-shadow: 0 0.125rem 0.25rem 0 rgba(105, 122, 141, 0.1);
             border-radius: 0.375rem; 
             padding: 0.4375rem 1rem;
-        }
-        .dt-buttons .dropdown-toggle:hover {
-            background-color: #f8f9fa !important;
         }
         .dt-buttons {
             display: inline-flex;
@@ -39,11 +35,11 @@
                 </div>
             </div>
             <div class="col-sm-6 p-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
-                @can('create', Spatie\Permission\Models\Role::class)
+                @if(Auth::user()->can('role.create') || Auth::user()->hasRole('Super Admin'))
                 <a href="{{ route('roles.create') }}" class="btn btn-primary btn-rounded shadow-sm fw-bold px-4 py-2">
                     <i class="fa fa-plus me-2"></i> {{ __('roles.create_new') }}
                 </a>
-                @endcan
+                @endif
             </div>
         </div>
 
@@ -93,7 +89,6 @@
                             <table id="roleTable" class="display" style="width:100%">
                                 <thead>
                                     <tr>
-                                        {{-- Conditional check if you want bulk delete on roles --}}
                                         <th style="width: 50px;" class="no-sort">
                                             <div class="form-check custom-checkbox checkbox-primary check-lg me-3">
                                                 <input type="checkbox" class="form-check-input" id="checkAll">
@@ -119,14 +114,8 @@
 @endsection
 
 @section('js')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
 <script src="https://cdn.datatables.net/select/1.7.0/js/dataTables.select.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -136,47 +125,20 @@
             processing: true,
             serverSide: true,
             ajax: "{{ route('roles.index') }}",
-            dom: '<"row me-2"<"col-md-2"<"me-3"l>><"col-md-10"<"dt-action-buttons text-xl-end text-lg-start text-md-end text-start d-flex align-items-center justify-content-end flex-md-row flex-column mb-3 mb-md-0"fB>>>t<"row mx-2"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
-            buttons: [
-                {
-                    extend: 'collection',
-                    className: 'btn btn-outline-secondary dropdown-toggle me-2',
-                    text: '<i class="fa fa-download me-1"></i> {{ __("roles.export") }}',
-                    buttons: [
-                        { extend: 'print', text: '<i class="fa fa-print me-2"></i> Print', className: 'dropdown-item' },
-                        { extend: 'csv', text: '<i class="fa fa-file-text-o me-2"></i> CSV', className: 'dropdown-item' },
-                        { extend: 'excel', text: '<i class="fa fa-file-excel-o me-2"></i> Excel', className: 'dropdown-item' },
-                        { extend: 'pdf', text: '<i class="fa fa-file-pdf-o me-2"></i> PDF', className: 'dropdown-item' },
-                        { extend: 'copy', text: '<i class="fa fa-copy me-2"></i> Copy', className: 'dropdown-item' }
-                    ]
-                }
-            ],
-            ordering: true,
-            order: [[1, 'asc']], 
             columns: [
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
                 { data: 'name', name: 'name' },
                 { data: 'users_count', name: 'users_count', searchable: false },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
-            ],
-            language: {
-                search: "",
-                searchPlaceholder: "{{ __('roles.search_placeholder') }}",
-                emptyTable: "{{ __('roles.no_records_found') }}",
-                processing: '<i class="fa fa-spinner fa-spin fa-2x fa-fw"></i>',
-                lengthMenu: "_MENU_",
-                paginate: { next: '<i class="fa fa-angle-right"></i>', previous: '<i class="fa fa-angle-left"></i>' }
-            },
-            drawCallback: function() {
-                // Re-bind delete events or other actions
-            }
+            ]
         });
 
         // Delete Action
         $('#roleTable tbody').on('click', '.delete-btn', function() {
             let id = $(this).data('id');
             let url = "{{ route('roles.destroy', ':id') }}".replace(':id', id);
+            
             Swal.fire({
                 title: "{{ __('roles.are_you_sure') }}",
                 text: "{{ __('roles.delete_warning') }}",

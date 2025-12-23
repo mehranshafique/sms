@@ -220,7 +220,7 @@
                                 <a class="nav-link" href="javascript:void(0);" role="button" data-bs-toggle="dropdown">
                                     <div class="header-info me-2 d-flex align-items-center">
                                         {{-- Only Show First Name --}}
-                                        <span class="text-black font-w600">{{ explode(' ', Auth::user()->name)[0] }}</span>
+                                        <span class="text-black font-w600"></span>
                                     </div>
                                     @if(Auth::user()->profile_picture)
                                         <img src="{{ asset('storage/'.Auth::user()->profile_picture) }}" width="35" alt="Profile" style="object-fit: cover; border-radius: 50%;"/>

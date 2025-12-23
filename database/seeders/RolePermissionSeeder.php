@@ -44,7 +44,7 @@ class RolePermissionSeeder extends Seeder
             'Modules' => ['view', 'create', 'update', 'delete'],
             
             // Core Structure
-            'Institutes' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
+            'Institutions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
             'Campuses' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Head Officers' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             
@@ -58,7 +58,7 @@ class RolePermissionSeeder extends Seeder
             
             // People & Students
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Student Attendance' => ['view', 'create', 'update', 'delete'], 
             'Student Promotion' => ['view', 'create'], // Special Tool
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
@@ -115,7 +115,7 @@ class RolePermissionSeeder extends Seeder
         $user = User::updateOrCreate(
             ['email' => 'test@gmail.com'],
             [
-                'name' => 'Super Admin User',
+                'name' => 'Super Admin',
                 'password' => Hash::make('password'),
                 'user_type' => 1,
                 'is_active' => true,

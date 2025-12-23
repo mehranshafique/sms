@@ -32,7 +32,7 @@
             let formData = new FormData(this);
             $.ajax({
                 url: $(this).attr('action'),
-                type: "POST", // Method spoofing via _method
+                type: "POST", 
                 data: formData,
                 processData: false,
                 contentType: false,

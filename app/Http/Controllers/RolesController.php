@@ -5,27 +5,45 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
-use App\Models\Module; // Ensure you have this model
+use App\Models\Module;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class RolesController extends BaseController
 {
     public function __construct()
     {
-        // Enforce Resource Policy
+        // FIX: Commented out to prevent auto-blocking Role ID 1
         // $this->authorizeResource(Role::class, 'role');
         $this->setPageTitle(__('roles.page_title'));
     }
 
     public function index(Request $request)
     {
+        // Manual Auth Check
+        if (!Auth::user()->can('role.viewAny') && !Auth::user()->hasRole('Super Admin')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
         if ($request->ajax()) {
-            $data = Role::withCount('users')->select('*');
-            return \Yajra\DataTables\Facades\DataTables::of($data)
+            // FIX: Removed select('*') to ensure withCount('users') works correctly
+            $query = Role::withCount('users');
+
+            // DIGITEX ARCHITECTURE: Hierarchy Check
+            if (!Auth::user()->hasRole('Super Admin')) {
+                // Head Officers cannot see 'Super Admin' role
+                $query->where('name', '!=', 'Super Admin');
+            }
+
+            // Order by latest
+            $query->latest(); 
+
+            return \Yajra\DataTables\Facades\DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
-                    // Only allow deleting non-super-admin roles or custom logic
-                    if(auth()->user()->can('delete', $row) && $row->name !== 'Super Admin'){
+                    // Prevent deleting core roles
+                    $protectedRoles = ['Super Admin', 'Head Officer', 'Teacher', 'Student'];
+                    if(!in_array($row->name, $protectedRoles) && auth()->user()->can('role.delete')){
                         return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
                                     <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
                                     <label class="form-check-label"></label>
@@ -34,18 +52,24 @@ class RolesController extends BaseController
                     return '';
                 })
                 ->addColumn('users_count', function($row){
-                    return '<span class="badge badge-primary">'.$row->users_count.'</span>';
+                    // Ensure users_count is treated as an integer, default to 0 if null
+                    $count = $row->users_count ?? 0;
+                    return '<span class="badge badge-primary">'.$count.'</span>';
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    if(auth()->user()->can('update', $row)){
-                        $btn .= '<a href="'.route('roles.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('roles.edit').'">
-                                    <i class="fa fa-pencil"></i>
-                                </a>';
+                    if(auth()->user()->can('role.update') || auth()->user()->hasRole('Super Admin')){
+                        // Allow Super Admin to edit everything, others cannot edit Super Admin role
+                        if($row->name !== 'Super Admin' || auth()->user()->hasRole('Super Admin')) {
+                            $btn .= '<a href="'.route('roles.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('roles.edit').'">
+                                        <i class="fa fa-pencil"></i>
+                                    </a>';
+                        }
                     }
 
-                    if(auth()->user()->can('delete', $row) && $row->name !== 'Super Admin'){
+                    $protectedRoles = ['Super Admin', 'Head Officer', 'Teacher', 'Student'];
+                    if(auth()->user()->can('role.delete') && !in_array($row->name, $protectedRoles)){
                         $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" title="'.__('roles.delete').'">
                                     <i class="fa fa-trash"></i>
                                 </button>';
@@ -58,31 +82,38 @@ class RolesController extends BaseController
                 ->make(true);
         }
 
-        // Stats Logic
         $totalRoles = Role::count();
         $rolesWithUsers = Role::has('users')->count();
-        // You can add more specific stats here
         
         return view('roles.index', compact('totalRoles', 'rolesWithUsers'));
     }
 
     public function create()
     {
-        // Fetch all modules with their permissions
-        $modules = Module::with('permissions')->get();
+        if (!Auth::user()->can('role.create')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
+        $modules = $this->getAccessiblePermissions();
         return view('roles.create', compact('modules'));
     }
 
     public function store(Request $request)
     {
+        if (!Auth::user()->can('role.create')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
         $request->validate([
             'name' => 'required|unique:roles,name',
             'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,name', // Validate permission names
+            'permissions.*' => 'exists:permissions,name',
         ]);
 
+        $this->verifyPermissionOwnership($request->permissions);
+
         DB::transaction(function () use ($request) {
-            $role = Role::create(['name' => $request->name]);
+            $role = Role::create(['name' => $request->name, 'guard_name' => 'web']);
             
             if ($request->has('permissions')) {
                 $role->syncPermissions($request->permissions);
@@ -94,9 +125,19 @@ class RolesController extends BaseController
 
     public function edit(Role $role)
     {
-        // Fetch all modules with their permissions
-        $modules = Module::with('permissions')->get();
-        // Get permissions assigned to this role
+        // FIX: Allow Super Admin to edit Role ID 1 explicitly
+        if ($role->id == 1 && Auth::user()->hasRole('Super Admin')) {
+            // Allowed
+        } elseif (!Auth::user()->can('role.update')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
+        // Prevent non-super admins from editing Super Admin role
+        if($role->name === 'Super Admin' && !Auth::user()->hasRole('Super Admin')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
+        $modules = $this->getAccessiblePermissions();
         $rolePermissions = $role->permissions->pluck('name')->toArray();
         
         return view('roles.edit', compact('role', 'modules', 'rolePermissions'));
@@ -104,12 +145,24 @@ class RolesController extends BaseController
 
     public function update(Request $request, Role $role)
     {
-        // Prevent editing Super Admin name if restricted logic applies
+        // FIX: Allow Super Admin to update Role ID 1
+        if ($role->id == 1 && Auth::user()->hasRole('Super Admin')) {
+            // Allowed
+        } elseif (!Auth::user()->can('role.update')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
+        if($role->name === 'Super Admin' && $request->name !== 'Super Admin') {
+             return response()->json(['message' => __('roles.cannot_edit_super_admin_name')], 403);
+        }
+
         $request->validate([
             'name' => 'required|unique:roles,name,'.$role->id,
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,name',
         ]);
+
+        $this->verifyPermissionOwnership($request->permissions);
 
         DB::transaction(function () use ($request, $role) {
             $role->update(['name' => $request->name]);
@@ -117,7 +170,6 @@ class RolesController extends BaseController
             if ($request->has('permissions')) {
                 $role->syncPermissions($request->permissions);
             } else {
-                // If no permissions sent (checkboxes unchecked), revoke all
                 $role->syncPermissions([]);
             }
         });
@@ -127,11 +179,47 @@ class RolesController extends BaseController
 
     public function destroy(Role $role)
     {
-        if ($role->name === 'Super Admin') {
-            return response()->json(['error' => __('roles.cannot_delete_super_admin')], 403);
+        if (!Auth::user()->can('role.delete')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
+
+        $protectedRoles = ['Super Admin', 'Head Officer', 'Teacher', 'Student'];
+        if (in_array($role->name, $protectedRoles)) {
+            return response()->json(['error' => __('roles.cannot_delete_system_role')], 403);
         }
         
         $role->delete();
         return response()->json(['message' => __('roles.messages.success_delete')]);
+    }
+
+    private function getAccessiblePermissions()
+    {
+        $user = Auth::user();
+        $query = Module::with(['permissions' => function($q) use ($user) {
+            if (!$user->hasRole('Super Admin')) {
+                $userPermissions = $user->getAllPermissions()->pluck('name')->toArray();
+                $q->whereIn('name', $userPermissions);
+            }
+        }]);
+
+        $modules = $query->get()->filter(function($module) {
+            return $module->permissions->isNotEmpty();
+        });
+
+        return $modules;
+    }
+
+    private function verifyPermissionOwnership($requestedPermissions)
+    {
+        if (empty($requestedPermissions)) return;
+        if (Auth::user()->hasRole('Super Admin')) return;
+
+        $userPermissions = Auth::user()->getAllPermissions()->pluck('name')->toArray();
+        
+        foreach ($requestedPermissions as $perm) {
+            if (!in_array($perm, $userPermissions)) {
+                abort(403, __('roles.messages.unauthorized_assignment', ['perm' => $perm]));
+            }
+        }
     }
 }

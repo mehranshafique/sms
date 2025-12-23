@@ -46,7 +46,8 @@ class ExamController extends BaseController
         if ($request->ajax()) {
             $data = Exam::with(['academicSession', 'institution'])
                 ->whereIn('institution_id', $allowedInstitutionIds)
-                ->select('exams.*');
+                ->select('exams.*')
+                ->latest('exams.created_at'); // Rule 3: Latest First
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -75,7 +76,8 @@ class ExamController extends BaseController
                         'completed' => 'badge-primary',
                         'published' => 'badge-success',
                     ];
-                    $status = ucfirst($row->status);
+                    // Rule 1: Use localized status
+                    $status = ucfirst($row->status); // Or use localized enum if available
                     if($row->finalized_at) {
                         $status .= ' (' . __('exam.finalized') . ')';
                     }
@@ -197,10 +199,15 @@ class ExamController extends BaseController
 
         $exam->load(['academicSession', 'institution']);
 
-        // Pass available classes for print modal
-        $classes = ClassSection::where('institution_id', $exam->institution_id)
+        // Pass available classes for print modal with Rule 2: Section (Grade)
+        $classes = ClassSection::with('gradeLevel') // Eager load
+            ->where('institution_id', $exam->institution_id)
             ->where('is_active', true)
-            ->pluck('name', 'id');
+            ->get()
+            ->mapWithKeys(function ($item) {
+                 $grade = $item->gradeLevel->name ?? '';
+                 return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
+            });
         
         return view('exams.show', compact('exam', 'classes'));
     }

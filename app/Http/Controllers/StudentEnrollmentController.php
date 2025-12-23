@@ -31,8 +31,9 @@ class StudentEnrollmentController extends BaseController
         $currentSession = $querySession->where('is_current', true)->first();
 
         if ($request->ajax()) {
-            $data = StudentEnrollment::with(['student', 'classSection', 'gradeLevel'])
-                ->select('student_enrollments.*');
+            $data = StudentEnrollment::with(['student', 'classSection.gradeLevel', 'gradeLevel'])
+                ->select('student_enrollments.*')
+                ->latest('student_enrollments.created_at'); // Rule 3: Latest First
 
             if ($institutionId) {
                 $data->where('student_enrollments.institution_id', $institutionId);
@@ -64,7 +65,9 @@ class StudentEnrollmentController extends BaseController
                     return $row->student->admission_number ?? 'N/A';
                 })
                 ->addColumn('class', function($row){
-                    return $row->classSection->name ?? 'N/A';
+                    // Rule 2: Section (Grade)
+                    $grade = $row->classSection->gradeLevel->name ?? '';
+                    return ($row->classSection->name ?? 'N/A') . ($grade ? ' (' . $grade . ')' : '');
                 })
                 ->editColumn('status', function($row){
                     $badges = [
@@ -91,11 +94,15 @@ class StudentEnrollmentController extends BaseController
                 ->make(true);
         }
 
-        $classSectionsQuery = ClassSection::query();
+        // Dropdown Filter: Rule 2 Applied
+        $classSectionsQuery = ClassSection::with('gradeLevel');
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
         }
-        $classSections = $classSectionsQuery->pluck('name', 'id');
+        $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) {
+             $grade = $item->gradeLevel->name ?? '';
+             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
+        });
         
         $sessionName = $currentSession ? $currentSession->name : __('enrollment.no_active_session');
 
@@ -106,12 +113,13 @@ class StudentEnrollmentController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
+        // Rule 2: Class Name with Grade
         $classesQuery = ClassSection::with(['gradeLevel', 'institution']);
         if ($institutionId) {
             $classesQuery->where('institution_id', $institutionId);
         }
         $classes = $classesQuery->get()->mapWithKeys(function($item) use ($institutionId){
-            $label = $item->name . ' (' . $item->gradeLevel->name . ')';
+            $label = $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')';
             if (!$institutionId && $item->institution) {
                 $label .= ' - ' . $item->institution->code;
             }
@@ -126,8 +134,6 @@ class StudentEnrollmentController extends BaseController
         
         $sessionId = $currentSession ? $currentSession->id : 0;
 
-        // Fetch students NOT currently enrolled in the *active* session
-        // This is the logic for "Re-Enrollment": Find existing student -> Add to new session
         $studentsQuery = Student::whereDoesntHave('enrollments', function($q) use ($sessionId) {
             $q->where('academic_session_id', $sessionId);
         });
@@ -174,7 +180,6 @@ class StudentEnrollmentController extends BaseController
             'student_id'       => [
                 'required', 
                 'exists:students,id',
-                // Enforce: One enrollment per session per student
                 Rule::unique('student_enrollments')->where(function ($query) use ($currentSession) {
                     return $query->where('academic_session_id', $currentSession->id);
                 })
@@ -212,7 +217,7 @@ class StudentEnrollmentController extends BaseController
             $classesQuery->where('institution_id', $institutionId);
         }
         $classes = $classesQuery->get()->mapWithKeys(function($item){
-            return [$item->id => $item->name . ' (' . $item->gradeLevel->name . ')'];
+            return [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')'];
         });
 
         $students = [$enrollment->student_id => $enrollment->student->full_name];

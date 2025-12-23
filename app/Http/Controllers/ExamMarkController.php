@@ -32,8 +32,8 @@ class ExamMarkController extends BaseController
         }
         $exams = $examsQuery->pluck('name', 'id');
 
-        // 2. Fetch Classes
-        $classesQuery = ClassSection::query();
+        // 2. Fetch Classes (Rule 2: Show Section + Grade)
+        $classesQuery = ClassSection::with('gradeLevel');
         if ($institutionId) {
             $classesQuery->where('institution_id', $institutionId);
         }
@@ -56,7 +56,11 @@ class ExamMarkController extends BaseController
              }
         }
         
-        $classes = $classesQuery->pluck('name', 'id');
+        // Rule 2 Applied here using mapWithKeys
+        $classes = $classesQuery->get()->mapWithKeys(function($item) {
+             $grade = $item->gradeLevel->name ?? '';
+             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
+        });
 
         $subjects = [];
         $students = [];
@@ -73,25 +77,18 @@ class ExamMarkController extends BaseController
                      if (Auth::user()->staff) {
                          $staffId = Auth::user()->staff->id;
                          
-                         // Get subject IDs from timetable where this teacher is assigned to this class
                          $allowedSubjectIds = Timetable::where('class_section_id', $selectedClass->id)
-                            ->where('teacher_id', $staffId) // Correct column
+                            ->where('teacher_id', $staffId)
                             ->pluck('subject_id')
                             ->unique()
                             ->toArray();
                          
                          if(empty($allowedSubjectIds)) {
-                             // If not in timetable, check if they are the class teacher (optional override)
-                             // Usually class teachers oversee all, but strict mode implies timetable only.
-                             // Uncomment below line to allow class teacher all subjects:
-                             // if($selectedClass->staff_id != $staffId) {
                                  $subjectsQuery->whereIn('id', []); // Force empty result
-                             // }
                          } else {
                              $subjectsQuery->whereIn('id', $allowedSubjectIds);
                          }
                      } else {
-                         // Teacher without profile sees nothing
                          $subjectsQuery->whereIn('id', []);
                      }
                  }
@@ -131,7 +128,14 @@ class ExamMarkController extends BaseController
     {
         if(!$request->exam_id) return response()->json([]);
         $classes = $this->fetchClassesForExam($request->exam_id);
-        return response()->json($classes->pluck('name', 'id'));
+        
+        // Rule 2: Section (Grade)
+        $formattedClasses = $classes->mapWithKeys(function($item) {
+             $grade = $item->gradeLevel->name ?? '';
+             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
+        });
+
+        return response()->json($formattedClasses);
     }
 
     public function getSubjects(Request $request)
@@ -148,7 +152,8 @@ class ExamMarkController extends BaseController
         $exam = Exam::find($examId);
         if(!$exam) return collect();
 
-        $query = ClassSection::where('institution_id', $exam->institution_id)
+        $query = ClassSection::with('gradeLevel') // Rule 2 dependency
+                             ->where('institution_id', $exam->institution_id)
                              ->where('is_active', true);
 
         $user = Auth::user();
@@ -182,15 +187,13 @@ class ExamMarkController extends BaseController
             if ($user->staff) {
                 $staffId = $user->staff->id;
                 
-                // Filter subjects based on timetable assignment
                 $validSubjectIds = Timetable::where('class_section_id', $classId)
-                    ->where('teacher_id', $staffId) // Correct column
+                    ->where('teacher_id', $staffId) 
                     ->pluck('subject_id')
                     ->unique()
                     ->toArray();
                 
                 if (empty($validSubjectIds)) {
-                     // Strict: return empty collection if not in timetable
                      return collect();
                 }
                     
@@ -237,7 +240,6 @@ class ExamMarkController extends BaseController
 
         $exam = Exam::findOrFail($request->exam_id);
         
-        // Ensure Exam is not finalized/published
         if (($exam->finalized_at || $exam->status == 'published') && !Auth::user()->hasRole(['Super Admin', 'Head Officer'])) {
              return response()->json(['message' => __('exam.messages.exam_finalized_error')], 403);
         }

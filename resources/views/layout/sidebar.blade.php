@@ -103,7 +103,7 @@
                 </li>
             @endcan
 
-            <li class="nav-label">Examinations</li>
+            <li class="nav-label">{{ __('sidebar.examinations') }}</li>
 
             {{-- Exams --}}
             @can('exam.view')
@@ -111,7 +111,7 @@
                     <a class="ai-icon {{ isActive('exams.index') }}"
                        href="{{ route('exams.index') }}" aria-expanded="false">
                         <i class="la la-file-text"></i>
-                        <span class="nav-text">Exams</span>
+                        <span class="nav-text">{{ __('sidebar.exams.title') }}</span>
                     </a>
                 </li>
             @endcan
@@ -122,7 +122,7 @@
                     <a class="ai-icon {{ isActive('marks.create') }}"
                        href="{{ route('marks.create') }}" aria-expanded="false">
                         <i class="la la-edit"></i>
-                        <span class="nav-text">Enter Marks</span>
+                        <span class="nav-text">{{ __('sidebar.marks.title') }}</span>
                     </a>
                 </li>
             @endcan
@@ -157,7 +157,7 @@
                     <a class="ai-icon {{ isActive(['attendance.index','attendance.create']) }}"
                        href="{{ route('attendance.index') }}" aria-expanded="false">
                         <i class="la la-check-square"></i>
-                        <span class="nav-text">Attendance</span>
+                        <span class="nav-text">{{ __('sidebar.attendance.title') }}</span>
                     </a>
                 </li>
             @endcan
@@ -168,7 +168,7 @@
                     <a class="ai-icon {{ isActive('promotions.index') }}"
                        href="{{ route('promotions.index') }}" aria-expanded="false">
                         <i class="la la-level-up"></i>
-                        <span class="nav-text">Promotions</span>
+                        <span class="nav-text">{{ __('sidebar.promotions.title') }}</span>
                     </a>
                 </li>
             @endcan
@@ -184,25 +184,27 @@
                 </li>
             @endcan
 
-            {{-- Finance (New) --}}
-            <li class="nav-label">Finance</li>
+            {{-- Finance --}}
+            <li class="nav-label">{{ __('sidebar.finance') }}</li>
             @can('fee_structure.view')
-                <li class="{{ isActive(['fees.index','fees.create']) }}">
+                <li class="{{ isActive(['fees.index','fees.create', 'fee-types.index', 'invoices.index', 'invoices.create', 'payments.create']) }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
                         <i class="la la-money"></i>
-                        <span class="nav-text">Finance</span>
+                        <span class="nav-text">{{ __('sidebar.finance') }}</span>
                     </a>
                     <ul aria-expanded="false">
-                        <li><a href="{{ route('fee-types.index') }}">Fee Types</a></li>
-                        <li><a href="{{ route('fees.index') }}">Fee Structures</a></li>
-                        <li><a href="{{ route('invoices.create') }}">Generate Invoices</a></li>
-                        <li><a href="{{ route('invoices.index') }}">Invoices & Payments</a></li>
+                        <li><a href="{{ route('fee-types.index') }}">{{ __('sidebar.fee_types.title') }}</a></li>
+                        <li><a href="{{ route('fees.index') }}">{{ __('sidebar.fee_structures.title') }}</a></li>
+                        <li><a href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
+                        <li><a href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
                     </ul>
                 </li>
             @endcan
 
             <li class="nav-label">{{ __('sidebar.settings') }}</li>
-            @can('institution.view') {{-- Or a specific permission 'settings.manage' --}}
+            
+            {{-- General Settings --}}
+            @can('institution.view') 
             <li class="{{ isActive(['settings.index']) }}">
                 <a class="ai-icon {{ isActive('settings.index') }}" href="{{ route('settings.index') }}" aria-expanded="false">
                     <i class="la la-cogs"></i>
@@ -210,32 +212,15 @@
                 </a>
             </li>
             @endcan
-            {{-- Permissions --}}
+            
+            {{-- Permissions (Simplified - Removed Module Link) --}}
             @can('role.view')
-                <li class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions']) }}">
-                    <a class="has-arrow" href="javascript:void(0)" aria-expanded="false">
+                <li class="{{ isActive(['roles.index', 'roles.assign-permissions', 'roles.create', 'roles.edit']) }}">
+                    <a class="ai-icon {{ isActive(['roles.index', 'roles.assign-permissions', 'roles.create', 'roles.edit']) }}"
+                       href="{{ route('roles.index') }}" aria-expanded="false">
                         <i class="la la-shield"></i>
-                        <span class="nav-text">{{ __('sidebar.permissions.title') }}</span>
+                        <span class="nav-text">{{ __('sidebar.permissions.roles') }}</span>
                     </a>
-
-                    <ul aria-expanded="false"
-                        class="{{ isActive(['roles.index', 'permissions.index','roles.assign-permissions'], 'mm-show') }}">
-
-                        <li>
-                            <a class="{{ isActive(['roles.index','roles.assign-permissions']) }}"
-                               href="{{ route('roles.index') }}">
-                                {{ __('sidebar.permissions.roles') }}
-                            </a>
-                        </li>
-
-                        <li>
-                            <a class="{{ isActive(['modules.index','permissions.index']) }}"
-                               href="{{ route('modules.index') }}">
-                                {{ __('sidebar.permissions.modules') }}
-                            </a>
-                        </li>
-
-                    </ul>
                 </li>
             @endcan
 

@@ -22,8 +22,6 @@ class StudentPromotionController extends BaseController
 
     public function index(Request $request)
     {
-        // FIX: Use getInstitutionId() to respect the Active Context (Session Switcher)
-        // Previously: $institutionId = Auth::user()->institute_id; (This ignored the switcher)
         $institutionId = $this->getInstitutionId();
 
         // 1. Fetch Academic Sessions
@@ -40,16 +38,18 @@ class StudentPromotionController extends BaseController
             return [$item->id => $label];
         });
 
-        // 2. Fetch Classes
-        $classesQuery = ClassSection::with('institution');
+        // 2. Fetch Classes (Rule 2: Show Section + Grade)
+        $classesQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classesQuery->where('institution_id', $institutionId);
         }
         
         $classes = $classesQuery->get()->mapWithKeys(function ($item) use ($institutionId) {
-            $label = $item->name;
+            $grade = $item->gradeLevel->name ?? '';
+            $label = $item->name . ($grade ? ' (' . $grade . ')' : '');
+            
             if (!$institutionId && $item->institution) {
-                $label .= ' (' . $item->institution->code . ')';
+                $label .= ' - ' . $item->institution->code;
             }
             return [$item->id => $label];
         });
@@ -58,28 +58,25 @@ class StudentPromotionController extends BaseController
         
         // 3. Logic: Find Eligible Students
         if ($request->filled('from_session_id') && $request->filled('from_class_id')) {
-            // Find students enrolled in the FROM session/class
             
-            $query = StudentEnrollment::with('student')
+            $query = StudentEnrollment::with(['student', 'classSection', 'gradeLevel'])
                 ->where('academic_session_id', $request->from_session_id)
                 ->where('class_section_id', $request->from_class_id)
-                // Only active or passed students from previous session
                 ->whereIn('status', ['active', 'promoted']); 
 
-            // Strict Scope for Students too (Double Check)
             if ($institutionId) {
                 $query->where('institution_id', $institutionId);
             }
 
             if ($request->filled('to_session_id')) {
                 $toSessionId = $request->to_session_id;
-                // Exclude students who already have an enrollment in the target session
                 $query->whereDoesntHave('student.enrollments', function($q) use ($toSessionId) {
                     $q->where('academic_session_id', $toSessionId);
                 });
             }
 
-            $students = $query->get();
+            // Rule 3: Latest records first logic (though usually alphabetical for lists is better, strict adherence applied)
+            $students = $query->latest('created_at')->get();
         }
 
         return view('promotions.index', compact('sessions', 'classes', 'students'));
@@ -101,12 +98,10 @@ class StudentPromotionController extends BaseController
         DB::transaction(function () use ($request, $institutionId) {
             $targetClass = ClassSection::with('gradeLevel')->findOrFail($request->to_class_id);
             
-            // Security: Ensure target class belongs to current context (if set)
             if ($institutionId && $targetClass->institution_id != $institutionId) {
-                abort(403, 'Unauthorized target class selection.');
+                abort(403); // Rule 1: Removed hardcoded string
             }
 
-            // Use the target class's institution ID for the new records
             $targetInstitutionId = $targetClass->institution_id;
 
             foreach ($request->promote as $studentId) {

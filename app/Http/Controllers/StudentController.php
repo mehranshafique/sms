@@ -12,8 +12,8 @@ use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
 use App\Services\IdGeneratorService;
 use App\Interfaces\SmsGatewayInterface;
-use App\Enums\UserType; // Import Enum
-use Spatie\Permission\Models\Role; // Import Role Model
+use App\Enums\UserType;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +38,8 @@ class StudentController extends BaseController
 
         if ($request->ajax()) {
             $data = Student::with(['institution', 'campus', 'gradeLevel'])
-                ->select('students.*');
+                ->select('students.*')
+                ->latest('students.created_at'); // Rule 3: Latest First
 
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
@@ -57,7 +58,7 @@ class StudentController extends BaseController
                     $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
                     $initial = strtoupper(substr($row->first_name, 0, 1));
                     $avatarHtml = $img ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
-                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">ID: '.$row->admission_number.'</span></div></div>';
+                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.$row->admission_number.'</span></div></div>';
                 })
                 ->addColumn('parent_info', function($row){
                     return '<div><i class="fa fa-user me-1"></i> '.$row->father_name.'</div><div class="text-muted"><i class="fa fa-phone me-1"></i> '.$row->father_phone.'</div>';
@@ -112,14 +113,21 @@ class StudentController extends BaseController
             return response()->json([]);
         }
 
-        $sections = ClassSection::where('grade_level_id', $gradeId)
+        $sectionsQuery = ClassSection::with('gradeLevel')
+            ->where('grade_level_id', $gradeId)
             ->where('is_active', true);
             
         if ($institutionId) {
-            $sections->where('institution_id', $institutionId);
+            $sectionsQuery->where('institution_id', $institutionId);
         }
         
-        return response()->json($sections->pluck('name', 'id'));
+        // Rule 2: Section (Grade)
+        $sections = $sectionsQuery->get()->mapWithKeys(function($item) {
+             $gradeName = $item->gradeLevel->name ?? '';
+             return [$item->id => $item->name . ($gradeName ? ' (' . $gradeName . ')' : '')];
+        });
+        
+        return response()->json($sections);
     }
 
     public function store(Request $request)
@@ -137,12 +145,12 @@ class StudentController extends BaseController
                 'exists:grade_levels,id',
                 function($attribute, $value, $fail) use ($institutionId) {
                     if ($institutionId && GradeLevel::where('id', $value)->where('institution_id', $institutionId)->doesntExist()) {
-                        $fail('Invalid grade level for the current institution.');
+                        $fail(__('student.invalid_grade_level'));
                     }
                 }
             ],
             'class_section_id' => 'nullable|exists:class_sections,id',
-            'email' => 'nullable|email|unique:users,email', // Check email uniqueness on USERS table
+            'email' => 'nullable|email|unique:users,email',
         ]);
 
         $data = $request->except(['_token', '_method']);
@@ -170,18 +178,15 @@ class StudentController extends BaseController
                 $user = User::create([
                     'name' => $request->first_name . ' ' . $request->last_name,
                     'email' => $request->email,
-                    'password' => Hash::make('Student123!'), // Default password
-                    'user_type' => UserType::STUDENT->value, // Use Enum
+                    'password' => Hash::make('Student123!'),
+                    'user_type' => UserType::STUDENT->value,
                     'institute_id' => $institutionId,
                     'is_active' => true,
                 ]);
                 
-                // Assign Role safely
                 $roleName = 'Student';
                 if (Role::where('name', $roleName)->where('guard_name', 'web')->exists()) {
                     $user->assignRole($roleName);
-                } else {
-                    \Log::warning("Role '$roleName' not found. Student user created without role.");
                 }
                 
                 $data['user_id'] = $user->id;
@@ -219,7 +224,7 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($institutionId && $student->institution_id != $institutionId) {
-            abort(403, 'This student does not belong to the active institution context.');
+            abort(403, __('student.unauthorized_access'));
         }
 
         $institutes = Institution::where('id', $student->institution_id)->pluck('name', 'id');
@@ -262,11 +267,9 @@ class StudentController extends BaseController
 
         $student->update($data);
         
-        // Sync User Record
         if($student->user_id) {
             $userLink = User::find($student->user_id);
             if($userLink) {
-                // Ensure role is assigned if missing
                 if (!$userLink->hasRole('Student')) {
                     if (Role::where('name', 'Student')->exists()) {
                         $userLink->assignRole('Student');

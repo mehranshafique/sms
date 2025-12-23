@@ -40,12 +40,20 @@ return [
     'upload' => 'Upload',
     'select_role' => 'Select Role',
     
+    // Form Labels (Fixed Missing Keys)
+    'email' => 'Email Address',
+    'phone' => 'Phone Number',
+    'password' => 'Password',
+    'address' => 'Physical Address',
+    
+    // Placeholders
     'enter_name' => 'Enter Full Name',
     'enter_email' => 'Enter Email Address',
     'enter_phone' => 'Enter Phone Number',
     'enter_address' => 'Enter Physical Address',
     'enter_password' => 'Enter Password',
     'leave_blank_to_keep_current' => 'Leave blank to keep current password',
+    
     'select_institutes' => 'Select Institutes',
     'status' => 'Status',
     'active' => 'Active',
@@ -58,6 +66,7 @@ return [
     'account_status' => 'Account Status',
     'joined_date' => 'Joined Date',
     'no_institutes_assigned' => 'No institutes assigned yet.',
+    'call' => 'Call',
 
     // Buttons
     'save' => 'Save Officer',

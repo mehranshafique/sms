@@ -5,36 +5,43 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use App\Models\Module;
-//use App\Models\Permission;
 use Spatie\Permission\Models\Permission;
 
-use App\Http\Controllers\BaseController;
 class RolePermissionController extends BaseController
 {
-    public  function __construct(){
-        parent::__construct();
-        $this->setPageTitle(__('modules.role_permissions_page_title'));
+    public function __construct()
+    {
+        $this->setPageTitle(__('roles.role_permissions_page_title'));
     }
-    // Show assignment page
+
+    /**
+     * Show the form for editing permissions of a specific role.
+     * Note: This is also covered in RolesController@edit.
+     */
     public function edit(Role $role)
     {
         $modules = Module::with('permissions')->get();
-        $rolePermissions = $role->permissions()->pluck('id')->toArray();
-//        return view('permissions.index');
-        return view('permissions.roles.assign-permissions', compact('role', 'modules', 'rolePermissions'));
+        $rolePermissions = $role->permissions()->pluck('name')->toArray(); // Changed to pluck 'name' to match view logic
+
+        return view('roles.edit', compact('role', 'modules', 'rolePermissions'));
     }
 
-    // Assign permissions to role
+    /**
+     * Update permissions for a specific role.
+     */
     public function update(Request $request, Role $role)
     {
         $request->validate([
-            'permissions' => 'array'
+            'permissions' => 'array',
+            'permissions.*' => 'exists:permissions,name'
         ]);
-        $permissions = Permission::whereIn('id', $request->permissions ?? [])->pluck('name')->toArray();
-        $role->syncPermissions($permissions);
 
-//        $role->syncPermissions($request->permissions ?? []);
+        if($role->name === 'Super Admin') {
+             // Optional: prevent removing perms from Super Admin
+        }
 
-        return redirect()->route('roles.index')->with('success', __('modules.permission_messages.permission_assigned_successfully'));
+        $role->syncPermissions($request->permissions ?? []);
+
+        return redirect()->route('roles.index')->with('success', __('roles.messages.permission_assigned_successfully'));
     }
 }

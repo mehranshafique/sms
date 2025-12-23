@@ -43,25 +43,15 @@
                                 </select>
                             </div>
 
-                            {{-- Role Selection --}}
-                            <div class="mb-3 col-md-6">
-                                <label class="form-label">{{ __('head_officers.role') }} <span class="text-danger">*</span></label>
-                                <select name="role" class="form-control default-select" required>
-                                    <option value="">{{ __('head_officers.select_role') }}</option>
-                                    @if(isset($roles))
-                                        @foreach($roles as $role)
-                                            <option value="{{ $role->name }}" {{ (isset($head_officer) && $head_officer->hasRole($role->name)) ? 'selected' : '' }}>{{ $role->name }}</option>
-                                        @endforeach
-                                    @endif
-                                </select>
-                            </div>
-
+                            {{-- Role Selection (DISABLED/HIDDEN) --}}
+                            {{-- Auto-assigning 'Head Officer' role --}}
+                            <input type="hidden" name="role" value="Head Officer">
+                            
                             {{-- Institute Assignment (Select2 Multi) --}}
-                            <div class="mb-3 col-md-6">
+                            <div class="mb-3 col-md-12"> {{-- Expanded to full width since role is hidden --}}
                                 <label class="form-label">{{ __('head_officers.select_institutes') }}</label>
                                 <select name="institute_ids[]" class="form-control multi-select" multiple="multiple">
-                                
-                                @if(isset($institutes) && count($institutes) > 0)
+                                    @if(isset($institutes) && count($institutes) > 0)
                                         @foreach($institutes as $id => $name)
                                             <option value="{{ $id }}" {{ (isset($assignedIds) && in_array($id, $assignedIds)) ? 'selected' : '' }}>{{ $name }}</option>
                                         @endforeach

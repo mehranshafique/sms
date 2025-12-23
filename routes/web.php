@@ -22,7 +22,11 @@ use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
 use App\Http\Controllers\StudentPromotionController;
+// Finance Controllers
+use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
+use App\Http\Controllers\Finance\InvoiceController;
+use App\Http\Controllers\Finance\PaymentController;
 
 Route::redirect('/','/login' );
 
@@ -143,18 +147,24 @@ Route::middleware('auth')->group(function () {
     });
     
     // Finance Module
+    // =========================================================================
+    // FINANCE MODULE (Merged into web.php)
+    // =========================================================================
     Route::prefix('finance')->group(function () {
-        Route::resource('fee-types', \App\Http\Controllers\Finance\FeeTypeController::class);
+        Route::resource('fee-types', FeeTypeController::class);
         Route::resource('fees', FeeStructureController::class);
         
         // Invoices
-        Route::get('invoices/get-students', [\App\Http\Controllers\Finance\InvoiceController::class, 'getStudents'])->name('invoices.get_students');
-        Route::get('invoices/{invoice}/print', [\App\Http\Controllers\Finance\InvoiceController::class, 'print'])->name('invoices.print');
-        Route::get('invoices/{invoice}/download', [\App\Http\Controllers\Finance\InvoiceController::class, 'downloadPdf'])->name('invoices.download');
-        Route::resource('invoices', \App\Http\Controllers\Finance\InvoiceController::class);
+        // IMPORTANT: AJAX/Specific routes MUST come before the resource route
+        Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
+        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoices.download');
+        
+        Route::resource('invoices', InvoiceController::class);
+        
         // Payments
-        Route::get('payments/create', [\App\Http\Controllers\Finance\PaymentController::class, 'create'])->name('payments.create');
-        Route::post('payments', [\App\Http\Controllers\Finance\PaymentController::class, 'store'])->name('payments.store');
+        Route::get('payments/create', [PaymentController::class, 'create'])->name('payments.create');
+        Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
     });
 });
 

@@ -6,6 +6,7 @@ return [
         'success_create' => 'Role created successfully.',
         'success_update' => 'Role updated successfully.',
         'success_delete' => 'Role deleted successfully.',
+        'unauthorized_assignment' => 'You are not authorized to assign the permission: :perm',
     ],
     'role_management' => 'Role Management',
     'manage_list_subtitle' => 'Manage system roles and permissions',
@@ -34,6 +35,7 @@ return [
     'update_role_details' => 'Update role name and permissions',
     'save_role' => 'Save Role',
     'update_role' => 'Update Role',
+    'no_permissions_available' => 'No permissions available to assign.',
 
     // Buttons
     'export' => 'Export',
@@ -50,4 +52,6 @@ return [
     'are_you_sure' => 'Are you sure?',
     'delete_warning' => 'This action cannot be undone!',
     'cannot_delete_super_admin' => 'The Super Admin role cannot be deleted.',
+    'cannot_edit_super_admin_name' => 'The Super Admin role name cannot be changed.',
+    'cannot_delete_system_role' => 'System roles cannot be deleted.',
 ];

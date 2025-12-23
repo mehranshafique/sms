@@ -27,16 +27,24 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function(){
-        // Initialize Select2 for the multi-select dropdown
-        $('.multi-select').select2({
-            placeholder: "{{ __('head_officers.select_institutes') }}",
-            allowClear: true,
-            width: '100%'
-        });
+        // FIX: Use 'selectpicker' instead of 'select2'
+        if(jQuery().selectpicker) {
+            $('.multi-select').selectpicker({
+                noneSelectedText: "{{ __('head_officers.select_institutes') }}",
+                liveSearch: true,
+                width: '100%'
+            });
+        }
 
         $('#officerForm').submit(function(e){
             e.preventDefault();
+            
+            // UI Feedback
+            let $btn = $(this).find('button[type="submit"]');
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Processing...');
+
             let formData = new FormData(this);
+            
             $.ajax({
                 url: $(this).attr('action'),
                 type: "POST", // _method handled inside form for PUT
@@ -54,6 +62,8 @@
                     });
                 },
                 error: function(xhr){
+                    $btn.prop('disabled', false).text('Update'); // Reset button
+                    
                     let msg = '{{ __("head_officers.error_occurred") }}';
                     if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
                     if(xhr.responseJSON && xhr.responseJSON.errors) {

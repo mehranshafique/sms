@@ -29,8 +29,9 @@ class StudentAttendanceController extends BaseController
         $institutionId = Auth::user()->institute_id;
 
         if ($request->ajax()) {
-            $data = StudentAttendance::with(['student', 'classSection'])
-                ->select('student_attendances.*');
+            $data = StudentAttendance::with(['student', 'classSection.gradeLevel'])
+                ->select('student_attendances.*')
+                ->latest('student_attendances.created_at'); // Rule 3: Latest First
 
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
@@ -52,7 +53,9 @@ class StudentAttendanceController extends BaseController
                     return $row->student->admission_number; 
                 })
                 ->addColumn('class', function($row){
-                    return $row->classSection->name;
+                    // Rule 2: Section (Grade)
+                    $grade = $row->classSection->gradeLevel->name ?? '';
+                    return $row->classSection->name . ($grade ? ' (' . $grade . ')' : '');
                 })
                 ->editColumn('status', function($row){
                     $badges = [
@@ -72,13 +75,16 @@ class StudentAttendanceController extends BaseController
                 ->make(true);
         }
 
-        $classSectionsQuery = ClassSection::with('institution');
+        // Rule 2: Dropdown formatting
+        $classSectionsQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
         }
         
         $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) use ($institutionId) {
-            $label = $item->name;
+            $grade = $item->gradeLevel->name ?? '';
+            $label = $item->name . ($grade ? ' (' . $grade . ')' : '');
+            
             if (!$institutionId && $item->institution) {
                 $label .= ' (' . $item->institution->code . ')';
             }
@@ -95,12 +101,15 @@ class StudentAttendanceController extends BaseController
     {
         $institutionId = Auth::user()->institute_id;
 
-        // Dropdown Data
-        $classSectionsQuery = ClassSection::with('institution');
+        // Rule 2: Dropdown formatting
+        $classSectionsQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
         }
-        $classSections = $classSectionsQuery->get()->mapWithKeys(fn($item) => [$item->id => $item->name]);
+        $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) {
+             $grade = $item->gradeLevel->name ?? '';
+             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
+        });
 
         $students = [];
         $attendanceMap = [];
@@ -138,13 +147,16 @@ class StudentAttendanceController extends BaseController
     {
         $institutionId = Auth::user()->institute_id;
         
-        $classSectionsQuery = ClassSection::with('institution');
+        // Rule 2: Dropdown formatting
+        $classSectionsQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
         }
         
         $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) use ($institutionId) {
-            $label = $item->name;
+            $grade = $item->gradeLevel->name ?? '';
+            $label = $item->name . ($grade ? ' (' . $grade . ')' : '');
+            
             if (!$institutionId && $item->institution) {
                 $label .= ' (' . $item->institution->code . ')';
             }
