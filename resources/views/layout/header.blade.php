@@ -53,10 +53,6 @@
             padding: 6px;
             font-size: 22px;
         }
-        .language-select {
-            width: 140px;
-            padding-left: 30px;
-        }
 
         /* Button Processing State */
         .btn { position: relative; transition: all 0.2s ease-in-out; }
@@ -75,6 +71,19 @@
             justify-content: center; 
             font-weight: bold;
             font-size: 14px;
+        }
+
+        /* School Switcher Search */
+        .school-search-container {
+            padding: 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        .school-search-input {
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            padding: 5px 15px;
+            width: 100%;
         }
     </style>
 </head>
@@ -132,16 +141,17 @@
 
                         <ul class="navbar-nav header-right">
                             
-                            {{-- 1. Institution Context Switcher --}}
+                            {{-- 1. Institution Context Switcher (Updated: Icon Only + Search + Global) --}}
                             @php
                                 $user = Auth::user();
                                 $showSwitcher = false;
                                 $activeInstitutionName = 'Select Institute';
                                 $allowedInstitutions = collect();
+                                $isActiveGlobal = session('active_institution_id') === 'global';
 
                                 if ($user) {
                                     if ($user->hasRole('Super Admin')) {
-                                        $allowedInstitutions = \App\Models\Institution::select('id', 'name', 'code')->get();
+                                        $allowedInstitutions = \App\Models\Institution::select('id', 'name', 'code')->orderBy('name')->get();
                                         $showSwitcher = true;
                                     } elseif ($user->institutes->count() > 0) {
                                         $allowedInstitutions = $user->institutes;
@@ -151,60 +161,84 @@
                                     }
                                     
                                     $activeId = session('active_institution_id', $user->institute_id);
-                                    if($activeId) {
+                                    if ($activeId && $activeId !== 'global') {
                                         $activeInst = $allowedInstitutions->where('id', $activeId)->first();
                                         if (!$activeInst && $user->institute) $activeInst = $user->institute;
                                         if ($activeInst) {
                                             $activeInstitutionName = $activeInst->name;
                                         }
                                     }
+                                    
+                                    if($isActiveGlobal) {
+                                        $activeInstitutionName = 'Global View';
+                                    }
                                 }
                             @endphp
 
                             @if($showSwitcher)
                             <li class="nav-item dropdown notification_dropdown">
-                                <a class="nav-link bell ai-icon bg-primary text-white rounded px-3" href="#" role="button" data-bs-toggle="dropdown">
-                                    <i class="fa fa-university me-2"></i>
-                                    <span class="font-w600 d-none d-md-inline">{{ \Illuminate\Support\Str::limit($activeInstitutionName, 15) }}</span>
-                                    <i class="fa fa-caret-down ms-2"></i>
+                                {{-- Trigger: Icon Only (Mobile Friendly) --}}
+                                <a class="nav-link bell ai-icon {{ $isActiveGlobal ? 'bg-dark text-white' : 'bg-primary text-white' }} rounded" href="#" role="button" data-bs-toggle="dropdown" title="{{ $activeInstitutionName }}">
+                                    <i class="fa fa-university"></i>
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end">
-                                    <div id="DZ_W_Notification1" class="widget-media dz-scroll p-3" style="height:auto; max-height:380px; overflow-y:auto;">
-                                        <ul class="timeline">
+                                
+                                <div class="dropdown-menu dropdown-menu-end p-0" style="min-width: 320px; overflow: hidden;">
+                                    
+                                    {{-- 1. Search Bar --}}
+                                    <div class="school-search-container">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text border-0 bg-transparent ps-1"><i class="fa fa-search text-muted"></i></span>
+                                            <input type="text" id="schoolSearchInput" class="form-control border-0 bg-transparent" placeholder="Search school...">
+                                        </div>
+                                    </div>
+
+                                    {{-- 2. Global View Option (Super Admin) --}}
+                                    @if($user->hasRole('Super Admin'))
+                                        <a href="{{ route('institution.switch', 'global') }}" class="dropdown-item py-2 border-bottom {{ $isActiveGlobal ? 'bg-light text-primary fw-bold' : '' }}">
+                                            <i class="fa fa-globe me-2 text-info"></i> Global Dashboard
+                                        </a>
+                                    @endif
+                                    
+                                    {{-- 3. Scrollable List --}}
+                                    <div id="schoolListContainer" class="widget-media dz-scroll" style="height:auto; max-height:350px; overflow-y:auto;">
+                                        <ul class="timeline p-3" id="schoolTimeline">
                                             @foreach($allowedInstitutions as $inst)
-                                                <li>
-                                                    <div class="timeline-panel">
+                                                <li class="school-item">
+                                                    <div class="timeline-panel p-2 rounded hover-bg-light">
                                                         <div class="media-body">
-                                                            <h6 class="mb-1">
-                                                                <a href="{{ route('institution.switch', $inst->id) }}" class="{{ session('active_institution_id') == $inst->id ? 'text-primary fw-bold' : 'text-dark' }}">
+                                                            <h6 class="mb-0">
+                                                                <a href="{{ route('institution.switch', $inst->id) }}" class="stretched-link text-decoration-none {{ session('active_institution_id') == $inst->id ? 'text-primary fw-bold' : 'text-dark' }} school-name">
                                                                     {{ $inst->name }}
                                                                 </a>
                                                             </h6>
-                                                            <small class="d-block text-muted">{{ $inst->code }}</small>
+                                                            <small class="d-block text-muted school-code fs-11">{{ $inst->code }}</small>
                                                         </div>
                                                         @if(session('active_institution_id') == $inst->id)
-                                                            <i class="fa fa-check-circle text-success fs-18"></i>
+                                                            <i class="fa fa-check-circle text-success fs-18 ms-2"></i>
                                                         @endif
                                                     </div>
                                                 </li>
                                             @endforeach
+                                            <li id="noSchoolFound" class="text-center text-muted py-3" style="display: none;">No school found</li>
                                         </ul>
                                     </div>
                                 </div>
                             </li>
                             @endif
 
-                            {{-- 2. Language Selector --}}
+                            {{-- 2. Language Selector (Fixed: Icon Only Dropdown) --}}
 							<li class="nav-item dropdown notification_dropdown">
-                               <form action="{{ url('/change-language') }}" method="GET">
-                                    <div class="d-flex position-relative">
-                                        <i class="text-muted fas fa-globe word-icon position-absolute" style="top: 7px; left: 8px;"></i>
-                                        <select name="language" onchange="this.form.submit()" class="form-control form-control-sm language-select" style="width: 130px; height: 40px; padding-left: 35px;">
-                                            <option value="en" {{ app()->getLocale() === 'en' ? 'selected' : '' }}>English</option>
-                                            <option value="fr" {{ app()->getLocale() === 'fr' ? 'selected' : '' }}>Français</option>
-                                        </select>
-                                    </div>
-                                </form>
+                                <a class="nav-link bell ai-icon text-muted" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-globe"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a href="{{ url('/change-language?language=en') }}" class="dropdown-item {{ app()->getLocale() === 'en' ? 'active' : '' }}">
+                                        <span class="ms-2">English</span>
+                                    </a>
+                                    <a href="{{ url('/change-language?language=fr') }}" class="dropdown-item {{ app()->getLocale() === 'fr' ? 'active' : '' }}">
+                                        <span class="ms-2">Français</span>
+                                    </a>
+                                </div>
 							</li>
                             
                             {{-- 3. Theme Toggle --}}
@@ -269,3 +303,30 @@
                 </nav>
             </div>
         </div>
+
+        {{-- INLINE SCRIPT FOR SEARCH --}}
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const searchInput = document.getElementById('schoolSearchInput');
+                if(searchInput){
+                    searchInput.addEventListener('keyup', function(e) {
+                        const term = e.target.value.toLowerCase();
+                        const items = document.querySelectorAll('.school-item');
+                        let hasVisible = false;
+
+                        items.forEach(item => {
+                            const name = item.querySelector('.school-name').innerText.toLowerCase();
+                            const code = item.querySelector('.school-code').innerText.toLowerCase();
+                            if(name.includes(term) || code.includes(term)) {
+                                item.style.display = 'block';
+                                hasVisible = true;
+                            } else {
+                                item.style.display = 'none';
+                            }
+                        });
+
+                        document.getElementById('noSchoolFound').style.display = hasVisible ? 'none' : 'block';
+                    });
+                }
+            });
+        </script>

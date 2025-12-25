@@ -35,13 +35,25 @@
                 <div class="card-body">
                     <div class="row">
                         @forelse($modules as $module)
+                            @php
+                                $isDisabled = !$module->is_subscribed;
+                                $opacity = $isDisabled ? '0.6' : '1';
+                                $badge = $isDisabled ? '<span class="badge badge-xs badge-danger ms-2">Inactive</span>' : '';
+                            @endphp
                             <div class="col-md-6 col-lg-4 mb-4">
-                                <div class="border rounded h-100 shadow-sm">
+                                <div class="border rounded h-100 shadow-sm" style="opacity: {{ $opacity }};">
                                     {{-- Module Header with Select All --}}
                                     <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
-                                        <h5 class="mb-0 text-primary fw-bold text-uppercase fs-14">{{ $module->name }}</h5>
+                                        <div class="d-flex align-items-center">
+                                            <h5 class="mb-0 text-primary fw-bold text-uppercase fs-14">{{ $module->name }}</h5>
+                                            {!! $badge !!}
+                                        </div>
                                         <div class="form-check custom-checkbox">
-                                            <input type="checkbox" class="form-check-input module-check" id="mod_check_{{ $module->id }}" data-module-id="{{ $module->id }}">
+                                            <input type="checkbox" 
+                                                   class="form-check-input module-check" 
+                                                   id="mod_check_{{ $module->id }}" 
+                                                   data-module-id="{{ $module->id }}"
+                                                   {{ $isDisabled ? 'disabled' : '' }}>
                                             <label class="form-check-label" for="mod_check_{{ $module->id }}"></label>
                                         </div>
                                     </div>
@@ -55,9 +67,9 @@
                                                        value="{{ $permission->name }}" 
                                                        class="form-check-input permission-checkbox module-{{ $module->id }}" 
                                                        id="perm_{{ $permission->id }}"
-                                                       {{ (isset($rolePermissions) && in_array($permission->name, $rolePermissions)) ? 'checked' : '' }}>
+                                                       {{ (isset($rolePermissions) && in_array($permission->name, $rolePermissions)) ? 'checked' : '' }}
+                                                       {{ $isDisabled ? 'disabled' : '' }}>
                                                 <label class="form-check-label" for="perm_{{ $permission->id }}">
-                                                    {{-- Basic format cleanup if needed --}}
                                                     {{ ucfirst(last(explode('.', $permission->name))) }}
                                                 </label>
                                             </div>

@@ -21,7 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-
+            // ADD THIS LINE HERE:
+            \App\Http\Middleware\LoadInstitutionSettings::class, 
+            \App\Http\Middleware\CheckSubscription::class, 
+            // \App\Http\Middleware\CheckModuleAccess::class,
             // Your locale middleware (language switch)
             SetLocale::class,
         ]);

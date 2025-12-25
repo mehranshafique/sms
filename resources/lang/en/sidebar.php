@@ -5,75 +5,108 @@ return [
     'dashboard' => [
         'title' => 'Dashboard',
     ],
-    'institutes' => [
-        'title' => 'Institutes',
-    ],
-    'campuses' => [
-        'title' => 'Campuses',
-    ],
-    'header_officers' => [
-        'title' => 'Head Officers',
-    ],
+    
+    // Main Admin Keys
+    'main_admin' => 'Main Admin',
+    'reporting' => 'Reporting',
+    'creation' => 'Creation',
+    'institution_creation' => 'Institution Creation',
+    'headoff_creation' => 'HeadOff Creation',
+    'sms_whatsapp_mail' => 'SMS/Whatsapp/Mail',
+    
+    'management' => 'Management',
+    'institution_mgmt' => 'Institution Mgmt',
+    'all_institutions' => 'All Institutions',
+    'expired_institution' => 'Expired Institution',
+    'module_activated' => 'Module Activated',
+    
+    'configuration' => 'Configuration',
+    'system_config' => 'System Config',
+    'smtp' => 'SMTP',
+    'id_sender_sms' => 'ID Sender SMS',
+    'school_year' => 'School Year',
+    'modules' => 'Modules',
+    'recharging' => 'Recharging',
+    
+    'tracking' => 'Tracking',
+    'audit_log' => 'Audit Log',
+    
+    'finance' => 'Finance',
+    'billing' => 'Billing',
+    'billing_requests' => 'Billing Requests',
+    'status_billing' => 'Status Billing',
+    
+    'event' => 'Event',
+    'vote_election' => 'Vote Election',
+    
+    'communication' => 'Communication',
+    'system_alerts' => 'System Alerts',
+    'global_announcements' => 'Global Announcements',
+    'maintenance_notice' => 'Maintenance Notice',
+
+    // School Admin Keys
     'academics' => 'Academics',
     'sessions' => [
-        'title' => 'Academic Sessions',
+        'title' => 'Sessions'
     ],
     'grade_levels' => [
-        'title' => 'Grade Levels',
+        'title' => 'Grades'
     ],
     'class_sections' => [
-        'title' => 'Class Sections',
+        'title' => 'Classes'
     ],
     'subjects' => [
-        'title' => 'Subjects',
+        'title' => 'Subjects'
     ],
     'timetables' => [
-        'title' => 'Routine',
+        'title' => 'Timetables'
     ],
-    
-    // Examinations
     'examinations' => 'Examinations',
     'exams' => [
-        'title' => 'Exams',
+        'title' => 'Exams'
     ],
     'marks' => [
-        'title' => 'Enter Marks',
+        'title' => 'Marks'
     ],
-
     'people' => 'People',
     'students' => [
-        'title' => 'Students',
+        'title' => 'Students'
     ],
     'enrollments' => [
-        'title' => 'Class Enrollments',
+        'title' => 'Enrollments'
     ],
     'attendance' => [
-        'title' => 'Attendance',
-    ],
-    'promotions' => [
-        'title' => 'Promotions',
+        'title' => 'Attendance'
     ],
     'staff' => [
-        'title' => 'Staff',
+        'title' => 'Staff'
     ],
-    
-    // Finance
-    'finance' => 'Finance',
     'fee_types' => [
-        'title' => 'Fee Types',
+        'title' => 'Fee Types'
     ],
     'fee_structures' => [
-        'title' => 'Fee Structures',
+        'title' => 'Fee Structure'
     ],
     'invoices' => [
-        'generate' => 'Generate Invoices',
-        'list' => 'Invoices & Payments',
+        'generate' => 'Generate Invoice',
+        'list' => 'Invoice List'
     ],
-
     'settings' => 'Settings',
     'permissions' => [
-        'title' => 'Roles & Permissions',
         'roles' => 'Roles',
         'modules' => 'Modules',
+        'title' => 'Permissions'
     ],
+    'institutes' => [
+        'title' => 'Institutes'
+    ],
+    'campuses' => [
+        'title' => 'Campuses'
+    ],
+    'header_officers' => [
+        'title' => 'Head Officers'
+    ],
+    'promotions' => [
+        'title' => 'Promotions'
+    ]
 ];

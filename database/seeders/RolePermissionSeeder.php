@@ -4,127 +4,149 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
-use App\Models\Permission; // Updated to use your Custom Permission Model
+use App\Models\Permission; 
 use App\Models\User;
 use App\Models\Module;
+use App\Enums\RoleEnum;
+use App\Enums\UserType;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Support\Str;
 
 class RolePermissionSeeder extends Seeder
 {
-    public function run()
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
     {
-        // Reset cached roles and permissions
+        // 1. Reset cached roles and permissions (Crucial for Spatie)
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // 1. Create Super Admin Role
-        $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
-        // 2. Define Roles
-        $roles = [
-            // 'Super Admin',      // Developer / System Owner
-            'Head Officer',     // Multi-School Manager
-            'Branch Admin',     // Campus Director
-            'Staff',            // Generic Staff (Accountant, etc.)
-            'Teacher',          // Academic Staff
-            'Student',          // Learner
-            'Parent',           // Guardian
-        ];
-
-        foreach ($roles as $roleName) {
-            Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
-        }
-        
-        // 2. Define Modules and Permissions
-        // Format: 'Module Name' => ['permission_1', 'permission_2', ...]
-        $modules = [
-            'Roles' => ['view', 'create', 'update', 'delete'],
-            'Permissions' => ['view', 'create', 'update', 'delete'],
-            'Users' => ['view', 'create', 'update', 'delete'],
-            'Modules' => ['view', 'create', 'update', 'delete'],
-            
-            // Core Structure
-            'Institutions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], 
+        // 2. Define Independent Modules
+        // Every feature is a separate module for granular control via the 'Module' model.
+        $modulesData = [
+            // System Infrastructure
+            'Institutions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Campuses' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Head Officers' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Modules' => ['view', 'create', 'update', 'delete'],
+            'Roles' => ['view', 'create', 'update', 'delete', 'viewAny'],
+            'Permissions' => ['view', 'create', 'update', 'delete'],
             
-            // Academics
+            // Academic Cycle
             'Academic Sessions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Grade Levels' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Streams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Class Sections' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             
-            // People & Students
+            // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Student Attendance' => ['view', 'create', 'update', 'delete'], 
-            'Student Promotion' => ['view', 'create'], // Special Tool
+            'Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Student Attendance' => ['view', 'create', 'update', 'delete'],
+            'Student Promotion' => ['view', 'create'],
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             
-            // Examinations
+            // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Marks' => ['create', 'update', 'view'],
-
+            
             // Finance
             'Fee Structures' => ['view', 'create', 'update', 'delete'],
             'Fee Types' => ['view', 'create', 'update', 'delete'],
             'Invoices' => ['view', 'create', 'update', 'delete'],
-            'Payments' => ['view', 'create'], // Added payments permission
+            'Payments' => ['view', 'create'],
+            
+            // Security & Config
+            'Audit Logs' => ['view'],
+            'Settings' => ['manage'],
+            'Subscriptions' => ['view', 'create', 'update', 'delete'],
+            'Packages' => ['view', 'create', 'update', 'delete'],
         ];
 
-        // 3. Create Permissions and Assign to Module
+        // 3. Create Modules and Permissions dynamically
         $allPermissions = [];
-
-        foreach ($modules as $moduleName => $actions) {
-            // Create or find Module
-            $moduleKey = strtolower(str_replace(' ', '_', $moduleName));
-            $module = Module::updateOrCreate(['name' => $moduleName, 'slug'=>$moduleKey]);
+        foreach ($modulesData as $moduleName => $actions) {
+            $slug = Str::slug($moduleName, '_');
+            
+            // Sync Module in database
+            $module = Module::updateOrCreate(
+                ['slug' => $slug],
+                ['name' => $moduleName]
+            );
 
             foreach ($actions as $action) {
-                // Determine permission name convention
-                // Lowercase and replace spaces with underscores for keys (e.g., "Head Officers" -> "head_officers")
-                $moduleKey = strtolower(str_replace(' ', '_', $moduleName));
+                // Formatting: singular_module.action (e.g. academic_session.view)
+                $singularKey = Str::singular($slug);
                 
-                // Force singular naming for all modules (e.g., 'roles' -> 'role', 'head_officers' -> 'head_officer')
-                $singularModule = Str::singular($moduleKey);
-                $permissionName = "{$singularModule}.{$action}";
+                // Exceptional cases for collective words
+                if ($slug === 'settings') $singularKey = 'setting';
+                if ($slug === 'audit_logs') $singularKey = 'audit_log';
 
-                // Use the Custom App\Models\Permission to ensure module_id is saved
+                $permissionName = "{$singularKey}.{$action}";
+
                 $permission = Permission::firstOrCreate([
-                    'name' => $permissionName, 
+                    'name' => $permissionName,
                     'guard_name' => 'web',
                 ], [
-                    'module_id' => $module->id // Only set on create
+                    'module_id' => $module->id
                 ]);
-                
-                // Ensure module_id is set if it was found but null (optional safety)
-                if ($permission->module_id !== $module->id) {
+
+                // Ensure link exists if record was previously created without module_id
+                if (!$permission->module_id) {
                     $permission->update(['module_id' => $module->id]);
                 }
 
-                $allPermissions[] = $permission;
+                $allPermissions[] = $permission->name;
             }
         }
 
-        // 4. Assign All Permissions to Super Admin
+        // 4. Create Global Template Roles (institution_id = null)
+        // These roles are shared across the system as "System Defaults"
+        $superAdminRole = Role::firstOrCreate([
+            'name' => RoleEnum::SUPER_ADMIN->value, 
+            'guard_name' => 'web', 
+            'institution_id' => null
+        ]);
+
+        $headOfficerRole = Role::firstOrCreate([
+            'name' => RoleEnum::HEAD_OFFICER->value, 
+            'guard_name' => 'web', 
+            'institution_id' => null
+        ]);
+
+        $teacherRole = Role::firstOrCreate([
+            'name' => RoleEnum::TEACHER->value, 
+            'guard_name' => 'web', 
+            'institution_id' => null
+        ]);
+
+        // 5. Assign Permissions
+        // Super Admin: Full access to every generated permission
         $superAdminRole->syncPermissions($allPermissions);
 
-        // 5. Create or Update Test User
+        // Head Officer (Template): Standard management permissions
+        // Excluding Platform Admin functions like modifying institutions or packages
+        $headOfficerPermissions = array_filter($allPermissions, function($perm) {
+            return !Str::startsWith($perm, ['institution.', 'package.', 'subscription.', 'audit_log.', 'module.']);
+        });
+        $headOfficerRole->syncPermissions($headOfficerPermissions);
+
+        // 6. Setup Initial System User
         $user = User::updateOrCreate(
-            ['email' => 'test@gmail.com'],
+            ['email' => 'admin@digitex.com'],
             [
-                'name' => 'Super Admin',
+                'name' => 'Digitex Super Admin',
                 'password' => Hash::make('password'),
-                'user_type' => 1,
+                'user_type' => UserType::SUPER_ADMIN->value,
                 'is_active' => true,
+                'institute_id' => null, // Global
             ]
         );
 
-        // 6. Assign Role to User
         $user->assignRole($superAdminRole);
 
-        $this->command->info('Super Admin role created, permissions assigned, and user test@gmail.com set up successfully.');
+        $this->command->info('Success: Modules initialized, Permissions generated, and Scoped Roles configured.');
     }
 }

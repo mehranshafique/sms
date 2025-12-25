@@ -111,7 +111,9 @@ class HeadOfficersController extends BaseController
         }
 
         $user = User::create($userData);
-
+        if ($request->has('institute_ids') && count($request->institute_ids) > 0) {
+            $user->update(['institute_id' => $request->institute_ids[0]]);
+        }
         $user->institutes()->sync($request->input('institute_ids', []));
 
         $user->assignRole($request->role);

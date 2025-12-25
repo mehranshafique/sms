@@ -9,24 +9,42 @@ use App\Models\Institution;
 class InstitutionContextController extends Controller
 {
     /**
-     * Switch the active institution context for the current session.
+     * Switch the active institution context.
+     * Params: $id can be an Integer (ID) or String ('global')
      */
-    public function switch(Request $request, $id)
+    public function switch($id)
     {
         $user = Auth::user();
         
-        // 1. Validate: Is the user allowed to access this institution?
-        if (!$this->canAccessInstitution($user, $id)) {
-            abort(403, 'Unauthorized access to this institution.');
+        // 1. Handle Global View (Clear Context)
+        if ($id === 'global') {
+            
+            if ($user->hasRole('Super Admin')) {
+                session(['active_institution_id' => '0']);
+                
+                return redirect()->route('dashboard')->with('success', 'Switched to Global View.');
+            }
+            return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
-        // 2. Set Session
-        session(['active_institution_id' => $id]);
-
-        // 3. Optional: Add a flash message
-        $institutionName = Institution::find($id)->name ?? 'Institution';
+        // 2. Validate & Switch to Specific School
         
-        return redirect()->back()->with('success', "Switched context to {$institutionName}");
+        // Super Admin Access
+        if ($user->hasRole('Super Admin')) {
+            $exists = Institution::where('id', $id)->exists();
+            if ($exists) {
+                session(['active_institution_id' => $id]);
+                return redirect()->route('dashboard')->with('success', 'Context switched successfully.');
+            }
+        }
+
+        // Head Officer Access
+        if ($user->institutes->contains('id', $id)) {
+            session(['active_institution_id' => $id]);
+            return redirect()->route('dashboard')->with('success', 'Context switched successfully.');
+        }
+
+        return redirect()->back()->with('error', 'Unauthorized access.');
     }
 
     /**

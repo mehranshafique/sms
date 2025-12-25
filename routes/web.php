@@ -22,11 +22,21 @@ use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
 use App\Http\Controllers\StudentPromotionController;
+use App\Http\Controllers\ConfigurationController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\InstitutionContextController;
+use App\Http\Controllers\SubscriptionController;
+
 // Finance Controllers
 use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
+
+// Middleware Imports
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use App\Http\Middleware\CheckModuleAccess; // Added Middleware Import
 
 Route::redirect('/','/login' );
 
@@ -47,6 +57,11 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    
+    // =========================================================================
+    // CORE SYSTEM (Access Control, Infrastructure, Core Student Data)
+    // =========================================================================
+    
     // Access Control
     Route::resource('roles', RolesController::class);
     
@@ -71,101 +86,160 @@ Route::middleware('auth')->group(function () {
         Route::post('{role}/assign-permissions', [RolePermissionController::class, 'update'])->name('roles.update-permissions');
     });
 
-    // Institutes
+    // Infrastructure
     Route::delete('institutes/bulk-delete', [InstituteController::class, 'bulkDelete'])->name('institutes.bulkDelete');
     Route::resource('institutes', InstituteController::class);
-    // Institution Context Switcher
-    Route::get('institution/switch/{id}', [App\Http\Controllers\InstitutionContextController::class, 'switch'])->name('institution.switch');
+    Route::get('institution/switch/{id}', [InstitutionContextController::class, 'switch'])->name('institution.switch');
 
-    // Campuses
     Route::delete('campuses/bulk-delete', [CampusController::class, 'bulkDelete'])->name('campuses.bulkDelete');
     Route::resource('campuses', CampusController::class);
 
-    // Head Officers
     Route::post('header-officers/bulk-delete', [HeadOfficersController::class, 'bulkDelete'])->name('header-officers.bulkDelete');
     Route::resource('header-officers', HeadOfficersController::class);
     
-    // --- Core Modules ---
-    
-    // FIX: Define get-sections BEFORE resource to prevent 404 error
+    // Core Student Profile (Available to all)
     Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
     Route::resource('students', StudentController::class);
-    
-    // Student Enrollments
-    Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
-    Route::resource('enrollments', StudentEnrollmentController::class);
 
-    Route::resource('staff', StaffController::class);
-    Route::resource('academic-sessions', AcademicSessionController::class);
-    
-    // Academic Structure
-    Route::post('grade-levels/bulk-delete', [GradeLevelController::class, 'bulkDelete'])->name('grade-levels.bulkDelete');
-    Route::resource('grade-levels', GradeLevelController::class);
+    // =========================================================================
+    // MODULE: ACADEMICS
+    // =========================================================================
+    // Fix: Using Class Name instead of alias
+    Route::middleware([CheckModuleAccess::class . ':academics'])->group(function () {
+        Route::resource('academic-sessions', AcademicSessionController::class);
+        
+        Route::post('grade-levels/bulk-delete', [GradeLevelController::class, 'bulkDelete'])->name('grade-levels.bulkDelete');
+        Route::resource('grade-levels', GradeLevelController::class);
 
-    Route::post('class-sections/bulk-delete', [ClassSectionController::class, 'bulkDelete'])->name('class-sections.bulkDelete');
-    Route::resource('class-sections', ClassSectionController::class);
+        Route::post('class-sections/bulk-delete', [ClassSectionController::class, 'bulkDelete'])->name('class-sections.bulkDelete');
+        Route::resource('class-sections', ClassSectionController::class);
 
-    Route::post('subjects/bulk-delete', [SubjectController::class, 'bulkDelete'])->name('subjects.bulkDelete');
-    Route::resource('subjects', SubjectController::class);
+        Route::post('subjects/bulk-delete', [SubjectController::class, 'bulkDelete'])->name('subjects.bulkDelete');
+        Route::resource('subjects', SubjectController::class);
 
-    Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
-    Route::get('timetables/routine', [TimetableController::class, 'classRoutine'])->name('timetables.routine');
-    Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
-    Route::get('timetables/{timetable}/print', [TimetableController::class, 'print'])->name('timetables.print');
-    Route::get('timetables/{timetable}/download', [TimetableController::class, 'downloadPdf'])->name('timetables.download');
-    Route::resource('timetables', TimetableController::class);
+        Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
+        Route::get('timetables/routine', [TimetableController::class, 'classRoutine'])->name('timetables.routine');
+        Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
+        Route::get('timetables/{timetable}/print', [TimetableController::class, 'print'])->name('timetables.print');
+        Route::get('timetables/{timetable}/download', [TimetableController::class, 'downloadPdf'])->name('timetables.download');
+        Route::resource('timetables', TimetableController::class);
+        
+        Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
+        Route::resource('enrollments', StudentEnrollmentController::class);
+        
+        // Attendance
+        Route::get('attendance/create', [StudentAttendanceController::class, 'create'])->name('attendance.create');
+        Route::post('attendance', [StudentAttendanceController::class, 'store'])->name('attendance.store');
+        Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');
+        Route::get('attendance/report', [StudentAttendanceController::class, 'report'])->name('attendance.report');
+        
+        // Promotions
+        Route::get('promotions', [StudentPromotionController::class, 'index'])->name('promotions.index');
+        Route::post('promotions', [StudentPromotionController::class, 'store'])->name('promotions.store');
+    });
 
-    // Attendance
-    Route::get('attendance/create', [StudentAttendanceController::class, 'create'])->name('attendance.create');
-    Route::post('attendance', [StudentAttendanceController::class, 'store'])->name('attendance.store');
-    Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');
-    // Must be defined BEFORE Route::resource('attendance', ...)
-    Route::get('attendance/report', [StudentAttendanceController::class, 'report'])->name('attendance.report');
-
-    // Exams
-    Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
-    
-    Route::post('exams/{exam}/finalize', [\App\Http\Controllers\ExamController::class, 'finalize'])->name('exams.finalize');
-    Route::get('exams/{exam}/print-result', [\App\Http\Controllers\ExamController::class, 'printClassResult'])->name('exams.print_result');
-    Route::resource('exams', ExamController::class);
-    
-    // Marks
-    Route::get('my-marks', [\App\Http\Controllers\ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
-    // Exam Marks
-    Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
-    Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
-    Route::get('marks/get-classes', [\App\Http\Controllers\ExamMarkController::class, 'getClasses'])->name('marks.get_classes');
-    Route::get('marks/get-subjects', [\App\Http\Controllers\ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
-
-    // Promotions
-    Route::get('promotions', [StudentPromotionController::class, 'index'])->name('promotions.index');
-    Route::post('promotions', [StudentPromotionController::class, 'store'])->name('promotions.store');
-
-    Route::prefix('settings')->group(function () {
-        Route::get('/', [\App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
-        Route::post('/update', [\App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
+    // =========================================================================
+    // MODULE: EXAMINATIONS
+    // =========================================================================
+    // Fix: Using Class Name instead of alias
+    Route::middleware([CheckModuleAccess::class . ':examinations'])->group(function () {
+        Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
+        Route::post('exams/{exam}/finalize', [ExamController::class, 'finalize'])->name('exams.finalize');
+        Route::get('exams/{exam}/print-result', [ExamController::class, 'printClassResult'])->name('exams.print_result');
+        Route::resource('exams', ExamController::class);
+        
+        // Marks Entry
+        Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
+        Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
+        Route::get('marks/get-classes', [ExamMarkController::class, 'getClasses'])->name('marks.get_classes');
+        Route::get('marks/get-subjects', [ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
     });
     
-    // Finance Module
+    // Student Result View
+    // Fix: Using Class Name instead of alias
+    Route::middleware([CheckModuleAccess::class . ':examinations'])->get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
+
     // =========================================================================
-    // FINANCE MODULE (Merged into web.php)
+    // MODULE: HR (Staff)
     // =========================================================================
-    Route::prefix('finance')->group(function () {
+    // Fix: Using Class Name instead of alias
+    Route::middleware([CheckModuleAccess::class . ':hr'])->group(function () {
+        Route::resource('staff', StaffController::class);
+    });
+
+    // =========================================================================
+    // MODULE: FINANCE
+    // =========================================================================
+    // Fix: Using Class Name instead of alias
+    Route::middleware([CheckModuleAccess::class . ':finance'])->prefix('finance')->group(function () {
         Route::resource('fee-types', FeeTypeController::class);
         Route::resource('fees', FeeStructureController::class);
         
         // Invoices
-        // IMPORTANT: AJAX/Specific routes MUST come before the resource route
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
         Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
         Route::get('invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoices.download');
-        
         Route::resource('invoices', InvoiceController::class);
         
         // Payments
         Route::get('payments/create', [PaymentController::class, 'create'])->name('payments.create');
         Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
+        // 1. Platform Invoices (Accessible by Super Admin & Head Officer)
+        // 1. Platform Invoices (Accessible by Super Admin & Head Officer)
+        Route::middleware([RoleMiddleware::class . ':Super Admin|Head Officer'])->group(function () {
+             Route::get('platform-invoices', [SubscriptionController::class, 'invoices'])->name('subscriptions.invoices');
+             Route::get('platform-invoices/{id}', [SubscriptionController::class, 'showInvoice'])->name('subscriptions.invoices.show'); // NEW
+             Route::get('platform-invoices/{id}/print', [SubscriptionController::class, 'printInvoice'])->name('subscriptions.invoices.print'); // NEW
+             Route::get('platform-invoices/{id}/download', [SubscriptionController::class, 'downloadInvoicePdf'])->name('subscriptions.invoices.download'); // NEW
+        });
+        // --- SUBSCRIPTIONS (Main Admin Only) ---
+        Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
+            // PACKAGES
+            Route::get('packages', [SubscriptionController::class, 'indexPackages'])->name('packages.index');
+            Route::post('packages', [SubscriptionController::class, 'storePackage'])->name('packages.store');
+            Route::get('packages/{package}/edit', [SubscriptionController::class, 'editPackage'])->name('packages.edit');
+            Route::put('packages/{package}', [SubscriptionController::class, 'updatePackage'])->name('packages.update');
+            Route::delete('packages/{package}', [SubscriptionController::class, 'destroyPackage'])->name('packages.destroy');
+
+            // SUBSCRIPTIONS
+            Route::get('subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions.index');
+            Route::get('subscriptions/create', [SubscriptionController::class, 'create'])->name('subscriptions.create');
+            Route::post('subscriptions', [SubscriptionController::class, 'store'])->name('subscriptions.store');
+            Route::get('subscriptions/{subscription}/edit', [SubscriptionController::class, 'edit'])->name('subscriptions.edit');
+            Route::put('subscriptions/{subscription}', [SubscriptionController::class, 'update'])->name('subscriptions.update');
+        });
     });
+
+    // =========================================================================
+    // SETTINGS & CONFIGURATION
+    // =========================================================================
+    
+    Route::prefix('settings')->group(function () {
+        Route::get('/', [SettingsController::class, 'index'])->name('settings.index');
+        Route::post('/update', [SettingsController::class, 'update'])->name('settings.update');
+    });
+    
+    // Tracking / Audit Logs (Super Admin Only)
+    Route::resource('audit-logs', \App\Http\Controllers\AuditLogController::class)
+        ->only(['index'])
+        ->middleware([RoleMiddleware::class . ':Super Admin']);
+
+    // Configuration Module
+    Route::prefix('configuration')
+        ->middleware([RoleMiddleware::class . ':Super Admin|Head Officer'])
+        ->group(function () {
+            Route::get('/', [ConfigurationController::class, 'index'])->name('configuration.index');
+            Route::post('/smtp', [ConfigurationController::class, 'updateSmtp'])->name('configuration.smtp.update');
+            Route::post('/smtp/test', [ConfigurationController::class, 'testSmtp'])->name('configuration.smtp.test');
+            Route::post('/sms', [ConfigurationController::class, 'updateSms'])->name('configuration.sms.update');
+            Route::post('/school-year', [ConfigurationController::class, 'updateSchoolYear'])->name('configuration.year.update');
+            
+            // Super Admin Only
+            Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
+                Route::post('/modules', [ConfigurationController::class, 'updateModules'])->name('configuration.modules.update');
+                Route::post('/recharge', [ConfigurationController::class, 'recharge'])->name('configuration.recharge');
+            });
+        });
 });
 
 require __DIR__.'/auth.php';

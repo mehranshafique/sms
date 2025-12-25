@@ -6,6 +6,7 @@ use Illuminate\Routing\Controller as LaravelController;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
+use App\Models\Institution;
 
 class BaseController extends LaravelController
 {
@@ -35,55 +36,62 @@ class BaseController extends LaravelController
         $user = Auth::user();
 
         if (!$user) {
-            return null; // Should be handled by Auth middleware
+            return null;
         }
 
-        // 1. Standard Users (Teachers, Admins locked to one place)
-        if ($user->institute_id) {
-            return $user->institute_id;
-        }
-
-        // 2. Multi-Institute Users (Head Officers / Super Admins)
-        // Check Session first
-        $activeId = session('active_institution_id');
-
-        // Validate the session ID against allowed list (Security check)
+        // 1. Get Allowed Institutes for this user
+        // This ensures security: User can only switch to what they own/manage.
         $allowedIds = $this->getAllowedInstitutionIds($user);
+
+        // 2. Check Session Context (Priority)
+        // If the user has switched context, we respect that selection first.
+        $activeId = session('active_institution_id');
 
         if ($activeId && in_array($activeId, $allowedIds)) {
             return $activeId;
         }
 
-        // 3. Fallback: If no session or invalid, default to the first allowed one
+        // 3. Fallback: User's Default Institute
+        // If no session is set, use their primary assignment.
+        if ($user->institute_id && in_array($user->institute_id, $allowedIds)) {
+            // Auto-set session for consistency
+            session(['active_institution_id' => $user->institute_id]);
+            return $user->institute_id;
+        }
+
+        // 4. Fallback: First Available Institute
+        // If no primary set (e.g. Super Admin or Multi-school Manager without home), pick first.
         if (!empty($allowedIds)) {
             $firstId = $allowedIds[0];
-            session(['active_institution_id' => $firstId]); // Auto-set session
+            session(['active_institution_id' => $firstId]); 
             return $firstId;
         }
 
-        // 4. No Access (Super Admin with no institutes created yet?)
-        return null; 
+        return null; // No access
     }
 
     /**
      * Helper: Get list of all IDs user can access.
      */
-    protected function getAllowedInstitutionIds($user)
+   protected function getAllowedInstitutionIds($user)
     {
         if ($user->hasRole('Super Admin')) {
-            // Optimization: In a real large app, don't fetch ALL. 
-            // But for dropdowns/checks, we need a list.
-            return \App\Models\Institution::pluck('id')->toArray();
+            // Super Admin can access ALL
+            return Institution::pluck('id')->toArray();
         }
 
+        $ids = [];
+
+        // 1. Direct Assignment (Staff/Student/Primary)
         if ($user->institute_id) {
-            return [$user->institute_id];
+            $ids[] = $user->institute_id;
         }
 
-        if ($user->institutes && $user->institutes->isNotEmpty()) {
-            return $user->institutes->pluck('id')->toArray();
+        // 2. Pivot Assignment (Head Officers)
+        if ($user->institutes && $user->institutes->count() > 0) {
+            $ids = array_merge($ids, $user->institutes->pluck('id')->toArray());
         }
 
-        return [];
+        return array_unique($ids);
     }
 }

@@ -1,0 +1,81 @@
+<?php
+
+return [
+    'page_title' => 'Subscription Management',
+    'package_title' => 'Packages',
+    'invoice_title' => 'Platform Invoices',
+    
+    // Menu / Headers
+    'manage_subscriptions' => 'Manage Subscriptions',
+    'manage_packages' => 'Manage Packages',
+    'manage_invoices' => 'Manage Billing',
+    'subscription_list' => 'Subscription List',
+    'package_list' => 'Package List',
+    'invoice_list' => 'Invoice List',
+
+    // Package Fields
+    'package_name' => 'Package Name',
+    'price' => 'Price',
+    'duration' => 'Duration (Days)',
+    'modules' => 'Modules',
+    'limits' => 'Limits (Student/Staff)',
+    'status' => 'Status',
+    'actions' => 'Actions',
+    'create_package' => 'Create Package',
+    'edit_package' => 'Edit Package',
+    'enter_name' => 'e.g. Gold Plan',
+    'enter_price' => 'e.g. 500.00',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
+    'save' => 'Save',
+    'update' => 'Update',
+    'are_you_sure' => 'Are you sure?',
+    'no_records' => 'No records found',
+    
+    // Subscription Fields
+    'institution' => 'Institution',
+    'plan' => 'Plan',
+    'start_date' => 'Start Date',
+    'end_date' => 'End Date',
+    'days_left' => 'Days Left',
+    'payment_method' => 'Payment Method',
+    'create_subscription' => 'Assign Subscription',
+    'manual_assign' => 'Manual Assignment',
+    'generate_invoice' => 'Generate Invoice Automatically',
+    'select_institution' => 'Select Institution',
+    'select_package' => 'Select Package',
+    'notes' => 'Notes',
+
+    // Invoice & Print Fields (NEW)
+    'invoice_number' => 'Invoice #',
+    'amount' => 'Amount',
+    'due_date' => 'Due Date',
+    'issue_date' => 'Issue Date',
+    'paid' => 'Paid',
+    'unpaid' => 'Unpaid',
+    'overdue' => 'Overdue',
+    'cancelled' => 'Cancelled',
+    'mark_paid' => 'Mark as Paid',
+    'download' => 'Download',
+    
+    'bill_to' => 'Bill To',
+    'from' => 'From',
+    'description' => 'Description',
+    'subtotal' => 'Subtotal',
+    'total' => 'Total',
+    'balance_due' => 'Balance Due',
+    'paid_to_date' => 'Paid to Date',
+    'authorized_signature' => 'Authorized Signature',
+    'thank_you' => 'Thank you for your business.',
+    'generated_on' => 'Generated on',
+    'print' => 'Print',
+    'platform_invoice' => 'Platform Subscription Invoice',
+    
+    // Messages
+    'success_create' => 'Created successfully.',
+    'success_update' => 'Updated successfully.',
+    'success_delete' => 'Deleted successfully.',
+    'subscription_assigned' => 'Subscription assigned successfully.',
+    'subscription_updated' => 'Subscription updated successfully.',
+    'package_in_use' => 'Package is in use and cannot be deleted.',
+];
