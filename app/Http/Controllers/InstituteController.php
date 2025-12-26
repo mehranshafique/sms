@@ -3,18 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Models\Institution;
-use App\Models\User; // Added User model
+use App\Models\User;
+use App\Services\NotificationService;
+use App\Services\IdGeneratorService;
+use App\Enums\UserType;
+use App\Enums\RoleEnum;
+use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Hash; // Added Hash
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class InstituteController extends BaseController
 {
-    public function __construct()
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
     {
         $this->authorizeResource(Institution::class, 'institute');
+        $this->notificationService = $notificationService;
     }
 
     public function index(Request $request)
@@ -33,14 +42,13 @@ class InstituteController extends BaseController
                     return '';
                 })
                 ->addColumn('logo', function($row){
-                    // Ensure the 'public' disk is linked: php artisan storage:link
                     $url = $row->logo ? asset('storage/'.$row->logo) : asset('images/no-image.png');
                     return '<img src="'.$url.'" class="rounded-circle" width="35" alt="">';
                 })
-                ->addColumn('contact', function($row){ // FIXED: Added missing 'contact' column
+                ->addColumn('contact', function($row){
                     return '<div class="d-flex flex-column">
-                                <span class="fs-14">'.$row->phone.'</span>
-                                <span class="fs-12 text-muted">'.$row->email.'</span>
+                                <span class="fs-14 fw-bold">'.$row->acronym.'</span>
+                                <span class="fs-12 text-muted">'.$row->phone.'</span>
                             </div>';
                 })
                 ->editColumn('is_active', function($row){
@@ -51,7 +59,6 @@ class InstituteController extends BaseController
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
-                    // Show Button
                     if(auth()->user()->can('view', $row)){
                          $btn .= '<a href="'.route('institutes.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
                     }
@@ -71,11 +78,10 @@ class InstituteController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'logo', 'contact', 'is_active', 'action']) // Added 'contact'
+                ->rawColumns(['checkbox', 'logo', 'contact', 'is_active', 'action'])
                 ->make(true);
         }
 
-        // Stats Logic
         $totalInstitutes = Institution::count();
         $activeInstitutes = Institution::where('is_active', true)->count();
         $inactiveInstitutes = Institution::where('is_active', false)->count();
@@ -93,34 +99,66 @@ class InstituteController extends BaseController
     {
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'code' => 'required|string|max:30|unique:institutions,code',
+            'acronym' => 'nullable|string|max:50',
             'type' => 'required|in:primary,secondary,university,mixed',
-            'country' => 'nullable|string',
-            'city' => 'nullable|string',
+            'country' => 'required|string|max:100',
+            'city' => 'required|string|max:100',
+            'commune' => 'required|string|max:100',
             'address' => 'nullable|string',
-            'phone' => 'nullable|string|max:30',
+            'phone' => ['required', 'string', 'max:30', 'regex:/^\+\d+/'], 
             'email' => 'nullable|email',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            'password' => 'nullable|string|min:6', // Validate password if provided for admin creation
+            'password' => 'nullable|string|min:6',
+        ], [
+            'phone.regex' => __('institute.phone_format_error'),
         ]);
 
         if ($request->hasFile('logo')) {
             $validated['logo'] = $request->file('logo')->store('institutes', 'public');
         }
 
-        $institute = Institution::create($validated);
+        $validated['code'] = IdGeneratorService::generateInstitutionCode($request->city, $request->commune);
 
-        // Optional: Create an Admin User for this Institute
-        if($request->filled('email') && $request->filled('password')) {
-            User::create([
-                'name' => 'Admin ' . $institute->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'institute_id' => $institute->id, // Assuming direct link exists or pivot needed
-                'user_type' => 3, // Branch/Institute Admin
+        DB::transaction(function () use ($validated, $request) {
+            $institute = Institution::create($validated);
+
+            // 1. Create Essential Roles for this Institution
+            $headOfficerRole = Role::firstOrCreate([
+                'name' => RoleEnum::HEAD_OFFICER->value,
+                'guard_name' => 'web',
+                'institution_id' => $institute->id
             ]);
-        }
+
+            Role::firstOrCreate([
+                'name' => RoleEnum::TEACHER->value,
+                'guard_name' => 'web',
+                'institution_id' => $institute->id
+            ]);
+
+            Role::firstOrCreate([
+                'name' => RoleEnum::STUDENT->value,
+                'guard_name' => 'web',
+                'institution_id' => $institute->id
+            ]);
+
+            // 2. Create Admin User
+            if($request->filled('email') && $request->filled('password')) {
+                $adminUser = User::create([
+                    'name' => 'Admin ' . ($request->acronym ?? $institute->name),
+                    'email' => $request->email,
+                    'password' => Hash::make($request->password),
+                    'institute_id' => $institute->id,
+                    'user_type' => UserType::HEAD_OFFICER->value,
+                    'mobile_number' => $request->phone,
+                ]);
+
+                // 3. Assign Head Officer Role to User
+                $adminUser->assignRole($headOfficerRole);
+
+                $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
+            }
+        });
 
         return response()->json(['message' => __('institute.messages.success_create'), 'redirect' => route('institutes.index')]);
     }
@@ -139,16 +177,19 @@ class InstituteController extends BaseController
     {
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'code' => 'required|string|max:30|unique:institutions,code,'.$institute->id,
+            'acronym' => 'nullable|string|max:50',
             'type' => 'required|in:primary,secondary,university,mixed',
-            'country' => 'nullable|string',
-            'city' => 'nullable|string',
+            'country' => 'required|string|max:100',
+            'city' => 'required|string|max:100',
+            'commune' => 'required|string|max:100',
             'address' => 'nullable|string',
-            'phone' => 'nullable|string|max:30',
+            'phone' => ['required', 'string', 'max:30', 'regex:/^\+\d+/'],
             'email' => 'nullable|email',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            'password' => 'nullable|string|min:6', // Optional password update
+            'password' => 'nullable|string|min:6',
+        ], [
+            'phone.regex' => __('institute.phone_format_error'),
         ]);
 
         if ($request->hasFile('logo')) {
@@ -158,15 +199,36 @@ class InstituteController extends BaseController
             $validated['logo'] = $request->file('logo')->store('institutes', 'public');
         }
 
-        $institute->update($validated);
+        DB::transaction(function () use ($validated, $request, $institute) {
+            $institute->update($validated);
 
-        // Update Admin Password if provided (Assumes we find the admin by email)
-        if($request->filled('password') && $request->filled('email')) {
-            $admin = User::where('email', $request->email)->first();
-            if($admin) {
-                $admin->update(['password' => Hash::make($request->password)]);
+            // 1. Ensure Roles exist on Update (Self-Healing)
+            $roles = [RoleEnum::HEAD_OFFICER->value, RoleEnum::TEACHER->value, RoleEnum::STUDENT->value];
+            foreach ($roles as $roleName) {
+                Role::firstOrCreate([
+                    'name' => $roleName,
+                    'guard_name' => 'web',
+                    'institution_id' => $institute->id
+                ]);
             }
-        }
+
+            // 2. Update Admin User Logic
+            if($request->filled('password') && $request->filled('email')) {
+                $admin = User::where('email', $request->email)->first();
+                if($admin) {
+                    $admin->update(['password' => Hash::make($request->password)]);
+                    
+                    // Ensure Head Officer Role assignment
+                    $headOfficerRole = Role::where('name', RoleEnum::HEAD_OFFICER->value)
+                        ->where('institution_id', $institute->id)
+                        ->first();
+                        
+                    if($headOfficerRole && !$admin->hasRole($headOfficerRole)) {
+                        $admin->assignRole($headOfficerRole);
+                    }
+                }
+            }
+        });
 
         return response()->json(['message' => __('institute.messages.success_update'), 'redirect' => route('institutes.index')]);
     }

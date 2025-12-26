@@ -24,7 +24,6 @@ class RolePermissionSeeder extends Seeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // 2. Define Independent Modules
-        // Every feature is a separate module for granular control via the 'Module' model.
         $modulesData = [
             // System Infrastructure
             'Institutions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
@@ -63,6 +62,13 @@ class RolePermissionSeeder extends Seeder
             'Settings' => ['manage'],
             'Subscriptions' => ['view', 'create', 'update', 'delete'],
             'Packages' => ['view', 'create', 'update', 'delete'],
+            'Sms Templates' => ['view', 'update'], // NEW MODULE
+            
+            // NEW MODULES (Communication & Voting)
+            'Communication' => ['view', 'create', 'update', 'delete'],
+            'Notices' => ['view', 'create', 'update', 'delete','viewAny'],
+            'Voting' => ['view', 'create', 'update', 'delete'],
+            'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
         ];
 
         // 3. Create Modules and Permissions dynamically
@@ -83,6 +89,7 @@ class RolePermissionSeeder extends Seeder
                 // Exceptional cases for collective words
                 if ($slug === 'settings') $singularKey = 'setting';
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
+                if ($slug === 'sms_templates') $singularKey = 'sms_template';
 
                 $permissionName = "{$singularKey}.{$action}";
 
@@ -103,7 +110,6 @@ class RolePermissionSeeder extends Seeder
         }
 
         // 4. Create Global Template Roles (institution_id = null)
-        // These roles are shared across the system as "System Defaults"
         $superAdminRole = Role::firstOrCreate([
             'name' => RoleEnum::SUPER_ADMIN->value, 
             'guard_name' => 'web', 
@@ -123,11 +129,9 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // 5. Assign Permissions
-        // Super Admin: Full access to every generated permission
         $superAdminRole->syncPermissions($allPermissions);
 
-        // Head Officer (Template): Standard management permissions
-        // Excluding Platform Admin functions like modifying institutions or packages
+        // Head Officer (Template)
         $headOfficerPermissions = array_filter($allPermissions, function($perm) {
             return !Str::startsWith($perm, ['institution.', 'package.', 'subscription.', 'audit_log.', 'module.']);
         });

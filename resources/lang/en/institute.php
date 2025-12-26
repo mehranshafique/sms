@@ -46,6 +46,7 @@ return [
     'admin_email' => 'Admin Email',
     'password' => 'Password',
     'phone_number' => 'Phone Number',
+    'commune' => 'Commune / Location', // NEW
 
     // Placeholders
     'enter_institute_name' => 'Enter institute name',
@@ -56,6 +57,9 @@ return [
     'enter_admin_email' => 'Enter Admin Email',
     'enter_password' => 'Enter Password',
     'enter_phone_number' => 'Enter phone number',
+    'auto_generated' => 'Auto Generated',
+    'phone_hint' => 'Format: +[CountryCode][Number] (e.g. +243...)',
+    'leave_blank_to_keep_current' => 'Leave blank to keep current password',
 
     // Dropdown Options
     'primary_school' => 'Primary School',
@@ -88,7 +92,8 @@ return [
     'success' => 'Success!',
     'error_occurred' => 'Error Occurred',
     'something_went_wrong' => 'Something went wrong!',
-
+    'phone_format_error' => 'Phone number must start with a country code (+)',
+    
     'add_new_institute' => 'Add New Institute',
     'add_new_institute_subtitle' => 'Fill in the details to register a new institute',
     'basic_information' => 'Basic Information',

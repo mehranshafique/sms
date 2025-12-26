@@ -89,6 +89,14 @@ class Student extends Model
         return $this->belongsTo(GradeLevel::class);
     }
 
+    /**
+     * Relationship: Student belongs to a Class Section
+     */
+    public function classSection()
+    {
+        return $this->belongsTo(ClassSection::class);
+    }
+
     // Accessor for Full Name
     public function getFullNameAttribute()
     {

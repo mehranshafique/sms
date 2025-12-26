@@ -1,0 +1,86 @@
+<?php
+
+return [
+    'election_management' => 'Election Management',
+    'election_list' => 'Election List',
+    'create_election' => 'Create Election',
+    'edit_election' => 'Edit Election',
+    'manage_subtitle' => 'Organize school elections and voting sessions',
+    
+    // Fields
+    'title' => 'Title',
+    'academic_session' => 'Academic Session',
+    'start_date' => 'Start Date',
+    'end_date' => 'End Date',
+    'status' => 'Status',
+    'candidates_count' => 'Candidates',
+    'description' => 'Description',
+    'position_name' => 'Position Name',
+    'sequence' => 'Sequence Order',
+    'admission_number' => 'Admission Number',
+    'candidate_name' => 'Candidate Name',
+    'class' => 'Class',
+    'actions' => 'Actions',
+    'event_details' => 'Event Details', // Added missing key
+    'ballot_structure' => 'Ballot Structure', // Added missing key
+    'no_positions' => 'No positions defined yet.',
+    'no_candidates' => 'No candidates yet.',
+    'select_session' => 'Select Academic Session',
+    'enter_title' => 'Enter Election Title',
+    
+    // Status Labels
+    'draft' => 'Draft',
+    'scheduled' => 'Scheduled',
+    'ongoing' => 'Ongoing',
+    'completed' => 'Completed',
+    'published' => 'Published',
+
+    // Actions
+    'manage' => 'Manage',
+    'add_position' => 'Add Position',
+    'add_candidate' => 'Add Candidate',
+    'save_position' => 'Save Position',
+    'save_election' => 'Save Election',
+    'publish' => 'Publish Election',
+    'close' => 'Close Election',
+    'delete' => 'Delete',
+    
+    // Messages
+    'election_created' => 'Election event created successfully.',
+    'position_added' => 'Position added to election.',
+    'candidate_added' => 'Candidate approved and added.',
+    'student_not_found' => 'Student not found with this Admission Number.',
+    'student_institution_mismatch' => 'Student does not belong to the election institution.',
+    'candidate_exists' => 'Student is already a candidate for this position.',
+    'fees_not_paid' => 'Eligibility Error: Outstanding school fees.',
+    'no_active_elections' => 'No active elections found for your profile.',
+    'already_voted_for_position' => 'You have already voted for this position.',
+    'vote_cast_success' => 'Your vote has been recorded securely.',
+    'system_error' => 'A system error occurred. Please try again.',
+    'delete_warning' => 'This will delete the election and all votes. Proceed?',
+    'yes_delete' => 'Yes, Delete',
+    'cancel' => 'Cancel',
+    'success_delete' => 'Election deleted successfully.',
+    'success' => 'Success',
+    'error' => 'Error',
+    'validation_error' => 'Validation Error',
+
+    // studnets
+    'my_elections' => 'My Elections',
+    'active_polls' => 'Active Polls & Voting',
+    'closes_in' => 'Closes',
+    'vote_now' => 'Vote Now',
+    'cast_your_vote' => 'Cast your vote for the following positions',
+    'vote' => 'Vote',
+    'voted' => 'Voted',
+    'confirm_vote' => 'Confirm Vote?',
+    'vote_warning' => 'You cannot change your vote after submission.',
+    'yes_vote' => 'Yes, Vote',
+    'access_denied' => 'Access Denied',
+    'student_profile_not_found' => 'Student profile not found linked to your account.',
+    'unauthorized_election' => 'You are not authorized to vote in this election.',
+    'already_voted_position' => 'You have already voted for this position.',
+    'vote_success' => 'Vote cast successfully!',
+    'back_to_dashboard' => 'Back to Dashboard',
+    'no_active_elections' => 'No active elections found.',
+];

@@ -53,4 +53,35 @@ class IdGeneratorService
             return $prefix . $sequenceStr;
         });
     }
+
+    /**
+     * Generate Institution Code.
+     * Format: 2 chars City + 2 chars Commune + 4 chars Sequence
+     * Example: KI (Kinshasa) + GO (Gombe) + 0001 => KIGO0001
+     */
+    public static function generateInstitutionCode(string $city, string $commune): string
+    {
+        return DB::transaction(function () use ($city, $commune) {
+            // 1. Clean and Extract 2 chars
+            $cityCode = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $city), 0, 2));
+            $communeCode = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $commune), 0, 2));
+            
+            // Pad if short (e.g. if city is "A")
+            $cityCode = str_pad($cityCode, 2, 'X');
+            $communeCode = str_pad($communeCode, 2, 'X');
+
+            // 2. Generate Sequence
+            // We count existing institutes to determine the next number
+            // Using lockForUpdate isn't strictly necessary here if collisions aren't critical, 
+            // but usually we rely on the DB ID or a separate sequence table.
+            // Here, using max(id) is a simple approach for the code.
+            
+            $lastId = Institution::max('id') ?? 0;
+            $nextId = $lastId + 1;
+            
+            $sequence = str_pad($nextId, 4, '0', STR_PAD_LEFT);
+
+            return $cityCode . $communeCode . $sequence;
+        });
+    }
 }

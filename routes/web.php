@@ -26,7 +26,14 @@ use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\SmsTemplateController; // Add this
 
+// New Module Controllers
+use App\Http\Controllers\NoticeController;
+use App\Http\Controllers\ElectionController;
+use App\Http\Controllers\VotingController;
+use App\Http\Controllers\StudentVotingController;
+use App\Http\Controllers\StudentNoticeController;
 // Finance Controllers
 use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
@@ -36,7 +43,7 @@ use App\Http\Controllers\Finance\PaymentController;
 // Middleware Imports
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
-use App\Http\Middleware\CheckModuleAccess; // Added Middleware Import
+use App\Http\Middleware\CheckModuleAccess; 
 
 Route::redirect('/','/login' );
 
@@ -62,7 +69,6 @@ Route::middleware('auth')->group(function () {
     // CORE SYSTEM (Access Control, Infrastructure, Core Student Data)
     // =========================================================================
     
-    // Access Control
     Route::resource('roles', RolesController::class);
     
     Route::prefix('modules')->group(function () {
@@ -97,14 +103,47 @@ Route::middleware('auth')->group(function () {
     Route::post('header-officers/bulk-delete', [HeadOfficersController::class, 'bulkDelete'])->name('header-officers.bulkDelete');
     Route::resource('header-officers', HeadOfficersController::class);
     
-    // Core Student Profile (Available to all)
     Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
     Route::resource('students', StudentController::class);
 
     // =========================================================================
+    // MODULE: COMMUNICATION (Notices)
+    // =========================================================================
+    Route::middleware([CheckModuleAccess::class . ':communication'])->group(function () {
+        Route::resource('notices', NoticeController::class);
+    });
+    // STUDENT NOTICES
+    Route::get('/my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
+    Route::get('/my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
+
+    // =========================================================================
+    // MODULE: VOTING & ELECTIONS
+    // =========================================================================
+
+    Route::get('/my-elections', [StudentVotingController::class, 'index'])->name('student.elections.index');
+    Route::get('/my-elections/{election}', [StudentVotingController::class, 'show'])->name('student.elections.show');
+    Route::post('/my-elections/{election}/vote', [StudentVotingController::class, 'vote'])->name('student.elections.vote');
+
+    Route::middleware([CheckModuleAccess::class . ':voting'])->group(function () {
+        // Election Management
+        Route::post('elections/{election}/positions', [ElectionController::class, 'addPosition'])->name('elections.addPosition');
+        Route::post('elections/{election}/candidates', [ElectionController::class, 'addCandidate'])->name('elections.addCandidate');
+        Route::delete('elections/candidates/{candidate}', [ElectionController::class, 'destroyCandidate'])->name('elections.destroyCandidate');
+        
+        // NEW: Publish and Close Routes
+        Route::post('elections/{election}/publish', [ElectionController::class, 'publish'])->name('elections.publish');
+        Route::post('elections/{election}/close', [ElectionController::class, 'close'])->name('elections.close');
+
+        Route::resource('elections', ElectionController::class);
+        
+        // Voting Device Endpoints
+        Route::post('voting/identify', [VotingController::class, 'identifyVoter'])->name('voting.identify');
+        Route::post('voting/cast', [VotingController::class, 'castVote'])->name('voting.cast');
+    });
+
+    // =========================================================================
     // MODULE: ACADEMICS
     // =========================================================================
-    // Fix: Using Class Name instead of alias
     Route::middleware([CheckModuleAccess::class . ':academics'])->group(function () {
         Route::resource('academic-sessions', AcademicSessionController::class);
         
@@ -141,7 +180,6 @@ Route::middleware('auth')->group(function () {
     // =========================================================================
     // MODULE: EXAMINATIONS
     // =========================================================================
-    // Fix: Using Class Name instead of alias
     Route::middleware([CheckModuleAccess::class . ':examinations'])->group(function () {
         Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
         Route::post('exams/{exam}/finalize', [ExamController::class, 'finalize'])->name('exams.finalize');
@@ -156,13 +194,11 @@ Route::middleware('auth')->group(function () {
     });
     
     // Student Result View
-    // Fix: Using Class Name instead of alias
     Route::middleware([CheckModuleAccess::class . ':examinations'])->get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
 
     // =========================================================================
     // MODULE: HR (Staff)
     // =========================================================================
-    // Fix: Using Class Name instead of alias
     Route::middleware([CheckModuleAccess::class . ':hr'])->group(function () {
         Route::resource('staff', StaffController::class);
     });
@@ -170,7 +206,6 @@ Route::middleware('auth')->group(function () {
     // =========================================================================
     // MODULE: FINANCE
     // =========================================================================
-    // Fix: Using Class Name instead of alias
     Route::middleware([CheckModuleAccess::class . ':finance'])->prefix('finance')->group(function () {
         Route::resource('fee-types', FeeTypeController::class);
         Route::resource('fees', FeeStructureController::class);
@@ -184,13 +219,12 @@ Route::middleware('auth')->group(function () {
         // Payments
         Route::get('payments/create', [PaymentController::class, 'create'])->name('payments.create');
         Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
-        // 1. Platform Invoices (Accessible by Super Admin & Head Officer)
-        // 1. Platform Invoices (Accessible by Super Admin & Head Officer)
+        
         Route::middleware([RoleMiddleware::class . ':Super Admin|Head Officer'])->group(function () {
              Route::get('platform-invoices', [SubscriptionController::class, 'invoices'])->name('subscriptions.invoices');
-             Route::get('platform-invoices/{id}', [SubscriptionController::class, 'showInvoice'])->name('subscriptions.invoices.show'); // NEW
-             Route::get('platform-invoices/{id}/print', [SubscriptionController::class, 'printInvoice'])->name('subscriptions.invoices.print'); // NEW
-             Route::get('platform-invoices/{id}/download', [SubscriptionController::class, 'downloadInvoicePdf'])->name('subscriptions.invoices.download'); // NEW
+             Route::get('platform-invoices/{id}', [SubscriptionController::class, 'showInvoice'])->name('subscriptions.invoices.show');
+             Route::get('platform-invoices/{id}/print', [SubscriptionController::class, 'printInvoice'])->name('subscriptions.invoices.print');
+             Route::get('platform-invoices/{id}/download', [SubscriptionController::class, 'downloadInvoicePdf'])->name('subscriptions.invoices.download');
         });
         // --- SUBSCRIPTIONS (Main Admin Only) ---
         Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
@@ -219,7 +253,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/update', [SettingsController::class, 'update'])->name('settings.update');
     });
     
-    // Tracking / Audit Logs (Super Admin Only)
+    // Tracking / Audit Logs
     Route::resource('audit-logs', \App\Http\Controllers\AuditLogController::class)
         ->only(['index'])
         ->middleware([RoleMiddleware::class . ':Super Admin']);
@@ -234,7 +268,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/sms', [ConfigurationController::class, 'updateSms'])->name('configuration.sms.update');
             Route::post('/school-year', [ConfigurationController::class, 'updateSchoolYear'])->name('configuration.year.update');
             
-            // Super Admin Only
+            // SMS Templates Management
+            Route::get('/sms-templates', [SmsTemplateController::class, 'index'])->name('sms_templates.index');
+            Route::put('/sms-templates/{id}', [SmsTemplateController::class, 'update'])->name('sms_templates.update');
+            Route::post('/sms-templates/override', [SmsTemplateController::class, 'override'])->name('sms_templates.override');
+
             Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
                 Route::post('/modules', [ConfigurationController::class, 'updateModules'])->name('configuration.modules.update');
                 Route::post('/recharge', [ConfigurationController::class, 'recharge'])->name('configuration.recharge');

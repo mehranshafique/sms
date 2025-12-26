@@ -11,7 +11,7 @@ use App\Models\AcademicSession;
 use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
 use App\Services\IdGeneratorService;
-use App\Interfaces\SmsGatewayInterface;
+use App\Services\NotificationService; // UPDATED to use NotificationService
 use App\Enums\UserType;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
@@ -24,12 +24,12 @@ use Illuminate\Support\Facades\Hash;
 
 class StudentController extends BaseController
 {
-    protected $smsService;
+    protected $notificationService;
 
-    public function __construct(SmsGatewayInterface $smsService)
+    public function __construct(NotificationService $notificationService)
     {
         $this->authorizeResource(Student::class, 'student');
-        $this->smsService = $smsService;
+        $this->notificationService = $notificationService;
     }
 
     public function index(Request $request)
@@ -39,7 +39,7 @@ class StudentController extends BaseController
         if ($request->ajax()) {
             $data = Student::with(['institution', 'campus', 'gradeLevel'])
                 ->select('students.*')
-                ->latest('students.created_at'); // Rule 3: Latest First
+                ->latest('students.created_at');
 
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
@@ -121,7 +121,6 @@ class StudentController extends BaseController
             $sectionsQuery->where('institution_id', $institutionId);
         }
         
-        // Rule 2: Section (Grade)
         $sections = $sectionsQuery->get()->mapWithKeys(function($item) {
              $gradeName = $item->gradeLevel->name ?? '';
              return [$item->id => $item->name . ($gradeName ? ' (' . $gradeName . ')' : '')];
@@ -173,7 +172,6 @@ class StudentController extends BaseController
                 $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
             }
 
-            // Create User Account if Email is provided
             if ($request->email) {
                 $user = User::create([
                     'name' => $request->first_name . ' ' . $request->last_name,
@@ -194,7 +192,6 @@ class StudentController extends BaseController
 
             $student = Student::create($data);
 
-            // Determine Section
             $sectionId = $request->class_section_id;
             if (!$sectionId) {
                 $section = ClassSection::where('grade_level_id', $request->grade_level_id)
@@ -213,6 +210,18 @@ class StudentController extends BaseController
                     'status' => 'active',
                     'enrolled_at' => now(),
                 ]);
+            }
+
+            // Trigger "Student Admission" SMS if phone number exists
+            $phone = $student->mobile_number ?? $student->father_phone;
+            if ($phone) {
+                $smsData = [
+                    'StudentName' => $student->full_name,
+                    'AdmissionNumber' => $student->admission_number,
+                    'SchoolName' => $institution->name
+                ];
+                // Using 'student_admission' template event
+                $this->notificationService->sendSmsEvent('student_admission', $phone, $smsData, $institutionId);
             }
         });
 

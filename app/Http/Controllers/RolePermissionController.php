@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use App\Models\Module;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Support\Facades\Auth;
 
 class RolePermissionController extends BaseController
 {
@@ -14,30 +15,34 @@ class RolePermissionController extends BaseController
         $this->setPageTitle(__('roles.role_permissions_page_title'));
     }
 
-    /**
-     * Show the form for editing permissions of a specific role.
-     * Note: This is also covered in RolesController@edit.
-     */
     public function edit(Role $role)
     {
-        $modules = Module::with('permissions')->get();
-        $rolePermissions = $role->permissions()->pluck('name')->toArray(); // Changed to pluck 'name' to match view logic
+        // Scope Check: Can't edit roles from other institutes
+        $this->checkInstitution($role);
 
-        return view('roles.edit', compact('role', 'modules', 'rolePermissions'));
+        $modules = Module::with('permissions')->get();
+        $rolePermissions = $role->permissions()->pluck('name')->toArray();
+
+        return view('roles.assign_permissions', compact('role', 'modules', 'rolePermissions'));
     }
 
-    /**
-     * Update permissions for a specific role.
-     */
     public function update(Request $request, Role $role)
     {
+        $user = Auth::user();
+
+        // 1. Prevent updating own role permissions (unless Super Admin)
+        if (!$user->hasRole('Super Admin') && $user->hasRole($role->name)) {
+            return back()->with('error', __('roles.cannot_update_own_role'));
+        }
+
         $request->validate([
             'permissions' => 'array',
             'permissions.*' => 'exists:permissions,name'
         ]);
 
         if($role->name === 'Super Admin') {
-             // Optional: prevent removing perms from Super Admin
+             // Optional safety: Super Admin always keeps all perms
+             return redirect()->route('roles.index')->with('error', 'Cannot modify Super Admin permissions.');
         }
 
         $role->syncPermissions($request->permissions ?? []);

@@ -64,6 +64,7 @@
                     <ul aria-expanded="false">
                         <li><a href="{{ route('configuration.index') }}#smtp">{{ __('sidebar.smtp') }}</a></li>
                         <li><a href="{{ route('configuration.index') }}#sms">{{ __('sidebar.id_sender_sms') }}</a></li>
+                        <li><a href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
                         <li><a href="{{ route('configuration.index') }}#school_year">{{ __('sidebar.school_year') }}</a></li>
                         <li><a href="{{ route('configuration.index') }}#modules">{{ __('sidebar.modules') }}</a></li>
                         <li><a href="{{ route('configuration.index') }}#recharge">{{ __('sidebar.recharging') }}</a></li>
@@ -78,7 +79,7 @@
                     </a>
                     <ul aria-expanded="false">
                         <li><a href="{{ route('subscriptions.index') }}">Billing</a></li> 
-                        <li><a href="{{ route('subscriptions.invoices') }}">{{ __('sidebar.billing_requests') }} (Invoices)</a></li> {{-- NEW --}}
+                        <li><a href="{{ route('subscriptions.invoices') }}">{{ __('sidebar.billing_requests') }} (Invoices)</a></li>
                     </ul>
                 </li>
 
@@ -140,6 +141,28 @@
                     @can('exam_mark.create')
                     <li><a class="ai-icon" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
                     @endcan
+                @endif
+
+                {{-- COMMUNICATION GROUP --}}
+                @if($hasModule('communication'))
+                <li class="nav-label">{{ __('sidebar.communication') }}</li>
+                    @can('notice.view')
+                    <li><a class="ai-icon" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
+                    @endcan
+                    @if(auth()->user()->hasRole('Student'))
+                    <li><a class="ai-icon" href="{{ route('student.notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.my_notices') }}</span></a></li>
+                    @endif
+                @endif
+
+                {{-- VOTING GROUP --}}
+                @if($hasModule('voting'))
+                <li class="nav-label">{{ __('sidebar.voting') }}</li>
+                    @can('election.view')
+                    <li><a class="ai-icon" href="{{ route('elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
+                    @endcan
+                    @if(auth()->user()->hasRole('Student'))
+                    <li><a class="ai-icon" href="{{ route('student.elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.my_elections') }}</span></a></li>
+                    @endif
                 @endif
 
                 {{-- PEOPLE GROUP --}}
@@ -218,6 +241,8 @@
                 @if($hasModule('settings')) {{-- Assuming 'settings' is a module or part of core --}}
                     @can('institution.update')
                     <li><a class="ai-icon" href="{{ route('configuration.index') }}"><i class="fa fa-sliders"></i><span class="nav-text">{{ __('configuration.page_title') }}</span></a></li>
+                    {{-- Added SMS Templates Link --}}
+                    <li><a class="ai-icon" href="{{ route('sms_templates.index') }}"><i class="fa fa-commenting"></i><span class="nav-text">{{ __('sidebar.sms_templates') }}</span></a></li>
                     @endcan
                 @endif
                 

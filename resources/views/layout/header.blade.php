@@ -204,7 +204,8 @@
                                         <ul class="timeline p-3" id="schoolTimeline">
                                             @foreach($allowedInstitutions as $inst)
                                                 <li class="school-item">
-                                                    <div class="timeline-panel p-2 rounded hover-bg-light">
+                                                    {{-- Added position-relative to fix stretched-link issue --}}
+                                                    <div class="timeline-panel p-2 rounded hover-bg-light position-relative">
                                                         <div class="media-body">
                                                             <h6 class="mb-0">
                                                                 <a href="{{ route('institution.switch', $inst->id) }}" class="stretched-link text-decoration-none {{ session('active_institution_id') == $inst->id ? 'text-primary fw-bold' : 'text-dark' }} school-name">

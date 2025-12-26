@@ -20,7 +20,8 @@ class InstitutionContextController extends Controller
         if ($id === 'global') {
             
             if ($user->hasRole('Super Admin')) {
-                session(['active_institution_id' => '0']);
+                // FIXED: Use 'global' string instead of '0' for consistency
+                session(['active_institution_id' => 'global']);
                 
                 return redirect()->route('dashboard')->with('success', 'Switched to Global View.');
             }

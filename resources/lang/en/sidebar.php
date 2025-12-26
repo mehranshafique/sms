@@ -27,6 +27,7 @@ return [
     'school_year' => 'School Year',
     'modules' => 'Modules',
     'recharging' => 'Recharging',
+    'sms_templates' => 'SMS Templates', 
     
     'tracking' => 'Tracking',
     'audit_log' => 'Audit Log',
@@ -36,13 +37,21 @@ return [
     'billing_requests' => 'Billing Requests',
     'status_billing' => 'Status Billing',
     
-    'event' => 'Event',
-    'vote_election' => 'Vote Election',
-    
+    // NEW ADDITIONS
     'communication' => 'Communication',
+    'notices' => [
+        'title' => 'Notices Board',
+    ],
+    'my_notices' => 'My Notices', // Added
     'system_alerts' => 'System Alerts',
     'global_announcements' => 'Global Announcements',
-    'maintenance_notice' => 'Maintenance Notice',
+    
+    'voting' => 'Voting System',
+    'vote_election' => 'Vote Election',
+    'elections' => [
+        'title' => 'Elections',
+    ],
+    'my_elections' => 'My Elections', // Added
 
     // School Admin Keys
     'academics' => 'Academics',
@@ -78,6 +87,9 @@ return [
     'attendance' => [
         'title' => 'Attendance'
     ],
+    'promotions' => [
+        'title' => 'Promotions'
+    ],
     'staff' => [
         'title' => 'Staff'
     ],
@@ -105,8 +117,5 @@ return [
     ],
     'header_officers' => [
         'title' => 'Head Officers'
-    ],
-    'promotions' => [
-        'title' => 'Promotions'
     ]
 ];

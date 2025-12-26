@@ -16,8 +16,7 @@ class BaseController extends LaravelController
 
     public function __construct() 
     {
-        // Share common data with all views (optional but helpful)
-        // Note: Middleware usually handles this better for Auth checks
+        // Share common data if needed
     }
 
     public function setPageTitle($title)
@@ -29,7 +28,7 @@ class BaseController extends LaravelController
     /**
      * CORE SECURITY LOGIC
      * specific to Multi-Tenancy Data Isolation.
-     * * Returns the ID of the institution the user is CURRENTLY working in.
+     * Returns the ID of the institution the user is CURRENTLY working in.
      */
     protected function getInstitutionId()
     {
@@ -40,34 +39,38 @@ class BaseController extends LaravelController
         }
 
         // 1. Get Allowed Institutes for this user
-        // This ensures security: User can only switch to what they own/manage.
         $allowedIds = $this->getAllowedInstitutionIds($user);
 
         // 2. Check Session Context (Priority)
-        // If the user has switched context, we respect that selection first.
         $activeId = session('active_institution_id');
 
-        if ($activeId && in_array($activeId, $allowedIds)) {
+        // FIX: Explicitly handle 'global' session value
+        // If session says 'global', we MUST return null immediately 
+        // to prevent falling back to the default institution below.
+        if (($activeId === 'global' || $activeId === 0 || $activeId === '0') && $user->hasRole('Super Admin')) {
+            return null; // Null indicates Global Context
+        }
+
+        // Check if session ID is valid and allowed
+        if (!empty($activeId) && in_array($activeId, $allowedIds)) {
             return $activeId;
         }
 
         // 3. Fallback: User's Default Institute
-        // If no session is set, use their primary assignment.
+        // Only if no valid session is set.
         if ($user->institute_id && in_array($user->institute_id, $allowedIds)) {
-            // Auto-set session for consistency
             session(['active_institution_id' => $user->institute_id]);
             return $user->institute_id;
         }
 
         // 4. Fallback: First Available Institute
-        // If no primary set (e.g. Super Admin or Multi-school Manager without home), pick first.
         if (!empty($allowedIds)) {
             $firstId = $allowedIds[0];
             session(['active_institution_id' => $firstId]); 
             return $firstId;
         }
 
-        return null; // No access
+        return null; 
     }
 
     /**
