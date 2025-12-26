@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model; // Import Model for unguard
 use Faker\Factory as Faker;
 use App\Models\User;
 use App\Models\Institution;
@@ -30,8 +31,8 @@ use App\Models\Election;
 use App\Models\ElectionPosition; 
 use App\Models\Candidate;  
 use App\Models\Vote;       
-use App\Models\Package;      // NEW
-use App\Models\Subscription; // NEW
+use App\Models\Package;      
+use App\Models\Subscription; 
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
 use Spatie\Permission\Models\Role;
@@ -41,9 +42,12 @@ class BulkDummyDataSeeder extends Seeder
 {
     public function run()
     {
+        // Disable mass assignment protection for seeding
+        Model::unguard();
+
         $faker = Faker::create('fr_FR'); // French Locale for DRC context
         
-        $this->command->info('🌱 Seeding DR Congo School Data with Full Modules (Packages, Subscriptions, Communication, Voting)...');
+        $this->command->info('🌱 Seeding DR Congo School Data with Full Modules...');
 
         // 0. Create Packages (Platform Level)
         $packages = [
@@ -82,8 +86,7 @@ class BulkDummyDataSeeder extends Seeder
         
         $premiumPackage = Package::where('name', 'Premium Plan')->first();
 
-        // 1. Institution (Updated with Acronym and Commune)
-        // Code format: KI (Kinshasa) + LE (Lemba) + 0001 = KILE0001
+        // 1. Institution
         $institution = Institution::firstOrCreate(
             ['code' => 'KILE0001'], 
             [
@@ -100,25 +103,23 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // 1.1 Create Default Roles for this Institution
-        // Roles MUST be scoped to the institution_id
+        // 1.1 Create Default Roles
         $rolesToCreate = [
             RoleEnum::HEAD_OFFICER->value,
             RoleEnum::TEACHER->value,
             RoleEnum::STUDENT->value,
-            'Staff',        // Additional role
-            'Branch Admin'  // Additional role
+            'Staff',        
+            'Branch Admin'  
         ];
 
         foreach ($rolesToCreate as $roleName) {
-            Role::firstOrCreate([
-                'name' => $roleName,
-                'guard_name' => 'web',
-                'institution_id' => $institution->id
-            ]);
+            Role::firstOrCreate(
+                ['name' => $roleName, 'institution_id' => $institution->id],
+                ['guard_name' => 'web']
+            );
         }
 
-        // 1.2 Create Subscription for the Institution
+        // 1.2 Create Subscription
         Subscription::firstOrCreate(
             ['institution_id' => $institution->id],
             [
@@ -156,7 +157,7 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // 4. Grade Levels (French System)
+        // 4. Grade Levels
         $gradesList = [
             ['name' => '1ère Primaire', 'code' => '1P', 'cycle' => 'primary', 'order' => 1],
             ['name' => '2ème Primaire', 'code' => '2P', 'cycle' => 'primary', 'order' => 2],
@@ -187,6 +188,7 @@ class BulkDummyDataSeeder extends Seeder
         ];
         
         $teacherIds = [];
+        $adminUserId = null; // Store for Notice creation
 
         foreach ($staffData as $idx => $data) {
             $roleName = $data['role'];
@@ -206,6 +208,10 @@ class BulkDummyDataSeeder extends Seeder
                 ]
             );
             
+            if ($roleName == RoleEnum::HEAD_OFFICER->value) {
+                $adminUserId = $user->id;
+            }
+
             // Assign Institution-Specific Role
             $role = Role::where('name', $roleName)
                         ->where('institution_id', $institution->id)
@@ -235,22 +241,23 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
 
+        // Fallback if no admin created in loop
+        if (!$adminUserId && $teacherIds) $adminUserId = User::find(1)->id ?? $teacherIds[0];
+
         // 6. Class Sections & Subjects
         $sections = [];
         foreach ($gradeModels as $code => $grade) {
-            // Section A
             $sections[$code] = ClassSection::firstOrCreate(
                 ['institution_id' => $institution->id, 'grade_level_id' => $grade->id, 'name' => 'Section A'],
                 [
                     'campus_id' => $campus->id,
                     'room_number' => 'Salle ' . $grade->order_index,
                     'capacity' => 40,
-                    'staff_id' => $faker->randomElement($teacherIds), 
+                    'staff_id' => !empty($teacherIds) ? $faker->randomElement($teacherIds) : null, 
                     'is_active' => true
                 ]
             );
 
-            // Subjects
             $subjNames = ['Mathématiques', 'Français', 'Anglais', 'Informatique'];
             foreach($subjNames as $subName) {
                 Subject::firstOrCreate(
@@ -336,28 +343,30 @@ class BulkDummyDataSeeder extends Seeder
             'frequency' => 'termly'
         ]);
 
-        // 9. Communication (Notices) - NEW
+        // 9. Communication (Notices)
+        // FIX: Ensure 'published_at' is used instead of 'publish_date' if migration requires it
+        // and user a real created_by ID
         $noticesData = [
             [
                 'title' => 'Rentrée Scolaire 2024',
                 'content' => 'La rentrée scolaire est fixée au 4 Septembre à 7h30. Soyez à l\'heure.',
                 'type' => 'info',
                 'audience' => 'all',
-                'publish_date' => now()->subDays(10),
+                'published_at' => now()->subDays(10),
             ],
             [
                 'title' => 'Réunion des Parents',
                 'content' => 'Une réunion importante aura lieu ce Samedi pour discuter des frais.',
                 'type' => 'event',
                 'audience' => 'parent',
-                'publish_date' => now()->subDays(2),
+                'published_at' => now()->subDays(2),
             ],
             [
                 'title' => 'Urgent: Paiement Frais',
                 'content' => 'Veuillez régulariser vos frais avant le début des examens.',
                 'type' => 'urgent',
                 'audience' => 'student',
-                'publish_date' => now(),
+                'published_at' => now(),
             ]
         ];
 
@@ -368,21 +377,21 @@ class BulkDummyDataSeeder extends Seeder
                 'content' => $n['content'],
                 'type' => $n['type'],
                 'audience' => $n['audience'],
-                'publish_date' => $n['publish_date'],
+                'published_at' => $n['published_at'], // FIX: Match migration column
                 'is_published' => true,
-                'created_by' => 1 // Assuming Super Admin ID 1
+                'created_by' => $adminUserId // FIX: Use valid user ID
             ]);
         }
 
-        // 10. Voting System (Elections) - NEW
+        // 10. Voting System (Elections)
         $election = Election::create([
             'institution_id' => $institution->id,
             'academic_session_id' => $session->id,
             'title' => 'Élections du Comité des Élèves ' . $session->name,
             'description' => 'Élection pour choisir le Doyen et les chefs de classe.',
-            'start_date' => now()->subDays(1), // Started yesterday
-            'end_date' => now()->addDays(2),   // Ends in 2 days
-            'status' => 'published', // Active
+            'start_date' => now()->subDays(1),
+            'end_date' => now()->addDays(2),
+            'status' => 'published',
         ]);
 
         // Positions
@@ -392,26 +401,32 @@ class BulkDummyDataSeeder extends Seeder
         // Candidates (Pick random students)
         $candidateStudents = $faker->randomElements($students, 4);
         
-        // President Candidates
-        Candidate::create(['election_id' => $election->id, 'election_position_id' => $posPresident->id, 'student_id' => $candidateStudents[0]->id, 'status' => 'approved']);
-        Candidate::create(['election_id' => $election->id, 'election_position_id' => $posPresident->id, 'student_id' => $candidateStudents[1]->id, 'status' => 'approved']);
+        // FIX: Capture Candidate Instances to get real IDs for voting
+        $cand1 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posPresident->id, 'student_id' => $candidateStudents[0]->id, 'status' => 'approved']);
+        $cand2 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posPresident->id, 'student_id' => $candidateStudents[1]->id, 'status' => 'approved']);
         
-        // Vice Candidates
-        Candidate::create(['election_id' => $election->id, 'election_position_id' => $posVice->id, 'student_id' => $candidateStudents[2]->id, 'status' => 'approved']);
-        Candidate::create(['election_id' => $election->id, 'election_position_id' => $posVice->id, 'student_id' => $candidateStudents[3]->id, 'status' => 'approved']);
+        $cand3 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posVice->id, 'student_id' => $candidateStudents[2]->id, 'status' => 'approved']);
+        $cand4 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posVice->id, 'student_id' => $candidateStudents[3]->id, 'status' => 'approved']);
 
         // Votes (Simulate some voting)
         $voters = $faker->randomElements($students, 10);
         foreach($voters as $voter) {
             // Vote for President
-            Vote::create([
+            // FIX: Use actual Candidate IDs, not hardcoded 1 or 2
+            $chosenCandidate = $faker->randomElement([$cand1, $cand2]);
+            
+            // Use DB::table for votes because 'votes' table likely missing timestamps, but Eloquent model assumes them.
+            DB::table('votes')->insert([
                 'election_id' => $election->id,
                 'election_position_id' => $posPresident->id,
-                'candidate_id' => $faker->randomElement([1, 2]), // Assuming IDs 1,2 are candidates
+                'candidate_id' => $chosenCandidate->id, 
                 'voter_id' => $voter->id,
                 'voted_at' => now(),
             ]);
         }
+
+        // Re-enable mass assignment protection
+        Model::reguard();
 
         $this->command->info('✅ Bulk Dummy Data (Institutes, Packages, Subscriptions, Staff, Students, Notices, Elections) Seeded Successfully!');
     }
