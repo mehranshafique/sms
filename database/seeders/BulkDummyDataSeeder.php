@@ -120,12 +120,15 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // 1.2 Create Subscription
+        // FIX: Cast duration_days to int to prevent Carbon error
+        $duration = (int) $premiumPackage->duration_days;
+
         Subscription::firstOrCreate(
             ['institution_id' => $institution->id],
             [
                 'package_id' => $premiumPackage->id,
                 'start_date' => now(),
-                'end_date' => now()->addDays($premiumPackage->duration_days),
+                'end_date' => now()->addDays($duration),
                 'status' => 'active',
                 'price_paid' => $premiumPackage->price,
                 'payment_method' => 'bank_transfer',
