@@ -61,7 +61,8 @@
 
 <script>
     $(document).ready(function() {
-        $('#studentTable').DataTable({
+        // 1. Initialize DataTable
+        var table = $('#studentTable').DataTable({
             processing: true,
             serverSide: true,
             ajax: "{{ route('students.index') }}",
@@ -72,6 +73,49 @@
                 { data: 'status', name: 'status' },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
             ]
+        });
+
+        // 2. Delete Button Logic
+        $('#studentTable').on('click', '.delete-btn', function() {
+            var id = $(this).data('id');
+            var deleteUrl = "{{ route('students.destroy', ':id') }}";
+            deleteUrl = deleteUrl.replace(':id', id);
+
+            Swal.fire({
+                title: "{{ __('student.are_you_sure') }}",
+                text: "{{ __('student.delete_warning') }}",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: "{{ __('student.yes_delete') }}",
+                cancelButtonText: "{{ __('student.cancel') }}"
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: deleteUrl,
+                        type: 'DELETE',
+                        data: {
+                            _token: "{{ csrf_token() }}"
+                        },
+                        success: function(response) {
+                            table.ajax.reload();
+                            Swal.fire(
+                                "{{ __('student.deleted') }}",
+                                response.message,
+                                'success'
+                            );
+                        },
+                        error: function(xhr) {
+                            Swal.fire(
+                                "{{ __('student.error') }}",
+                                "{{ __('student.something_went_wrong') }}",
+                                'error'
+                            );
+                        }
+                    });
+                }
+            });
         });
     });
 </script>

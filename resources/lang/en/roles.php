@@ -71,4 +71,11 @@ return [
     'cannot_delete_super_admin' => 'The Super Admin role cannot be deleted.',
     'cannot_edit_super_admin_name' => 'The Super Admin role name cannot be changed.',
     'cannot_delete_system_role' => 'System roles cannot be deleted.',
+
+    // emais template roles
+    'head_officer' => 'Head Officer',
+    'student' => 'Student',
+    'teacher' => 'Teacher',
+    'parent' => 'Parent',
+    
 ];

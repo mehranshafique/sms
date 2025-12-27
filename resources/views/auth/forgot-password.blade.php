@@ -1,25 +1,38 @@
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-        {{ __('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.') }}
-    </div>
+@extends('layouts.auth')
 
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+@section('title', __('login.forgot_password_title') ?? 'Forgot Password')
 
-    <form method="POST" action="{{ route('password.email') }}">
+@section('content')
+    <h4 class="text-center mb-4">{{ __('login.reset_password_header') ?? 'Reset Password' }}</h4>
+    
+    <p class="text-center mb-4">
+        {{ __('login.forgot_password_desc') ?? 'Enter your email address and we will send you a link to reset your password.' }}
+    </p>
+
+    <form method="POST" action="{{ route('password.email') }}" >
         @csrf
-
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+        
+        {{-- Email Input --}}
+        <div class="form-group">
+            <label class="form-label" for="email">{{ __('login.email_label') ?? 'Email Address' }}</label>
+            <input 
+                type="email" 
+                class="form-control @error('email') is-invalid @enderror" 
+                placeholder="{{ __('login.email_placeholder') ?? 'hello@example.com' }}" 
+                name="email" 
+                id="email"
+                value="{{ old('email') }}" 
+                required 
+                autofocus>
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Email Password Reset Link') }}
-            </x-primary-button>
+        {{-- Submit Button --}}
+        <div class="text-center mt-4">
+            <button type="submit" class="btn btn-primary btn-block">{{ __('login.send_reset_link') ?? 'Send Password Reset Link' }}</button>
+        </div>
+        
+        <div class="text-center mt-3">
+            <a href="{{ route('login') }}" class="text-primary">{{ __('login.back_to_login') ?? 'Back to Login' }}</a>
         </div>
     </form>
-</x-guest-layout>
+@endsection

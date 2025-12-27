@@ -49,9 +49,10 @@
                     </a>
                     <ul aria-expanded="false">
                         <li><a href="{{ route('institutes.index') }}">{{ __('sidebar.all_institutions') }}</a></li>
+                        <li><a href="{{ route('header-officers.index') }}">{{ __('sidebar.header_officers.title') }}</a></li>
                         <li><a href="{{ route('institutes.index') }}?status=0">{{ __('sidebar.expired_institution') }}</a></li>
-                        <li><a href="{{ route('packages.index') }}">Packages</a></li>
-                        <li><a href="{{ route('subscriptions.index') }}">Subscriptions</a></li>
+                        <li><a href="{{ route('packages.index') }}">{{ __('sidebar.packages.title') }}</a></li>
+                        <li><a href="{{ route('subscriptions.index') }}">{{ __('sidebar.subscriptions.title') }}</a></li>
                     </ul>
                 </li>
 

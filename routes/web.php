@@ -44,6 +44,7 @@ use App\Http\Controllers\Finance\PaymentController;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use App\Http\Middleware\CheckModuleAccess; 
+use App\Http\Controllers\LocationController;
 
 Route::redirect('/','/login' );
 
@@ -278,6 +279,12 @@ Route::middleware('auth')->group(function () {
                 Route::post('/recharge', [ConfigurationController::class, 'recharge'])->name('configuration.recharge');
             });
         });
+    
+    Route::middleware(['auth'])->prefix('locations')->name('locations.')->group(function() {
+        Route::get('countries', [LocationController::class, 'countries'])->name('countries');
+        Route::get('states', [LocationController::class, 'states'])->name('states');
+        Route::get('cities', [LocationController::class, 'cities'])->name('cities');
+    });
 });
 
 require __DIR__.'/auth.php';

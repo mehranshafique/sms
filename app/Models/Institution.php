@@ -22,6 +22,7 @@ class Institution extends Model
         'phone',
         'email',
         'logo', 
+        'sms_credits',
         'is_active',
     ];
 

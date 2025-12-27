@@ -17,19 +17,19 @@ class SmsTemplateController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        // Fetch templates. 
-        // Logic: Show Global templates if Super Admin (inst_id null). 
-        // Show School templates if School Admin.
-        
-        $query = SmsTemplate::query();
-        
-        if ($institutionId) {
-            $query->where('institution_id', $institutionId);
+        if (!$institutionId) {
+            // Super Admin: Show only Global Templates
+            $templates = SmsTemplate::whereNull('institution_id')->get();
         } else {
-            $query->whereNull('institution_id');
-        }
+            // School Admin: Fetch Global AND School Specific
+            // We key them by 'event_key' to merge them easily
+            
+            $globalTemplates = SmsTemplate::whereNull('institution_id')->get()->keyBy('event_key');
+            $schoolTemplates = SmsTemplate::where('institution_id', $institutionId)->get()->keyBy('event_key');
 
-        $templates = $query->get();
+            // Merge: School templates take precedence over Global ones
+            $templates = $globalTemplates->merge($schoolTemplates);
+        }
 
         return view('settings.sms_templates.index', compact('templates'));
     }
@@ -37,49 +37,40 @@ class SmsTemplateController extends BaseController
     public function update(Request $request, $id)
     {
         $template = SmsTemplate::findOrFail($id);
-        
-        // Security check
         $institutionId = $this->getInstitutionId();
-        if ($institutionId && $template->institution_id != $institutionId) {
-            abort(403);
+
+        $validated = $request->validate([
+            'body' => 'required|string',
+            'is_active' => 'boolean' // Handles the activation toggle
+        ]);
+
+        // Scenario 1: Super Admin updating Global Template
+        if (!$institutionId) {
+            $template->update($validated);
+            return response()->json(['message' => 'Global template updated.']);
         }
 
-        $validated = $request->validate([
-            'body' => 'required|string',
-            'is_active' => 'boolean'
-        ]);
+        // Scenario 2: School Admin updating their OWN Custom Template
+        if ($template->institution_id == $institutionId) {
+            $template->update($validated);
+            return response()->json(['message' => 'Template updated.']);
+        }
 
-        $template->update($validated);
+        // Scenario 3: School Admin "Activating" or "Editing" a Global Template (Implicit Override)
+        // We create a NEW record for this school based on the global one
+        if ($template->institution_id === null) {
+            SmsTemplate::create([
+                'institution_id' => $institutionId,
+                'event_key' => $template->event_key,
+                'name' => $template->name,
+                'available_tags' => $template->available_tags,
+                'body' => $validated['body'], // Use the new body from request
+                'is_active' => $request->boolean('is_active') // Use new status
+            ]);
+            
+            return response()->json(['message' => 'Template activated and customized for your school.']);
+        }
 
-        return response()->json(['message' => 'Template updated successfully.']);
-    }
-
-    /**
-     * For School Admins to override a Global Template
-     * This creates a copy of the global event for their specific institution ID
-     */
-    public function override(Request $request)
-    {
-        $institutionId = $this->getInstitutionId();
-        if (!$institutionId) abort(403, 'Only schools can override global templates.');
-
-        $validated = $request->validate([
-            'event_key' => 'required|string',
-            'name' => 'required|string',
-            'body' => 'required|string',
-            'available_tags' => 'nullable|string',
-        ]);
-
-        SmsTemplate::updateOrCreate(
-            ['event_key' => $validated['event_key'], 'institution_id' => $institutionId],
-            [
-                'name' => $validated['name'],
-                'body' => $validated['body'],
-                'available_tags' => $validated['available_tags'],
-                'is_active' => true
-            ]
-        );
-
-        return response()->json(['message' => 'Custom template saved.']);
+        abort(403, 'Unauthorized action.');
     }
 }

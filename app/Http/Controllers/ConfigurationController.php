@@ -68,7 +68,6 @@ class ConfigurationController extends BaseController
         ];
 
         // 4. Modules (Dynamic from DB)
-        // Fetch all modules from database instead of hardcoded list
         $allModules = Module::orderBy('name')->get();
         $enabledModules = json_decode($settings['enabled_modules'] ?? '[]', true);
         if(!is_array($enabledModules)) $enabledModules = [];
@@ -87,7 +86,6 @@ class ConfigurationController extends BaseController
      */
     public function updateSmtp(Request $request)
     {
-        // Authorized Head Officers can update their own SMTP, but Main Admin can update ANY.
         $institutionId = $this->getInstitutionId();
         $this->authorize('update', Institution::findOrFail($institutionId));
         
@@ -123,9 +121,6 @@ class ConfigurationController extends BaseController
         ]);
 
         try {
-            // Because our Middleware 'LoadInstitutionSettings' runs before this,
-            // the Mail config is already set to the institution's settings.
-            
             Mail::raw('This is a test email from the Digitex System Configuration check.', function ($message) use ($request) {
                 $message->to($request->test_email)
                         ->subject('SMTP Configuration Test');
@@ -169,7 +164,6 @@ class ConfigurationController extends BaseController
 
     /**
      * Update Module Purchased (Menu: Module Purchased)
-     * STRICTLY for Main Admin (Platform Owner)
      */
     public function updateModules(Request $request)
     {
@@ -177,7 +171,6 @@ class ConfigurationController extends BaseController
 
         $institutionId = $this->getInstitutionId();
         
-        // Store slugs of enabled modules
         $modules = $request->input('modules', []);
         InstitutionSetting::set($institutionId, 'enabled_modules', json_encode($modules), 'modules');
 
@@ -186,7 +179,6 @@ class ConfigurationController extends BaseController
 
     /**
      * Recharge SMS/WhatsApp (Menu: SMS Recharging / Whatsapp Recharging)
-     * STRICTLY for Main Admin (Billing)
      */
     public function recharge(Request $request)
     {
@@ -200,17 +192,16 @@ class ConfigurationController extends BaseController
             'amount' => 'required|integer|min:1',
         ]);
 
-        // Logic: Main Admin adds credits to the school's account
+        // Explicitly update and save to ensure database persistence
         if ($request->type === 'sms') {
-            $institution->increment('sms_credits', $request->amount);
+            $institution->sms_credits = (int)$institution->sms_credits + (int)$request->amount;
         } else {
-            $institution->increment('whatsapp_credits', $request->amount);
+            $institution->whatsapp_credits = (int)$institution->whatsapp_credits + (int)$request->amount;
         }
+        
+        $institution->save();
 
-        // Ideally, log this transaction in an Audit Log (Tracking Module)
-        // \App\Models\AuditLog::log('Recharge', "Added {$request->amount} {$request->type} credits to {$institution->name}");
-
-        return back()->with('success', __('configuration.recharge_success'));
+        return back()->with('success', __('configuration.recharge_success') . ' - New Balance: ' . ($request->type === 'sms' ? $institution->sms_credits : $institution->whatsapp_credits));
     }
     
     /**

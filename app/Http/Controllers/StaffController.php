@@ -6,6 +6,7 @@ use App\Models\Staff;
 use App\Models\User;
 use App\Models\Institution;
 use App\Models\Campus;
+use App\Services\NotificationService; // New Import
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -17,21 +18,22 @@ use Illuminate\Validation\Rule;
 
 class StaffController extends BaseController
 {
-    public function __construct()
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
     {
         $this->authorizeResource(Staff::class, 'staff');
         $this->setPageTitle(__('staff.page_title'));
+        $this->notificationService = $notificationService;
     }
 
     public function index(Request $request)
     {
-        // 1. Get Context
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
             $data = Staff::with(['user', 'institution', 'campus'])->select('staff.*');
 
-            // 2. Strict Scoping
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
             }
@@ -115,7 +117,6 @@ class StaffController extends BaseController
         }
         $campuses = $campusesQuery->pluck('name', 'id');
         
-        // Exclude Super Admin role from selection
         $roles = Role::where('name', '!=', 'Super Admin')->get();
         
         return view('staff.create', compact('institutions', 'campuses', 'roles', 'institutionId'));
@@ -123,19 +124,15 @@ class StaffController extends BaseController
 
     public function store(Request $request)
     {
-        // 1. Resolve ID
         $institutionId = $this->getInstitutionId() ?? $request->institution_id;
 
         $request->validate([
-            // User Fields
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
             'role' => 'required|exists:roles,name',
             'phone' => 'nullable|string',
             'profile_picture' => 'nullable|image|max:2048',
-            
-            // Staff Fields
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'campus_id' => 'nullable|exists:campuses,id',
             'designation' => 'nullable|string',
@@ -144,15 +141,14 @@ class StaffController extends BaseController
         ]);
 
         DB::transaction(function () use ($request, $institutionId) {
-            // 1. Create User
             $userData = [
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
-                'user_type' => 4, // 4 = Staff
+                'user_type' => 4, // Staff
                 'is_active' => true,
-                'institute_id' => $institutionId, // Link User to Institution
+                'institute_id' => $institutionId,
             ];
 
             if ($request->hasFile('profile_picture')) {
@@ -162,8 +158,6 @@ class StaffController extends BaseController
             $user = User::create($userData);
             $user->assignRole($request->role);
 
-            // 2. Create Staff Profile
-            // Auto-generate Employee ID if not provided: EMP-{USER_ID}-{INST_ID}
             $empId = $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
 
             Staff::create([
@@ -178,6 +172,9 @@ class StaffController extends BaseController
                 'address' => $request->address,
                 'status' => 'active',
             ]);
+
+            // SEND CREDENTIALS
+            $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
         });
 
         return response()->json(['redirect' => route('staff.index'), 'message' => __('staff.messages.success_create')]);
@@ -195,11 +192,7 @@ class StaffController extends BaseController
     public function edit(Staff $staff)
     {
         $institutionId = $this->getInstitutionId();
-
-        // Strict Check
-        if ($institutionId && $staff->institution_id != $institutionId) {
-            abort(403, 'Unauthorized access.');
-        }
+        if ($institutionId && $staff->institution_id != $institutionId) abort(403);
 
         $staff->load('user');
         
@@ -226,7 +219,6 @@ class StaffController extends BaseController
         ]);
 
         DB::transaction(function () use ($request, $staff, $user, $institutionId) {
-            // Update User
             $userData = [
                 'name' => $request->name,
                 'email' => $request->email,
@@ -247,7 +239,6 @@ class StaffController extends BaseController
             $user->update($userData);
             $user->syncRoles([$request->role]);
 
-            // Update Staff
             $staff->update([
                 'institution_id' => $institutionId ?? $request->institution_id,
                 'campus_id' => $request->campus_id,
@@ -259,6 +250,10 @@ class StaffController extends BaseController
                 'address' => $request->address,
                 'status' => $request->status ?? $staff->status,
             ]);
+
+            if($request->password) {
+                $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
+            }
         });
 
         return response()->json(['redirect' => route('staff.index'), 'message' => __('staff.messages.success_update')]);
@@ -270,14 +265,11 @@ class StaffController extends BaseController
         if ($institutionId && $staff->institution_id != $institutionId) abort(403);
 
         $user = $staff->user;
-        
         if ($user->profile_picture) {
             Storage::disk('public')->delete($user->profile_picture);
         }
-        
-        $staff->delete(); // Delete profile
-        $user->delete();  // Delete login
-        
+        $staff->delete();
+        $user->delete();
         return response()->json(['message' => __('staff.messages.success_delete')]);
     }
 }

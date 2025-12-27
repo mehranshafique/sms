@@ -11,7 +11,7 @@ use App\Models\AcademicSession;
 use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
 use App\Services\IdGeneratorService;
-use App\Services\NotificationService; // UPDATED to use NotificationService
+use App\Services\NotificationService;
 use App\Enums\UserType;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\QueryException;
 
 class StudentController extends BaseController
 {
@@ -139,24 +140,34 @@ class StudentController extends BaseController
             'last_name' => 'required|string|max:100',
             'admission_date' => 'required|date',
             'dob' => 'required|date',
-            'grade_level_id' => [
-                'required', 
-                'exists:grade_levels,id',
-                function($attribute, $value, $fail) use ($institutionId) {
-                    if ($institutionId && GradeLevel::where('id', $value)->where('institution_id', $institutionId)->doesntExist()) {
-                        $fail(__('student.invalid_grade_level'));
-                    }
-                }
-            ],
+            'grade_level_id' => 'required|exists:grade_levels,id',
             'class_section_id' => 'nullable|exists:class_sections,id',
             'email' => 'nullable|email|unique:users,email',
+            'country' => 'nullable|string',
+            'state' => 'nullable|string',
+            'city' => 'nullable|string',
+            'religion' => 'nullable|string',
+            'blood_group' => 'nullable|string',
+            'avenue' => 'nullable|string',
+            'place_of_birth' => 'nullable|string',
         ]);
 
         $data = $request->except(['_token', '_method']);
 
+        // --- Capitalize Text Fields (Title Case) ---
+        $textFields = [
+            'first_name', 'last_name', 'post_name', 'place_of_birth', 
+            'avenue', 'father_name', 'mother_name', 'country', 'state', 'city', 'religion'
+        ];
+        
+        foreach ($textFields as $field) {
+            if (!empty($data[$field])) {
+                $data[$field] = ucwords(strtolower($data[$field]));
+            }
+        }
+
         DB::transaction(function () use ($request, $data, $institutionId) {
             $institution = Institution::findOrFail($institutionId);
-            
             $currentSession = AcademicSession::where('institution_id', $institutionId)
                 ->where('is_current', true)
                 ->first();
@@ -166,30 +177,38 @@ class StudentController extends BaseController
             }
 
             $data['institution_id'] = $institutionId; 
-            $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
-
-            if ($request->hasFile('student_photo')) {
-                $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
-            }
-
+            
+            // 1. CREATE USER FIRST (To get the User ID for ID Generation)
+            $user = null;
             if ($request->email) {
+                $plainPassword = 'Student' . rand(1000, 9999) . '!';
+                
                 $user = User::create([
-                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'name' => $data['first_name'] . ' ' . $data['last_name'],
                     'email' => $request->email,
-                    'password' => Hash::make('Student123!'),
+                    'password' => Hash::make($plainPassword),
                     'user_type' => UserType::STUDENT->value,
                     'institute_id' => $institutionId,
                     'is_active' => true,
                 ]);
                 
-                $roleName = 'Student';
-                if (Role::where('name', $roleName)->where('guard_name', 'web')->exists()) {
-                    $user->assignRole($roleName);
-                }
-                
+                $user->assignRole('Student');
                 $data['user_id'] = $user->id;
+                
+                // Send credentials later
+                $this->notificationService->sendUserCredentials($user, $plainPassword, 'Student');
             }
 
+            // 2. GENERATE ID (Pass User ID if available)
+            // This ensures ID is [InstID][YY][UserID] which is guaranteed unique per user
+            $userId = $user ? $user->id : null;
+            $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession, $userId);
+
+            if ($request->hasFile('student_photo')) {
+                $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
+            }
+
+            // 3. CREATE STUDENT
             $student = Student::create($data);
 
             $sectionId = $request->class_section_id;
@@ -212,7 +231,6 @@ class StudentController extends BaseController
                 ]);
             }
 
-            // Trigger "Student Admission" SMS if phone number exists
             $phone = $student->mobile_number ?? $student->father_phone;
             if ($phone) {
                 $smsData = [
@@ -220,7 +238,6 @@ class StudentController extends BaseController
                     'AdmissionNumber' => $student->admission_number,
                     'SchoolName' => $institution->name
                 ];
-                // Using 'student_admission' template event
                 $this->notificationService->sendSmsEvent('student_admission', $phone, $smsData, $institutionId);
             }
         });
@@ -261,11 +278,26 @@ class StudentController extends BaseController
             'first_name' => 'required',
             'last_name' => 'required',
             'dob' => 'required|date',
+            'country' => 'nullable|string',
+            'state' => 'nullable|string',
+            'city' => 'nullable|string',
         ]);
 
         $data = $request->all();
         unset($data['admission_number']); 
         unset($data['institution_id']); 
+
+        // --- Capitalize Text Fields (Title Case) ---
+        $textFields = [
+            'first_name', 'last_name', 'post_name', 'place_of_birth', 
+            'avenue', 'father_name', 'mother_name', 'country', 'state', 'city', 'religion'
+        ];
+        
+        foreach ($textFields as $field) {
+            if (!empty($data[$field])) {
+                $data[$field] = ucwords(strtolower($data[$field]));
+            }
+        }
 
         if ($request->hasFile('student_photo')) {
             if ($student->student_photo) {
@@ -279,14 +311,8 @@ class StudentController extends BaseController
         if($student->user_id) {
             $userLink = User::find($student->user_id);
             if($userLink) {
-                if (!$userLink->hasRole('Student')) {
-                    if (Role::where('name', 'Student')->exists()) {
-                        $userLink->assignRole('Student');
-                    }
-                }
-                
                 $userLink->update([
-                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'name' => $data['first_name'] . ' ' . $data['last_name'],
                     'email' => $request->email,
                 ]);
             }
@@ -300,13 +326,27 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) abort(403);
         
-        if ($student->student_photo) {
-            Storage::disk('public')->delete($student->student_photo);
+        try {
+            DB::transaction(function () use ($student) {
+                if ($student->student_photo) {
+                    Storage::disk('public')->delete($student->student_photo);
+                }
+                if($student->user_id) {
+                    User::destroy($student->user_id);
+                }
+                $student->delete();
+            });
+            
+            return response()->json(['message' => __('student.messages.success_delete')]);
+
+        } catch (QueryException $e) {
+            if ($e->errorInfo[1] == 1451) {
+                return response()->json([
+                    'message' => __('student.messages.cannot_delete_linked_data') ?? 'Cannot delete student because they are linked to other records (e.g. Grades, Attendance).'
+                ], 422);
+            }
+            
+            return response()->json(['message' => __('student.messages.error_occurred') ?? 'An error occurred while deleting the student.'], 500);
         }
-        if($student->user_id) {
-            User::destroy($student->user_id);
-        }
-        $student->delete();
-        return response()->json(['message' => __('student.messages.success_delete')]);
     }
 }

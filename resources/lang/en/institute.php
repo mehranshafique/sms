@@ -46,9 +46,21 @@ return [
     'admin_email' => 'Admin Email',
     'password' => 'Password',
     'phone_number' => 'Phone Number',
-    'commune' => 'Commune / Location', // NEW
+    'country' => 'Country',
+    'select_country' => 'Select Country',
+    'select_city' => 'Select City',
+    'select_commune' => 'Select Commune',
+    'commune' => 'Commune / Location', 
+    'update_btn' => 'Update Institute',
+    'save_btn' => 'Save Institute',
 
     // Placeholders
+    'institute_name_placeholder' => 'Enter institute name',
+    'acronym_placeholder' => 'e.g. ABC',
+    'acronym' => 'Acronym',
+    'email_placeholder' => 'Enter Admin Email',
+    'password_placeholder' => 'Enter Password',
+    'address_placeholder' => 'Enter complete address',
     'enter_institute_name' => 'Enter institute name',
     'select_institute_type' => '-- Select Institute Type --',
     'enter_country' => 'Country',
@@ -101,5 +113,21 @@ return [
     'contact_information' => 'Contact Information',
     'edit_institute' => 'Edit Institute',
     'update_institute_details' => 'Update institute details',
-    'leave_blank_to_keep_current' => 'Leave blank to keep current institute password',
+
+    // --- NEW VALIDATION KEYS FOR CONTROLLER ---
+    'validation_name_required' => 'The institute name is required',
+    'validation_type_required' => 'The institute type is required',
+    'validation_email_required' => 'The email address is required',
+    'validation_email_unique' => 'This email is already registered',
+    'validation_phone_required' => 'The phone number is required',
+    'validation_country_required' => 'Please select a country',
+    'validation_city_required' => 'Please select a city',
+    'validation_commune_required' => 'Please select a commune',
+    
+    // --- NEW EMAIL & CONTROLLER KEYS ---
+    'admin_default_name' => 'Admin :name',
+    'email_welcome_subject' => 'Welcome to Your New Institute Account',
+    'email_greeting' => 'Hello :name,',
+    'create_success' => 'Institute created successfully.',
+    'update_success' => 'Institute updated successfully.',
 ];

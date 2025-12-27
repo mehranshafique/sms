@@ -15,8 +15,9 @@ class Student extends Model
     protected $fillable = [
         'institution_id', 'campus_id', 'grade_level_id', 'class_section_id',
         'admission_number', 'roll_number', 'admission_date',
-        'first_name', 'last_name', 'gender', 'dob', 'blood_group', 'religion', 'category',
+        'first_name', 'last_name', 'gender', 'dob', 'blood_group','place_of_birth', 'religion', 'category',
         'mobile_number', 'email', 'current_address', 'permanent_address',
+        'country', 'state', 'city', 'avenue',
         'father_name', 'father_phone', 'father_occupation',
         'mother_name', 'mother_phone', 'mother_occupation',
         'guardian_name', 'guardian_relation', 'guardian_phone', 'guardian_email',

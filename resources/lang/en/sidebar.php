@@ -15,7 +15,7 @@ return [
     'sms_whatsapp_mail' => 'SMS/Whatsapp/Mail',
     
     'management' => 'Management',
-    'institution_mgmt' => 'Institution Mgmt',
+    'institution_mgmt' => 'Institution Management',
     'all_institutions' => 'All Institutions',
     'expired_institution' => 'Expired Institution',
     'module_activated' => 'Module Activated',
@@ -117,5 +117,11 @@ return [
     ],
     'header_officers' => [
         'title' => 'Head Officers'
+    ],
+    'packages' => [
+        'title' => 'Packages'
+    ],
+    'subscriptions' => [
+        'title' => 'Subscriptions'
     ]
 ];

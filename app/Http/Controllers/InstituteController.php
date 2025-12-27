@@ -15,6 +15,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class InstituteController extends BaseController
 {
@@ -97,64 +98,87 @@ class InstituteController extends BaseController
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:150',
-            'acronym' => 'nullable|string|max:50',
-            'type' => 'required|in:primary,secondary,university,mixed',
-            'country' => 'required|string|max:100',
-            'city' => 'required|string|max:100',
-            'commune' => 'required|string|max:100',
-            'address' => 'nullable|string',
-            'phone' => ['required', 'string', 'max:30', 'regex:/^\+\d+/'], 
-            'email' => 'nullable|email',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        $rules = [
+            'name'      => 'required|string|max:150',
+            'acronym'   => 'nullable|string|max:20',
+            'type'      => 'required|in:primary,secondary,university,mixed',
+            'country'   => 'required|exists:countries,id',
+            'state'     => 'required|exists:states,id',
+            'city'      => 'required|exists:cities,id',
+            'address'   => 'nullable|string',
+            'full_phone'=> 'required|string|max:30',
+            // Check unique in institutions AND users table
+            'email'     => ['required', 'email', 'unique:institutions,email', 'unique:users,email'],
+            'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            'password' => 'nullable|string|min:6',
-        ], [
-            'phone.regex' => __('institute.phone_format_error'),
-        ]);
+            'password'  => 'required|string|min:6', // REQUIRED for creation
+        ];
 
-        if ($request->hasFile('logo')) {
-            $validated['logo'] = $request->file('logo')->store('institutes', 'public');
+        $messages = [
+            'name.required'       => __('institute.validation_name_required'),
+            'type.required'       => __('institute.validation_type_required'),
+            'country.required'    => __('locations.country_required'),
+            'state.required'      => __('locations.state_required'),
+            'city.required'       => __('locations.city_required'),
+            'full_phone.required' => __('institute.validation_phone_required'),
+            'email.unique'        => __('institute.validation_email_unique'), 
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        // --- Capitalize Text Fields ---
+        $textFields = ['name', 'acronym', 'address'];
+        
+        // Exclude 'password' so it isn't passed to Institution::fill()
+        $data = $request->except(['logo', 'password', 'full_phone', 'commune']); 
+        
+        foreach ($textFields as $field) {
+            if (!empty($data[$field])) {
+                $data[$field] = ucwords(strtolower($data[$field]));
+            }
         }
 
-        $validated['code'] = IdGeneratorService::generateInstitutionCode($request->city, $request->commune);
+        DB::transaction(function () use ($validated, $request, $data) {
+            $institute = new Institution();
+            
+            // $data already excludes 'password', so this won't throw SQL error
+            $institute->fill($data);
+            
+            // To be safe and maintain "meaningless" structure (1-5-001) as requested
+            $institute->code = IdGeneratorService::generateInstitutionCode($request->state, $request->city);
+            
+            $institute->phone = $request->full_phone;
 
-        DB::transaction(function () use ($validated, $request) {
-            $institute = Institution::create($validated);
+            // Note: Password is NOT stored on Institution model, only on User model.
+            // We removed $institute->password assignment here.
 
-            // 1. Create Essential Roles for this Institution
-            $headOfficerRole = Role::firstOrCreate([
-                'name' => RoleEnum::HEAD_OFFICER->value,
-                'guard_name' => 'web',
-                'institution_id' => $institute->id
-            ]);
+            if ($request->hasFile('logo')) {
+                $institute->logo = $request->file('logo')->store('institutes', 'public');
+            }
 
-            Role::firstOrCreate([
-                'name' => RoleEnum::TEACHER->value,
-                'guard_name' => 'web',
-                'institution_id' => $institute->id
-            ]);
+            $institute->save();
+            $this->createInstituteRoles($institute);
 
-            Role::firstOrCreate([
-                'name' => RoleEnum::STUDENT->value,
-                'guard_name' => 'web',
-                'institution_id' => $institute->id
-            ]);
-
-            // 2. Create Admin User
             if($request->filled('email') && $request->filled('password')) {
+                // Use capitalized Name/Acronym for admin name
+                $adminName = __('institute.admin_default_name', ['name' => ($data['acronym'] ?? $data['name'])]);
+                
                 $adminUser = User::create([
-                    'name' => 'Admin ' . ($request->acronym ?? $institute->name),
-                    'email' => $request->email,
-                    'password' => Hash::make($request->password),
-                    'institute_id' => $institute->id,
-                    'user_type' => UserType::HEAD_OFFICER->value,
-                    'mobile_number' => $request->phone,
+                    'name'          => $adminName,
+                    'email'         => $request->email,
+                    'password'      => Hash::make($request->password),
+                    'institute_id'  => $institute->id,
+                    'user_type'     => UserType::HEAD_OFFICER->value,
+                    'mobile_number' => $request->full_phone,
                 ]);
 
-                // 3. Assign Head Officer Role to User
-                $adminUser->assignRole($headOfficerRole);
+                $headOfficerRole = Role::where('name', RoleEnum::HEAD_OFFICER->value)
+                                       ->where('institution_id', $institute->id)
+                                       ->first();
+
+                if ($headOfficerRole) {
+                    $adminUser->assignRole($headOfficerRole);
+                }
 
                 $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
             }
@@ -175,56 +199,93 @@ class InstituteController extends BaseController
 
     public function update(Request $request, Institution $institute)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:150',
-            'acronym' => 'nullable|string|max:50',
-            'type' => 'required|in:primary,secondary,university,mixed',
-            'country' => 'required|string|max:100',
-            'city' => 'required|string|max:100',
-            'commune' => 'required|string|max:100',
-            'address' => 'nullable|string',
-            'phone' => ['required', 'string', 'max:30', 'regex:/^\+\d+/'],
-            'email' => 'nullable|email',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        $adminUser = User::where('institute_id', $institute->id)
+                         ->where('user_type', UserType::HEAD_OFFICER->value)
+                         ->first();
+        $adminUserId = $adminUser ? $adminUser->id : null;
+
+        $rules = [
+            'name'      => 'required|string|max:150',
+            'acronym'   => 'nullable|string|max:20',
+            'type'      => 'required|in:primary,secondary,university,mixed',
+            'country'   => 'required|exists:countries,id',
+            'state'     => 'required|exists:states,id',
+            'city'      => 'required|exists:cities,id',
+            'address'   => 'nullable|string',
+            'full_phone'=> 'required|string|max:30',
+            'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            'password' => 'nullable|string|min:6',
-        ], [
-            'phone.regex' => __('institute.phone_format_error'),
-        ]);
+            'password'  => 'nullable|string|min:6', // Optional for update
+            'email'     => [
+                'required', 
+                'email', 
+                // Fix: Ensure correct table name 'institutions'
+                Rule::unique('institutions')->ignore($institute->id),
+                Rule::unique('users')->ignore($adminUserId)
+            ],
+        ];
+
+        $messages = [
+            'name.required'       => __('institute.validation_name_required'),
+            'type.required'       => __('institute.validation_type_required'),
+            'country.required'    => __('locations.country_required'),
+            'state.required'      => __('locations.state_required'),
+            'city.required'       => __('locations.city_required'),
+            'full_phone.required' => __('institute.validation_phone_required'),
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        // --- Capitalize Text Fields ---
+        $textFields = ['name', 'acronym', 'address'];
+        
+        // Exclude 'password' so it isn't passed to Institution::fill()
+        $data = $request->except(['logo', 'password', 'full_phone', 'commune']);
+
+        foreach ($textFields as $field) {
+            if (!empty($data[$field])) {
+                $data[$field] = ucwords(strtolower($data[$field]));
+            }
+        }
 
         if ($request->hasFile('logo')) {
             if ($institute->logo) {
                 Storage::disk('public')->delete($institute->logo);
             }
-            $validated['logo'] = $request->file('logo')->store('institutes', 'public');
+            $data['logo'] = $request->file('logo')->store('institutes', 'public');
         }
 
-        DB::transaction(function () use ($validated, $request, $institute) {
-            $institute->update($validated);
+        $data['phone'] = $request->full_phone;
 
-            // 1. Ensure Roles exist on Update (Self-Healing)
-            $roles = [RoleEnum::HEAD_OFFICER->value, RoleEnum::TEACHER->value, RoleEnum::STUDENT->value];
-            foreach ($roles as $roleName) {
-                Role::firstOrCreate([
-                    'name' => $roleName,
-                    'guard_name' => 'web',
-                    'institution_id' => $institute->id
-                ]);
-            }
+        DB::transaction(function () use ($validated, $request, $institute, $adminUser, $data) {
+            
+            // Password is NOT stored on Institution model, do NOT add it to $data
+            // If it was in $data, remove it:
+            if(isset($data['password'])) unset($data['password']);
 
-            // 2. Update Admin User Logic
-            if($request->filled('password') && $request->filled('email')) {
-                $admin = User::where('email', $request->email)->first();
-                if($admin) {
-                    $admin->update(['password' => Hash::make($request->password)]);
+            $institute->update($data);
+            $this->createInstituteRoles($institute);
+
+            if($request->filled('email')) {
+                if($adminUser) {
+                    $updateData = ['email' => $request->email];
                     
-                    // Ensure Head Officer Role assignment
+                    // Only update User password if provided
+                    if ($request->filled('password')) {
+                        $updateData['password'] = Hash::make($request->password);
+                    }
+                    
+                    $adminUser->update($updateData);
+
                     $headOfficerRole = Role::where('name', RoleEnum::HEAD_OFFICER->value)
                         ->where('institution_id', $institute->id)
                         ->first();
-                        
-                    if($headOfficerRole && !$admin->hasRole($headOfficerRole)) {
-                        $admin->assignRole($headOfficerRole);
+                    if($headOfficerRole && !$adminUser->hasRole($headOfficerRole)) {
+                        $adminUser->assignRole($headOfficerRole);
+                    }
+
+                    if ($request->filled('password')) {
+                        $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
                     }
                 }
             }
@@ -235,10 +296,15 @@ class InstituteController extends BaseController
 
     public function destroy(Institution $institute)
     {
-        if ($institute->logo) {
-            Storage::disk('public')->delete($institute->logo);
-        }
-        $institute->delete();
+        DB::transaction(function () use ($institute) {
+            User::where('institute_id', $institute->id)->delete();
+            
+            if ($institute->logo) {
+                Storage::disk('public')->delete($institute->logo);
+            }
+            $institute->delete();
+        });
+
         return response()->json(['message' => __('institute.messages.success_delete')]);
     }
 
@@ -249,14 +315,32 @@ class InstituteController extends BaseController
         $ids = $request->ids;
         if (!empty($ids)) {
             $institutes = Institution::whereIn('id', $ids)->get();
-            foreach ($institutes as $institute) {
-                if ($institute->logo) {
-                    Storage::disk('public')->delete($institute->logo);
+            
+            DB::transaction(function () use ($institutes) {
+                foreach ($institutes as $institute) {
+                    User::where('institute_id', $institute->id)->delete();
+
+                    if ($institute->logo) {
+                        Storage::disk('public')->delete($institute->logo);
+                    }
+                    $institute->delete();
                 }
-                $institute->delete();
-            }
+            });
+            
             return response()->json(['success' => __('institute.messages.success_delete')]);
         }
         return response()->json(['error' => __('institute.something_went_wrong')]);
+    }
+
+    private function createInstituteRoles($institute)
+    {
+        $roles = [RoleEnum::HEAD_OFFICER->value, RoleEnum::TEACHER->value, RoleEnum::STUDENT->value];
+        foreach ($roles as $roleName) {
+            Role::firstOrCreate([
+                'name' => $roleName,
+                'guard_name' => 'web',
+                'institution_id' => $institute->id
+            ]);
+        }
     }
 }

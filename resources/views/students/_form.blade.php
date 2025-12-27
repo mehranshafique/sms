@@ -1,4 +1,4 @@
-<form action="{{ isset($student) ? route('students.update', $student->id) : route('students.store') }}" method="POST" id="studentForm" enctype="multipart/form-data">
+<form action="{{ isset($student) ? route('students.update', $student->id) : route('students.store') }}" method="POST" id="studentForm" enctype="multipart/form-data" novalidate>
     @csrf
     @if(isset($student))
         @method('PUT')
@@ -12,39 +12,34 @@
             
             <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
                 <li class="nav-item">
-                    <button class="nav-link active" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button">{{ __('student.official_details') }}</button>
+                    <button class="nav-link active" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button" role="tab" aria-controls="official" aria-selected="true">{{ __('student.official_details') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button">{{ __('student.personal_details') }}</button>
+                    <button class="nav-link" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab" aria-controls="personal" aria-selected="false">{{ __('student.personal_details') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button">{{ __('student.parents_guardian') }}</button>
+                    <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab" aria-controls="parents" aria-selected="false">{{ __('student.parents_guardian') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="identity-tab" data-bs-toggle="tab" data-bs-target="#identity" type="button">{{ __('student.identity_access') }}</button>
+                    <button class="nav-link" id="identity-tab" data-bs-toggle="tab" data-bs-target="#identity" type="button" role="tab" aria-controls="identity" aria-selected="false">{{ __('student.identity_access') }}</button>
                 </li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
                 
                 <!-- Tab 1: Official Details -->
-                <div class="tab-pane fade show active" id="official">
+                <div class="tab-pane fade show active" id="official" role="tabpanel" aria-labelledby="official-tab">
                     <div class="row">
                         
                         {{-- LOGIC: Auto-Assign vs Select Institute --}}
                         @php
-                            // Check if a context ID is actively set in controller (passed via create method)
                             $hasContext = isset($institutionId) && $institutionId;
-                            
-                            // Super Admin Check (Explicit override logic)
                             $isSuperAdmin = auth()->user()->hasRole('Super Admin');
                         @endphp
 
                         @if($hasContext && !$isSuperAdmin)
-                            {{-- Standard User or Head Officer with Context Set: Hide & Auto-Fill --}}
                             <input type="hidden" name="institution_id" value="{{ $institutionId }}">
                         @else
-                            {{-- Super Admin or No Context Set: Show Dropdown --}}
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">{{ __('student.select_institute') }} <span class="text-danger">*</span></label>
                                 <select name="institution_id" class="form-control default-select" required>
@@ -55,6 +50,7 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <div class="invalid-feedback">Please select an institute.</div>
                             </div>
                         @endif
 
@@ -82,6 +78,7 @@
                                     <option value="{{ $id }}" {{ (old('grade_level_id', $student->grade_level_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                 @endforeach
                             </select>
+                            <div class="invalid-feedback">Please select a class.</div>
                         </div>
 
                         <div class="col-md-4 mb-3">
@@ -94,14 +91,15 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.admission_date') }} <span class="text-danger">*</span></label>
                             <input type="text" name="admission_date" 
-                                   value="{{ old('admission_date', isset($student) ? $student->admission_date->format('Y-m-d') : date('Y-m-d')) }}" 
+                                   value="{{ old('admission_date', (isset($student) && $student->admission_date) ? $student->admission_date->format('Y-m-d') : date('Y-m-d')) }}" 
                                    class="datepicker form-control" placeholder="YYYY-MM-DD" required>
+                            <div class="invalid-feedback">Admission date is required.</div>
                         </div>
                     </div>
                 </div>
 
                 {{-- Tab 2: Personal Details --}}
-                <div class="tab-pane fade" id="personal">
+                <div class="tab-pane fade" id="personal" role="tabpanel" aria-labelledby="personal-tab">
                     <div class="row">
                         <div class="col-md-12 mb-3 text-center">
                             <label class="form-label d-block">{{ __('student.photo') }}</label>
@@ -127,10 +125,12 @@
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.first_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="first_name" class="form-control" value="{{ old('first_name', $student->first_name ?? '') }}" required>
+                            <div class="invalid-feedback">First name is required.</div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.last_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="last_name" class="form-control" value="{{ old('last_name', $student->last_name ?? '') }}" required>
+                            <div class="invalid-feedback">Last name is required.</div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.post_name') }}</label>
@@ -140,18 +140,41 @@
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.dob') }} <span class="text-danger">*</span></label>
                             <input type="text" name="dob" 
-                                   value="{{ old('dob', isset($student) ? $student->dob->format('Y-m-d') : '') }}" 
+                                   value="{{ old('dob', (isset($student) && $student->dob) ? $student->dob->format('Y-m-d') : '') }}" 
                                    class="datepicker form-control" placeholder="YYYY-MM-DD" required>
+                            <div class="invalid-feedback">Date of birth is required.</div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.place_of_birth') }} <span class="text-danger">*</span></label>
                             <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}" required>
+                             <div class="invalid-feedback">Place of birth is required.</div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.gender') }} <span class="text-danger">*</span></label>
                             <select name="gender" class="form-control default-select" required>
                                 <option value="male" {{ (old('gender', $student->gender ?? '') == 'male') ? 'selected' : '' }}>Male</option>
                                 <option value="female" {{ (old('gender', $student->gender ?? '') == 'female') ? 'selected' : '' }}>Female</option>
+                            </select>
+                             <div class="invalid-feedback">Gender is required.</div>
+                        </div>
+                        
+                        <!-- Religion & Blood Group -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.religion') }}</label>
+                            <select name="religion" class="form-control default-select">
+                                <option value="">{{ __('student.select_option') }}</option>
+                                @foreach(['Christian', 'Muslim', 'Hindu', 'Buddhist', 'Other'] as $rel)
+                                    <option value="{{ $rel }}" {{ (old('religion', $student->religion ?? '') == $rel) ? 'selected' : '' }}>{{ $rel }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.blood_group') }}</label>
+                            <select name="blood_group" class="form-control default-select">
+                                <option value="">{{ __('student.select_option') }}</option>
+                                @foreach(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] as $bg)
+                                    <option value="{{ $bg }}" {{ (old('blood_group', $student->blood_group ?? '') == $bg) ? 'selected' : '' }}>{{ $bg }}</option>
+                                @endforeach
                             </select>
                         </div>
 
@@ -164,24 +187,37 @@
                             <input type="text" name="mobile_number" class="form-control" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.province') }} <span class="text-danger">*</span></label>
-                            <select name="province" class="form-control default-select" required>
-                                <option value="">{{ __('student.select_option') }}</option>
-                                <option value="Kinshasa" {{ (old('province', $student->province ?? '') == 'Kinshasa') ? 'selected' : '' }}>Kinshasa</option>
-                                <option value="North Kivu" {{ (old('province', $student->province ?? '') == 'North Kivu') ? 'selected' : '' }}>North Kivu</option>
-                                <option value="South Kivu" {{ (old('province', $student->province ?? '') == 'South Kivu') ? 'selected' : '' }}>South Kivu</option>
+                        {{-- Location Logic --}}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.country') }}</label>
+                            <select name="country" id="countrySelect" class="form-control default-select">
+                                <option value="">{{ __('student.select_country') }}</option>
+                                {{-- Populated via AJAX or Controller --}}
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.avenue') }} <span class="text-danger">*</span></label>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.state') }}</label>
+                            <select name="state" id="stateSelect" class="form-control default-select" disabled>
+                                <option value="">{{ __('student.select_state') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.city') }}</label>
+                            <select name="city" id="citySelect" class="form-control default-select" disabled>
+                                <option value="">{{ __('student.select_city') }}</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">{{ __('student.avenue_address') }} <span class="text-danger">*</span></label>
                             <input type="text" name="avenue" class="form-control" value="{{ old('avenue', $student->avenue ?? '') }}" required>
+                             <div class="invalid-feedback">Address is required.</div>
                         </div>
                     </div>
                 </div>
 
                 {{-- Tab 3: Parents/Guardian --}}
-                <div class="tab-pane fade" id="parents">
+                <div class="tab-pane fade" id="parents" role="tabpanel" aria-labelledby="parents-tab">
                     <div class="row">
                         <div class="col-md-12 mb-3">
                             <label class="form-label">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
@@ -195,15 +231,18 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.father_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="father_name" class="form-control" value="{{ old('father_name', $student->father_name ?? '') }}" required>
+                             <div class="invalid-feedback">Father name is required.</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.father_phone') }} <span class="text-danger">*</span></label>
                             <input type="text" name="father_phone" class="form-control" value="{{ old('father_phone', $student->father_phone ?? '') }}" required>
+                             <div class="invalid-feedback">Phone is required.</div>
                         </div>
                         
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.mother_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="mother_name" class="form-control" value="{{ old('mother_name', $student->mother_name ?? '') }}" required>
+                             <div class="invalid-feedback">Mother name is required.</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.mother_phone') }}</label>
@@ -213,7 +252,7 @@
                 </div>
 
                 {{-- Tab 4: Identity --}}
-                <div class="tab-pane fade" id="identity">
+                <div class="tab-pane fade" id="identity" role="tabpanel" aria-labelledby="identity-tab">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.nfc_tag_uid') }}</label>
@@ -233,7 +272,7 @@
 
             <div class="row mt-4">
                 <div class="col-12">
-                    <button type="submit" class="btn btn-primary">{{ isset($student) ? __('student.update_student') : __('student.save_student') }}</button>
+                    <button type="submit" class="btn btn-primary" id="saveStudentBtn">{{ isset($student) ? __('student.update_student') : __('student.save_student') }}</button>
                 </div>
             </div>
         </div>
@@ -280,33 +319,63 @@
     const LANG_ERROR = "{{ __('student.error_loading') }}";
     const LANG_SELECT_CLASS_FIRST = "{{ __('student.select_class_first') }}";
 
-    // Wait for Window Load to ensure jQuery is available
     window.addEventListener('load', function() {
         if (typeof $ !== 'undefined') {
             $(document).ready(function() {
+                // --- 1. Tab Validation Logic ---
+                $('#studentForm').on('submit', function(e) {
+                    if (!this.checkValidity()) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Find first invalid field
+                        let $invalid = $(this).find(':invalid').first();
+                        
+                        // Find its tab pane
+                        let $tabPane = $invalid.closest('.tab-pane');
+                        let tabId = $tabPane.attr('id');
+                        
+                        // Switch to that tab
+                        if(tabId) {
+                            let triggerEl = document.querySelector(`button[data-bs-target="#${tabId}"]`);
+                            if(triggerEl) {
+                                bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+                            }
+                        }
+                        
+                        // Focus on field
+                        $invalid.focus();
+                        
+                        // Show generic error toast/alert
+                        if(typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Missing Information',
+                                text: 'Please fill in all required fields in the ' + $tabPane.attr('id').replace('_', ' ') + ' section.'
+                            });
+                        } else {
+                            alert('Please fill in all required fields.');
+                        }
+                    }
+                    $(this).addClass('was-validated');
+                });
+
+                // --- 2. Grade & Section Logic ---
                 $('#gradeLevelSelect').on('change', function() {
                     let gradeId = $(this).val();
                     let $sectionSelect = $('#sectionSelect'); 
-                    
-                    // Clear options safely for bootstrap-select compatibility
                     $sectionSelect.html('');
                     
                     if(gradeId) {
-                        // Add loading state
                         $sectionSelect.append(`<option value="">${LANG_LOADING}</option>`);
                         $sectionSelect.prop('disabled', true);
-                        
-                        // Refresh if plugin is active
-                        if($.fn.selectpicker) {
-                            $sectionSelect.selectpicker('refresh');
-                        }
+                        if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
 
                         $.ajax({
                             url: "{{ route('students.get_sections') }}", 
                             data: { grade_id: gradeId },
                             success: function(data) {
                                 $sectionSelect.empty();
-                                
                                 if($.isEmptyObject(data)) {
                                     $sectionSelect.append(`<option value="">${LANG_NO_OPTIONS}</option>`);
                                     $sectionSelect.prop('disabled', true);
@@ -317,24 +386,71 @@
                                     });
                                     $sectionSelect.prop('disabled', false);
                                 }
-                                
-                                if($.fn.selectpicker) {
-                                    $sectionSelect.selectpicker('refresh');
-                                }
+                                if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
                             },
                             error: function() {
                                 $sectionSelect.empty().append(`<option value="">${LANG_ERROR}</option>`);
-                                if($.fn.selectpicker) {
-                                    $sectionSelect.selectpicker('refresh');
-                                }
+                                if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
                             }
                         });
                     } else {
                         $sectionSelect.empty().append(`<option value="">${LANG_SELECT_CLASS_FIRST}</option>`);
                         $sectionSelect.prop('disabled', true);
-                        if($.fn.selectpicker) {
-                            $sectionSelect.selectpicker('refresh');
-                        }
+                        if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
+                    }
+                });
+                
+                // --- 3. Location Logic (Country > State > City) ---
+                const $country = $('#countrySelect');
+                const $state = $('#stateSelect');
+                const $city = $('#citySelect');
+                
+                // Load Countries on Init
+                $.get("{{ route('locations.countries') }}", function(data) {
+                    $country.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
+                    $.each(data, function(i, item) {
+                        let selected = "{{ old('country', $student->country ?? '') }}" == item.name ? 'selected' : '';
+                        $country.append(`<option value="${item.name}" data-id="${item.id}" ${selected}>${item.name}</option>`);
+                    });
+                    if($.fn.selectpicker) $country.selectpicker('refresh');
+                    // Trigger change if value exists
+                    if($country.val()) $country.trigger('change');
+                });
+
+                $country.change(function() {
+                    let countryId = $(this).find(':selected').data('id');
+                    $state.empty().append(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
+                    $city.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`).prop('disabled', true);
+                    if($.fn.selectpicker) { $state.selectpicker('refresh'); $city.selectpicker('refresh'); }
+
+                    if(countryId) {
+                        $.get("{{ route('locations.states') }}", { country_id: countryId }, function(data) {
+                            $state.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
+                            $.each(data, function(i, item) {
+                                let selected = "{{ old('state', $student->state ?? '') }}" == item.name ? 'selected' : '';
+                                $state.append(`<option value="${item.name}" data-id="${item.id}" ${selected}>${item.name}</option>`);
+                            });
+                            $state.prop('disabled', false);
+                            if($.fn.selectpicker) $state.selectpicker('refresh');
+                            if($state.val()) $state.trigger('change');
+                        });
+                    }
+                });
+
+                $state.change(function() {
+                    let stateId = $(this).find(':selected').data('id');
+                    $city.empty().append(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
+                    
+                    if(stateId) {
+                        $.get("{{ route('locations.cities') }}", { state_id: stateId }, function(data) {
+                            $city.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
+                            $.each(data, function(i, item) {
+                                let selected = "{{ old('city', $student->city ?? '') }}" == item.name ? 'selected' : '';
+                                $city.append(`<option value="${item.name}" ${selected}>${item.name}</option>`);
+                            });
+                            $city.prop('disabled', false);
+                            if($.fn.selectpicker) $city.selectpicker('refresh');
+                        });
                     }
                 });
             });

@@ -1,12 +1,33 @@
 @extends('layout.layout')
 
 @section('styles')
+<!-- Date Picker & Select Picker CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/css/bootstrap-select.min.css">
+
 <style>
     /* Custom Toggle Switch Width */
     .form-switch .form-check-input {
-        width: 3.5em !important; /* Increased width */
+        width: 3.5em !important;
         height: 1.75em !important;
         cursor: pointer;
+    }
+    
+    /* Fix for "Half Modal" / Modal Width Issues */
+    .modal-dialog {
+        max-width: 90%; 
+        margin: 1.75rem auto;
+    }
+    @media (min-width: 576px) {
+        .modal-dialog {
+            max-width: 600px; /* Standard width for configuration modals */
+            margin: 1.75rem auto;
+        }
+    }
+    @media (min-width: 992px) {
+        .modal-dialog.modal-lg {
+            max-width: 800px;
+        }
     }
 </style>
 @endsection
@@ -68,7 +89,7 @@
                                 <h4 class="card-title">{{ __('configuration.smtp') }}</h4>
                             </div>
                             <div class="card-body">
-                                <form action="{{ route('configuration.smtp.update') }}" method="POST">
+                                <form action="{{ route('configuration.smtp.update') }}" method="POST" id="smtpForm">
                                     @csrf
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -108,12 +129,12 @@
                                             <input type="text" name="mail_from_name" class="form-control" value="{{ $smtp['from_name'] }}" required>
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">{{ __('configuration.save_changes') }}</button>
+                                    <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
                                 </form>
 
                                 <hr class="my-4">
 
-                                {{-- Test Email Section --}}
+                                {{-- Test Email --}}
                                 <h5 class="text-primary mb-3">{{ __('configuration.test_email_connection') }}</h5>
                                 <form action="{{ route('configuration.smtp.test') }}" method="POST" id="testEmailForm">
                                     @csrf
@@ -136,7 +157,7 @@
                                 <h4 class="card-title">{{ __('configuration.sms_sender') }}</h4>
                             </div>
                             <div class="card-body">
-                                <form action="{{ route('configuration.sms.update') }}" method="POST">
+                                <form action="{{ route('configuration.sms.update') }}" method="POST" id="smsForm">
                                     @csrf
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -152,7 +173,7 @@
                                             <small class="text-muted">Max 11 characters.</small>
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">{{ __('configuration.save_changes') }}</button>
+                                    <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
                                 </form>
                             </div>
                         </div>
@@ -165,7 +186,7 @@
                                 <h4 class="card-title">{{ __('configuration.school_year') }}</h4>
                             </div>
                             <div class="card-body">
-                                <form action="{{ route('configuration.year.update') }}" method="POST">
+                                <form action="{{ route('configuration.year.update') }}" method="POST" id="yearForm">
                                     @csrf
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -185,7 +206,7 @@
                                             </select>
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">{{ __('configuration.save_changes') }}</button>
+                                    <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
                                 </form>
                             </div>
                         </div>
@@ -199,7 +220,7 @@
                                 <h4 class="card-title">{{ __('configuration.module_management') }}</h4>
                             </div>
                             <div class="card-body">
-                                <form action="{{ route('configuration.modules.update') }}" method="POST">
+                                <form action="{{ route('configuration.modules.update') }}" method="POST" id="modulesForm">
                                     @csrf
                                     <div class="table-responsive">
                                         <table class="table table-striped table-hover">
@@ -210,14 +231,11 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {{-- Dynamic Modules from Database (using $allModules as per new Controller logic) --}}
                                                 @foreach($allModules as $mod)
                                                 <tr>
-                                                    {{-- Display correct DB Name (e.g. "Academic Sessions") --}}
                                                     <td class="align-middle fw-bold">{{ $mod->name }}</td>
                                                     <td class="text-end">
                                                         <div class="form-check form-switch d-inline-block">
-                                                            {{-- Use slug for value matching with enabled_modules array --}}
                                                             <input class="form-check-input" type="checkbox" 
                                                                    name="modules[]" 
                                                                    value="{{ $mod->slug }}" 
@@ -230,7 +248,7 @@
                                         </table>
                                     </div>
                                     <div class="text-end mt-4">
-                                        <button type="submit" class="btn btn-primary px-5">{{ __('configuration.save_changes') }}</button>
+                                        <button type="submit" class="btn btn-primary px-5 submit-btn">{{ __('configuration.save_changes') }}</button>
                                     </div>
                                 </form>
                             </div>
@@ -253,7 +271,7 @@
                                                     <span class="me-3"><i class="fa fa-envelope"></i></span>
                                                     <div class="media-body text-white">
                                                         <p class="mb-1">{{ __('configuration.sms_purchased') }}</p>
-                                                        <h3 class="text-white">{{ number_format($institution->sms_credits) }}</h3>
+                                                        <h3 class="text-white" id="smsBalance">{{ number_format($institution->sms_credits) }}</h3>
                                                     </div>
                                                 </div>
                                             </div>
@@ -266,7 +284,7 @@
                                                     <span class="me-3"><i class="fa fa-whatsapp"></i></span>
                                                     <div class="media-body text-white">
                                                         <p class="mb-1">{{ __('configuration.whatsapp_purchased') }}</p>
-                                                        <h3 class="text-white">{{ number_format($institution->whatsapp_credits) }}</h3>
+                                                        <h3 class="text-white" id="waBalance">{{ number_format($institution->whatsapp_credits) }}</h3>
                                                     </div>
                                                 </div>
                                             </div>
@@ -275,22 +293,34 @@
                                 </div>
 
                                 <h4 class="mb-3">{{ __('configuration.add_credits') }}</h4>
-                                <form action="{{ route('configuration.recharge') }}" method="POST">
+                                <form action="{{ route('configuration.recharge') }}" method="POST" id="rechargeForm">
                                     @csrf
                                     <div class="row">
+                                        {{-- 1. Type Select with Dynamic Balance Display --}}
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">Type</label>
-                                            <select name="type" class="form-control default-select">
+                                            <select name="type" id="rechargeType" class="form-control default-select">
                                                 <option value="sms">SMS</option>
                                                 <option value="whatsapp">WhatsApp</option>
                                             </select>
+                                            {{-- Dynamic Balance Info --}}
+                                            <small class="text-muted mt-2 d-block">
+                                                {{ __('configuration.balance') ?? 'Balance' }}: 
+                                                <span id="currentBalanceDisplay" class="fw-bold text-primary">0</span>
+                                            </small>
                                         </div>
+                                        
+                                        {{-- 2. Amount Input --}}
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">{{ __('configuration.enter_amount') }}</label>
                                             <input type="number" name="amount" class="form-control" min="1" required>
                                         </div>
-                                        <div class="col-md-4 mb-3 d-flex align-items-end">
-                                            <button type="submit" class="btn btn-success w-100">{{ __('configuration.recharge') }}</button>
+                                        
+                                        {{-- 3. Action Button (Fixed Alignment) --}}
+                                        <div class="col-md-4 mb-3">
+                                            {{-- Spacer Label ensures button aligns with inputs on all devices --}}
+                                            <label class="form-label d-block">&nbsp;</label>
+                                            <button type="submit" class="btn btn-success w-100 submit-btn">{{ __('configuration.recharge') }}</button>
                                         </div>
                                     </div>
                                 </form>
@@ -307,17 +337,122 @@
 @endsection
 
 @section('js')
+<!-- Datepicker & Select Picker JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/js/bootstrap-select.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     $(document).ready(function() {
+        // Initialize Components
         if($.fn.selectpicker) {
             $('.default-select').selectpicker('refresh');
         }
+        
+        if ($.fn.datepicker) {
+            $('.datepicker').datepicker({
+                autoclose: true,
+                format: 'yyyy-mm-dd',
+                todayHighlight: true
+            });
+        }
 
-        // AJAX Handler for Test Email
+        // --- NEW: Dynamic Balance Display Logic ---
+        function updateRechargeBalance() {
+            let type = $('#rechargeType').val();
+            let balance = 0;
+            
+            if (type === 'sms') {
+                balance = $('#smsBalance').text();
+            } else {
+                balance = $('#waBalance').text();
+            }
+            
+            $('#currentBalanceDisplay').text(balance);
+        }
+
+        // Bind change event
+        $('#rechargeType').change(updateRechargeBalance);
+        
+        // Initial call to set correct balance on load
+        updateRechargeBalance();
+
+
+        // --- Generic AJAX Form Handler ---
+        function handleAjaxForm(formSelector) {
+            $(formSelector).submit(function(e) {
+                e.preventDefault(); 
+
+                let form = $(this);
+                let btn = form.find('.submit-btn');
+                let originalText = btn.html();
+                
+                btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> {{ __('configuration.saving') }}');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    type: "POST",
+                    data: form.serialize(),
+                    success: function(response) {
+                        btn.prop('disabled', false).html(originalText);
+                        
+                        // Show Success Alert
+                        Swal.fire({
+                            icon: 'success',
+                            title: '{{ __('configuration.success') }}',
+                            text: response.message,
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => {
+                            // --- NEW: Reload Page After Success ---
+                            // This ensures all settings (and potential modal data) are fresh
+                            location.reload(); 
+                        });
+
+                        // (Optional fallback if reload isn't immediate or wanted for specific forms)
+                        if(formSelector === '#rechargeForm' && response.new_balance !== undefined) {
+                             if(response.type === 'sms') {
+                                $('#smsBalance').text(new Intl.NumberFormat().format(response.new_balance));
+                            } else {
+                                $('#waBalance').text(new Intl.NumberFormat().format(response.new_balance));
+                            }
+                            updateRechargeBalance();
+                            form[0].reset();
+                            if($.fn.selectpicker) $('.default-select').selectpicker('refresh');
+                        }
+                    },
+                    error: function(xhr) {
+                        btn.prop('disabled', false).html(originalText);
+                        let msg = '{{ __('configuration.something_went_wrong') }}';
+                        
+                        if(xhr.responseJSON) {
+                            if(xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                            else if (xhr.responseJSON.errors) {
+                                // Extract first validation error
+                                msg = Object.values(xhr.responseJSON.errors)[0][0];
+                            }
+                        }
+                        
+                        Swal.fire({
+                            icon: 'error',
+                            title: '{{ __('configuration.error') }}',
+                            text: msg
+                        });
+                    }
+                });
+            });
+        }
+
+        // Attach handlers to all forms
+        handleAjaxForm('#smtpForm');
+        handleAjaxForm('#smsForm');
+        handleAjaxForm('#yearForm');
+        handleAjaxForm('#modulesForm');
+        handleAjaxForm('#rechargeForm');
+
+        // --- Specific Handler for Test Email (keeps existing logic) ---
         $('#testEmailForm').submit(function(e) {
             e.preventDefault(); 
-
             let btn = $('#testEmailBtn');
             let originalText = btn.html();
             
@@ -329,25 +464,12 @@
                 data: $(this).serialize(),
                 success: function(response) {
                     btn.prop('disabled', false).html(originalText);
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success',
-                        text: response.message || 'Email sent successfully!'
-                    });
+                    Swal.fire({ icon: 'success', title: 'Success', text: response.message });
                 },
                 error: function(xhr) {
                     btn.prop('disabled', false).html(originalText);
-                    let msg = 'Failed to send email.';
-                    if(xhr.responseJSON && xhr.responseJSON.message) {
-                        msg = xhr.responseJSON.message;
-                    } else if (xhr.responseJSON && xhr.responseJSON.error) {
-                        msg = xhr.responseJSON.error;
-                    }
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: msg
-                    });
+                    let msg = xhr.responseJSON ? (xhr.responseJSON.message || xhr.responseJSON.error) : 'Failed to send email.';
+                    Swal.fire({ icon: 'error', title: 'Error', text: msg });
                 }
             });
         });

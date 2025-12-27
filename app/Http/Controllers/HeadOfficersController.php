@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Institution;
-use App\Services\NotificationService; // Injected Service
-use App\Enums\RoleEnum; // Using Enums
+use App\Services\NotificationService;
+use App\Enums\RoleEnum;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
 use Yajra\DataTables\Facades\DataTables;
@@ -41,28 +41,19 @@ class HeadOfficersController extends BaseController
                 ->addColumn('details', function($row){
                     $img = $row->profile_picture ? asset('storage/' . $row->profile_picture) : null;
                     $initial = strtoupper(substr($row->name, 0, 1));
-                    
                     $avatarHtml = $img 
                         ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
                         : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
 
-                    return '<div class="d-flex align-items-center">
-                                '.$avatarHtml.'
-                                <div>
-                                    <h6 class="fs-16 font-w600 mb-0"><a href="'.route('header-officers.show', $row->id).'" class="text-black">'.$row->name.'</a></h6>
-                                    <span class="fs-13 text-muted">'.$row->email.'</span>
-                                </div>
-                            </div>';
+                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('header-officers.show', $row->id).'" class="text-black">'.$row->name.'</a></h6><span class="fs-13 text-muted">'.$row->email.'</span></div></div>';
                 })
                 ->addColumn('contact', function($row){
                     return '<div>'.$row->phone.'</div>';
                 })
                 ->addColumn('assigned_institutes', function($row){
-                    // Display codes of assigned institutes
                     return $row->institutes->pluck('code')->join(', ');
                 })
                 ->addColumn('role', function($row){
-                    // Display roles (unique names to avoid repetition if multiple Head Officer roles)
                     return $row->roles->pluck('name')->unique()->join(', ');
                 })
                 ->addColumn('action', function($row){
@@ -88,7 +79,6 @@ class HeadOfficersController extends BaseController
     public function create()
     {
         $institutes = Institution::where('is_active', true)->pluck('name', 'id');
-        // Filter roles generally available, but specific assignment happens in store
         $roles = Role::where('name', '!=', 'Super Admin')->groupBy('name')->pluck('name', 'name'); 
         return view('head_officers.create', compact('institutes', 'roles'));
     }
@@ -100,7 +90,7 @@ class HeadOfficersController extends BaseController
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
             'institute_ids' => 'array',
-            'phone' => 'required', // Phone is critical for SMS
+            'phone' => 'required',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', 
         ]);
 
@@ -108,7 +98,7 @@ class HeadOfficersController extends BaseController
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'user_type' => 2, // Head Officer Type
+            'user_type' => 2,
             'phone' => $request->phone,
             'address' => $request->address,
             'is_active' => $request->is_active ?? 1
@@ -122,23 +112,18 @@ class HeadOfficersController extends BaseController
         
         $assignedInstitutes = $request->input('institute_ids', []);
 
-        // 1. Set Default Institute ID (First one)
         if (count($assignedInstitutes) > 0) {
             $user->update(['institute_id' => $assignedInstitutes[0]]);
         }
         
-        // 2. Sync Pivot Table
         $user->institutes()->sync($assignedInstitutes);
 
-        // 3. Assign Institution-Specific Roles
-        // We find the 'Head Officer' role for EACH assigned institution
         $rolesToAssign = Role::whereIn('institution_id', $assignedInstitutes)
                              ->where('name', RoleEnum::HEAD_OFFICER->value)
                              ->get();
         
         $user->syncRoles($rolesToAssign);
 
-        // 4. Notify User
         $this->notificationService->sendHeadOfficerCredentials($user, $request->password, $assignedInstitutes);
 
         return response()->json(['redirect' => route('header-officers.index'), 'message' => __('head_officers.messages.success_create')]);
@@ -155,7 +140,6 @@ class HeadOfficersController extends BaseController
         $head_officer = User::with(['institutes', 'roles'])->findOrFail($id);
         $institutes = Institution::where('is_active', true)->pluck('name', 'id');
         $assignedIds = $head_officer->institutes->pluck('id')->toArray();
-        // Just showing distinct role names for UI, actual sync is logic-based
         $roles = Role::where('name', '!=', 'Super Admin')->groupBy('name')->pluck('name', 'name');
 
         return view('head_officers.edit', compact('head_officer', 'institutes', 'assignedIds', 'roles'));
@@ -189,19 +173,17 @@ class HeadOfficersController extends BaseController
         
         $assignedInstitutes = $request->input('institute_ids', []);
         
-        // 1. Sync Institutes
         $user->institutes()->sync($assignedInstitutes);
 
-        // 2. Sync Roles (Re-calculate based on assigned institutes)
         $rolesToAssign = Role::whereIn('institution_id', $assignedInstitutes)
                              ->where('name', RoleEnum::HEAD_OFFICER->value)
                              ->get();
 
         $user->syncRoles($rolesToAssign);
 
-        // 3. Notify User (Credentials Updated)
-        // Sending notification even on update to ensure they have latest access info
-        $this->notificationService->sendHeadOfficerCredentials($user, $request->password, $assignedInstitutes);
+        if($request->filled('password')){
+            $this->notificationService->sendHeadOfficerCredentials($user, $request->password, $assignedInstitutes);
+        }
 
         return response()->json(['redirect' => route('header-officers.index'), 'message' => __('head_officers.messages.success_update')]);
     }
@@ -213,7 +195,6 @@ class HeadOfficersController extends BaseController
             Storage::disk('public')->delete($user->profile_picture);
         }
         $user->institutes()->detach();
-        // Remove roles before deleting to be clean, though cascade usually handles it
         $user->roles()->detach();
         $user->delete();
         return response()->json(['message' => __('head_officers.messages.success_delete')]);
