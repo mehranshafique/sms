@@ -126,7 +126,8 @@ class SubscriptionController extends BaseController
         DB::transaction(function () use ($request) {
             $package = Package::findOrFail($request->package_id);
             $startDate = Carbon::parse($request->start_date);
-            $endDate = $startDate->copy()->addDays($package->duration_days);
+            // Fix: Cast duration_days to int to prevent Carbon error
+            $endDate = $startDate->copy()->addDays((int) $package->duration_days);
 
             $sub = Subscription::create([
                 'institution_id' => $request->institution_id,
