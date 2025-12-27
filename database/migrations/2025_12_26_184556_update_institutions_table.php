@@ -10,14 +10,14 @@ return new class extends Migration
     {
         Schema::table('institutions', function (Blueprint $table) {
             $table->string('acronym', 50)->nullable()->after('name');
-            $table->string('commune', 100)->nullable()->after('city'); // Required for Code Generation
+            $table->string('state', 100)->nullable()->after('city'); // Required for Code Generation
         });
     }
 
     public function down(): void
     {
         Schema::table('institutions', function (Blueprint $table) {
-            $table->dropColumn(['acronym', 'commune']);
+            $table->dropColumn(['acronym', 'state']);
         });
     }
 };

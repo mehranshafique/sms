@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Eloquent\Model; // Import Model for unguard
+use Illuminate\Database\Eloquent\Model;
 use Faker\Factory as Faker;
 use App\Models\User;
 use App\Models\Institution;
@@ -37,6 +37,7 @@ use App\Enums\UserType;
 use App\Enums\RoleEnum;
 use Spatie\Permission\Models\Role;
 use Carbon\Carbon;
+use App\Services\IdGeneratorService;
 
 class BulkDummyDataSeeder extends Seeder
 {
@@ -47,9 +48,38 @@ class BulkDummyDataSeeder extends Seeder
 
         $faker = Faker::create('fr_FR'); // French Locale for DRC context
         
-        $this->command->info('🌱 Seeding DR Congo School Data with Full Modules...');
+        $this->command->info('🌱 Seeding Data with Updated Student & Institution Logic (Preserving Modules)...');
 
-        // 0. Create Packages (Platform Level)
+        // ---------------------------------------------------------
+        // 0. Locations (NEW LOGIC: Required for Institute)
+        // ---------------------------------------------------------
+        // We need IDs for Country, State, and City for the Institution
+        
+        // Clean up locations to avoid duplicates if re-running (Optional, helps avoid FK errors)
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('countries')->truncate();
+        DB::table('states')->truncate();
+        DB::table('cities')->truncate();
+        
+        $countryId = DB::table('countries')->insertGetId([
+            'sortname' => 'CD', 'name' => 'Democratic Republic of the Congo', 'phonecode' => 243, 'created_at' => now(), 'updated_at' => now()
+        ]);
+        $stateId = DB::table('states')->insertGetId([
+            'name' => 'Kinshasa', 'country_id' => $countryId, 'created_at' => now(), 'updated_at' => now()
+        ]);
+        $cityId = DB::table('cities')->insertGetId([
+            'name' => 'Lemba', 'state_id' => $stateId, 'created_at' => now(), 'updated_at' => now()
+        ]);
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+
+        // Text names for Student address fields
+        $countryName = 'Democratic Republic of the Congo';
+        $stateName = 'Kinshasa';
+        $cityName = 'Lemba';
+
+        // ---------------------------------------------------------
+        // 1. Packages (Platform Level)
+        // ---------------------------------------------------------
         $packages = [
             [
                 'name' => 'Basic Plan',
@@ -86,24 +116,30 @@ class BulkDummyDataSeeder extends Seeder
         
         $premiumPackage = Package::where('name', 'Premium Plan')->first();
 
-        // 1. Institution
+        // ---------------------------------------------------------
+        // 2. Institution (UPDATED LOGIC)
+        // ---------------------------------------------------------
+        // Generate Code using Service
+        $instCode = IdGeneratorService::generateInstitutionCode((string)$stateId, (string)$cityId);
+
         $institution = Institution::firstOrCreate(
-            ['code' => 'KILE0001'], 
+            ['email' => 'info@montamba.cd'], 
             [
+                'code' => $instCode,
                 'name' => 'Complexe Scolaire Mont Amba',
                 'acronym' => 'CSMA',
                 'type' => 'mixed',
-                'country' => 'DR Congo',
-                'city' => 'Kinshasa',
-                'commune' => 'Lemba',
+                'country' => $countryId, // ID
+                'state' => $stateId,     // ID (Was City)
+                'city' => $cityId,       // ID (Was Commune)
+                // 'commune' => 'Lemba', // REMOVED as requested
                 'address' => 'Avenue de l\'Université, Lemba',
                 'phone' => '+243815550000',
-                'email' => 'info@montamba.cd',
                 'is_active' => true,
             ]
         );
 
-        // 1.1 Create Default Roles
+        // 2.1 Create Default Roles
         $rolesToCreate = [
             RoleEnum::HEAD_OFFICER->value,
             RoleEnum::TEACHER->value,
@@ -119,8 +155,7 @@ class BulkDummyDataSeeder extends Seeder
             );
         }
 
-        // 1.2 Create Subscription
-        // FIX: Cast duration_days to int to prevent Carbon error
+        // 2.2 Create Subscription
         $duration = (int) $premiumPackage->duration_days;
 
         Subscription::firstOrCreate(
@@ -137,7 +172,9 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // 2. Campus
+        // ---------------------------------------------------------
+        // 3. Campus
+        // ---------------------------------------------------------
         $campus = Campus::firstOrCreate(
             ['code' => 'CMP-LEMBA', 'institution_id' => $institution->id],
             [
@@ -149,7 +186,9 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // 3. Academic Session
+        // ---------------------------------------------------------
+        // 4. Academic Session
+        // ---------------------------------------------------------
         $session = AcademicSession::firstOrCreate(
             ['institution_id' => $institution->id, 'name' => '2024-2025'],
             [
@@ -160,7 +199,9 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // 4. Grade Levels
+        // ---------------------------------------------------------
+        // 5. Grade Levels
+        // ---------------------------------------------------------
         $gradesList = [
             ['name' => '1ère Primaire', 'code' => '1P', 'cycle' => 'primary', 'order' => 1],
             ['name' => '2ème Primaire', 'code' => '2P', 'cycle' => 'primary', 'order' => 2],
@@ -181,7 +222,9 @@ class BulkDummyDataSeeder extends Seeder
             );
         }
 
-        // 5. Staff (Teachers & Admin)
+        // ---------------------------------------------------------
+        // 6. Staff (Teachers & Admin)
+        // ---------------------------------------------------------
         $staffData = [
             ['role' => RoleEnum::TEACHER->value, 'dept' => 'Sciences'],
             ['role' => RoleEnum::TEACHER->value, 'dept' => 'Lettres'],
@@ -191,7 +234,7 @@ class BulkDummyDataSeeder extends Seeder
         ];
         
         $teacherIds = [];
-        $adminUserId = null; // Store for Notice creation
+        $adminUserId = null; 
 
         foreach ($staffData as $idx => $data) {
             $roleName = $data['role'];
@@ -244,10 +287,11 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
 
-        // Fallback if no admin created in loop
         if (!$adminUserId && $teacherIds) $adminUserId = User::find(1)->id ?? $teacherIds[0];
 
-        // 6. Class Sections & Subjects
+        // ---------------------------------------------------------
+        // 7. Class Sections & Subjects
+        // ---------------------------------------------------------
         $sections = [];
         foreach ($gradeModels as $code => $grade) {
             $sections[$code] = ClassSection::firstOrCreate(
@@ -276,7 +320,9 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
 
-        // 7. Students (20 records)
+        // ---------------------------------------------------------
+        // 8. Students (UPDATED LOGIC)
+        // ---------------------------------------------------------
         $students = [];
         $studentRole = Role::where('name', RoleEnum::STUDENT->value)
                            ->where('institution_id', $institution->id)
@@ -286,6 +332,7 @@ class BulkDummyDataSeeder extends Seeder
             $firstName = $faker->firstName;
             $lastName = $faker->lastName;
             
+            // A. Create User First (Updated)
             $sUser = User::firstOrCreate(
                 ['email' => "student$i@montamba.cd"],
                 [
@@ -299,12 +346,16 @@ class BulkDummyDataSeeder extends Seeder
             
             if($studentRole) $sUser->assignRole($studentRole);
 
+            // B. Generate ID using User ID seed (Updated)
+            $admissionNumber = IdGeneratorService::generateStudentId($institution, $session, $sUser->id);
+
+            // C. Create Student (Updated with Location Strings and New ID)
             $student = Student::firstOrCreate(
                 ['user_id' => $sUser->id],
                 [
                     'institution_id' => $institution->id,
                     'campus_id' => $campus->id,
-                    'admission_number' => 'MAT-' . (2024000 + $i),
+                    'admission_number' => $admissionNumber,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'gender' => $faker->randomElement(['male', 'female']),
@@ -312,6 +363,10 @@ class BulkDummyDataSeeder extends Seeder
                     'admission_date' => '2024-09-04',
                     'father_name' => $faker->name('male'),
                     'father_phone' => '+24381' . $faker->numerify('#######'),
+                    // Using text strings for student details as per controller logic
+                    'country' => $countryName,
+                    'state' => $stateName,
+                    'city' => $cityName,
                     'status' => 'active'
                 ]
             );
@@ -335,20 +390,23 @@ class BulkDummyDataSeeder extends Seeder
             );
         }
 
-        // 8. Finance (Fees)
+        // ---------------------------------------------------------
+        // 9. Finance (Fees)
+        // ---------------------------------------------------------
         $tuitionType = FeeType::firstOrCreate(['institution_id' => $institution->id, 'name' => 'Frais Scolaires']);
-        $fee = FeeStructure::create([
-            'institution_id' => $institution->id,
-            'academic_session_id' => $session->id,
-            'fee_type_id' => $tuitionType->id,
-            'name' => 'Minerval T1',
-            'amount' => 150.00,
-            'frequency' => 'termly'
-        ]);
+        $fee = FeeStructure::firstOrCreate(
+            ['institution_id' => $institution->id, 'name' => 'Minerval T1'],
+            [
+                'academic_session_id' => $session->id,
+                'fee_type_id' => $tuitionType->id,
+                'amount' => 150.00,
+                'frequency' => 'termly'
+            ]
+        );
 
-        // 9. Communication (Notices)
-        // FIX: Ensure 'published_at' is used instead of 'publish_date' if migration requires it
-        // and user a real created_by ID
+        // ---------------------------------------------------------
+        // 10. Communication (Notices)
+        // ---------------------------------------------------------
         $noticesData = [
             [
                 'title' => 'Rentrée Scolaire 2024',
@@ -374,63 +432,70 @@ class BulkDummyDataSeeder extends Seeder
         ];
 
         foreach ($noticesData as $n) {
-            Notice::create([
-                'institution_id' => $institution->id,
-                'title' => $n['title'],
-                'content' => $n['content'],
-                'type' => $n['type'],
-                'audience' => $n['audience'],
-                'published_at' => $n['published_at'], // FIX: Match migration column
-                'is_published' => true,
-                'created_by' => $adminUserId // FIX: Use valid user ID
-            ]);
+            Notice::firstOrCreate(
+                ['title' => $n['title'], 'institution_id' => $institution->id],
+                [
+                    'content' => $n['content'],
+                    'type' => $n['type'],
+                    'audience' => $n['audience'],
+                    'published_at' => $n['published_at'], 
+                    'is_published' => true,
+                    'created_by' => $adminUserId 
+                ]
+            );
         }
 
-        // 10. Voting System (Elections)
-        $election = Election::create([
-            'institution_id' => $institution->id,
-            'academic_session_id' => $session->id,
-            'title' => 'Élections du Comité des Élèves ' . $session->name,
-            'description' => 'Élection pour choisir le Doyen et les chefs de classe.',
-            'start_date' => now()->subDays(1),
-            'end_date' => now()->addDays(2),
-            'status' => 'published',
-        ]);
+        // ---------------------------------------------------------
+        // 11. Voting System (Elections)
+        // ---------------------------------------------------------
+        $election = Election::firstOrCreate(
+            ['title' => 'Élections du Comité des Élèves ' . $session->name, 'institution_id' => $institution->id],
+            [
+                'academic_session_id' => $session->id,
+                'description' => 'Élection pour choisir le Doyen et les chefs de classe.',
+                'start_date' => now()->subDays(1),
+                'end_date' => now()->addDays(2),
+                'status' => 'published',
+            ]
+        );
 
         // Positions
-        $posPresident = ElectionPosition::create(['election_id' => $election->id, 'name' => 'Doyen (Président)', 'sequence' => 1]);
-        $posVice = ElectionPosition::create(['election_id' => $election->id, 'name' => 'Vice-Doyen', 'sequence' => 2]);
+        $posPresident = ElectionPosition::firstOrCreate(['election_id' => $election->id, 'name' => 'Doyen (Président)'], ['sequence' => 1]);
+        $posVice = ElectionPosition::firstOrCreate(['election_id' => $election->id, 'name' => 'Vice-Doyen'], ['sequence' => 2]);
 
         // Candidates (Pick random students)
-        $candidateStudents = $faker->randomElements($students, 4);
-        
-        // FIX: Capture Candidate Instances to get real IDs for voting
-        $cand1 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posPresident->id, 'student_id' => $candidateStudents[0]->id, 'status' => 'approved']);
-        $cand2 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posPresident->id, 'student_id' => $candidateStudents[1]->id, 'status' => 'approved']);
-        
-        $cand3 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posVice->id, 'student_id' => $candidateStudents[2]->id, 'status' => 'approved']);
-        $cand4 = Candidate::create(['election_id' => $election->id, 'election_position_id' => $posVice->id, 'student_id' => $candidateStudents[3]->id, 'status' => 'approved']);
-
-        // Votes (Simulate some voting)
-        $voters = $faker->randomElements($students, 10);
-        foreach($voters as $voter) {
-            // Vote for President
-            // FIX: Use actual Candidate IDs, not hardcoded 1 or 2
-            $chosenCandidate = $faker->randomElement([$cand1, $cand2]);
+        // Ensure we have enough students seeded
+        if (count($students) >= 4) {
+            $candidateStudents = $faker->randomElements($students, 4);
             
-            // Use DB::table for votes because 'votes' table likely missing timestamps, but Eloquent model assumes them.
-            DB::table('votes')->insert([
-                'election_id' => $election->id,
-                'election_position_id' => $posPresident->id,
-                'candidate_id' => $chosenCandidate->id, 
-                'voter_id' => $voter->id,
-                'voted_at' => now(),
-            ]);
+            $cand1 = Candidate::firstOrCreate(['election_id' => $election->id, 'student_id' => $candidateStudents[0]->id], ['election_position_id' => $posPresident->id, 'status' => 'approved']);
+            $cand2 = Candidate::firstOrCreate(['election_id' => $election->id, 'student_id' => $candidateStudents[1]->id], ['election_position_id' => $posPresident->id, 'status' => 'approved']);
+            
+            $cand3 = Candidate::firstOrCreate(['election_id' => $election->id, 'student_id' => $candidateStudents[2]->id], ['election_position_id' => $posVice->id, 'status' => 'approved']);
+            $cand4 = Candidate::firstOrCreate(['election_id' => $election->id, 'student_id' => $candidateStudents[3]->id], ['election_position_id' => $posVice->id, 'status' => 'approved']);
+
+            // Votes (Simulate some voting)
+            $voters = $faker->randomElements($students, 10);
+            foreach($voters as $voter) {
+                // Check if already voted
+                $exists = DB::table('votes')->where('election_id', $election->id)->where('voter_id', $voter->id)->exists();
+                if (!$exists) {
+                    $chosenCandidate = $faker->randomElement([$cand1, $cand2]);
+                    
+                    DB::table('votes')->insert([
+                        'election_id' => $election->id,
+                        'election_position_id' => $posPresident->id,
+                        'candidate_id' => $chosenCandidate->id, 
+                        'voter_id' => $voter->id,
+                        'voted_at' => now(),
+                    ]);
+                }
+            }
         }
 
         // Re-enable mass assignment protection
         Model::reguard();
 
-        $this->command->info('✅ Bulk Dummy Data (Institutes, Packages, Subscriptions, Staff, Students, Notices, Elections) Seeded Successfully!');
+        $this->command->info('✅ Bulk Dummy Data Seeded Successfully!');
     }
 }
