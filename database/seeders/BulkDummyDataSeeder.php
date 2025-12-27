@@ -48,7 +48,7 @@ class BulkDummyDataSeeder extends Seeder
 
         $faker = Faker::create('fr_FR'); // French Locale for DRC context
         
-        $this->command->info('🌱 Seeding Data with Updated Student & Institution Logic (Preserving Modules)...');
+        $this->command->info('🌱 Seeding Data for E-Digitex System...');
 
         // ---------------------------------------------------------
         // 0. Locations (NEW LOGIC: Required for Institute)
@@ -117,23 +117,22 @@ class BulkDummyDataSeeder extends Seeder
         $premiumPackage = Package::where('name', 'Premium Plan')->first();
 
         // ---------------------------------------------------------
-        // 2. Institution (UPDATED LOGIC)
+        // 2. Institution (UPDATED LOGIC: Name Changed to E-Digitex)
         // ---------------------------------------------------------
         // Generate Code using Service
         $instCode = IdGeneratorService::generateInstitutionCode((string)$stateId, (string)$cityId);
 
         $institution = Institution::firstOrCreate(
-            ['email' => 'info@montamba.cd'], 
+            ['email' => 'admin@e-digitex.com'], 
             [
                 'code' => $instCode,
-                'name' => 'Complexe Scolaire Mont Amba',
-                'acronym' => 'CSMA',
+                'name' => 'E-Digitex International School',
+                'acronym' => 'E-DIGITEX',
                 'type' => 'mixed',
                 'country' => $countryId, // ID
                 'state' => $stateId,     // ID (Was City)
                 'city' => $cityId,       // ID (Was Commune)
-                // 'commune' => 'Lemba', // REMOVED as requested
-                'address' => 'Avenue de l\'Université, Lemba',
+                'address' => '123 Tech Avenue, Innovation Park',
                 'phone' => '+243815550000',
                 'is_active' => true,
             ]
@@ -176,10 +175,10 @@ class BulkDummyDataSeeder extends Seeder
         // 3. Campus
         // ---------------------------------------------------------
         $campus = Campus::firstOrCreate(
-            ['code' => 'CMP-LEMBA', 'institution_id' => $institution->id],
+            ['code' => 'CMP-MAIN', 'institution_id' => $institution->id],
             [
-                'name' => 'Campus Principal Lemba',
-                'address' => 'Lemba Super, Kinshasa',
+                'name' => 'Main Campus',
+                'address' => 'Innovation Park',
                 'city' => 'Kinshasa',
                 'phone' => '+243825551111',
                 'is_active' => true,
@@ -240,7 +239,8 @@ class BulkDummyDataSeeder extends Seeder
             $roleName = $data['role'];
             $firstName = $faker->firstName;
             $lastName = $faker->lastName;
-            $email = strtolower($firstName . '.' . $lastName . '@montamba.cd');
+            // Updated email domain
+            $email = strtolower($firstName . '.' . $lastName . '@e-digitex.com');
             
             $user = User::firstOrCreate(
                 ['email' => $email],
@@ -332,9 +332,9 @@ class BulkDummyDataSeeder extends Seeder
             $firstName = $faker->firstName;
             $lastName = $faker->lastName;
             
-            // A. Create User First (Updated)
+            // A. Create User First (Updated email domain)
             $sUser = User::firstOrCreate(
-                ['email' => "student$i@montamba.cd"],
+                ['email' => "student$i@e-digitex.com"],
                 [
                     'name' => "$firstName $lastName",
                     'password' => Hash::make('password'),
