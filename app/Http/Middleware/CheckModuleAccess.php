@@ -32,11 +32,12 @@ class CheckModuleAccess
         }
 
         // 2. Resolve Active Institution Context
-        // We check the session first (for multi-school admins), then the fixed ID (for staff/students)
+        // Fix: Prioritize Session ID over User Fixed ID to support context switching
         $activeId = session('active_institution_id');
         $fixedId = $user->institute_id;
         
-        $institutionId = $fixedId ?? $activeId;
+        // If session is set, use it. Otherwise fall back to user's home institute.
+        $institutionId = $activeId ?: $fixedId;
 
         if (!$institutionId) {
             // If no context, strictly block access to protected routes
@@ -67,11 +68,22 @@ class CheckModuleAccess
                 ->where('key', 'enabled_modules')
                 ->first();
 
-            // If no setting found, assume NO modules enabled (Strict Security)
-            $enabledModules = $setting ? json_decode($setting->value, true) : [];
+            // Handle potential JSON string or Array (if model casts it)
+            $value = $setting ? $setting->value : null;
+            
+            if (is_array($value)) {
+                $enabledModules = $value;
+            } else {
+                $enabledModules = json_decode($value ?? '[]', true);
+            }
+
             if (!is_array($enabledModules)) {
                 $enabledModules = [];
             }
+
+            // Normalize strings to lowercase to prevent case-sensitivity issues
+            $moduleName = strtolower($moduleName);
+            $enabledModules = array_map('strtolower', $enabledModules);
 
             // Check if the requested $moduleName is in the allowed list
             if (!in_array($moduleName, $enabledModules)) {

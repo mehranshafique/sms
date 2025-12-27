@@ -19,7 +19,9 @@ class CheckSubscription
             return $next($request);
         }
 
-        $institutionId = $user->institute_id ?? session('active_institution_id');
+        // Fix: Prioritize Session (Active Context) over Fixed ID (Home School)
+        // This allows Head Officers to switch contexts correctly.
+        $institutionId = session('active_institution_id') ?: $user->institute_id;
 
         if ($institutionId) {
             // Find Active Subscription
@@ -34,9 +36,10 @@ class CheckSubscription
             }
 
             // Check Expiry
-            if ($subscription->end_date->isPast()) {
+            // Fix: Check against END of the day to ensure full day access on expiry date
+            if ($subscription->end_date->endOfDay()->isPast()) {
                 // Grace Period Logic (e.g. 3 days extra)
-                $gracePeriodEnd = $subscription->end_date->copy()->addDays(3);
+                $gracePeriodEnd = $subscription->end_date->copy()->addDays(3)->endOfDay();
                 
                 if (now()->gt($gracePeriodEnd)) {
                     return response()->view('errors.subscription_expired', [], 403);
