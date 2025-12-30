@@ -27,8 +27,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class, // Creates Super Admin & Roles
             // BulkDummyDataSeeder::class,
-            // SmsTemplateSeeder::class,
-            // LocationSeeder::class,
+            SmsTemplateSeeder::class,
+            LocationSeeder::class,
             // Add other seeders here if you have them
             // InstitutionSeeder::class, 
         ]);
