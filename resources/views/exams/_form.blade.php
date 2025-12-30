@@ -32,7 +32,7 @@
                                 <input type="text" name="name" class="form-control" value="{{ old('name', $exam->name ?? '') }}" placeholder="{{ __('exam.enter_name') }}" required>
                             </div>
 
-                            {{-- Dates (Fixed: Using 'datepicker' class instead of type='date') --}}
+                            {{-- Dates --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('exam.start_date') }} <span class="text-danger">*</span></label>
                                 <input type="text" name="start_date" class="form-control datepicker" value="{{ old('start_date', isset($exam) ? $exam->start_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
@@ -69,3 +69,102 @@
         </div>
     </div>
 </form>
+
+@section('js')
+{{-- Ensure SweetAlert is loaded --}}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+{{-- Fix Z-Index issues for SweetAlert in case it's behind other modals/headers --}}
+<style>
+    .swal2-container {
+        z-index: 99999 !important;
+    }
+    .swal2-actions button {
+        margin: 0 5px !important;
+    }
+</style>
+
+<script>
+    $(document).ready(function() {
+        $('#examForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            let form = $(this);
+            let btn = form.find('button[type="submit"]');
+            let initialBtnText = btn.text();
+            let formData = new FormData(this);
+
+            // Clear previous errors
+            $('.is-invalid').removeClass('is-invalid');
+            $('.invalid-feedback').remove();
+
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST', // Laravel handles PUT via _method
+                data: formData,
+                contentType: false,
+                processData: false,
+                beforeSend: function() {
+                    btn.attr('disabled', true).text('Processing...');
+                },
+                success: function(response) {
+                    btn.attr('disabled', false).text(initialBtnText);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
+                        timer: 2000,
+                        showConfirmButton: true, // Explicitly show button
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#3085d6'
+                    }).then((result) => {
+                        // Redirect regardless of button click or timer
+                        if (response.redirect) {
+                            window.location.href = response.redirect;
+                        }
+                    });
+                },
+                error: function(xhr) {
+                    btn.attr('disabled', false).text(initialBtnText);
+                    
+                    if (xhr.status === 422) {
+                        let errors = xhr.responseJSON.errors;
+                        $.each(errors, function(key, value) {
+                            let input = form.find('[name="' + key + '"]');
+                            input.addClass('is-invalid');
+                            
+                            let errorHtml = '<div class="invalid-feedback d-block">' + value[0] + '</div>';
+                            if (input.hasClass('default-select') || input.next().hasClass('nice-select')) {
+                                input.parent().append(errorHtml);
+                            } else {
+                                input.after(errorHtml);
+                            }
+                        });
+                        
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Validation Error',
+                            text: 'Please check the form for highlighted errors.',
+                            confirmButtonColor: '#d33'
+                        });
+
+                    } else {
+                        let errorMsg = 'An error occurred.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMsg = xhr.responseJSON.message;
+                        }
+                        
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg,
+                            confirmButtonColor: '#d33'
+                        });
+                    }
+                }
+            });
+        });
+    });
+</script>
+@endsection

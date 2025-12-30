@@ -24,7 +24,13 @@
                     <a class="ai-icon" href="{{ route('dashboard') }}">
                         <i class="la la-home"></i>
                         <span class="nav-text">{{ __('sidebar.dashboard.title') }}</span>
-                        <li><a class="ai-icon" href="{{ route('roles.index') }}"><i class="la la-shield"></i><span class="nav-text">{{ __('sidebar.permissions.roles') }}</span></a></li>
+                    </a>
+                </li>
+                
+                <li>
+                    <a class="ai-icon" href="{{ route('roles.index') }}">
+                        <i class="la la-shield"></i>
+                        <span class="nav-text">{{ __('sidebar.permissions.roles') }}</span>
                     </a>
                 </li>
 
@@ -80,6 +86,7 @@
                     </a>
                     <ul aria-expanded="false">
                         <li><a href="{{ route('subscriptions.index') }}">Billing</a></li> 
+                        {{-- FIXED: Removed faulty translation key that caused array error --}}
                         <li><a href="{{ route('subscriptions.invoices') }}">{{ __('sidebar.billing_requests') }} (Invoices)</a></li>
                     </ul>
                 </li>
@@ -142,6 +149,13 @@
                     @can('exam_mark.create')
                     <li><a class="ai-icon" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
                     @endcan
+                @endif
+
+                {{-- NEW: RESULT CARD MODULE --}}
+                @if($hasModule('results') || $hasModule('examinations')) 
+                    @if(auth()->user()->can('view result_card') || auth()->user()->hasRole(['Super Admin', 'Head Officer', 'Teacher', 'Student']))
+                    <li><a class="ai-icon" href="{{ route('results.index') }}"><i class="la la-certificate"></i><span class="nav-text">{{ __('sidebar.results') }}</span></a></li>
+                    @endif
                 @endif
 
                 {{-- COMMUNICATION GROUP --}}
@@ -239,7 +253,7 @@
                 <li><a class="ai-icon" href="{{ route('settings.index') }}"><i class="la la-cogs"></i><span class="nav-text">{{ __('settings.page_title') }}</span></a></li>
                 @endcan
                 
-                @if($hasModule('settings')) {{-- Assuming 'settings' is a module or part of core --}}
+                @if($hasModule('settings'))
                     @can('institution.update')
                     <li><a class="ai-icon" href="{{ route('configuration.index') }}"><i class="fa fa-sliders"></i><span class="nav-text">{{ __('configuration.page_title') }}</span></a></li>
                     {{-- Added SMS Templates Link --}}

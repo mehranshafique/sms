@@ -26,8 +26,8 @@ use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
-use App\Http\Controllers\SmsTemplateController; // Add this
-
+use App\Http\Controllers\SmsTemplateController;
+use App\Http\Controllers\ResultCardController; // Add this import
 // New Module Controllers
 use App\Http\Controllers\NoticeController;
 use App\Http\Controllers\ElectionController;
@@ -45,7 +45,7 @@ use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use App\Http\Middleware\CheckModuleAccess; 
 use App\Http\Controllers\LocationController;
-
+use App\Http\Controllers\UserProfileController;
 Route::redirect('/','/login' );
 
 Route::get('/change-language', function (\Illuminate\Http\Request $request) {
@@ -108,30 +108,37 @@ Route::middleware('auth')->group(function () {
     Route::resource('students', StudentController::class);
 
     // =========================================================================
-    // MODULE: COMMUNICATION (Notices)
+    // MODULE: COMMUNICATION
     // =========================================================================
-    Route::middleware([CheckModuleAccess::class . ':communication'])->group(function () {
+    // Changed to granular key: 'notices'
+    Route::middleware([CheckModuleAccess::class . ':notices'])->group(function () {
         Route::resource('notices', NoticeController::class);
     });
     // STUDENT NOTICES
-    Route::get('/my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
-    Route::get('/my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
+    Route::middleware([CheckModuleAccess::class . ':notices'])->group(function () {
+        Route::get('/my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
+        Route::get('/my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
+    });
 
     // =========================================================================
     // MODULE: VOTING & ELECTIONS
     // =========================================================================
 
-    Route::get('/my-elections', [StudentVotingController::class, 'index'])->name('student.elections.index');
-    Route::get('/my-elections/{election}', [StudentVotingController::class, 'show'])->name('student.elections.show');
-    Route::post('/my-elections/{election}/vote', [StudentVotingController::class, 'vote'])->name('student.elections.vote');
+    // Student Voting Interface
+    // Granular key: 'elections' (Using elections for consistency across student/admin)
+    Route::middleware([CheckModuleAccess::class . ':elections'])->group(function() {
+        Route::get('/my-elections', [StudentVotingController::class, 'index'])->name('student.elections.index');
+        Route::get('/my-elections/{election}', [StudentVotingController::class, 'show'])->name('student.elections.show');
+        Route::post('/my-elections/{election}/vote', [StudentVotingController::class, 'vote'])->name('student.elections.vote');
+    });
 
-    Route::middleware([CheckModuleAccess::class . ':voting'])->group(function () {
+    // Admin/Staff Election Management
+    Route::middleware([CheckModuleAccess::class . ':elections'])->group(function () {
         // Election Management
         Route::post('elections/{election}/positions', [ElectionController::class, 'addPosition'])->name('elections.addPosition');
         Route::post('elections/{election}/candidates', [ElectionController::class, 'addCandidate'])->name('elections.addCandidate');
         Route::delete('elections/candidates/{candidate}', [ElectionController::class, 'destroyCandidate'])->name('elections.destroyCandidate');
         
-        // NEW: Publish and Close Routes
         Route::post('elections/{election}/publish', [ElectionController::class, 'publish'])->name('elections.publish');
         Route::post('elections/{election}/close', [ElectionController::class, 'close'])->name('elections.close');
 
@@ -143,37 +150,58 @@ Route::middleware('auth')->group(function () {
     });
 
     // =========================================================================
-    // MODULE: ACADEMICS
+    // MODULE: ACADEMICS (Granular Breakdown)
     // =========================================================================
-    Route::middleware([CheckModuleAccess::class . ':academics'])->group(function () {
+    
+    // Academic Sessions
+    Route::middleware([CheckModuleAccess::class . ':academic_sessions'])->group(function () {
         Route::resource('academic-sessions', AcademicSessionController::class);
-        
+    });
+    
+    // Grade Levels
+    Route::middleware([CheckModuleAccess::class . ':grade_levels'])->group(function () {
         Route::post('grade-levels/bulk-delete', [GradeLevelController::class, 'bulkDelete'])->name('grade-levels.bulkDelete');
         Route::resource('grade-levels', GradeLevelController::class);
+    });
 
+    // Class Sections
+    Route::middleware([CheckModuleAccess::class . ':class_sections'])->group(function () {
         Route::post('class-sections/bulk-delete', [ClassSectionController::class, 'bulkDelete'])->name('class-sections.bulkDelete');
         Route::resource('class-sections', ClassSectionController::class);
+    });
 
+    // Subjects
+    Route::middleware([CheckModuleAccess::class . ':subjects'])->group(function () {
         Route::post('subjects/bulk-delete', [SubjectController::class, 'bulkDelete'])->name('subjects.bulkDelete');
         Route::resource('subjects', SubjectController::class);
+    });
 
+    // Timetables
+    Route::middleware([CheckModuleAccess::class . ':timetables'])->group(function () {
         Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
         Route::get('timetables/routine', [TimetableController::class, 'classRoutine'])->name('timetables.routine');
         Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
         Route::get('timetables/{timetable}/print', [TimetableController::class, 'print'])->name('timetables.print');
         Route::get('timetables/{timetable}/download', [TimetableController::class, 'downloadPdf'])->name('timetables.download');
         Route::resource('timetables', TimetableController::class);
-        
+    });
+    
+    // Enrollments
+    Route::middleware([CheckModuleAccess::class . ':enrollments'])->group(function () {
         Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
         Route::resource('enrollments', StudentEnrollmentController::class);
-        
-        // Attendance
+    });
+    
+    // Attendance
+    Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () {
         Route::get('attendance/create', [StudentAttendanceController::class, 'create'])->name('attendance.create');
         Route::post('attendance', [StudentAttendanceController::class, 'store'])->name('attendance.store');
         Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');
         Route::get('attendance/report', [StudentAttendanceController::class, 'report'])->name('attendance.report');
-        
-        // Promotions
+    });
+    
+    // Promotions
+    Route::middleware([CheckModuleAccess::class . ':student_promotion'])->group(function () {
         Route::get('promotions', [StudentPromotionController::class, 'index'])->name('promotions.index');
         Route::post('promotions', [StudentPromotionController::class, 'store'])->name('promotions.store');
     });
@@ -181,45 +209,79 @@ Route::middleware('auth')->group(function () {
     // =========================================================================
     // MODULE: EXAMINATIONS
     // =========================================================================
-    Route::middleware([CheckModuleAccess::class . ':examinations'])->group(function () {
+    
+    // Exams
+    Route::middleware([CheckModuleAccess::class . ':exams'])->group(function () {
         Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
         Route::post('exams/{exam}/finalize', [ExamController::class, 'finalize'])->name('exams.finalize');
         Route::get('exams/{exam}/print-result', [ExamController::class, 'printClassResult'])->name('exams.print_result');
         Route::resource('exams', ExamController::class);
-        
-        // Marks Entry
-        Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
-        Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
-        Route::get('marks/get-classes', [ExamMarkController::class, 'getClasses'])->name('marks.get_classes');
-        Route::get('marks/get-subjects', [ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
+        // --- NEW: RESULT CARD MODULE ---
+        Route::get('results', [ResultCardController::class, 'index'])->name('results.index');
+        Route::get('results/print', [ResultCardController::class, 'print'])->name('results.print');
+        // Helper route for the AJAX dropdown in results page
+        Route::get('results/get-students', function(\Illuminate\Http\Request $request) {
+            // Simple closure to fetch students for dropdown, reusing logic logic or new
+            $request->validate(['class_section_id' => 'required']);
+            return \App\Models\StudentEnrollment::with('student')
+                ->where('class_section_id', $request->class_section_id)
+                ->where('status', 'active')
+                ->get()
+                ->map(function($en) {
+                     return ['id' => $en->student->id, 'name' => $en->student->full_name, 'roll_number' => $en->roll_number];
+                });
+        })->name('results.get_students');
+        Route::get('/results/get-classes', [ResultCardController::class, 'getClasses'])->name('results.get_classes');
+        Route::get('/results/get-students', [ResultCardController::class, 'getStudents'])->name('results.get_students');
     });
     
-    // Student Result View
-    Route::middleware([CheckModuleAccess::class . ':examinations'])->get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
+    // Exam Marks
+    Route::middleware([CheckModuleAccess::class . ':exam_marks'])->group(function () {
+        // Marks Entry Routes
+        Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
+        Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
+
+        // AJAX Helpers for Marks
+        Route::get('marks/get-classes', [ExamMarkController::class, 'getClasses'])->name('marks.get_classes');
+        Route::get('marks/get-subjects', [ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
+        Route::get('marks/get-students', [ExamMarkController::class, 'getStudents'])->name('marks.get_students');
+        // Student Result View
+        Route::get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
+    });
 
     // =========================================================================
     // MODULE: HR (Staff)
     // =========================================================================
-    Route::middleware([CheckModuleAccess::class . ':hr'])->group(function () {
+    Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);
     });
 
     // =========================================================================
-    // MODULE: FINANCE
+    // MODULE: FINANCE (Granular Breakdown)
     // =========================================================================
-    Route::middleware([CheckModuleAccess::class . ':finance'])->prefix('finance')->group(function () {
-        Route::resource('fee-types', FeeTypeController::class);
-        Route::resource('fees', FeeStructureController::class);
+    Route::prefix('finance')->group(function () {
+        
+        Route::middleware([CheckModuleAccess::class . ':fee_types'])->group(function () {
+            Route::resource('fee-types', FeeTypeController::class);
+        });
+
+        Route::middleware([CheckModuleAccess::class . ':fee_structures'])->group(function () {
+            Route::resource('fees', FeeStructureController::class);
+        });
         
         // Invoices
-        Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
-        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
-        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoices.download');
-        Route::resource('invoices', InvoiceController::class);
+        Route::middleware([CheckModuleAccess::class . ':invoices'])->group(function () {
+            Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
+            Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+            Route::get('invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoices.download');
+            Route::resource('invoices', InvoiceController::class);
+        });
         
         // Payments
-        Route::get('payments/create', [PaymentController::class, 'create'])->name('payments.create');
-        Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
+        Route::middleware([CheckModuleAccess::class . ':payments'])->group(function () {
+            Route::get('payments/create', [PaymentController::class, 'create'])->name('payments.create');
+            Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
+        });
         
         Route::middleware([RoleMiddleware::class . ':Super Admin|Head Officer'])->group(function () {
              Route::get('platform-invoices', [SubscriptionController::class, 'invoices'])->name('subscriptions.invoices');
@@ -227,7 +289,8 @@ Route::middleware('auth')->group(function () {
              Route::get('platform-invoices/{id}/print', [SubscriptionController::class, 'printInvoice'])->name('subscriptions.invoices.print');
              Route::get('platform-invoices/{id}/download', [SubscriptionController::class, 'downloadInvoicePdf'])->name('subscriptions.invoices.download');
         });
-        // --- SUBSCRIPTIONS (Main Admin Only) ---
+
+        // --- SUBSCRIPTIONS (Main Admin Only - No module check usually needed for super admin features) ---
         Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
             // PACKAGES
             Route::get('packages', [SubscriptionController::class, 'indexPackages'])->name('packages.index');
@@ -270,9 +333,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/school-year', [ConfigurationController::class, 'updateSchoolYear'])->name('configuration.year.update');
             
             // SMS Templates Management
-            Route::get('/sms-templates', [SmsTemplateController::class, 'index'])->name('sms_templates.index');
-            Route::put('/sms-templates/{id}', [SmsTemplateController::class, 'update'])->name('sms_templates.update');
-            Route::post('/sms-templates/override', [SmsTemplateController::class, 'override'])->name('sms_templates.override');
+            Route::middleware([CheckModuleAccess::class . ':sms_templates'])->group(function() {
+                Route::get('/sms-templates', [SmsTemplateController::class, 'index'])->name('sms_templates.index');
+                Route::put('/sms-templates/{id}', [SmsTemplateController::class, 'update'])->name('sms_templates.update');
+                Route::post('/sms-templates/override', [SmsTemplateController::class, 'override'])->name('sms_templates.override');
+            });
 
             Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
                 Route::post('/modules', [ConfigurationController::class, 'updateModules'])->name('configuration.modules.update');
@@ -285,6 +350,11 @@ Route::middleware('auth')->group(function () {
         Route::get('states', [LocationController::class, 'states'])->name('states');
         Route::get('cities', [LocationController::class, 'cities'])->name('cities');
     });
+
+    // User Profile Routes
+    Route::get('profile', [UserProfileController::class, 'index'])->name('profile.index');
+    Route::put('profile', [UserProfileController::class, 'update'])->name('profile.update');
+    Route::put('profile/password', [UserProfileController::class, 'updatePassword'])->name('profile.password');
 });
 
 require __DIR__.'/auth.php';

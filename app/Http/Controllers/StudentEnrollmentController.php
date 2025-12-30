@@ -33,7 +33,7 @@ class StudentEnrollmentController extends BaseController
         if ($request->ajax()) {
             $data = StudentEnrollment::with(['student', 'classSection.gradeLevel', 'gradeLevel'])
                 ->select('student_enrollments.*')
-                ->latest('student_enrollments.created_at'); // Rule 3: Latest First
+                ->latest('student_enrollments.created_at');
 
             if ($institutionId) {
                 $data->where('student_enrollments.institution_id', $institutionId);
@@ -62,10 +62,10 @@ class StudentEnrollmentController extends BaseController
                     return $row->student->full_name ?? 'N/A';
                 })
                 ->addColumn('student_code', function($row){
-                    return $row->student->admission_number ?? 'N/A';
+                    // UPDATED: Explicitly use admission_number instead of any ID
+                    return $row->student->admission_number ?? '-';
                 })
                 ->addColumn('class', function($row){
-                    // Rule 2: Section (Grade)
                     $grade = $row->classSection->gradeLevel->name ?? '';
                     return ($row->classSection->name ?? 'N/A') . ($grade ? ' (' . $grade . ')' : '');
                 })
@@ -94,7 +94,6 @@ class StudentEnrollmentController extends BaseController
                 ->make(true);
         }
 
-        // Dropdown Filter: Rule 2 Applied
         $classSectionsQuery = ClassSection::with('gradeLevel');
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
@@ -113,7 +112,6 @@ class StudentEnrollmentController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        // Rule 2: Class Name with Grade
         $classesQuery = ClassSection::with(['gradeLevel', 'institution']);
         if ($institutionId) {
             $classesQuery->where('institution_id', $institutionId);
@@ -144,6 +142,7 @@ class StudentEnrollmentController extends BaseController
             $studentsQuery->with('institution');
         }
 
+        // UPDATED: Ensuring admission_number is fetched and used for the label
         $students = $studentsQuery->select('id', 'first_name', 'last_name', 'admission_number', 'institution_id')
             ->get()
             ->mapWithKeys(function($item) use ($institutionId){

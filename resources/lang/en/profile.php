@@ -1,0 +1,37 @@
+<?php
+
+return [
+    'page_title' => 'Profile',
+    'my_profile' => 'My Profile',
+    'subtitle' => 'Manage your personal account details',
+    'dashboard' => 'Dashboard',
+    'profile' => 'Profile',
+    'user' => 'User',
+    'email' => 'Email',
+    'joined' => 'Joined',
+    'status' => 'Status',
+    'active' => 'Active',
+    'profile_settings' => 'Profile Settings',
+    'tab_overview' => 'Overview',
+    'tab_edit_profile' => 'Edit Profile',
+    'tab_security' => 'Security',
+    'account_information' => 'Account Information',
+    'full_name' => 'Full Name',
+    'phone' => 'Phone Number',
+    'address' => 'Address',
+    'not_set' => 'Not Set',
+    'academic_details' => 'Academic Details',
+    'admission_no' => 'Admission Number',
+    'update_profile' => 'Update Profile',
+    'upload_hint' => 'Click the camera icon to upload. Max size 2MB.',
+    'save_changes' => 'Save Changes',
+    'change_password' => 'Change Password',
+    'current_password' => 'Current Password',
+    'new_password' => 'New Password',
+    'confirm_password' => 'Confirm New Password',
+    'update_password' => 'Update Password',
+    
+    // Messages
+    'update_success' => 'Profile updated successfully.',
+    'password_update_success' => 'Password changed successfully.',
+];

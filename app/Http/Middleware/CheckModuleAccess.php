@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\InstitutionSetting;
+use App\Models\Subscription;
 use Symfony\Component\HttpFoundation\Response;
 
 class CheckModuleAccess
@@ -15,45 +16,44 @@ class CheckModuleAccess
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure  $next
-     * @param  string|null  $moduleName  The module key (e.g. 'finance', 'academics')
+     * @param  string|null  $moduleName  The granular module key to verify (e.g., 'subjects', 'invoices')
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function handle(Request $request, Closure $next, ?string $moduleName = null): Response
     {
         $user = Auth::user();
 
+        // 1. Unauthenticated Bypass
         if (!$user) {
-            return redirect('/login');
+            return $next($request);
         }
 
-        // 1. Super Admin Bypass
-        // Super Admins have global access to debug or manage all features
+        // 2. Super Admin Bypass
         if ($user->hasRole('Super Admin')) {
             return $next($request);
         }
 
-        // 2. Resolve Active Institution Context
-        // Fix: Prioritize Session ID over User Fixed ID to support context switching
+        // 3. Resolve Active Institution Context
         $activeId = session('active_institution_id');
         $fixedId = $user->institute_id;
         
-        // If session is set, use it. Otherwise fall back to user's home institute.
         $institutionId = $activeId ?: $fixedId;
 
+        // FIX: Bypass module/context checks if in Global Dashboard mode
+        if ($institutionId === 'global') {
+            return $next($request);
+        }
+
         if (!$institutionId) {
-            // If no context, strictly block access to protected routes
             abort(403, 'No institution context selected.');
         }
 
-        // 3. Context Validation: Is the user actually allowed to access this Institution?
-        // This ensures strict separation: A Head Officer of "School A" cannot access "School B"
-        // even if they manipulate the session/URL, unless they are explicitly assigned in the DB.
+        // 4. Context Validation (Security Check)
+        // Ensure the user actually belongs to this institution context
         $hasAccess = false;
-        
         if ($user->institute_id == $institutionId) {
-            // Case A: Direct Link (Staff/Student) - Locked to this ID
             $hasAccess = true;
         } elseif ($user->institutes()->where('institution_id', $institutionId)->exists()) {
-            // Case B: Pivot Link (Head Officer / Branch Admin) - Assigned via pivot table
             $hasAccess = true;
         }
 
@@ -61,36 +61,61 @@ class CheckModuleAccess
              abort(403, 'Unauthorized: You do not have access to the selected institution context.');
         }
 
-        // 4. Module Subscription Check (Licensing)
-        // Only run if a specific module is requested (e.g. 'finance')
+        // 5. Granular Module Permission Check
         if (!empty($moduleName)) {
+            // Fetch enabled modules from Institution Settings
             $setting = InstitutionSetting::where('institution_id', $institutionId)
                 ->where('key', 'enabled_modules')
                 ->first();
 
-            // Handle potential JSON string or Array (if model casts it)
-            $value = $setting ? $setting->value : null;
+            $enabledModules = [];
             
-            if (is_array($value)) {
-                $enabledModules = $value;
-            } else {
-                $enabledModules = json_decode($value ?? '[]', true);
+            if ($setting && $setting->value) {
+                $enabledModules = is_array($setting->value) 
+                    ? $setting->value 
+                    : json_decode($setting->value, true);
+            }
+
+            // Fallback: If settings are empty, check Subscription and seed settings
+            if (empty($enabledModules)) {
+                $activeSub = Subscription::with('package')
+                    ->where('institution_id', $institutionId)
+                    ->where('status', 'active')
+                    ->where('end_date', '>=', now()->startOfDay())
+                    ->latest('created_at')
+                    ->first();
+
+                if ($activeSub && $activeSub->package) {
+                    $enabledModules = $activeSub->package->modules ?? [];
+                    
+                    // Persist for future requests to avoid heavy query overhead
+                    if (!empty($enabledModules)) {
+                        InstitutionSetting::updateOrCreate(
+                            ['institution_id' => $institutionId, 'key' => 'enabled_modules'],
+                            ['value' => json_encode($enabledModules), 'group' => 'modules']
+                        );
+                    }
+                }
             }
 
             if (!is_array($enabledModules)) {
                 $enabledModules = [];
             }
 
-            // Normalize strings to lowercase to prevent case-sensitivity issues
-            $moduleName = strtolower($moduleName);
-            $enabledModules = array_map('strtolower', $enabledModules);
+            // Normalize for comparison
+            $moduleName = strtolower(trim($moduleName));
+            $enabledModules = array_map(fn($m) => strtolower(trim($m)), $enabledModules);
 
-            // Check if the requested $moduleName is in the allowed list
+            // Direct Granular Check
+            // We strictly check if the requested module key exists in the enabled list.
             if (!in_array($moduleName, $enabledModules)) {
+                
                 if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json(['message' => 'Module access denied by subscription plan.'], 403);
+                    return response()->json(['message' => 'Module access denied.'], 403);
                 }
-                abort(403, 'Access Denied: Your institution subscription does not include the ' . ucfirst($moduleName) . ' module.');
+
+                $prettyName = ucwords(str_replace('_', ' ', $moduleName));
+                abort(403, "Access Denied: The '{$prettyName}' module is not enabled for your institution.");
             }
         }
 

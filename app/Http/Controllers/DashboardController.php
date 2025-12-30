@@ -32,34 +32,92 @@ class DashboardController extends BaseController
     {
         $this->setPageTitle(__('dashboard.page_title'));
         $user = Auth::user();
-        $institutionId = $this->getInstitutionId();
+        
+        // Get Active Context from Session
+        $activeInstId = session('active_institution_id');
 
         // 1. MAIN ADMIN (PLATFORM OWNER) CHECK
         if ($user->hasRole('Super Admin')) {
-            // FIX: If Super Admin has switched context to a specific school, show that school's dashboard
-            // if ($institutionId != '0') {
-            //     return $this->schoolAdminDashboard($institutionId);
-            // }
+            // If Super Admin switched to a specific school
+            if ($activeInstId && $activeInstId !== 'global') {
+                return $this->schoolAdminDashboard($activeInstId);
+            }
             // Otherwise, show the Global Platform Dashboard
             return $this->platformAdminDashboard();
         }
 
         // 2. School Admin (Head Officer)
         if ($user->hasRole('Head Officer')) {
+            $myInstitutes = $user->institutes; // Assuming relationship exists
+            
+            // Check if Head Officer has multiple institutions AND is in Global Mode
+            if ($myInstitutes->count() > 1 && ($activeInstId === 'global' || !$activeInstId)) {
+                return $this->multiSchoolDashboard($user, $myInstitutes);
+            }
+
+            // Otherwise, determine the specific school ID
+            $institutionId = ($activeInstId && $activeInstId !== 'global') 
+                ? $activeInstId 
+                : ($myInstitutes->first()->id ?? $user->institute_id);
+
             return $this->schoolAdminDashboard($institutionId);
         }
 
         // 3. Teacher/Staff
         if ($user->hasRole(['Teacher', 'Staff']) || $user->user_type == 4) {
+            $institutionId = $this->getInstitutionId(); // Fallback to helper
             return $this->teacherDashboard($user, $institutionId);
         }
 
         // 4. Student
         if ($user->hasRole('Student')) {
+            $institutionId = $this->getInstitutionId(); // Fallback to helper
             return $this->studentDashboard($user, $institutionId);
         }
 
         return view('dashboard.dashboard');
+    }
+
+    /**
+     * NEW: Multi-School Dashboard for Head Officers
+     * Aggregates stats across all assigned schools.
+     */
+    private function multiSchoolDashboard($user, $institutes)
+    {
+        $instituteIds = $institutes->pluck('id');
+
+        // 1. Aggregated Counts
+        $totalSchools = $institutes->count();
+        $activeSchools = $institutes->where('is_active', true)->count();
+        
+        $totalStudents = Student::whereIn('institution_id', $instituteIds)->count();
+        $totalStaff = Staff::whereIn('institution_id', $instituteIds)->count();
+
+        // 2. Aggregated Finances (School Invoices)
+        $invoiceQuery = Invoice::whereIn('institution_id', $instituteIds);
+        $totalRevenue = $invoiceQuery->sum('total_amount');
+        $collectedRevenue = $invoiceQuery->sum('paid_amount');
+        $pendingRevenue = $totalRevenue - $collectedRevenue;
+
+        // 3. School List with Mini-Stats
+        // We attach student count to each institute object for the table
+        $institutes->map(function($inst) {
+            $inst->student_count = Student::where('institution_id', $inst->id)->count();
+            $inst->staff_count = Staff::where('institution_id', $inst->id)->count();
+            return $inst;
+        });
+
+        // 4. Recent Activity (Audit Logs filtered by these schools)
+        // Assuming AuditLog has 'institution_id'
+        $auditLogCount = \App\Models\AuditLog::whereIn('institution_id', $instituteIds)
+            ->where('created_at', '>=', now()->subDay())
+            ->count();
+
+        return view('dashboard.head_officer_global', compact(
+            'totalSchools', 'activeSchools', 'totalStudents', 'totalStaff',
+            'totalRevenue', 'collectedRevenue', 'pendingRevenue',
+            'institutes', 'auditLogCount'
+        ));
     }
 
     /**
@@ -123,7 +181,6 @@ class DashboardController extends BaseController
      */
     private function schoolAdminDashboard($institutionId)
     {
-        // dd($institutionId);
         // Core Counts (Scoped to Institution)
         $studentsQuery = Student::where('institution_id', $institutionId);
         $staffQuery = Staff::where('institution_id', $institutionId);
@@ -131,7 +188,7 @@ class DashboardController extends BaseController
         
         $totalStudents = $studentsQuery->count();
         $totalStaff = $staffQuery->count();
-        $totalTeachers = $staffQuery->whereNotNull('designation')->count(); // Adjust filter if needed
+        $totalTeachers = $staffQuery->whereNotNull('designation')->count(); 
         $totalCampuses = Campus::where('institution_id', $institutionId)->count();
         $totalInstitutes = 1;
 

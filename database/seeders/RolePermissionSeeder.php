@@ -50,6 +50,7 @@ class RolePermissionSeeder extends Seeder
             // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Marks' => ['create', 'update', 'view'],
+            'Result Cards' => ['view'], // Added Result Cards Permission
             
             // Finance
             'Fee Structures' => ['view', 'create', 'update', 'delete'],
@@ -62,7 +63,7 @@ class RolePermissionSeeder extends Seeder
             'Settings' => ['manage'],
             'Subscriptions' => ['view', 'create', 'update', 'delete'],
             'Packages' => ['view', 'create', 'update', 'delete'],
-            'Sms Templates' => ['view', 'update'], // NEW MODULE
+            'Sms Templates' => ['view', 'update'],
             
             // NEW MODULES (Communication & Voting)
             'Communication' => ['view', 'create', 'update', 'delete'],

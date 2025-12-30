@@ -61,4 +61,62 @@ return [
     'published_exams' => 'Published Exams',
     'present' => 'Present',
     'teacher' => 'Teacher',
+
+    'switched_global_view' => 'Switched to Global View successfully.',
+    'context_switched_success' => 'School context switched successfully.',
+    'unauthorized_access' => 'Unauthorized access.',
+
+    //head officer dashboard
+    // Page Titles & Headings
+    'page_title' => 'Dashboard',
+    'main_admin_title' => 'Platform Admin',
+    'platform_overview' => 'System Overview & Statistics',
+    'my_schools_overview' => 'My Institutions Overview',
+    'global_dashboard' => 'Global Dashboard',
+    'global_view' => 'Global View',
+
+    // Stats Widgets
+    'total_institutions' => 'Total Institutions',
+    'institution_newcomer' => 'New Institutions (30 Days)',
+    'active_institutions' => 'Active Institutions',
+    'total_enrollment' => 'Total Enrollment',
+    'my_schools' => 'My Schools',
+    'total_students' => 'Total Students',
+    'total_staff' => 'Total Staff',
+    'active_schools' => 'Active Schools',
+    'personnel' => 'Personnel',
+
+    // Financial Section
+    'financial_overview' => 'Financial Overview (All Schools)',
+    'funds_request' => 'Funds Request',
+    'total_invoiced' => 'Total Invoiced',
+    'collected' => 'Collected',
+    'pending' => 'Pending',
+    'validated' => 'Validated',
+    'view_details' => 'View Details',
+
+    // Activity & Logs
+    'recent_activity' => 'Recent Activity',
+    'actions' => 'Actions',
+    'system_actions_desc' => 'System actions recorded in last 24h across your schools.',
+    'view_logs' => 'View Logs',
+    'view_all' => 'View All',
+
+    // Lists & Tables
+    'my_institutions_list' => 'My Institutions',
+    'student_by_year' => 'Student Admissions by Month',
+    'name' => 'Name',
+    'code' => 'Code',
+    'city' => 'City',
+    'students' => 'Students',
+    'staff' => 'Staff',
+    'status' => 'Status',
+    'action' => 'Action',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
+
+    // Buttons & Actions
+    'add_new_school' => 'Add New School',
+    'switch_dashboard' => 'Switch Dashboard',
+    'edit' => 'Edit',
 ];

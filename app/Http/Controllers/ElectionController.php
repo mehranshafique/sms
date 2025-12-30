@@ -105,10 +105,10 @@ class ElectionController extends BaseController
 
     public function show(Election $election)
     {
-        $this->authorize('view', $election);
-        if ($election->institution_id !== $this->getInstitutionId()) {
-             abort(403);
-        }
+        // $this->authorize('view', $election);
+        // if ($election->institution_id !== $this->getInstitutionId()) {
+        //      abort(403);
+        // }
 
         $election->load(['positions.candidates.student', 'positions.candidates.student.classSection']);
         

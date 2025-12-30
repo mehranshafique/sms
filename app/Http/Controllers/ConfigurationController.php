@@ -61,10 +61,10 @@ class ConfigurationController extends BaseController
             'provider' => $settings['sms_provider'] ?? 'mobishastra',
         ];
         
-        // 3. School Year
+        // 3. School Year (UPDATED: Now using full dates)
         $schoolYear = [
-            'start_month' => $settings['academic_start_month'] ?? 'September',
-            'end_month' => $settings['academic_end_month'] ?? 'June',
+            'start_date' => $settings['academic_start_date'] ?? date('Y-09-01'),
+            'end_date'   => $settings['academic_end_date'] ?? date('Y-06-30'),
         ];
 
         // 4. Modules (Dynamic from DB)
@@ -211,9 +211,10 @@ class ConfigurationController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
+        // UPDATED: Validating Dates
         $data = $request->validate([
-            'academic_start_month' => 'required|string',
-            'academic_end_month' => 'required|string',
+            'academic_start_date' => 'required|date',
+            'academic_end_date'   => 'required|date|after:academic_start_date',
         ]);
         
         foreach ($data as $key => $value) {

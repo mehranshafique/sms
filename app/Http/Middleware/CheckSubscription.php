@@ -14,42 +14,56 @@ class CheckSubscription
     {
         $user = Auth::user();
         
-        // Skip for Super Admin or non-authenticated
+        // 1. Skip checks for unauthenticated users (let auth middleware handle them)
+        // or Super Admins (who always have access)
         if (!$user || $user->hasRole('Super Admin')) {
             return $next($request);
         }
 
-        // Fix: Prioritize Session (Active Context) over Fixed ID (Home School)
-        // This allows Head Officers to switch contexts correctly.
+        // 2. Resolve Institution Context
+        // CRITICAL FIX: Check Session FIRST, then User's fixed ID.
+        // This ensures that if a Head Officer switches to a different school,
+        // we check the subscription of the *active* school, not their default one.
         $institutionId = session('active_institution_id') ?: $user->institute_id;
 
+        // FIX: Bypass subscription check if in Global Dashboard mode
+        if ($institutionId === 'global') {
+            return $next($request);
+        }
+
         if ($institutionId) {
-            // Find Active Subscription
+            // 3. Find Active Subscription
+            // We look for the latest subscription that is marked as active.
             $subscription = Subscription::where('institution_id', $institutionId)
                 ->where('status', 'active')
                 ->latest('end_date')
                 ->first();
 
+            // 4. No Subscription Found
             if (!$subscription) {
-                // No active subscription found -> Redirect to Locked Page
                 return response()->view('errors.subscription_expired', [], 403);
             }
 
-            // Check Expiry
-            // Fix: Check against END of the day to ensure full day access on expiry date
+            // 5. Check Expiry
+            // Use endOfDay() to ensure the user has access until 23:59:59 on the expiry date.
             if ($subscription->end_date->endOfDay()->isPast()) {
-                // Grace Period Logic (e.g. 3 days extra)
+                
+                // Grace Period Logic (e.g. 3 days extra access)
                 $gracePeriodEnd = $subscription->end_date->copy()->addDays(3)->endOfDay();
                 
                 if (now()->gt($gracePeriodEnd)) {
+                    // Grace period over -> Block Access
                     return response()->view('errors.subscription_expired', [], 403);
                 } else {
-                    // In Grace Period -> Show Warning Flash Message
-                    session()->flash('warning', 'Your subscription has expired. Access will be revoked in ' . now()->diffInDays($gracePeriodEnd) . ' days. Please contact support.');
+                    // Inside Grace Period -> Allow Access but Flash Warning
+                    $daysOver = now()->diffInDays($gracePeriodEnd);
+                    session()->flash('warning', 'Your subscription has expired. Access will be revoked in ' . $daysOver . ' days. Please contact support.');
                 }
             } else {
-                // Active -> Check for Warning Threshold (e.g. 7 days before)
+                // 6. Subscription Active -> Check for Renewal Warning
+                // Warn if expiring within 7 days
                 $daysLeft = now()->diffInDays($subscription->end_date, false);
+                
                 if ($daysLeft <= 7 && $daysLeft >= 0) {
                     session()->flash('warning', "Subscription expiring in {$daysLeft} days. Please renew soon.");
                 }

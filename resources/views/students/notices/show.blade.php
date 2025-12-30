@@ -23,7 +23,15 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                             <div>
-                                <span class="badge badge-light text-muted mb-2"><i class="fa fa-calendar me-1"></i> {{ $notice->publish_date->format('l, d F Y') }}</span>
+                                {{-- FIX: Use created_at instead of publish_date to prevent null error --}}
+                                <span class="badge badge-light text-muted mb-2">
+                                    <i class="fa fa-calendar me-1"></i> 
+                                    @if($notice->created_at)
+                                        {{ $notice->created_at->format('l, d F Y') }}
+                                    @else
+                                        Date N/A
+                                    @endif
+                                </span>
                                 @if($notice->type == 'urgent')
                                     <span class="badge badge-danger ms-2">Urgent</span>
                                 @endif
@@ -32,7 +40,8 @@
                         </div>
                         
                         <div class="notice-content fs-16 text-dark lh-lg">
-                            {!! nl2br(e($notice->content)) !!}
+                            {{-- Use description field if content field doesn't exist, based on index view usage --}}
+                            {!! nl2br(e($notice->description ?? $notice->content)) !!}
                         </div>
 
                         <div class="mt-5 pt-3 border-top">

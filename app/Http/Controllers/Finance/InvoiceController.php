@@ -7,7 +7,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\FeeStructure;
 use App\Models\ClassSection;
-use App\Models\GradeLevel; // Added
+use App\Models\GradeLevel;
 use App\Models\StudentEnrollment;
 use App\Models\AcademicSession;
 use Illuminate\Http\Request;
@@ -29,12 +29,20 @@ class InvoiceController extends BaseController
 
     public function index(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        // FIX: Get Active Institution from Session
+        $user = Auth::user();
+        $institutionId = session('active_institution_id') ?? $user->institute_id;
+        
+        // Handle 'global' string if passed by switcher
+        if ($institutionId === 'global') {
+            $institutionId = null;
+        }
 
         if ($request->ajax()) {
             $data = Invoice::with(['student', 'academicSession'])
                 ->select('invoices.*');
 
+            // Only filter if we are in a specific institution context
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
             }
@@ -82,15 +90,24 @@ class InvoiceController extends BaseController
 
     public function create()
     {
-        $institutionId = Auth::user()->institute_id;
+        // FIX: Use Active Institution ID from Session
+        $user = Auth::user();
+        $institutionId = session('active_institution_id') ?? $user->institute_id;
+
+        if ($institutionId === 'global') {
+            $institutionId = null;
+        }
         
-        // 1. Fetch Grade Levels (instead of mixed sections)
         $gradesQuery = GradeLevel::query();
         $feesQuery = FeeStructure::query();
 
         if ($institutionId) {
             $gradesQuery->where('institution_id', $institutionId);
             $feesQuery->where('institution_id', $institutionId);
+        } else {
+            // Optional: If Super Admin in Global View, maybe show nothing or all?
+            // Currently showing all if no ID is present (depends on Global Scopes)
+            // If you use MultiTenancy scopes, you might need ->withoutGlobalScopes() here
         }
 
         $grades = $gradesQuery->pluck('name', 'id');
@@ -106,7 +123,10 @@ class InvoiceController extends BaseController
     {
         $request->validate(['grade_id' => 'required|exists:grade_levels,id']);
         
-        $institutionId = Auth::user()->institute_id;
+        // FIX: Use Active Institution ID from Session
+        $user = Auth::user();
+        $institutionId = session('active_institution_id') ?? $user->institute_id;
+        if ($institutionId === 'global') $institutionId = null;
         
         $query = ClassSection::where('grade_level_id', $request->grade_id);
         
@@ -129,8 +149,12 @@ class InvoiceController extends BaseController
             'issue_date' => 'required|date',
         ]);
 
-        $institutionId = Auth::user()->institute_id;
+        // FIX: Use Active Institution ID
+        $user = Auth::user();
+        $institutionId = session('active_institution_id') ?? $user->institute_id;
+        if ($institutionId === 'global') $institutionId = null;
         
+        // Fallback: If still null (Super Admin without specific selection), deduce from Class Section
         if(!$institutionId) {
             $class = ClassSection::find($request->class_section_id);
             $institutionId = $class->institution_id;

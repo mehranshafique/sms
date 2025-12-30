@@ -8,6 +8,7 @@ use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log; // Added for logging
 
 class StudentVotingController extends BaseController
 {
@@ -23,10 +24,6 @@ class StudentVotingController extends BaseController
     {
         $user = Auth::user();
         
-        // 1. Identify Student Profile
-        // Assuming the User is linked to a Student profile via 'user_id' or 'email'
-        // Ideally, we use the 'student' relationship on User model if it exists, 
-        // otherwise we find the student record.
         $student = Student::where('user_id', $user->id)->first();
 
         if (!$student) {
@@ -89,17 +86,22 @@ class StudentVotingController extends BaseController
         try {
             DB::beginTransaction();
 
-            // 1. Check Double Voting
+            // 1. Check Double Voting (Race Condition Safe Lock)
+            // We use lockForUpdate to prevent simultaneous submissions
             $exists = Vote::where('voter_id', $student->id)
                 ->where('election_position_id', $request->position_id)
+                ->lockForUpdate() 
                 ->exists();
 
             if ($exists) {
+                DB::rollBack();
                 return response()->json(['message' => __('voting.already_voted_position')], 422);
             }
 
             // 2. Cast Vote
-            Vote::create([
+            // FIX: Use DB::table directly to avoid Eloquent assuming 'updated_at' exists
+            // The error "Unknown column 'updated_at'" indicates the table doesn't have timestamps.
+            DB::table('votes')->insert([
                 'election_id' => $election->id,
                 'election_position_id' => $request->position_id,
                 'candidate_id' => $request->candidate_id,
@@ -114,7 +116,20 @@ class StudentVotingController extends BaseController
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => __('voting.system_error')], 500);
+            
+            // Log the actual error for debugging
+            Log::error("Voting Error: " . $e->getMessage());
+
+            // Return specific error message if available, else generic
+            // Check for specific SQL duplicate entry error (Code 23000)
+            if ($e instanceof \Illuminate\Database\QueryException && $e->getCode() == 23000) {
+                 return response()->json(['message' => __('voting.already_voted_position')], 422);
+            }
+
+            return response()->json([
+                'message' => __('voting.system_error') . ' (Debug: ' . $e->getMessage() . ')', 
+                'error_detail' => $e->getMessage() // For easier debugging in browser console
+            ], 500);
         }
     }
 }

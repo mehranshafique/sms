@@ -57,9 +57,17 @@ return [
     'email' => 'Email',
     'province' => 'Province',
     'avenue' => 'Avenue / Address',
+    'avenue_address' => 'Avenue / Address',
     'current_address' => 'Current Address',
     'permanent_address' => 'Permanent Address',
-    
+    'country' => 'Country',
+    'state' => 'State',
+    'city' => 'City',
+
+    'select_country' => 'Select Country',
+    'select_state' => 'Select State',
+    'select_city' => 'Select City',
+
     'primary_guardian' => 'Primary Guardian',
     'father_name' => 'Father Name',
     'father_phone' => 'Father Phone',

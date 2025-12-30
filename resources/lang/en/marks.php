@@ -18,7 +18,7 @@ return [
     'roll_no' => 'Roll No',
     'marks_obtained' => 'Marks Obtained',
     'is_absent' => 'Absent?',
-    
+    'admission_no' => 'Admission No',
     'save_marks' => 'Save Marks',
     
     'validation_error' => 'Validation Error',

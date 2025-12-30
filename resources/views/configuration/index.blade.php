@@ -179,7 +179,7 @@
                         </div>
                     </div>
                     
-                    {{-- 3. School Year --}}
+                    {{-- 3. School Year (UPDATED: Date Inputs) --}}
                     <div id="school_year" class="tab-pane fade">
                         <div class="card">
                              <div class="card-header">
@@ -190,20 +190,12 @@
                                     @csrf
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Academic Start Month</label>
-                                            <select name="academic_start_month" class="form-control default-select">
-                                                @foreach(['January','February','March','April','May','June','July','August','September','October','November','December'] as $m)
-                                                    <option value="{{ $m }}" {{ $schoolYear['start_month'] == $m ? 'selected' : '' }}>{{ $m }}</option>
-                                                @endforeach
-                                            </select>
+                                            <label class="form-label">{{ __('configuration.academic_start_date') }}</label>
+                                            <input type="text" name="academic_start_date" class="form-control datepicker" value="{{ $schoolYear['start_date'] }}" placeholder="YYYY-MM-DD" required>
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label class="form-label">Academic End Month</label>
-                                            <select name="academic_end_month" class="form-control default-select">
-                                                @foreach(['January','February','March','April','May','June','July','August','September','October','November','December'] as $m)
-                                                    <option value="{{ $m }}" {{ $schoolYear['end_month'] == $m ? 'selected' : '' }}>{{ $m }}</option>
-                                                @endforeach
-                                            </select>
+                                            <label class="form-label">{{ __('configuration.academic_end_date') }}</label>
+                                            <input type="text" name="academic_end_date" class="form-control datepicker" value="{{ $schoolYear['end_date'] }}" placeholder="YYYY-MM-DD" required>
                                         </div>
                                     </div>
                                     <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
@@ -342,6 +334,35 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/js/bootstrap-select.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+{{-- Fix Z-Index & Button Visibility for SweetAlert --}}
+<style>
+    .swal2-container {
+        z-index: 100000 !important;
+    }
+    .swal2-popup {
+        font-size: 14px !important; /* Ensure readable text size */
+    }
+    .swal2-actions {
+        z-index: 1 !important;
+    }
+    .swal2-actions button {
+        margin: 0 5px !important;
+    }
+    /* Force standard button look if theme overrides */
+    .swal2-confirm {
+        background-color: #3085d6 !important;
+        color: #fff !important;
+        padding: 10px 24px !important;
+        border-radius: 4px !important;
+    }
+    .swal2-cancel {
+        background-color: #d33 !important;
+        color: #fff !important;
+        padding: 10px 24px !important;
+        border-radius: 4px !important;
+    }
+</style>
+
 <script>
     $(document).ready(function() {
         // Initialize Components
@@ -401,11 +422,13 @@
                             icon: 'success',
                             title: '{{ __('configuration.success') }}',
                             text: response.message,
-                            timer: 2000,
-                            showConfirmButton: false
-                        }).then(() => {
+                            // timer: 2000, // Removed timer to ensure user sees the modal
+                            showConfirmButton: true, // Enabled button
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#3085d6'
+                        }).then((result) => {
                             // --- NEW: Reload Page After Success ---
-                            // This ensures all settings (and potential modal data) are fresh
+                            // Reload regardless of how the modal is closed
                             location.reload(); 
                         });
 
@@ -436,7 +459,9 @@
                         Swal.fire({
                             icon: 'error',
                             title: '{{ __('configuration.error') }}',
-                            text: msg
+                            text: msg,
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#d33'
                         });
                     }
                 });
@@ -464,12 +489,24 @@
                 data: $(this).serialize(),
                 success: function(response) {
                     btn.prop('disabled', false).html(originalText);
-                    Swal.fire({ icon: 'success', title: 'Success', text: response.message });
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'Success', 
+                        text: response.message,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#3085d6'
+                    });
                 },
                 error: function(xhr) {
                     btn.prop('disabled', false).html(originalText);
                     let msg = xhr.responseJSON ? (xhr.responseJSON.message || xhr.responseJSON.error) : 'Failed to send email.';
-                    Swal.fire({ icon: 'error', title: 'Error', text: msg });
+                    Swal.fire({ 
+                        icon: 'error', 
+                        title: 'Error', 
+                        text: msg,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#d33'
+                    });
                 }
             });
         });

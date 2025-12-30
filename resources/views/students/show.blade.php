@@ -186,7 +186,8 @@
                                             <tr>
                                                 <th>Session</th>
                                                 <th>Class / Grade</th>
-                                                <th>Roll No</th>
+                                                {{-- UPDATED Header: Using Admission No as requested --}}
+                                                <th>{{ __('student.admission_no') }}</th>
                                                 <th>Status</th>
                                             </tr>
                                         </thead>
@@ -200,7 +201,8 @@
                                                             {{ $enrollment->classSection->gradeLevel->name ?? '' }}
                                                         </small>
                                                     </td>
-                                                    <td>{{ $enrollment->roll_number ?? '-' }}</td>
+                                                    {{-- UPDATED Body: Showing Admission No instead of Roll Number --}}
+                                                    <td>{{ $student->admission_number ?? '-' }}</td>
                                                     <td>
                                                         <span class="badge badge-sm badge-{{ $enrollment->status == 'active' ? 'success' : 'light' }}">
                                                             {{ ucfirst($enrollment->status) }}

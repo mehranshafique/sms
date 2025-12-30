@@ -55,6 +55,7 @@ return [
 
     // Messages
     'update_success' => 'Configuration updated successfully.',
+    'success' => 'Configuration updated successfully.',
     'recharge_success' => 'Credits added successfully.',
     'save_changes' => 'Save Changes',
     'select_institution' => 'Please select an institution context first.',

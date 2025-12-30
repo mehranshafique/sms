@@ -23,7 +23,8 @@ class ExamMarkController extends BaseController
 
     public function create(Request $request)
     {
-        $institutionId = Auth::user()->institute_id;
+        // FIX: Respect the header context switch
+        $institutionId = session('active_institution_id') ?? Auth::user()->institute_id;
 
         // 1. Fetch Exams (Strictly 'ongoing' only)
         $examsQuery = Exam::where('status', 'ongoing');
@@ -32,92 +33,12 @@ class ExamMarkController extends BaseController
         }
         $exams = $examsQuery->pluck('name', 'id');
 
-        // 2. Fetch Classes (Rule 2: Show Section + Grade)
-        $classesQuery = ClassSection::with('gradeLevel');
-        if ($institutionId) {
-            $classesQuery->where('institution_id', $institutionId);
-        }
-        
-        // Filter classes for teacher (if role is teacher)
-        if (Auth::user()->hasRole('Teacher')) {
-             if (Auth::user()->staff) {
-                 $staffId = Auth::user()->staff->id;
-                 $classesQuery->where(function($q) use ($staffId) {
-                     // Check if Class Teacher (staff_id in class_sections)
-                     $q->where('staff_id', $staffId) 
-                       // OR if assigned in Timetable (teacher_id in timetables)
-                       ->orWhereHas('timetables', function($t) use ($staffId) {
-                           $t->where('teacher_id', $staffId);
-                       });
-                 });
-             } else {
-                 // Teacher role but no staff profile? Show nothing to be safe.
-                 $classesQuery->whereRaw('1 = 0');
-             }
-        }
-        
-        // Rule 2 Applied here using mapWithKeys
-        $classes = $classesQuery->get()->mapWithKeys(function($item) {
-             $grade = $item->gradeLevel->name ?? '';
-             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
-        });
-
+        // Initial load only requires Exams. 
+        // Classes and Subjects will be loaded via AJAX for security and UX.
+        $classes = []; 
         $subjects = [];
         $students = [];
         $existingMarks = [];
-
-        // 3. Logic for Dependent Dropdowns (Subjects)
-        if ($request->filled('class_section_id')) {
-             $selectedClass = ClassSection::find($request->class_section_id);
-             if($selectedClass) {
-                 $subjectsQuery = Subject::where('grade_level_id', $selectedClass->grade_level_id);
-                 
-                 // FILTER: Teachers see ONLY their timetable subjects
-                 if (Auth::user()->hasRole('Teacher')) {
-                     if (Auth::user()->staff) {
-                         $staffId = Auth::user()->staff->id;
-                         
-                         $allowedSubjectIds = Timetable::where('class_section_id', $selectedClass->id)
-                            ->where('teacher_id', $staffId)
-                            ->pluck('subject_id')
-                            ->unique()
-                            ->toArray();
-                         
-                         if(empty($allowedSubjectIds)) {
-                                 $subjectsQuery->whereIn('id', []); // Force empty result
-                         } else {
-                             $subjectsQuery->whereIn('id', $allowedSubjectIds);
-                         }
-                     } else {
-                         $subjectsQuery->whereIn('id', []);
-                     }
-                 }
-                 
-                 $subjects = $subjectsQuery->pluck('name', 'id');
-             }
-        }
-
-        // 4. Fetch Students & Marks
-        if ($request->filled('exam_id') && $request->filled('class_section_id') && $request->filled('subject_id')) {
-            if($this->validateAccess($request->exam_id, $request->class_section_id, $request->subject_id)) {
-                $exam = Exam::find($request->exam_id);
-                if ($exam) {
-                    $students = StudentEnrollment::with('student')
-                        ->where('class_section_id', $request->class_section_id)
-                        ->where('academic_session_id', $exam->academic_session_id)
-                        ->where('status', 'active')
-                        ->get();
-
-                    $existingMarks = ExamRecord::where('exam_id', $request->exam_id)
-                        ->where('subject_id', $request->subject_id)
-                        ->where('class_section_id', $request->class_section_id)
-                        ->get()
-                        ->keyBy('student_id');
-                }
-            } else {
-                abort(403, __('marks.messages.unauthorized'));
-            }
-        }
 
         return view('marks.create', compact('exams', 'classes', 'subjects', 'students', 'existingMarks'));
     }
@@ -142,7 +63,71 @@ class ExamMarkController extends BaseController
     {
         if(!$request->class_section_id) return response()->json([]);
         $subjects = $this->fetchSubjectsForClass($request->class_section_id);
-        return response()->json($subjects->pluck('name', 'id'));
+        
+        // UPDATED: Return object structure with total_marks
+        $formattedSubjects = $subjects->map(function($subject) {
+            return [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                // Default to 100 if column doesn't exist or is null
+                'total_marks' => $subject->total_marks ?? 100 
+            ];
+        });
+
+        return response()->json($formattedSubjects);
+    }
+
+    /**
+     * AJAX Method to fetch student list and existing marks.
+     * Securely validates teacher access before returning data.
+     */
+    public function getStudents(Request $request)
+    {
+        if(!$request->exam_id || !$request->class_section_id || !$request->subject_id) {
+            return response()->json(['message' => 'Missing required fields'], 400);
+        }
+
+        // Security Check
+        if(!$this->validateAccess($request->exam_id, $request->class_section_id, $request->subject_id)) {
+            return response()->json(['message' => __('marks.messages.unauthorized')], 403);
+        }
+
+        $exam = Exam::find($request->exam_id);
+        if(!$exam) return response()->json(['message' => 'Exam not found'], 404);
+
+        // Fetch Students
+        $students = StudentEnrollment::with('student')
+            ->where('class_section_id', $request->class_section_id)
+            ->where('academic_session_id', $exam->academic_session_id)
+            ->where('status', 'active')
+            ->get()
+            ->map(function($enrollment) {
+                return [
+                    'id' => $enrollment->student->id,
+                    'name' => $enrollment->student->full_name,
+                    // FIX: Use admission_number from student profile instead of table ID or roll_number
+                    'admission_number' => $enrollment->student->admission_number ?? '-',
+                ];
+            })
+            ->values();
+
+        // Fetch Existing Marks
+        $marks = ExamRecord::where('exam_id', $request->exam_id)
+            ->where('subject_id', $request->subject_id)
+            ->where('class_section_id', $request->class_section_id)
+            ->get()
+            ->keyBy('student_id')
+            ->map(function($record) {
+                return [
+                    'marks_obtained' => $record->marks_obtained,
+                    'is_absent' => $record->is_absent
+                ];
+            });
+
+        return response()->json([
+            'students' => $students,
+            'marks' => $marks
+        ]);
     }
 
     // --- PRIVATE HELPERS ---
@@ -152,7 +137,8 @@ class ExamMarkController extends BaseController
         $exam = Exam::find($examId);
         if(!$exam) return collect();
 
-        $query = ClassSection::with('gradeLevel') // Rule 2 dependency
+        // FIX: Ensure we only show classes for the exam's institution
+        $query = ClassSection::with('gradeLevel')
                              ->where('institution_id', $exam->institution_id)
                              ->where('is_active', true);
 
@@ -180,6 +166,7 @@ class ExamMarkController extends BaseController
         if(!$class) return collect();
 
         $query = Subject::where('grade_level_id', $class->grade_level_id)
+                        ->where('institution_id', $class->institution_id) // FIX: Strict Institution Check
                         ->where('is_active', true);
 
         $user = Auth::user();
@@ -244,11 +231,18 @@ class ExamMarkController extends BaseController
              return response()->json(['message' => __('exam.messages.exam_finalized_error')], 403);
         }
 
-        DB::transaction(function () use ($request) {
+        $subject = Subject::findOrFail($request->subject_id);
+        $maxMarks = $subject->total_marks ?? 100;
+
+        DB::transaction(function () use ($request, $maxMarks) {
             foreach ($request->marks as $studentId => $mark) {
                 
                 $isAbsent = isset($request->absent[$studentId]);
                 $finalMark = $isAbsent ? 0 : $mark;
+
+                if ($finalMark > $maxMarks) {
+                    throw new \Illuminate\Validation\ValidationException(\Illuminate\Support\Facades\Validator::make([], []), new \Illuminate\Http\JsonResponse(['message' => "Marks for student ID {$studentId} cannot exceed total marks ({$maxMarks})."], 422));
+                }
 
                 ExamRecord::updateOrCreate(
                     [
@@ -267,11 +261,7 @@ class ExamMarkController extends BaseController
 
         return response()->json([
             'message' =>(__('marks.messages.success_save')), 
-            'redirect' => route('marks.create', [
-                'exam_id' => $request->exam_id, 
-                'class_section_id' => $request->class_section_id, 
-                'subject_id' => $request->subject_id
-            ])
+            'redirect' => null 
         ]);
     }
 }

@@ -59,7 +59,9 @@ class StudentController extends BaseController
                     $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
                     $initial = strtoupper(substr($row->first_name, 0, 1));
                     $avatarHtml = $img ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
-                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.$row->admission_number.'</span></div></div>';
+                    
+                    // UPDATED: Explicitly showing Admission Number
+                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.($row->admission_number ?? '-').'</span></div></div>';
                 })
                 ->addColumn('parent_info', function($row){
                     return '<div><i class="fa fa-user me-1"></i> '.$row->father_name.'</div><div class="text-muted"><i class="fa fa-phone me-1"></i> '.$row->father_phone.'</div>';

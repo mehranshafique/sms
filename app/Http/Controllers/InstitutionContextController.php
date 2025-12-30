@@ -19,55 +19,37 @@ class InstitutionContextController extends Controller
         // 1. Handle Global View (Clear Context)
         if ($id === 'global') {
             
-            if ($user->hasRole('Super Admin')) {
-                // FIXED: Use 'global' string instead of '0' for consistency
+            // Check if user is Super Admin OR (Head Officer with multiple schools)
+            $isSuperAdmin = $user->hasRole('Super Admin');
+            $isHeadOfficerWithMultiple = $user->hasRole('Head Officer') && $user->institutes && $user->institutes->count() > 1;
+
+            if ($isSuperAdmin || $isHeadOfficerWithMultiple) {
+                // FIX: Set explicit 'global' state so middlewares know to bypass school-specific checks
                 session(['active_institution_id' => 'global']);
                 
-                return redirect()->route('dashboard')->with('success', 'Switched to Global View.');
+                return redirect()->route('dashboard')->with('success', __('messages.switched_global_view'));
             }
-            return redirect()->back()->with('error', 'Unauthorized access.');
+            
+            return redirect()->back()->with('error', __('messages.unauthorized_access'));
         }
 
         // 2. Validate & Switch to Specific School
-        
-        // Super Admin Access
+        $canSwitch = false;
+
+        // Super Admin Access (Check if ID exists in DB)
         if ($user->hasRole('Super Admin')) {
-            $exists = Institution::where('id', $id)->exists();
-            if ($exists) {
-                session(['active_institution_id' => $id]);
-                return redirect()->route('dashboard')->with('success', 'Context switched successfully.');
-            }
+            $canSwitch = Institution::where('id', $id)->exists();
+        } 
+        // Head Officer Access (Check if ID exists in their assigned list)
+        elseif ($user->institutes && $user->institutes->contains('id', $id)) {
+            $canSwitch = true;
         }
 
-        // Head Officer Access
-        if ($user->institutes->contains('id', $id)) {
+        if ($canSwitch) {
             session(['active_institution_id' => $id]);
-            return redirect()->route('dashboard')->with('success', 'Context switched successfully.');
+            return redirect()->route('dashboard')->with('success', __('messages.context_switched_success'));
         }
 
-        return redirect()->back()->with('error', 'Unauthorized access.');
-    }
-
-    /**
-     * Helper to verify access rights.
-     */
-    private function canAccessInstitution($user, $institutionId)
-    {
-        // Super Admin access all
-        if ($user->hasRole('Super Admin')) {
-            return true;
-        }
-
-        // Single Institute Admin (Should generally not switch, but valid check)
-        if ($user->institute_id == $institutionId) {
-            return true;
-        }
-
-        // Head Officer (Check pivot table)
-        if ($user->institutes->contains('id', $institutionId)) {
-            return true;
-        }
-
-        return false;
+        return redirect()->back()->with('error', __('messages.unauthorized_access'));
     }
 }

@@ -145,19 +145,22 @@
                             @php
                                 $user = Auth::user();
                                 $showSwitcher = false;
-                                $activeInstitutionName = 'Select Institute';
+                                $activeInstitutionName = __('header.select_institute');
                                 $allowedInstitutions = collect();
                                 $isActiveGlobal = session('active_institution_id') === 'global';
+                                $hasMultipleSchools = false;
 
                                 if ($user) {
                                     if ($user->hasRole('Super Admin')) {
                                         $allowedInstitutions = \App\Models\Institution::select('id', 'name', 'code')->orderBy('name')->get();
                                         $showSwitcher = true;
-                                    } elseif ($user->institutes->count() > 0) {
+                                        $hasMultipleSchools = true;
+                                    } elseif ($user->institutes && $user->institutes->count() > 0) {
                                         $allowedInstitutions = $user->institutes;
                                         $showSwitcher = true;
+                                        $hasMultipleSchools = $user->institutes->count() > 1;
                                     } else {
-                                        $activeInstitutionName = $user->institute->name ?? 'My Institute';
+                                        $activeInstitutionName = $user->institute->name ?? __('header.my_institute');
                                     }
                                     
                                     $activeId = session('active_institution_id', $user->institute_id);
@@ -170,7 +173,7 @@
                                     }
                                     
                                     if($isActiveGlobal) {
-                                        $activeInstitutionName = 'Global View';
+                                        $activeInstitutionName = __('header.global_view');
                                     }
                                 }
                             @endphp
@@ -188,14 +191,14 @@
                                     <div class="school-search-container">
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text border-0 bg-transparent ps-1"><i class="fa fa-search text-muted"></i></span>
-                                            <input type="text" id="schoolSearchInput" class="form-control border-0 bg-transparent" placeholder="Search school...">
+                                            <input type="text" id="schoolSearchInput" class="form-control border-0 bg-transparent" placeholder="{{ __('header.search_school') }}">
                                         </div>
                                     </div>
 
-                                    {{-- 2. Global View Option (Super Admin) --}}
-                                    @if($user->hasRole('Super Admin'))
+                                    {{-- 2. Global View Option (Super Admin OR Head Officer with >1 school) --}}
+                                    @if($hasMultipleSchools)
                                         <a href="{{ route('institution.switch', 'global') }}" class="dropdown-item py-2 border-bottom {{ $isActiveGlobal ? 'bg-light text-primary fw-bold' : '' }}">
-                                            <i class="fa fa-globe me-2 text-info"></i> Global Dashboard
+                                            <i class="fa fa-globe me-2 text-info"></i> {{ __('header.global_dashboard') }}
                                         </a>
                                     @endif
                                     
@@ -220,7 +223,7 @@
                                                     </div>
                                                 </li>
                                             @endforeach
-                                            <li id="noSchoolFound" class="text-center text-muted py-3" style="display: none;">No school found</li>
+                                            <li id="noSchoolFound" class="text-center text-muted py-3" style="display: none;">{{ __('header.no_school_found') }}</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -268,24 +271,31 @@
                                 <div class="dropdown-menu dropdown-menu-end">
                                     {{-- Expanded Info inside Dropdown --}}
                                     <div class="dropdown-header text-center border-bottom pb-3">
+                                        {{-- ADDED: Profile Picture inside Dropdown --}}
+                                        @if(Auth::user()->profile_picture)
+                                            <div class="mb-2">
+                                                <img src="{{ asset('storage/'.Auth::user()->profile_picture) }}" width="60" height="60" alt="Profile" style="object-fit: cover; border-radius: 50%; border: 2px solid #eee;"/>
+                                            </div>
+                                        @endif
+                                        
                                         <h6 class="text-black font-w600 mb-0">{{ Auth::user()->name }}</h6>
                                         <span class="fs-12 text-muted">{{ Auth::user()->email }}</span>
                                         <div class="fs-11 text-primary mt-1">{{ Auth::user()->roles->pluck('name')->first() ?? 'User' }}</div>
                                     </div>
                                     
-                                    <a href="#" class="dropdown-item ai-icon">
+                                    <a href="{{ route('profile.index') }}" class="dropdown-item ai-icon">
                                         <i class="fa fa-user text-primary me-2"></i>
-                                        <span class="ms-2">My Profile</span>
+                                        <span class="ms-2">{{ __('header.my_profile') }}</span>
                                     </a>
                                     
                                     <a href="#" class="dropdown-item ai-icon">
                                         <i class="fa fa-envelope text-success me-2"></i>
-                                        <span class="ms-2">Inbox</span>
+                                        <span class="ms-2">{{ __('header.inbox') }}</span>
                                     </a>
                                     
                                     <a href="{{ route('settings.index') }}" class="dropdown-item ai-icon">
                                         <i class="fa fa-cog text-warning me-2"></i>
-                                        <span class="ms-2">Settings</span>
+                                        <span class="ms-2">{{ __('header.settings') }}</span>
                                     </a>
 
                                     <div class="dropdown-divider"></div>
@@ -294,7 +304,7 @@
                                         @csrf
                                         <button type="submit" class="dropdown-item ai-icon text-danger">
                                             <svg id="icon-logout" xmlns="http://www.w3.org/2000/svg" class="text-danger" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                                            <span class="ms-2">Logout </span>
+                                            <span class="ms-2">{{ __('header.logout') }}</span>
                                         </button>
                                     </form>
                                 </div>
@@ -331,3 +341,5 @@
                 }
             });
         </script>
+</body>
+</html>

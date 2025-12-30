@@ -31,7 +31,7 @@ class StudentAttendanceController extends BaseController
         if ($request->ajax()) {
             $data = StudentAttendance::with(['student', 'classSection.gradeLevel'])
                 ->select('student_attendances.*')
-                ->latest('student_attendances.created_at'); // Rule 3: Latest First
+                ->latest('student_attendances.created_at');
 
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
@@ -47,13 +47,13 @@ class StudentAttendanceController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('student_name', function($row){
-                    return $row->student->full_name;
+                    return $row->student->full_name ?? 'Unknown';
                 })
+                // UPDATED: Explicitly use admission_number instead of roll_number or id
                 ->addColumn('roll_no', function($row){
-                    return $row->student->admission_number; 
+                    return $row->student->admission_number ?? '-'; 
                 })
                 ->addColumn('class', function($row){
-                    // Rule 2: Section (Grade)
                     $grade = $row->classSection->gradeLevel->name ?? '';
                     return $row->classSection->name . ($grade ? ' (' . $grade . ')' : '');
                 })
@@ -75,7 +75,6 @@ class StudentAttendanceController extends BaseController
                 ->make(true);
         }
 
-        // Rule 2: Dropdown formatting
         $classSectionsQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
@@ -101,7 +100,6 @@ class StudentAttendanceController extends BaseController
     {
         $institutionId = Auth::user()->institute_id;
 
-        // Rule 2: Dropdown formatting
         $classSectionsQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);
@@ -147,7 +145,6 @@ class StudentAttendanceController extends BaseController
     {
         $institutionId = Auth::user()->institute_id;
         
-        // Rule 2: Dropdown formatting
         $classSectionsQuery = ClassSection::with(['institution', 'gradeLevel']);
         if ($institutionId) {
             $classSectionsQuery->where('institution_id', $institutionId);

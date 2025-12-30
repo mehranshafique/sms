@@ -31,7 +31,6 @@ class StudentNoticeController extends BaseController
         // 1. Institution ID matches Student's Institute OR is Null (System Wide)
         // 2. Audience is 'all' OR 'student'
         // 3. Is Published
-        // 4. Publish Date is today or in the past
         
         $notices = Notice::where(function($q) use ($student) {
                 $q->where('institution_id', $student->institution_id)
@@ -39,8 +38,9 @@ class StudentNoticeController extends BaseController
             })
             ->whereIn('audience', ['all', 'student'])
             ->where('is_published', true)
-            ->whereDate('publish_date', '<=', now())
-            ->latest('publish_date')
+            // FIX: Removed 'publish_date' filter as the column does not exist.
+            // Using standard 'latest()' which sorts by 'created_at' desc.
+            ->latest() 
             ->paginate(10);
 
         return view('students.notices.index', compact('notices'));

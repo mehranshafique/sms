@@ -28,6 +28,11 @@ class ExamController extends BaseController
      */
     protected function getExamAllowedInstitutionIds()
     {
+        // FIX: Check for Context Switch (Session) first
+        if (session()->has('active_institution_id')) {
+            return [session('active_institution_id')];
+        }
+
         $user = Auth::user();
         if ($user->institute_id) {
             return [$user->institute_id];
