@@ -95,6 +95,15 @@
                                    class="datepicker form-control" placeholder="YYYY-MM-DD" required>
                             <div class="invalid-feedback">Admission date is required.</div>
                         </div>
+
+                        {{-- NEW: Payment Mode --}}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.payment_mode') }}</label>
+                            <select name="payment_mode" class="form-control default-select">
+                                <option value="installment" {{ (old('payment_mode', $student->payment_mode ?? '') == 'installment') ? 'selected' : '' }}>{{ __('student.payment_installment') }}</option>
+                                <option value="global" {{ (old('payment_mode', $student->payment_mode ?? '') == 'global') ? 'selected' : '' }}>{{ __('student.payment_global') }}</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 

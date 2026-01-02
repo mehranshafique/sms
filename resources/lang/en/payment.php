@@ -30,7 +30,9 @@ return [
     'error_occurred' => 'An error occurred while processing the payment.',
     'success_recorded' => 'Payment recorded successfully.',
     'exceeds_balance' => 'Amount exceeds remaining balance.',
+    //
     
+    'previous_installment_pending_error' => 'Cannot accept payment. A previous installment for this student is still pending. Please clear previous dues first.',
     // SMS Template
     'sms_template' => 'Hello :name, payment of :amount received for :school. Remaining Balance: :balance. Thank you.',
 ];

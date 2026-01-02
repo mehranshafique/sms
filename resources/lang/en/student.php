@@ -6,6 +6,8 @@ return [
         'success_create' => 'Student admitted successfully!',
         'success_update' => 'Student details updated successfully!',
         'success_delete' => 'Student record deleted successfully!',
+        'cannot_delete_linked_data' => 'Cannot delete student because they are linked to other records (e.g. Grades, Attendance).',
+        'error_occurred' => 'An error occurred while deleting the student.',
     ],
     
     // Headers & Stats
@@ -26,6 +28,7 @@ return [
     // Table Headers
     'table_no' => '#',
     'details' => 'Student Details',
+    'id' => 'ID',
     'parent_info' => 'Parent Info',
     'status' => 'Status',
     'action' => 'Action',
@@ -39,6 +42,7 @@ return [
     'parents_guardian' => 'Parents / Guardian',
     'documents' => 'Documents',
     'identity_access' => 'Identity & Access',
+    'enrollment_history' => 'Enrollment History',
 
     // Fields
     'admission_no' => 'Admission No',
@@ -46,9 +50,12 @@ return [
     'roll_no' => 'Roll No',
     'first_name' => 'First Name',
     'last_name' => 'Last Name',
+    'full_name' => 'Full Name',
     'post_name' => 'Post Name (Optional)',
     'gender' => 'Gender',
     'dob' => 'Date of Birth',
+    'age' => 'Age',
+    'years' => 'Years',
     'place_of_birth' => 'Place of Birth',
     'blood_group' => 'Blood Group',
     'religion' => 'Religion',
@@ -80,6 +87,12 @@ return [
     'guardian_phone' => 'Guardian Phone',
     
     'photo' => 'Student Photo',
+    'scan_for_details' => 'Scan for Student Details',
+    
+    // NEW: Payment Mode Keys
+    'payment_mode' => 'Payment Mode',
+    'payment_global' => 'Global (Annual)',
+    'payment_installment' => 'Installment',
     
     // Access Fields
     'qr_code_token' => 'QR Code Token',
@@ -95,6 +108,8 @@ return [
     'select_option' => 'Select Option',
     'academic_year' => 'Academic Year',
     'option_stream' => 'Option / Stream',
+    'session' => 'Session',
+    'class_grade' => 'Class / Grade',
     
     // Dropdown JS States
     'loading' => 'Loading...',
@@ -125,4 +140,6 @@ return [
     'validation_error' => 'Validation Error',
     'success' => 'Success!',
     'no_active_session' => 'No active academic session found for this institution.',
+    'unauthorized_access' => 'Unauthorized access.',
+    'no_enrollment_found' => 'No enrollment history found.',
 ];

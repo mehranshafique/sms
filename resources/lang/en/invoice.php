@@ -6,6 +6,11 @@ return [
     'generate_subtitle' => 'Assign fees to all students in a specific section',
     'invoice_details' => 'Invoice Details',
     
+    'no_active_session' => 'No active academic session found.',
+    'no_students_found' => 'No active students found in this class.',
+    'no_students_found_for_mode' => 'No students found matching the payment mode: :mode',
+    'success_generated' => 'Invoices generated successfully.',
+    'success_generated_count' => ':count Invoices generated successfully.',
     // Table Headers
     'invoice_list' => 'Invoice List',
     'invoice_number' => 'Invoice #',

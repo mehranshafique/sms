@@ -4,6 +4,8 @@
 <!-- Date Picker & Select Picker CSS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/css/bootstrap-select.min.css">
+<!-- Time Picker CSS -->
+<link rel="stylesheet" href="{{ asset('vendor/clockpicker/css/bootstrap-clockpicker.min.css') }}">
 
 <style>
     /* Custom Toggle Switch Width */
@@ -20,7 +22,7 @@
     }
     @media (min-width: 576px) {
         .modal-dialog {
-            max-width: 600px; /* Standard width for configuration modals */
+            max-width: 600px; 
             margin: 1.75rem auto;
         }
     }
@@ -179,16 +181,17 @@
                         </div>
                     </div>
                     
-                    {{-- 3. School Year (UPDATED: Date Inputs) --}}
+                    {{-- 3. School Year & Timings (UPDATED) --}}
                     <div id="school_year" class="tab-pane fade">
                         <div class="card">
                              <div class="card-header">
-                                <h4 class="card-title">{{ __('configuration.school_year') }}</h4>
+                                <h4 class="card-title">{{ __('configuration.school_year') }} & Timings</h4>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('configuration.year.update') }}" method="POST" id="yearForm">
                                     @csrf
-                                    <div class="row">
+                                    <h5 class="text-primary mb-3">Academic Session</h5>
+                                    <div class="row mb-4">
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">{{ __('configuration.academic_start_date') }}</label>
                                             <input type="text" name="academic_start_date" class="form-control datepicker" value="{{ $schoolYear['start_date'] }}" placeholder="YYYY-MM-DD" required>
@@ -198,6 +201,25 @@
                                             <input type="text" name="academic_end_date" class="form-control datepicker" value="{{ $schoolYear['end_date'] }}" placeholder="YYYY-MM-DD" required>
                                         </div>
                                     </div>
+
+                                    <h5 class="text-primary mb-3">School Operational Hours (For Auto-SMS)</h5>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">School Start Time</label>
+                                            <div class="input-group clockpicker">
+                                                <input type="text" name="school_start_time" class="form-control" value="{{ $schoolYear['start_time'] }}" required>
+                                                <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">School End Time</label>
+                                            <div class="input-group clockpicker">
+                                                <input type="text" name="school_end_time" class="form-control" value="{{ $schoolYear['end_time'] }}" required>
+                                                <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
                                 </form>
                             </div>
@@ -332,6 +354,8 @@
 <!-- Datepicker & Select Picker JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/js/bootstrap-select.min.js"></script>
+<!-- Clock Picker -->
+<script src="{{ asset('vendor/clockpicker/js/bootstrap-clockpicker.min.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 {{-- Fix Z-Index & Button Visibility for SweetAlert --}}
@@ -375,6 +399,16 @@
                 autoclose: true,
                 format: 'yyyy-mm-dd',
                 todayHighlight: true
+            });
+        }
+
+        // Initialize ClockPicker
+        if ($.fn.clockpicker) {
+            $('.clockpicker').clockpicker({
+                donetext: 'Done',
+                placement: 'bottom',
+                align: 'left',
+                autoclose: true
             });
         }
 

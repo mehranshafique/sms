@@ -86,7 +86,6 @@
                     </a>
                     <ul aria-expanded="false">
                         <li><a href="{{ route('subscriptions.index') }}">Billing</a></li> 
-                        {{-- FIXED: Removed faulty translation key that caused array error --}}
                         <li><a href="{{ route('subscriptions.invoices') }}">{{ __('sidebar.billing_requests') }} (Invoices)</a></li>
                     </ul>
                 </li>
@@ -152,7 +151,7 @@
                 @endif
 
                 {{-- NEW: RESULT CARD MODULE --}}
-                @if($hasModule('results') || $hasModule('examinations')) 
+                @if($hasModule('results') || $hasModule('exams')) 
                     @if(auth()->user()->can('view result_card') || auth()->user()->hasRole(['Super Admin', 'Head Officer', 'Teacher', 'Student']))
                     <li><a class="ai-icon" href="{{ route('results.index') }}"><i class="la la-certificate"></i><span class="nav-text">{{ __('sidebar.results') }}</span></a></li>
                     @endif
@@ -216,8 +215,8 @@
                 {{-- FINANCE GROUP --}}
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
                 
-                {{-- Consolidated Finance Check: If ANY finance module is active, show the dropdown --}}
-                @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices'))
+                {{-- Consolidated Finance Check --}}
+                @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices') || $hasModule('payrolls'))
                     @can('fee_structure.view')
                     <li>
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
@@ -233,6 +232,11 @@
                             @if($hasModule('invoices'))
                                 <li><a href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
                                 <li><a href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
+                            @endif
+                            {{-- NEW PAYROLL MODULES --}}
+                            @if($hasModule('payrolls'))
+                                <li><a href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
+                                <li><a href="{{ route('payroll.index') }}">{{ __('sidebar.generate_payroll') }}</a></li>
                             @endif
                         </ul>
                     </li>

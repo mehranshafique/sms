@@ -123,5 +123,9 @@ return [
     ],
     'subscriptions' => [
         'title' => 'Subscriptions'
-    ]
+    ],
+    'results' => 'Results',
+    // New Payroll Keys
+    'salary_structures' => 'Salary Structure',
+    'generate_payroll' => 'Generate Payroll',
 ];

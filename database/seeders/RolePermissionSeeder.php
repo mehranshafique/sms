@@ -50,13 +50,15 @@ class RolePermissionSeeder extends Seeder
             // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Marks' => ['create', 'update', 'view'],
-            'Result Cards' => ['view'], // Added Result Cards Permission
+            'Result Cards' => ['view'], 
             
             // Finance
             'Fee Structures' => ['view', 'create', 'update', 'delete'],
             'Fee Types' => ['view', 'create', 'update', 'delete'],
             'Invoices' => ['view', 'create', 'update', 'delete'],
             'Payments' => ['view', 'create'],
+            'Payrolls' => ['view', 'create', 'update', 'delete'], // Payroll
+            'Salary Structures' => ['view', 'create', 'update', 'delete'], // NEW: Salary Structure
             
             // Security & Config
             'Audit Logs' => ['view'],

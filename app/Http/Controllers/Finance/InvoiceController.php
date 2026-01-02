@@ -104,14 +104,16 @@ class InvoiceController extends BaseController
         if ($institutionId) {
             $gradesQuery->where('institution_id', $institutionId);
             $feesQuery->where('institution_id', $institutionId);
-        } else {
-            // Optional: If Super Admin in Global View, maybe show nothing or all?
-            // Currently showing all if no ID is present (depends on Global Scopes)
-            // If you use MultiTenancy scopes, you might need ->withoutGlobalScopes() here
         }
 
         $grades = $gradesQuery->pluck('name', 'id');
-        $feeStructures = $feesQuery->pluck('name', 'id');
+        
+        // Show payment mode in dropdown for clarity
+        $feeStructures = $feesQuery->get()->mapWithKeys(function($item) {
+            $label = $item->name . ' (' . number_format($item->amount) . ') - ' . ucfirst($item->payment_mode);
+            if($item->payment_mode == 'installment') $label .= ' #' . $item->installment_order;
+            return [$item->id => $label];
+        });
         
         return view('finance.invoices.create', compact('grades', 'feeStructures'));
     }
@@ -163,18 +165,39 @@ class InvoiceController extends BaseController
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         if(!$session) return response()->json(['message' => __('invoice.no_active_session')], 422);
 
-        $students = StudentEnrollment::where('class_section_id', $request->class_section_id)
-            ->where('academic_session_id', $session->id)
-            ->where('status', 'active')
-            ->pluck('student_id');
-
-        if($students->isEmpty()) return response()->json(['message' => __('invoice.no_students_found')], 422);
-
+        // Fetch Fee Structures to determine mode
         $fees = FeeStructure::whereIn('id', $request->fee_structure_ids)->get();
         $totalAmount = $fees->sum('amount');
+        
+        // Check if we are mixing Global and Installment (generally discouraged but possible)
+        // Ideally, mass generation should be consistent.
+        // We will filter students based on the first fee's mode if strict mode is desired.
+        $targetMode = $fees->first()->payment_mode; // 'global' or 'installment'
+
+        // Fetch Eligible Students
+        $studentsQuery = StudentEnrollment::where('class_section_id', $request->class_section_id)
+            ->where('academic_session_id', $session->id)
+            ->where('status', 'active')
+            ->with('student');
+
+        $students = $studentsQuery->get()->filter(function($enrollment) use ($targetMode) {
+            // Check Student's Payment Mode Preference
+            // If student mode is null, assume they accept 'installment' as default
+            $studentMode = $enrollment->student->payment_mode ?? 'installment';
+            return $studentMode === $targetMode;
+        })->pluck('student_id');
+
+        if($students->isEmpty()) {
+            return response()->json([
+                'message' => __('invoice.no_students_found_for_mode', ['mode' => ucfirst($targetMode)])
+            ], 422);
+        }
 
         DB::transaction(function () use ($students, $fees, $totalAmount, $request, $institutionId, $session) {
             foreach ($students as $studentId) {
+                // Skip if this exact invoice (same fees, same session) already exists?
+                // For now, allow multiple invoice generation.
+
                 $invoice = Invoice::create([
                     'institution_id' => $institutionId,
                     'academic_session_id' => $session->id,
@@ -197,7 +220,7 @@ class InvoiceController extends BaseController
             }
         });
 
-        return response()->json(['message' => __('invoice.success_generated'), 'redirect' => route('invoices.index')]);
+        return response()->json(['message' => __('invoice.success_generated_count', ['count' => $students->count()]), 'redirect' => route('invoices.index')]);
     }
 
     public function show(Invoice $invoice)

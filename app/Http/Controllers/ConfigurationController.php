@@ -61,13 +61,15 @@ class ConfigurationController extends BaseController
             'provider' => $settings['sms_provider'] ?? 'mobishastra',
         ];
         
-        // 3. School Year (UPDATED: Now using full dates)
+        // 3. School Year & Timing (UPDATED)
         $schoolYear = [
             'start_date' => $settings['academic_start_date'] ?? date('Y-09-01'),
             'end_date'   => $settings['academic_end_date'] ?? date('Y-06-30'),
+            'start_time' => $settings['school_start_time'] ?? '08:00', // Default 8 AM
+            'end_time'   => $settings['school_end_time'] ?? '15:00',   // Default 3 PM
         ];
 
-        // 4. Modules (Dynamic from DB)
+        // 4. Modules
         $allModules = Module::orderBy('name')->get();
         $enabledModules = json_decode($settings['enabled_modules'] ?? '[]', true);
         if(!is_array($enabledModules)) $enabledModules = [];
@@ -211,10 +213,12 @@ class ConfigurationController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        // UPDATED: Validating Dates
+        // UPDATED: Validating Dates AND Times
         $data = $request->validate([
             'academic_start_date' => 'required|date',
             'academic_end_date'   => 'required|date|after:academic_start_date',
+            'school_start_time'   => 'required|date_format:H:i',
+            'school_end_time'     => 'required|date_format:H:i|after:school_start_time',
         ]);
         
         foreach ($data as $key => $value) {

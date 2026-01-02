@@ -44,10 +44,22 @@
                             </div>
 
                             <div class="row mt-4">
-                                <div class="col-12">
-                                    <a href="{{ route('students.edit', $student->id) }}" class="btn btn-primary btn-sm me-2">
+                                <div class="col-12 text-center">
+                                    <a href="{{ route('students.edit', $student->id) }}" class="btn btn-primary btn-sm me-3">
                                         <i class="fa fa-pencil me-1"></i> {{ __('student.edit') }}
                                     </a>
+                                    {{-- Added Transfer Button with spacing --}}
+                                    @can('student_transfer.create')
+                                        @if($student->status === 'active')
+                                            <a href="{{ route('transfers.create', $student->id) }}" class="btn btn-danger btn-sm">
+                                                <i class="fa fa-exchange-alt me-1"></i> {{ __('transfer.page_title') }}
+                                            </a>
+                                        @elseif($student->status === 'transferred' || $student->status === 'withdrawn')
+                                            <a href="{{ route('transfers.print', $student->id) }}" class="btn btn-warning btn-sm" target="_blank">
+                                                <i class="fa fa-print me-1"></i> {{ __('transfer.issue_certificate') }}
+                                            </a>
+                                        @endif
+                                    @endcan
                                 </div>
                             </div>
                         </div>
@@ -70,7 +82,7 @@
                             @if($student->qr_code_token)
                                 <div class="text-center bg-light p-3 rounded mt-3">
                                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ $student->qr_code_token }}" alt="QR Code" class="img-fluid" style="max-width: 100px;">
-                                    <p class="fs-11 text-muted mt-2 mb-0">Scan for Student Details</p>
+                                    <p class="fs-11 text-muted mt-2 mb-0">{{ __('student.scan_for_details') }}</p>
                                 </div>
                             @endif
                         </div>
@@ -80,15 +92,15 @@
                         <div class="row">
                             <div class="col-4 pt-3 pb-3 border-end">
                                 <h3 class="mb-1">{{ $student->enrollments->count() }}</h3>
-                                <span>Years</span>
+                                <span>{{ __('student.years') }}</span>
                             </div>
                             <div class="col-4 pt-3 pb-3 border-end">
                                 <h3 class="mb-1">{{ ucfirst($student->gender) }}</h3>
-                                <span>Gender</span>
+                                <span>{{ __('student.gender') }}</span>
                             </div>
                             <div class="col-4 pt-3 pb-3">
                                 <h3 class="mb-1">{{ \Carbon\Carbon::parse($student->dob)->age }}</h3>
-                                <span>Age</span>
+                                <span>{{ __('student.age') }}</span>
                             </div>
                         </div>
                     </div>
@@ -119,6 +131,19 @@
                                     </div>
                                     <div class="col-sm-8 col-7"><span>{{ $student->admission_date ? $student->admission_date->format('d M, Y') : 'N/A' }}</span></div>
                                 </div>
+                                
+                                {{-- NEW: Payment Mode Display --}}
+                                <div class="row mb-2">
+                                    <div class="col-sm-4 col-5">
+                                        <h5 class="f-w-500">{{ __('student.payment_mode') }} <span class="pull-right">:</span></h5>
+                                    </div>
+                                    <div class="col-sm-8 col-7">
+                                        <span class="badge badge-{{ ($student->payment_mode ?? 'installment') == 'global' ? 'info' : 'primary' }}">
+                                            {{ ucfirst($student->payment_mode ?? 'installment') }}
+                                        </span>
+                                    </div>
+                                </div>
+
                                 <div class="row mb-2">
                                     <div class="col-sm-4 col-5">
                                         <h5 class="f-w-500">{{ __('student.status') }} <span class="pull-right">:</span></h5>
@@ -179,16 +204,16 @@
 
                             {{-- Academic History (Enrollments) --}}
                             <div class="pt-4">
-                                <h4 class="text-primary mb-4">Enrollment History</h4>
+                                <h4 class="text-primary mb-4">{{ __('student.enrollment_history') }}</h4>
                                 <div class="table-responsive">
                                     <table class="table table-striped table-bordered">
                                         <thead>
                                             <tr>
-                                                <th>Session</th>
-                                                <th>Class / Grade</th>
+                                                <th>{{ __('student.session') }}</th>
+                                                <th>{{ __('student.class_grade') }}</th>
                                                 {{-- UPDATED Header: Using Admission No as requested --}}
                                                 <th>{{ __('student.admission_no') }}</th>
-                                                <th>Status</th>
+                                                <th>{{ __('student.status') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -211,7 +236,7 @@
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="4" class="text-center">No enrollment history found.</td>
+                                                    <td colspan="4" class="text-center">{{ __('student.no_enrollment_found') }}</td>
                                                 </tr>
                                             @endforelse
                                         </tbody>

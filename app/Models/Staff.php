@@ -51,4 +51,12 @@ class Staff extends Model
     {
         return $this->belongsTo(Campus::class);
     }
+
+    /**
+     * Get the salary structure associated with the staff member.
+     */
+    public function salaryStructure()
+    {
+        return $this->hasOne(SalaryStructure::class);
+    }
 }

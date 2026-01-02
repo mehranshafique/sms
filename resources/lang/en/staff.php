@@ -6,6 +6,7 @@ return [
         'success_create' => 'Staff member added successfully!',
         'success_update' => 'Staff details updated successfully!',
         'success_delete' => 'Staff record deleted successfully!',
+        'success_marked' => 'Staff attendance marked successfully!',
     ],
     
     // Headers
@@ -50,6 +51,22 @@ return [
     'enter_email' => 'Enter email address',
     'leave_blank_password' => 'Leave blank to keep current password',
     
+    // Attendance
+    'attendance_title' => 'Staff Attendance',
+    'mark_attendance' => 'Mark Attendance',
+    'mark_staff_attendance' => 'Mark Staff Attendance',
+    'attendance_list' => 'Attendance List',
+    'check_in' => 'Check In',
+    'check_out' => 'Check Out',
+    'date' => 'Date',
+    'fetch_staff' => 'Fetch Staff',
+    'save_attendance' => 'Save Attendance',
+    'present' => 'Present',
+    'absent' => 'Absent',
+    'late' => 'Late',
+    'excused' => 'Excused',
+    'half_day' => 'Half Day',
+
     // Buttons
     'save_staff' => 'Save Staff',
     'update_staff' => 'Update Staff',
