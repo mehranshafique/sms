@@ -45,20 +45,23 @@ class RolePermissionSeeder extends Seeder
             'Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
             'Student Promotion' => ['view', 'create'],
+            'Student Transfers' => ['view', 'create', 'print'], // Added Transfer
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Staff Attendance' => ['view', 'create', 'update', 'delete'], // Added Staff Attendance
             
             // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Marks' => ['create', 'update', 'view'],
             'Result Cards' => ['view'], 
+            'Academic Reports' => ['view'], // Added Bulletin/Transcript
             
             // Finance
             'Fee Structures' => ['view', 'create', 'update', 'delete'],
             'Fee Types' => ['view', 'create', 'update', 'delete'],
             'Invoices' => ['view', 'create', 'update', 'delete'],
             'Payments' => ['view', 'create'],
-            'Payrolls' => ['view', 'create', 'update', 'delete'], // Payroll
-            'Salary Structures' => ['view', 'create', 'update', 'delete'], // NEW: Salary Structure
+            'Payrolls' => ['view', 'create', 'update', 'delete'], // Added Payrolls
+            'Salary Structures' => ['view', 'create', 'update', 'delete'], // Added Salary Structures
             
             // Security & Config
             'Audit Logs' => ['view'],
@@ -67,7 +70,7 @@ class RolePermissionSeeder extends Seeder
             'Packages' => ['view', 'create', 'update', 'delete'],
             'Sms Templates' => ['view', 'update'],
             
-            // NEW MODULES (Communication & Voting)
+            // Communication & Voting
             'Communication' => ['view', 'create', 'update', 'delete'],
             'Notices' => ['view', 'create', 'update', 'delete','viewAny'],
             'Voting' => ['view', 'create', 'update', 'delete'],

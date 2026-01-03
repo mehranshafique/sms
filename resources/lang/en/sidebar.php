@@ -36,6 +36,7 @@ return [
     'billing' => 'Billing',
     'billing_requests' => 'Billing Requests',
     'status_billing' => 'Status Billing',
+    'financial_reports' => 'Class Report',
     
     // NEW ADDITIONS
     'communication' => 'Communication',
@@ -77,6 +78,9 @@ return [
     'marks' => [
         'title' => 'Marks'
     ],
+    'results' => 'Result Cards',
+    'academic_reports' => 'Reports (PDF)',
+    
     'people' => 'People',
     'students' => [
         'title' => 'Students'
@@ -93,6 +97,8 @@ return [
     'staff' => [
         'title' => 'Staff'
     ],
+    'staff_attendance' => 'Staff Attendance',
+    
     'fee_types' => [
         'title' => 'Fee Types'
     ],

@@ -151,10 +151,15 @@
                 @endif
 
                 {{-- NEW: RESULT CARD MODULE --}}
-                @if($hasModule('results') || $hasModule('exams')) 
+                @if($hasModule('results') || $hasModule('examinations')) 
                     @if(auth()->user()->can('view result_card') || auth()->user()->hasRole(['Super Admin', 'Head Officer', 'Teacher', 'Student']))
                     <li><a class="ai-icon" href="{{ route('results.index') }}"><i class="la la-certificate"></i><span class="nav-text">{{ __('sidebar.results') }}</span></a></li>
                     @endif
+                @endif
+
+                {{-- NEW: ACADEMIC REPORTS (Bulletins/Transcripts) --}}
+                @if($hasModule('examinations')) 
+                    <li><a class="ai-icon" href="{{ route('reports.index') }}"><i class="la la-file-pdf-o"></i><span class="nav-text">{{ __('sidebar.academic_reports') }}</span></a></li>
                 @endif
 
                 {{-- COMMUNICATION GROUP --}}
@@ -210,6 +215,10 @@
                     @can('staff.view')
                     <li><a class="ai-icon" href="{{ route('staff.index') }}"><i class="la la-chalkboard-teacher"></i><span class="nav-text">{{ __('sidebar.staff.title') }}</span></a></li>
                     @endcan
+                    {{-- NEW: STAFF ATTENDANCE --}}
+                    @can('staff_attendance.view')
+                    <li><a class="ai-icon" href="{{ route('staff-attendance.index') }}"><i class="la la-calendar-check-o"></i><span class="nav-text">{{ __('sidebar.staff_attendance') }}</span></a></li>
+                    @endcan
                 @endif
 
                 {{-- FINANCE GROUP --}}
@@ -233,6 +242,9 @@
                                 <li><a href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
                                 <li><a href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
                             @endif
+                            
+                            <li><a href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
+
                             {{-- NEW PAYROLL MODULES --}}
                             @if($hasModule('payrolls'))
                                 <li><a href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
