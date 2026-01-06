@@ -60,7 +60,6 @@ class StudentController extends BaseController
                     $initial = strtoupper(substr($row->first_name, 0, 1));
                     $avatarHtml = $img ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
                     
-                    // UPDATED: Explicitly showing Admission Number
                     return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.($row->admission_number ?? '-').'</span></div></div>';
                 })
                 ->addColumn('parent_info', function($row){
@@ -152,9 +151,13 @@ class StudentController extends BaseController
             'blood_group' => 'nullable|string',
             'avenue' => 'nullable|string',
             'place_of_birth' => 'nullable|string',
+            // Discount Validation
+            'discount_amount' => 'nullable|numeric|min:0',
+            'discount_type' => 'required_with:discount_amount|in:fixed,percentage',
+            'scholarship_reason' => 'nullable|string|max:255',
         ]);
 
-        $data = $request->except(['_token', '_method']);
+        $data = $request->except(['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason']);
 
         // --- Capitalize Text Fields (Title Case) ---
         $textFields = [
@@ -180,7 +183,7 @@ class StudentController extends BaseController
 
             $data['institution_id'] = $institutionId; 
             
-            // 1. CREATE USER FIRST (To get the User ID for ID Generation)
+            // 1. CREATE USER FIRST
             $user = null;
             if ($request->email) {
                 $plainPassword = 'Student' . rand(1000, 9999) . '!';
@@ -201,8 +204,7 @@ class StudentController extends BaseController
                 $this->notificationService->sendUserCredentials($user, $plainPassword, 'Student');
             }
 
-            // 2. GENERATE ID (Pass User ID if available)
-            // This ensures ID is [InstID][YY][UserID] which is guaranteed unique per user
+            // 2. GENERATE ID
             $userId = $user ? $user->id : null;
             $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession, $userId);
 
@@ -221,6 +223,7 @@ class StudentController extends BaseController
                 $sectionId = $section ? $section->id : null;
             }
 
+            // 4. CREATE ENROLLMENT WITH DISCOUNT
             if ($sectionId) {
                 StudentEnrollment::create([
                     'institution_id' => $institutionId,
@@ -230,6 +233,10 @@ class StudentController extends BaseController
                     'class_section_id' => $sectionId,
                     'status' => 'active',
                     'enrolled_at' => now(),
+                    // Save Discount Details
+                    'discount_amount' => $request->discount_amount ?? 0,
+                    'discount_type' => $request->discount_type ?? 'fixed',
+                    'scholarship_reason' => $request->scholarship_reason,
                 ]);
             }
 
@@ -283,9 +290,13 @@ class StudentController extends BaseController
             'country' => 'nullable|string',
             'state' => 'nullable|string',
             'city' => 'nullable|string',
+            // Discount Validation
+            'discount_amount' => 'nullable|numeric|min:0',
+            'discount_type' => 'required_with:discount_amount|in:fixed,percentage',
+            'scholarship_reason' => 'nullable|string|max:255',
         ]);
 
-        $data = $request->all();
+        $data = $request->except(['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason']);
         unset($data['admission_number']); 
         unset($data['institution_id']); 
 
@@ -308,17 +319,30 @@ class StudentController extends BaseController
             $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
         }
 
-        $student->update($data);
-        
-        if($student->user_id) {
-            $userLink = User::find($student->user_id);
-            if($userLink) {
-                $userLink->update([
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $request->email,
+        // DB Transaction to update Student AND Enrollment discount
+        DB::transaction(function () use ($student, $data, $request) {
+            $student->update($data);
+            
+            if($student->user_id) {
+                $userLink = User::find($student->user_id);
+                if($userLink) {
+                    $userLink->update([
+                        'name' => $data['first_name'] . ' ' . $data['last_name'],
+                        'email' => $request->email ?? $userLink->email,
+                    ]);
+                }
+            }
+
+            // Update Current Enrollment Discount
+            $enrollment = $student->enrollments()->latest()->first();
+            if ($enrollment) {
+                $enrollment->update([
+                    'discount_amount' => $request->discount_amount ?? 0,
+                    'discount_type' => $request->discount_type ?? 'fixed',
+                    'scholarship_reason' => $request->scholarship_reason,
                 ]);
             }
-        }
+        });
 
         return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_update')]);
     }

@@ -18,6 +18,7 @@ return [
     'edit_student' => 'Edit Student',
     'student_details' => 'Student Details',
     'create_new' => 'Admit Student',
+    'profile_details' => 'Profile Details',
     
     'total_students' => 'Total Students',
     'active_students' => 'Active Students',
@@ -88,11 +89,8 @@ return [
     
     'photo' => 'Student Photo',
     'scan_for_details' => 'Scan for Student Details',
-    
-    // NEW: Payment Mode Keys
     'payment_mode' => 'Payment Mode',
-    'payment_global' => 'Global (Annual)',
-    'payment_installment' => 'Installment',
+    'finance_dashboard' => 'Finance Dashboard',
     
     // Access Fields
     'qr_code_token' => 'QR Code Token',
@@ -142,4 +140,15 @@ return [
     'no_active_session' => 'No active academic session found for this institution.',
     'unauthorized_access' => 'Unauthorized access.',
     'no_enrollment_found' => 'No enrollment history found.',
+    'payment_global' => 'Global (Annual)',
+    'payment_installment' => 'Installment',
+
+    // Scholarship / Discount
+    'scholarship_discount' => 'Scholarship / Discount',
+    'discount_amount' => 'Discount Amount',
+    'discount_type' => 'Discount Type',
+    'fixed_amount' => 'Fixed Amount',
+    'percentage' => 'Percentage (%)',
+    'reason_remark' => 'Reason / Remark',
+    'reason_placeholder' => 'e.g. Merit, Staff Child',
 ];

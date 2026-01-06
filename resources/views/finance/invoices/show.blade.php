@@ -6,7 +6,7 @@
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4>{{ __('invoice.invoice_details') ?? 'Invoice Details' }}</h4>
+                    <h4>{{ __('invoice.invoice_details') }}</h4>
                     <p class="mb-0">#{{ $invoice->invoice_number }}</p>
                 </div>
             </div>
@@ -24,7 +24,7 @@
                     <div class="card-header"> 
                         <strong>{{ $invoice->created_at->format('d M, Y') }}</strong> 
                         <span class="float-end">
-                            <strong>Status:</strong> 
+                            <strong>{{ __('invoice.status_label') }}:</strong> 
                             <span class="badge badge-{{ $invoice->status == 'paid' ? 'success' : ($invoice->status == 'partial' ? 'warning' : 'danger') }}">
                                 {{ ucfirst($invoice->status) }}
                             </span>
@@ -34,23 +34,23 @@
                         <div class="row mb-5">
                             {{-- LEFT ALIGNED INSTITUTION INFO --}}
                             <div class="col-xl-4 col-3 mt-4 text-start">
-                                <h6>From:</h6>
+                                <h6>{{ __('invoice.from') }}:</h6>
                                 <div> <strong>{{ $invoice->institution->name ?? 'Institution Name' }}</strong> </div>
                                 <div>{{ $invoice->institution->address ?? '' }}</div>
-                                <div>Email: {{ $invoice->institution->email ?? '' }}</div>
-                                <div>Phone: {{ $invoice->institution->phone ?? '' }}</div>
+                                <div>{{ __('invoice.email') }}: {{ $invoice->institution->email ?? '' }}</div>
+                                <div>{{ __('invoice.phone') }}: {{ $invoice->institution->phone ?? '' }}</div>
                             </div>
                             <div class="col-xl-4 col-3 mt-4">
-                                <h6>To:</h6>
+                                <h6>{{ __('invoice.to') }}:</h6>
                                 <div> <strong>{{ $invoice->student->full_name }}</strong> </div>
-                                <div>ID: {{ $invoice->student->admission_number }}</div>
-                                <div>Class: {{ $invoice->student->enrollments->last()->classSection->name ?? 'N/A' }}</div>
+                                <div>{{ __('invoice.id') }}: {{ $invoice->student->admission_number }}</div>
+                                <div>{{ __('invoice.class') }}: {{ $invoice->student->enrollments->last()->classSection->name ?? 'N/A' }}</div>
                             </div>
                             <div class="col-xl-4 col-6 mt-4 text-end">
-                                <h6>Invoice Info:</h6>
-                                <div>Invoice #: <strong>{{ $invoice->invoice_number }}</strong></div>
-                                <div>Issue Date: {{ $invoice->issue_date->format('d M, Y') }}</div>
-                                <div>Due Date: {{ $invoice->due_date->format('d M, Y') }}</div>
+                                <h6>{{ __('invoice.invoice_info') }}:</h6>
+                                <div>{{ __('invoice.invoice_number') }}: <strong>{{ $invoice->invoice_number }}</strong></div>
+                                <div>{{ __('invoice.issue_date') }}: {{ $invoice->issue_date->format('d M, Y') }}</div>
+                                <div>{{ __('invoice.due_date') }}: {{ $invoice->due_date->format('d M, Y') }}</div>
                             </div>
                         </div>
                         
@@ -59,8 +59,8 @@
                                 <thead>
                                     <tr>
                                         <th class="center">#</th>
-                                        <th>Item Description</th>
-                                        <th class="right">Cost</th>
+                                        <th>{{ __('invoice.item_description') }}</th>
+                                        <th class="right">{{ __('invoice.cost') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -68,7 +68,7 @@
                                     <tr>
                                         <td class="center">{{ $index + 1 }}</td>
                                         <td class="strong">{{ $item->description }}</td>
-                                        <td class="right">{{ number_format($item->amount, 2) }}</td>
+                                        <td class="right">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($item->amount, 2) }}</td>
                                     </tr>
                                     @endforeach
                                 </tbody>
@@ -80,16 +80,16 @@
                                 <table class="table table-clear">
                                     <tbody>
                                         <tr>
-                                            <td class="left"><strong>Subtotal</strong></td>
-                                            <td class="right">{{ number_format($invoice->total_amount, 2) }}</td>
+                                            <td class="left"><strong>{{ __('invoice.subtotal') }}</strong></td>
+                                            <td class="right">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($invoice->total_amount, 2) }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="left"><strong>Paid Amount</strong></td>
-                                            <td class="right text-success">{{ number_format($invoice->paid_amount, 2) }}</td>
+                                            <td class="left"><strong>{{ __('invoice.paid_amount') }}</strong></td>
+                                            <td class="right text-success">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($invoice->paid_amount, 2) }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="left"><strong>Balance Due</strong></td>
-                                            <td class="right text-danger"><strong>{{ number_format($invoice->total_amount - $invoice->paid_amount, 2) }}</strong></td>
+                                            <td class="left"><strong>{{ __('invoice.balance_due') }}</strong></td>
+                                            <td class="right text-danger"><strong>{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($invoice->total_amount - $invoice->paid_amount, 2) }}</strong></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -100,17 +100,17 @@
                         <div class="d-flex justify-content-end">
                             {{-- Print Button --}}
                             <a href="{{ route('invoices.print', $invoice->id) }}" target="_blank" class="btn btn-outline-secondary me-2">
-                                <i class="fa fa-print"></i> Print
+                                <i class="fa fa-print"></i> {{ __('invoice.print') }}
                             </a>
                             
                             {{-- Download PDF Button --}}
                             <a href="{{ route('invoices.download', $invoice->id) }}" class="btn btn-primary me-2">
-                                <i class="fa fa-download"></i> Download PDF
+                                <i class="fa fa-download"></i> {{ __('invoice.download_pdf') }}
                             </a>
                             
                             @if($invoice->status != 'paid')
                                 @can('payment.create')
-                                <a href="{{ route('payments.create', ['invoice_id' => $invoice->id]) }}" class="btn btn-success"><i class="fa fa-money"></i> Pay Now</a>
+                                <a href="{{ route('payments.create', ['invoice_id' => $invoice->id]) }}" class="btn btn-success"><i class="fa fa-money"></i> {{ __('invoice.pay_now') }}</a>
                                 @endcan
                             @endif
                         </div>
@@ -124,18 +124,18 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h4 class="card-title">Payment History</h4>
+                        <h4 class="card-title">{{ __('finance.payment_history') }}</h4>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-bordered">
                                 <thead class="bg-light">
                                     <tr>
-                                        <th>Date</th>
-                                        <th>Transaction ID</th>
-                                        <th>Method</th>
-                                        <th>Amount</th>
-                                        <th>Recorded By</th>
+                                        <th>{{ __('finance.date') }}</th>
+                                        <th>{{ __('finance.transaction_id') }}</th>
+                                        <th>{{ __('finance.method') }}</th>
+                                        <th>{{ __('finance.amount') }}</th>
+                                        <th>{{ __('finance.recorded_by') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -144,12 +144,12 @@
                                         <td>{{ $payment->payment_date->format('d M, Y') }}</td>
                                         <td>{{ $payment->transaction_id }}</td>
                                         <td>{{ ucfirst($payment->method) }}</td>
-                                        <td class="text-success fw-bold">{{ number_format($payment->amount, 2) }}</td>
+                                        <td class="text-success fw-bold">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($payment->amount, 2) }}</td>
                                         <td>{{ $payment->receivedBy->name ?? 'System' }}</td>
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted">No payments recorded yet.</td>
+                                        <td colspan="5" class="text-center text-muted">{{ __('finance.no_payments_found') }}</td>
                                     </tr>
                                     @endforelse
                                 </tbody>

@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Finance;
 use App\Http\Controllers\BaseController;
 use App\Models\Payment;
 use App\Models\Invoice;
-use App\Models\FeeStructure; // Added
+use App\Models\FeeStructure;
+use App\Models\StudentEnrollment;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -56,14 +57,48 @@ class PaymentController extends BaseController
             abort(403);
         }
 
-        // --- INSTALLMENT LOGIC ENFORCEMENT ---
-        // Check if this invoice is part of an installment plan (linked via FeeStructure)
-        // We assume an invoice contains items from similar installment orders or mixed.
-        // Logic: Find the Lowest Installment Order in this invoice. Check if any *lower* order exists unpaid.
-        
         $studentId = $invoice->student_id;
         $academicSessionId = $invoice->academic_session_id;
 
+        // --- 1. GLOBAL FEE CAP LOGIC ---
+        $enrollment = StudentEnrollment::where('student_id', $studentId)
+            ->where('academic_session_id', $academicSessionId)
+            ->first();
+
+        if ($enrollment) {
+            // Find "Global" Fee Structure Amount for this Class/Grade
+            $globalFeeStructure = FeeStructure::where('institution_id', $invoice->institution_id)
+                ->where('academic_session_id', $academicSessionId)
+                ->where('payment_mode', 'global')
+                ->where(function($q) use ($enrollment) {
+                    $q->where('class_section_id', $enrollment->class_section_id)
+                      ->orWhere('grade_level_id', $enrollment->grade_level_id);
+                })
+                ->first();
+
+            if ($globalFeeStructure) {
+                $annualLimit = $globalFeeStructure->amount;
+
+                // Calculate Total Paid So Far (Sum of ALL payments for this student in this session)
+                $totalPaidSoFar = Payment::whereHas('invoice', function($q) use ($studentId, $academicSessionId) {
+                    $q->where('student_id', $studentId)
+                      ->where('academic_session_id', $academicSessionId);
+                })->sum('amount');
+
+                // Check Limit
+                $newTotal = $totalPaidSoFar + $request->amount;
+                
+                // Allow a tiny margin for float precision errors (0.01)
+                if ($newTotal > ($annualLimit + 0.01)) {
+                    $remainingGlobal = max(0, $annualLimit - $totalPaidSoFar);
+                    return response()->json([
+                        'message' => "Payment rejected. Total annual fee is " . number_format($annualLimit, 2) . ". You can only pay up to " . number_format($remainingGlobal, 2) . " more for this academic year."
+                    ], 422);
+                }
+            }
+        }
+
+        // --- 2. INSTALLMENT LOGIC ENFORCEMENT ---
         foreach ($invoice->items as $item) {
             if ($item->feeStructure && $item->feeStructure->payment_mode === 'installment') {
                 $currentOrder = $item->feeStructure->installment_order;
@@ -87,11 +122,10 @@ class PaymentController extends BaseController
                 }
             }
         }
-        // -------------------------------------
 
         $remaining = $invoice->total_amount - $invoice->paid_amount;
         
-        if($request->amount > $remaining){
+        if($request->amount > ($remaining + 0.01)){ // Add small buffer for float comparison
             return response()->json(['message' => __('payment.exceeds_balance') . ' (' . number_format($remaining, 2) . ')'], 422);
         }
 
@@ -114,6 +148,7 @@ class PaymentController extends BaseController
             $total = (float)$invoice->total_amount;
             $paid = (float)$newPaid;
             
+            // Allow small float tolerance for 'paid' status
             $status = ($paid >= $total - 0.01) ? 'paid' : 'partial';
 
             $invoice->update([
@@ -123,7 +158,6 @@ class PaymentController extends BaseController
         });
 
         if ($payment) {
-            // Send Notification (SMS/Email) via Service
             $this->notificationService->sendPaymentNotification($payment);
         }
 

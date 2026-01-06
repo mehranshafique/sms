@@ -46,6 +46,13 @@ class FeeStructureController extends BaseController
                 ->editColumn('amount', function($row){
                     return number_format($row->amount, 2);
                 })
+                ->addColumn('mode', function($row){
+                    $mode = ucfirst($row->payment_mode);
+                    if($row->payment_mode == 'installment') {
+                        $mode .= ' (' . ($row->installment_order ?? '-') . ')';
+                    }
+                    return $mode;
+                })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     if(auth()->user()->can('fee_structure.update')){
@@ -68,21 +75,18 @@ class FeeStructureController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        // 1. Fetch Fee Types
         $feeTypesQuery = FeeType::where('is_active', true);
         if ($institutionId) {
             $feeTypesQuery->where('institution_id', $institutionId);
         }
         $feeTypes = $feeTypesQuery->pluck('name', 'id');
 
-        // 2. Fetch Grade Levels
         $gradeLevelsQuery = GradeLevel::query();
         if ($institutionId) {
             $gradeLevelsQuery->where('institution_id', $institutionId);
         }
         $gradeLevels = $gradeLevelsQuery->pluck('name', 'id');
         
-        // 3. Get Active Session
         $sessionQuery = AcademicSession::where('is_current', true);
         if($institutionId) {
             $sessionQuery->where('institution_id', $institutionId);
@@ -101,7 +105,6 @@ class FeeStructureController extends BaseController
             'fee_type_id' => [
                 'required', 
                 'exists:fee_types,id',
-                // Ensure fee type belongs to the same institution
                 function($attribute, $value, $fail) use ($institutionId) {
                     if($institutionId) {
                         $exists = FeeType::where('id', $value)->where('institution_id', $institutionId)->exists();
@@ -112,9 +115,10 @@ class FeeStructureController extends BaseController
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:one_time,monthly,termly,yearly',
             'grade_level_id' => 'nullable|exists:grade_levels,id',
+            'payment_mode' => 'required|in:global,installment',
+            'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
         ]);
 
-        // Fallback for Super Admin if not set via context
         if(!$institutionId) {
              $feeType = FeeType::find($request->fee_type_id);
              $institutionId = $feeType->institution_id;
@@ -126,6 +130,33 @@ class FeeStructureController extends BaseController
             return response()->json(['message' => __('finance.no_active_session')], 422);
         }
 
+        // --- NEW: VALIDATION LOGIC FOR INSTALLMENT CAP ---
+        // If creating an installment, check if it exceeds the Global Annual Fee
+        if ($request->payment_mode === 'installment' && $request->grade_level_id) {
+            $globalFee = FeeStructure::where('institution_id', $institutionId)
+                ->where('grade_level_id', $request->grade_level_id)
+                ->where('payment_mode', 'global')
+                ->where('academic_session_id', $session->id)
+                ->sum('amount'); // Assuming one global fee per grade usually
+
+            if ($globalFee > 0) {
+                $existingInstallments = FeeStructure::where('institution_id', $institutionId)
+                    ->where('grade_level_id', $request->grade_level_id)
+                    ->where('payment_mode', 'installment')
+                    ->where('academic_session_id', $session->id)
+                    ->sum('amount');
+
+                $newTotal = $existingInstallments + $request->amount;
+
+                if ($newTotal > $globalFee) {
+                    return response()->json([
+                        'message' => "Validation Error: Total installments ($newTotal) cannot exceed the Global Annual Fee ($globalFee) for this grade."
+                    ], 422);
+                }
+            }
+        }
+        // ------------------------------------------------
+
         FeeStructure::create([
             'institution_id' => $institutionId,
             'academic_session_id' => $session->id,
@@ -134,6 +165,8 @@ class FeeStructureController extends BaseController
             'amount' => $request->amount,
             'frequency' => $request->frequency,
             'grade_level_id' => $request->grade_level_id,
+            'payment_mode' => $request->payment_mode,
+            'installment_order' => $request->installment_order,
         ]);
 
         return response()->json(['message' => __('finance.success_create'), 'redirect' => route('fees.index')]);
@@ -144,7 +177,6 @@ class FeeStructureController extends BaseController
         $feeStructure = FeeStructure::findOrFail($id);
         $institutionId = $this->getInstitutionId();
 
-        // Strict Access Check
         if($institutionId && $feeStructure->institution_id != $institutionId) {
             abort(403);
         }
@@ -172,7 +204,41 @@ class FeeStructureController extends BaseController
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:one_time,monthly,termly,yearly',
             'grade_level_id' => 'nullable|exists:grade_levels,id',
+            'payment_mode' => 'required|in:global,installment',
+            'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
         ]);
+
+        // --- NEW: UPDATE VALIDATION LOGIC ---
+        if ($request->payment_mode === 'installment' && $request->grade_level_id) {
+            $session = AcademicSession::where('institution_id', $feeStructure->institution_id)->where('is_current', true)->first();
+            
+            if ($session) {
+                $globalFee = FeeStructure::where('institution_id', $feeStructure->institution_id)
+                    ->where('grade_level_id', $request->grade_level_id)
+                    ->where('payment_mode', 'global')
+                    ->where('academic_session_id', $session->id)
+                    ->sum('amount');
+
+                if ($globalFee > 0) {
+                    // Exclude current record from sum
+                    $existingInstallments = FeeStructure::where('institution_id', $feeStructure->institution_id)
+                        ->where('grade_level_id', $request->grade_level_id)
+                        ->where('payment_mode', 'installment')
+                        ->where('academic_session_id', $session->id)
+                        ->where('id', '!=', $id)
+                        ->sum('amount');
+
+                    $newTotal = $existingInstallments + $request->amount;
+
+                    if ($newTotal > $globalFee) {
+                        return response()->json([
+                            'message' => "Validation Error: Total installments ($newTotal) cannot exceed the Global Annual Fee ($globalFee)."
+                        ], 422);
+                    }
+                }
+            }
+        }
+        // ------------------------------------
 
         $feeStructure->update([
             'name' => $request->name,
@@ -180,6 +246,8 @@ class FeeStructureController extends BaseController
             'amount' => $request->amount,
             'frequency' => $request->frequency,
             'grade_level_id' => $request->grade_level_id,
+            'payment_mode' => $request->payment_mode,
+            'installment_order' => $request->installment_order,
         ]);
 
         return response()->json(['message' => __('finance.success_update'), 'redirect' => route('fees.index')]);

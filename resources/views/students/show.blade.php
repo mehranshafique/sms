@@ -45,17 +45,25 @@
 
                             <div class="row mt-4">
                                 <div class="col-12 text-center">
-                                    <a href="{{ route('students.edit', $student->id) }}" class="btn btn-primary btn-sm me-3">
+                                    <a href="{{ route('students.edit', $student->id) }}" class="btn btn-primary btn-sm me-2 mb-2">
                                         <i class="fa fa-pencil me-1"></i> {{ __('student.edit') }}
                                     </a>
-                                    {{-- Added Transfer Button with spacing --}}
+                                    
+                                    {{-- UPDATED: Finance Dashboard Button with Key --}}
+                                    @can('payment.create')
+                                    <a href="{{ route('finance.student.dashboard', $student->id) }}" class="btn btn-success btn-sm me-2 mb-2">
+                                        <i class="fa fa-money me-1"></i> {{ __('student.finance_dashboard') }}
+                                    </a>
+                                    @endcan
+
+                                    {{-- Transfer Button --}}
                                     @can('student_transfer.create')
                                         @if($student->status === 'active')
-                                            <a href="{{ route('transfers.create', $student->id) }}" class="btn btn-danger btn-sm">
+                                            <a href="{{ route('transfers.create', $student->id) }}" class="btn btn-danger btn-sm mb-2">
                                                 <i class="fa fa-exchange-alt me-1"></i> {{ __('transfer.page_title') }}
                                             </a>
                                         @elseif($student->status === 'transferred' || $student->status === 'withdrawn')
-                                            <a href="{{ route('transfers.print', $student->id) }}" class="btn btn-warning btn-sm" target="_blank">
+                                            <a href="{{ route('transfers.print', $student->id) }}" class="btn btn-warning btn-sm mb-2" target="_blank">
                                                 <i class="fa fa-print me-1"></i> {{ __('transfer.issue_certificate') }}
                                             </a>
                                         @endif
@@ -64,7 +72,7 @@
                             </div>
                         </div>
 
-                        {{-- Identity & Access Section (Merged for visibility) --}}
+                        {{-- Identity & Access Section --}}
                         <div class="mt-4 pt-4 border-top">
                             <h5 class="text-primary mb-3">{{ __('student.identity_access') }}</h5>
                             
@@ -132,7 +140,7 @@
                                     <div class="col-sm-8 col-7"><span>{{ $student->admission_date ? $student->admission_date->format('d M, Y') : 'N/A' }}</span></div>
                                 </div>
                                 
-                                {{-- NEW: Payment Mode Display --}}
+                                {{-- Payment Mode --}}
                                 <div class="row mb-2">
                                     <div class="col-sm-4 col-5">
                                         <h5 class="f-w-500">{{ __('student.payment_mode') }} <span class="pull-right">:</span></h5>
@@ -211,7 +219,6 @@
                                             <tr>
                                                 <th>{{ __('student.session') }}</th>
                                                 <th>{{ __('student.class_grade') }}</th>
-                                                {{-- UPDATED Header: Using Admission No as requested --}}
                                                 <th>{{ __('student.admission_no') }}</th>
                                                 <th>{{ __('student.status') }}</th>
                                             </tr>
@@ -226,7 +233,6 @@
                                                             {{ $enrollment->classSection->gradeLevel->name ?? '' }}
                                                         </small>
                                                     </td>
-                                                    {{-- UPDATED Body: Showing Admission No instead of Roll Number --}}
                                                     <td>{{ $student->admission_number ?? '-' }}</td>
                                                     <td>
                                                         <span class="badge badge-sm badge-{{ $enrollment->status == 'active' ? 'success' : 'light' }}">

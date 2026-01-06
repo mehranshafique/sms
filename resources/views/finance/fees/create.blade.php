@@ -34,7 +34,6 @@
                                     </div>
                                     <div class="mb-3 col-md-6">
                                         <label class="form-label">{{ __('finance.fee_type') }} <span class="text-danger">*</span></label>
-                                        {{-- Added data-live-search for better UX --}}
                                         <select name="fee_type_id" class="form-control default-select" data-live-search="true" required>
                                             <option value="">{{ __('finance.select_type') }}</option>
                                             @foreach($feeTypes as $id => $name)
@@ -55,15 +54,32 @@
                                             <option value="one_time">{{ __('finance.one_time') }}</option>
                                         </select>
                                     </div>
+                                    
+                                    {{-- Grade Level Selector --}}
                                     <div class="mb-3 col-md-4">
                                         <label class="form-label">{{ __('finance.grade_level') }}</label>
-                                        {{-- Added data-live-search --}}
                                         <select name="grade_level_id" class="form-control default-select" data-live-search="true">
                                             <option value="">All Grades</option>
                                             @foreach($gradeLevels as $id => $name)
                                                 <option value="{{ $id }}">{{ $name }}</option>
                                             @endforeach
                                         </select>
+                                    </div>
+
+                                    {{-- NEW: Payment Mode --}}
+                                    <div class="mb-3 col-md-4">
+                                        <label class="form-label">{{ __('finance.payment_mode') }}</label>
+                                        <select name="payment_mode" id="paymentMode" class="form-control default-select">
+                                            <option value="global">{{ __('finance.global') }}</option>
+                                            <option value="installment">{{ __('finance.installment') }}</option>
+                                        </select>
+                                    </div>
+
+                                    {{-- NEW: Installment Order (Visible only if installment) --}}
+                                    <div class="mb-3 col-md-4 d-none" id="installmentOrderDiv">
+                                        <label class="form-label">Installment Order</label>
+                                        <input type="number" name="installment_order" class="form-control" placeholder="1, 2, 3..." min="1">
+                                        <small class="text-muted">Sequence order (1 = First, 2 = Second...)</small>
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn-primary mt-3">{{ __('finance.save') }}</button>
@@ -82,10 +98,18 @@
 <script>
     $(document).ready(function(){
         
-        // Ensure dropdowns are refreshed
         if(jQuery().selectpicker) {
             $('.default-select').selectpicker('refresh');
         }
+
+        // Toggle Installment Order
+        $('#paymentMode').change(function() {
+            if($(this).val() === 'installment') {
+                $('#installmentOrderDiv').removeClass('d-none');
+            } else {
+                $('#installmentOrderDiv').addClass('d-none');
+            }
+        });
 
         $('#feeForm').submit(function(e){
             e.preventDefault();

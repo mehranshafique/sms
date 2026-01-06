@@ -18,6 +18,10 @@ class StudentEnrollment extends Model
         'roll_number',
         'status',
         'enrolled_at',
+        // Added these to allow saving discounts
+        'discount_amount', 
+        'discount_type',
+        'scholarship_reason'
     ];
 
     protected $casts = [

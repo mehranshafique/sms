@@ -151,14 +151,14 @@
                 @endif
 
                 {{-- NEW: RESULT CARD MODULE --}}
-                @if($hasModule('results') || $hasModule('examinations')) 
+                @if($hasModule('results') || $hasModule('exams')) 
                     @if(auth()->user()->can('view result_card') || auth()->user()->hasRole(['Super Admin', 'Head Officer', 'Teacher', 'Student']))
                     <li><a class="ai-icon" href="{{ route('results.index') }}"><i class="la la-certificate"></i><span class="nav-text">{{ __('sidebar.results') }}</span></a></li>
                     @endif
                 @endif
 
                 {{-- NEW: ACADEMIC REPORTS (Bulletins/Transcripts) --}}
-                @if($hasModule('examinations')) 
+                @if($hasModule('exams')) 
                     <li><a class="ai-icon" href="{{ route('reports.index') }}"><i class="la la-file-pdf-o"></i><span class="nav-text">{{ __('sidebar.academic_reports') }}</span></a></li>
                 @endif
 

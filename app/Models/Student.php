@@ -21,7 +21,8 @@ class Student extends Model
         'father_name', 'father_phone', 'father_occupation',
         'mother_name', 'mother_phone', 'mother_occupation',
         'guardian_name', 'guardian_relation', 'guardian_phone', 'guardian_email',
-        'student_photo', 'status'
+        'student_photo', 'status',
+        'payment_mode' // Added from previous steps
     ];
 
     protected $dates = ['admission_date', 'dob'];
@@ -110,5 +111,26 @@ class Student extends Model
     public function enrollments()
     {
         return $this->hasMany(StudentEnrollment::class);
+    }
+
+    /**
+     * Relationship: A Student has many Invoices
+     */
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Relationship: Get all payments through invoices
+     */
+    public function payments()
+    {
+        return $this->hasManyThrough(Payment::class, Invoice::class);
+    }
+    
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

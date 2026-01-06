@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice #{{ $invoice->invoice_number }}</title>
+    <title>{{ __('invoice.invoice') }} #{{ $invoice->invoice_number }}</title>
     <style>
         @page {
             size: A4;
@@ -156,28 +156,28 @@
         <!-- Info Section -->
         <div class="invoice-info">
             <div class="bill-to">
-                <div style="color: #888; margin-bottom: 5px; text-transform: uppercase; font-size: 10px; letter-spacing: 1px;">Bill To</div>
+                <div style="color: #888; margin-bottom: 5px; text-transform: uppercase; font-size: 10px; letter-spacing: 1px;">{{ __('invoice.bill_to') }}</div>
                 <h3>{{ $invoice->student->full_name }}</h3>
-                <div>ID: {{ $invoice->student->admission_number }}</div>
-                <div>Class: {{ $invoice->student->enrollments->last()->classSection->name ?? 'N/A' }}</div>
-                <div>Session: {{ $invoice->academicSession->name }}</div>
+                <div>{{ __('invoice.id') }}: {{ $invoice->student->admission_number }}</div>
+                <div>{{ __('invoice.class') }}: {{ $invoice->student->enrollments->last()->classSection->name ?? 'N/A' }}</div>
+                <div>{{ __('invoice.session') }}: {{ $invoice->academicSession->name }}</div>
             </div>
             <div class="invoice-meta">
                 <table>
                     <tr>
-                        <td style="font-weight: bold; color: #333; padding-right: 10px;">Invoice #:</td>
+                        <td style="font-weight: bold; color: #333; padding-right: 10px;">{{ __('invoice.invoice_number') }}:</td>
                         <td>{{ $invoice->invoice_number }}</td>
                     </tr>
                     <tr>
-                        <td style="font-weight: bold; color: #333; padding-right: 10px;">Date:</td>
+                        <td style="font-weight: bold; color: #333; padding-right: 10px;">{{ __('invoice.date') }}:</td>
                         <td>{{ $invoice->issue_date->format('d M, Y') }}</td>
                     </tr>
                     <tr>
-                        <td style="font-weight: bold; color: #333; padding-right: 10px;">Due Date:</td>
+                        <td style="font-weight: bold; color: #333; padding-right: 10px;">{{ __('invoice.due_date') }}:</td>
                         <td>{{ $invoice->due_date->format('d M, Y') }}</td>
                     </tr>
                     <tr>
-                        <td style="font-weight: bold; color: #333; padding-right: 10px;">Status:</td>
+                        <td style="font-weight: bold; color: #333; padding-right: 10px;">{{ __('invoice.status_label') }}:</td>
                         <td>
                             <span class="status-badge status-{{ $invoice->status }}">
                                 {{ ucfirst($invoice->status) }}
@@ -193,8 +193,8 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>Description</th>
-                    <th class="amount">Amount</th>
+                    <th>{{ __('invoice.description') }}</th>
+                    <th class="amount">{{ __('invoice.amount') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -202,7 +202,7 @@
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $item->description }}</td>
-                    <td class="amount">{{ number_format($item->amount, 2) }}</td>
+                    <td class="amount">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($item->amount, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -212,24 +212,24 @@
         <div class="totals">
             <table>
                 <tr>
-                    <td>Subtotal:</td>
-                    <td>{{ number_format($invoice->total_amount, 2) }}</td>
+                    <td>{{ __('invoice.subtotal') }}:</td>
+                    <td>{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($invoice->total_amount, 2) }}</td>
                 </tr>
                 <tr>
-                    <td>Paid to Date:</td>
-                    <td>{{ number_format($invoice->paid_amount, 2) }}</td>
+                    <td>{{ __('invoice.paid_to_date') }}:</td>
+                    <td>{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($invoice->paid_amount, 2) }}</td>
                 </tr>
                 <tr class="total-row">
-                    <td>Balance Due:</td>
-                    <td>{{ number_format($invoice->total_amount - $invoice->paid_amount, 2) }}</td>
+                    <td>{{ __('invoice.balance_due') }}:</td>
+                    <td>{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($invoice->total_amount - $invoice->paid_amount, 2) }}</td>
                 </tr>
             </table>
         </div>
 
         <!-- Footer -->
         <div class="footer">
-            <p>Thank you for your business.</p>
-            <p>Authorized Signature: __________________________</p>
+            <p>{{ __('invoice.thank_you') }}</p>
+            <p>{{ __('invoice.authorized_signature') }}: __________________________</p>
         </div>
     </div>
 

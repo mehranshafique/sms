@@ -3,9 +3,9 @@
 return [
     'page_title' => 'Finance Management',
     'fee_structure_title' => 'Fee Structures',
-    'fee_type_title' => 'Fee Types', // Added
+    'fee_type_title' => 'Fee Types',
     'manage_subtitle' => 'Manage fees, invoices and payments',
-    'manage_types_subtitle' => 'Define types of fees (Tuition, Bus, Lab)', // Added
+    'manage_types_subtitle' => 'Define types of fees (Tuition, Bus, Lab)',
     
     // Fee Structures
     'fee_list' => 'Fee Structure List',
@@ -18,7 +18,7 @@ return [
     'select_type' => 'Select Type',
     'select_grade' => 'Select Grade',
     
-    // Fee Types (Added)
+    // Fee Types
     'fee_type_list' => 'Fee Type List',
     'add_type' => 'Add Fee Type',
     'edit_type' => 'Edit Fee Type',
@@ -34,17 +34,20 @@ return [
 
     // Messages
     'success_create' => 'Fee structure created successfully.',
-    'success_create_type' => 'Fee type created successfully.', // Added
-    'success_update_type' => 'Fee type updated successfully.', // Added
-    'success_delete_type' => 'Fee type deleted successfully.', // Added
+    'success_create_type' => 'Fee type created successfully.',
+    'success_update_type' => 'Fee type updated successfully.',
+    'success_delete_type' => 'Fee type deleted successfully.',
+    'success_update' => 'Fee structure updated successfully.',
+    'success_delete' => 'Fee structure deleted successfully.',
     'no_active_session' => 'No active academic session found.',
     
     // Buttons
     'save' => 'Save',
     'cancel' => 'Cancel',
     'action' => 'Action',
+    'edit_fee' => 'Edit Fee',
     
-    //class_financial_report
+    // Class Financial Report
     'class_financial_report' => 'Class Financial Report',
     'report_subtitle' => 'Detailed financial overview per class',
     'select_class_filter' => 'Select Class to Generate Report',
@@ -64,4 +67,37 @@ return [
     'payment_mode' => 'Payment Mode',
     'global' => 'Global',
     'installment' => 'Installment',
+
+    // Student Finance Dashboard & General Keys
+    'student_finance_dashboard' => 'Student Finance Dashboard',
+    'back_to_profile' => 'Back to Profile',
+    'fee_management' => 'Fee Management',
+    'global_overview' => 'Global Overview',
+    'annual_fee_contract' => 'Annual Fee (Contract)',
+    'annual_fee_gross' => 'Annual Fee (Gross)', // New Key
+    'discount_applied' => 'Discount Applied',   // New Key
+    'total_paid_global' => 'Total Paid (Global)',
+    'total_remaining_year' => 'Total Remaining (Year)',
+    'installment_label' => 'Installment',
+    'paid' => 'Paid',
+    'remaining' => 'Remaining',
+    'locked_msg' => 'LOCKED! Previous installment must be fully paid before accessing :label.',
+    'payment_for' => 'Payment for: :label',
+    'already_paid' => 'Already Paid',
+    'remaining_due' => 'Remaining Due',
+    'pay_now' => 'Pay Now',
+    'fully_settled' => 'This installment is fully settled.',
+    'context_history' => 'Context & History',
+    'current_installment' => 'Current Installment',
+    'reduce_global_msg' => 'Paying this will reduce your Global Balance to:',
+    'student_not_enrolled' => 'Student not enrolled in any class.',
+    'installment_prefix' => 'Installment',
+    
+    // Payment History Table
+    'payment_history' => 'Payment History',
+    'date' => 'Date',
+    'transaction_id' => 'Transaction ID',
+    'method' => 'Method',
+    'recorded_by' => 'Recorded By',
+    'no_payments_found' => 'No payments recorded yet.',
 ];

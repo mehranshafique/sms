@@ -10,8 +10,16 @@ class FeeStructure extends Model
     use HasFactory;
 
     protected $fillable = [
-        'institution_id', 'academic_session_id', 'fee_type_id', 'grade_level_id',
-        'name', 'amount', 'frequency'
+        'institution_id', 
+        'academic_session_id', 
+        'fee_type_id', 
+        'grade_level_id',
+        'class_section_id', // Added
+        'name', 
+        'amount', 
+        'frequency',
+        'payment_mode', // Added
+        'installment_order' // Added
     ];
 
     public function feeType()
@@ -22,5 +30,10 @@ class FeeStructure extends Model
     public function gradeLevel()
     {
         return $this->belongsTo(GradeLevel::class);
+    }
+
+    public function classSection()
+    {
+        return $this->belongsTo(ClassSection::class);
     }
 }

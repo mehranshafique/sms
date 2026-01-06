@@ -35,6 +35,8 @@
                         @php
                             $hasContext = isset($institutionId) && $institutionId;
                             $isSuperAdmin = auth()->user()->hasRole('Super Admin');
+                            // Helper to get enrollment data if available
+                            $enrollment = isset($student) ? $student->enrollments()->latest()->first() : null;
                         @endphp
 
                         @if($hasContext && !$isSuperAdmin)
@@ -96,7 +98,7 @@
                             <div class="invalid-feedback">Admission date is required.</div>
                         </div>
 
-                        {{-- NEW: Payment Mode --}}
+                        {{-- Payment Mode --}}
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.payment_mode') }}</label>
                             <select name="payment_mode" class="form-control default-select">
@@ -104,6 +106,35 @@
                                 <option value="global" {{ (old('payment_mode', $student->payment_mode ?? '') == 'global') ? 'selected' : '' }}>{{ __('student.payment_global') }}</option>
                             </select>
                         </div>
+
+                        {{-- SCHOLARSHIP / DISCOUNT SECTION --}}
+                        <div class="col-12 mt-2">
+                            <div class="p-3 border rounded bg-light">
+                                <h5 class="text-primary mb-3"><i class="fa fa-percent me-2"></i> {{ __('student.scholarship_discount') }}</h5>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">{{ __('student.discount_amount') }}</label>
+                                        <input type="number" name="discount_amount" class="form-control" 
+                                               value="{{ old('discount_amount', $enrollment->discount_amount ?? 0) }}" 
+                                               min="0" step="0.01" placeholder="0.00">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">{{ __('student.discount_type') }}</label>
+                                        <select name="discount_type" class="form-control default-select">
+                                            <option value="fixed" {{ (old('discount_type', $enrollment->discount_type ?? '') == 'fixed') ? 'selected' : '' }}>{{ __('student.fixed_amount') }}</option>
+                                            <option value="percentage" {{ (old('discount_type', $enrollment->discount_type ?? '') == 'percentage') ? 'selected' : '' }}>{{ __('student.percentage') }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">{{ __('student.reason_remark') }}</label>
+                                        <input type="text" name="scholarship_reason" class="form-control" 
+                                               value="{{ old('scholarship_reason', $enrollment->scholarship_reason ?? '') }}" 
+                                               placeholder="{{ __('student.reason_placeholder') }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 

@@ -16,10 +16,6 @@
                 </ol>
             </div>
         </div>
-
-        {{-- Reuse the existing create form logic if possible, or create a specific edit form. 
-             Since _form.blade.php wasn't created for fees in previous steps (it was inline in create), 
-             I will create a standard edit form here similar to create. --}}
         
         <form action="{{ route('fees.update', $feeStructure->id) }}" method="POST" id="feeForm">
             @csrf
@@ -68,6 +64,21 @@
                                             @endforeach
                                         </select>
                                     </div>
+
+                                    {{-- NEW: Payment Mode --}}
+                                    <div class="mb-3 col-md-4">
+                                        <label class="form-label">{{ __('finance.payment_mode') }}</label>
+                                        <select name="payment_mode" id="paymentMode" class="form-control default-select">
+                                            <option value="global" {{ $feeStructure->payment_mode == 'global' ? 'selected' : '' }}>{{ __('finance.global') }}</option>
+                                            <option value="installment" {{ $feeStructure->payment_mode == 'installment' ? 'selected' : '' }}>{{ __('finance.installment') }}</option>
+                                        </select>
+                                    </div>
+
+                                    {{-- NEW: Installment Order --}}
+                                    <div class="mb-3 col-md-4 {{ $feeStructure->payment_mode == 'installment' ? '' : 'd-none' }}" id="installmentOrderDiv">
+                                        <label class="form-label">Installment Order</label>
+                                        <input type="number" name="installment_order" value="{{ $feeStructure->installment_order }}" class="form-control" placeholder="1, 2, 3..." min="1">
+                                    </div>
                                 </div>
                                 <button type="submit" class="btn btn-primary mt-3">{{ __('finance.save') ?? 'Update' }}</button>
                             </div>
@@ -84,6 +95,20 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function(){
+        
+        if(jQuery().selectpicker) {
+            $('.default-select').selectpicker('refresh');
+        }
+
+        // Toggle Installment Order
+        $('#paymentMode').change(function() {
+            if($(this).val() === 'installment') {
+                $('#installmentOrderDiv').removeClass('d-none');
+            } else {
+                $('#installmentOrderDiv').addClass('d-none');
+            }
+        });
+
         $('#feeForm').submit(function(e){
             e.preventDefault();
             $.ajax({

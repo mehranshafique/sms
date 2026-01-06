@@ -55,6 +55,7 @@ use App\Http\Controllers\Finance\FeeStructureController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\FinancialReportController;
+use App\Http\Controllers\Finance\StudentFinanceController; // Add import
 use App\Http\Controllers\SalaryStructureController; // Add this import
 
 // --- Middleware ---
@@ -269,6 +270,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::prefix('finance')->group(function () {
         
+         // NEW: Student Finance Dashboard (Tabbed View)
+        Route::get('student/{student}/dashboard', [StudentFinanceController::class, 'index'])
+            ->name('finance.student.dashboard');
+        
+        // Invoices - AJAX Routes (Must be before resource route to avoid collision with {invoice})
+        Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
+        Route::get('invoices/get-students', [InvoiceController::class, 'getStudents'])->name('invoices.get_students'); // Added this
+        // Invoices - AJAX Routes (Must be before resource route to avoid collision with {invoice})
+        Route::get('invoices/get-fees', [InvoiceController::class, 'getFees'])->name('invoices.get_fees'); // Added this
+        Route::get('invoices/check-duplicates', [InvoiceController::class, 'checkDuplicates'])->name('invoices.check_duplicates'); // Added this    
         // Fee Settings
         Route::middleware([CheckModuleAccess::class . ':fee_types'])->group(function () {
             Route::resource('fee-types', FeeTypeController::class);
