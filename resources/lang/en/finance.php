@@ -40,6 +40,8 @@ return [
     'success_update' => 'Fee structure updated successfully.',
     'success_delete' => 'Fee structure deleted successfully.',
     'no_active_session' => 'No active academic session found.',
+    'global_fee_missing_error' => 'A Global Annual Fee must be created for this grade before adding installments.',
+    'installment_cap_error' => 'Total installments (:total) cannot exceed the Global Annual Fee (:limit).',
     
     // Buttons
     'save' => 'Save',
@@ -74,8 +76,8 @@ return [
     'fee_management' => 'Fee Management',
     'global_overview' => 'Global Overview',
     'annual_fee_contract' => 'Annual Fee (Contract)',
-    'annual_fee_gross' => 'Annual Fee (Gross)', // New Key
-    'discount_applied' => 'Discount Applied',   // New Key
+    'annual_fee_gross' => 'Annual Fee (Gross)',
+    'discount_applied' => 'Discount Applied',
     'total_paid_global' => 'Total Paid (Global)',
     'total_remaining_year' => 'Total Remaining (Year)',
     'installment_label' => 'Installment',
@@ -100,4 +102,5 @@ return [
     'method' => 'Method',
     'recorded_by' => 'Recorded By',
     'no_payments_found' => 'No payments recorded yet.',
+    'fixed' => 'Fixed',
 ];
