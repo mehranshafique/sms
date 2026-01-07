@@ -48,6 +48,8 @@ return [
     'cancel' => 'Cancel',
     'action' => 'Action',
     'edit_fee' => 'Edit Fee',
+    'view_details' => 'View Details',
+    'close' => 'Close',
     
     // Class Financial Report
     'class_financial_report' => 'Class Financial Report',
@@ -103,4 +105,20 @@ return [
     'recorded_by' => 'Recorded By',
     'no_payments_found' => 'No payments recorded yet.',
     'fixed' => 'Fixed',
+
+    // New Balance Overview Keys
+    'student_balances' => 'Student Balances',
+    'balance_overview' => 'Balance Overview',
+    'class_wise_breakdown' => 'Class-wise financial breakdown',
+    'all_classes' => 'All Classes',
+    'class_name' => 'Class Name',
+    'students_count' => 'Students',
+    'total_invoiced' => 'Total Invoiced',
+    'total_collected' => 'Collected',
+    'total_outstanding' => 'Outstanding',
+    'class_details' => 'Class Details',
+    'loading_details' => 'Loading details...',
+    'no_fee_structures_class' => 'No fee structures or installments defined for this class yet.',
+    'view_dashboard' => 'View Dashboard',
+    'error_loading' => 'Error loading data. Please try again.',
 ];

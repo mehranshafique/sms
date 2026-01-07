@@ -37,6 +37,11 @@ return [
     'billing_requests' => 'Billing Requests',
     'status_billing' => 'Status Billing',
     'financial_reports' => 'Class Report',
+    'student_balances' => 'Student Balances', 
+    'budgets' => 'Budgets', // Added
+    'budget_allocation' => 'Budget Allocation', // Added
+    'fund_requests' => 'Fund Requests', // Added
+    'budget_categories' => 'Budget Categories', // Added
     
     // NEW ADDITIONS
     'communication' => 'Communication',
@@ -130,7 +135,6 @@ return [
     'subscriptions' => [
         'title' => 'Subscriptions'
     ],
-    'results' => 'Results',
     // New Payroll Keys
     'salary_structures' => 'Salary Structure',
     'generate_payroll' => 'Generate Payroll',

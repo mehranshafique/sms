@@ -182,14 +182,36 @@ class InvoiceController extends BaseController
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         if (!$session) return response()->json(['has_duplicates' => false]);
 
+        // Check specifically for fee structures already invoiced to selected students in the current session
         $count = InvoiceItem::whereIn('fee_structure_id', $feeIds)
             ->whereHas('invoice', fn($q) => $q->whereIn('student_id', $studentIds)->where('academic_session_id', $session->id))
             ->distinct('invoice_id')->count();
 
+        // Calculate total students selected
+        $totalSelected = count($studentIds);
+        
+        // Calculate new students who will actually get an invoice (Total - Duplicates roughly, logic improved below)
+        // Actually, let's just return the info. The JS will decide whether to prompt.
+        
+        $message = "";
+        if ($count > 0) {
+            // Find how many students already have invoices vs how many don't
+            // This is an approximation for the warning message
+            $studentsWithInvoice = Invoice::whereIn('student_id', $studentIds)
+                ->where('academic_session_id', $session->id)
+                ->whereHas('items', fn($q) => $q->whereIn('fee_structure_id', $feeIds))
+                ->distinct('student_id')
+                ->count();
+            
+            $studentsWithoutInvoice = $totalSelected - $studentsWithInvoice;
+            
+            $message = "Warning: {$studentsWithInvoice} student(s) already have invoices for these fees. Only {$studentsWithoutInvoice} new invoice(s) will be generated for missing students.";
+        }
+
         return response()->json([
             'has_duplicates' => $count > 0,
             'count' => $count,
-            'message' => $count > 0 ? __('invoice.duplicate_warning', ['count' => $count]) : ""
+            'message' => $message
         ]);
     }
 
@@ -219,9 +241,15 @@ class InvoiceController extends BaseController
 
         $fees = FeeStructure::whereIn('id', $request->fee_structure_ids)->with('feeType')->get();
         $totalFeeAmount = $fees->sum('amount');
+        
+        // --- 1. Mode Determination ---
+        // If ANY selected fee is 'one_time', we bypass the strict mode check.
+        $isOneTimeInvoice = $fees->contains('frequency', 'one_time');
+        
+        // If NOT one-time, we respect the payment mode of the first fee (global vs installment)
         $targetMode = $fees->first()->payment_mode; 
 
-        // Strict Fee Cap Validation
+        // --- 2. Fee Cap Check Setup ---
         $classSection = ClassSection::find($request->class_section_id);
         $globalFeeStructure = FeeStructure::where('institution_id', $institutionId)
             ->where('academic_session_id', $session->id)
@@ -231,55 +259,65 @@ class InvoiceController extends BaseController
                   ->orWhere('grade_level_id', $classSection->grade_level_id);
             })
             ->whereHas('feeType', function($q) {
-                $q->where('name', 'like', '%Tuition%'); 
+                $q->where('name', 'like', '%Tuition%'); // Only track Tuition against cap
             })
             ->first();
 
         $annualCap = $globalFeeStructure ? $globalFeeStructure->amount : 0;
 
+        // --- 3. Filter Students ---
         $studentsQuery = StudentEnrollment::where('class_section_id', $request->class_section_id)
             ->where('academic_session_id', $session->id)
             ->whereIn('student_id', $request->student_ids)
             ->where('status', 'active')
             ->with('student');
 
-        $students = $studentsQuery->get()->filter(function($enrollment) use ($targetMode) {
-            $studentMode = $enrollment->student->payment_mode ?? 'installment';
-            return $studentMode === $targetMode;
-        });
+        $students = $studentsQuery->get();
+
+        // Strict Mode Check (Skipped if One-Time fee)
+        if (!$isOneTimeInvoice) {
+            $students = $students->filter(function($enrollment) use ($targetMode) {
+                $studentMode = $enrollment->student->payment_mode ?? 'installment';
+                return $studentMode === $targetMode;
+            });
+        }
 
         if($students->isEmpty()) {
+            $modeMsg = $isOneTimeInvoice ? 'active' : ucfirst($targetMode);
             return response()->json([
-                'message' => __('invoice.no_students_found_for_mode', ['mode' => ucfirst($targetMode)])
+                'message' => __('invoice.no_students_found_for_mode', ['mode' => $modeMsg])
             ], 422);
         }
 
         $generatedCount = 0;
         $skippedCount = 0;
 
-        DB::transaction(function () use ($students, $fees, $totalFeeAmount, $request, $institutionId, $session, &$generatedCount, &$skippedCount, $targetMode, $annualCap) {
+        DB::transaction(function () use ($students, $fees, $totalFeeAmount, $request, $institutionId, $session, &$generatedCount, &$skippedCount, $targetMode, $annualCap, $isOneTimeInvoice) {
             foreach ($students as $enrollment) {
                 $studentId = $enrollment->student_id;
                 
-                // 1. Conflict Check
-                $hasGlobal = Invoice::where('student_id', $studentId)
-                    ->where('academic_session_id', $session->id)
-                    ->whereHas('items.feeStructure', fn($q) => $q->where('payment_mode', 'global'))
-                    ->exists();
+                // A. Conflict Check (Only for non-one-time invoices)
+                if (!$isOneTimeInvoice) {
+                    $hasGlobal = Invoice::where('student_id', $studentId)
+                        ->where('academic_session_id', $session->id)
+                        ->whereHas('items.feeStructure', fn($q) => $q->where('payment_mode', 'global')->where('frequency', '!=', 'one_time'))
+                        ->exists();
 
-                $hasInstallment = Invoice::where('student_id', $studentId)
-                    ->where('academic_session_id', $session->id)
-                    ->whereHas('items.feeStructure', fn($q) => $q->where('payment_mode', 'installment'))
-                    ->exists();
+                    $hasInstallment = Invoice::where('student_id', $studentId)
+                        ->where('academic_session_id', $session->id)
+                        ->whereHas('items.feeStructure', fn($q) => $q->where('payment_mode', 'installment'))
+                        ->exists();
 
-                if ($targetMode === 'installment' && $hasGlobal) { $skippedCount++; continue; }
-                if ($targetMode === 'global' && ($hasGlobal || $hasInstallment)) { $skippedCount++; continue; }
+                    if ($targetMode === 'installment' && $hasGlobal) { $skippedCount++; continue; }
+                    if ($targetMode === 'global' && ($hasGlobal || $hasInstallment)) { $skippedCount++; continue; }
+                }
 
-                // 2. Calculate Discount (Updated with Language Keys)
+                // B. Calculate Discount
+                // FIX: Only apply discount to standard (Global/Installment) invoices, NOT one-time extras.
                 $discountValue = 0;
                 $discountDescription = null;
 
-                if ($enrollment->discount_amount > 0) {
+                if (!$isOneTimeInvoice && $enrollment->discount_amount > 0) {
                     if ($enrollment->discount_type === 'percentage') {
                         $discountValue = ($totalFeeAmount * $enrollment->discount_amount) / 100;
                         $discountDescription = __('invoice.discount_scholarship') . " ({$enrollment->discount_amount}%)";
@@ -294,25 +332,30 @@ class InvoiceController extends BaseController
 
                 $finalAmount = max(0, $totalFeeAmount - $discountValue);
 
-                // 3. Fee Cap Check
+                // C. Fee Cap Check
+                // Applies only if this invoice contains "Tuition" related fees
                 if ($annualCap > 0) {
-                    $existingTuitionTotal = Invoice::where('student_id', $studentId)
-                        ->where('academic_session_id', $session->id)
-                        ->with(['items.feeStructure.feeType'])
-                        ->get()
-                        ->flatMap(fn($inv) => $inv->items)
-                        ->filter(fn($item) => $item->feeStructure && $item->feeStructure->feeType && stripos($item->feeStructure->feeType->name, 'Tuition') !== false)
-                        ->sum('amount');
-
                     $isTuitionInvoice = $fees->contains(fn($fee) => $fee->feeType && stripos($fee->feeType->name, 'Tuition') !== false);
 
-                    // Logic: Does (Existing + New Net Total) exceed cap?
-                    if ($isTuitionInvoice && ($existingTuitionTotal + $finalAmount) > ($annualCap + 0.01)) {
-                        $skippedCount++; continue;
+                    if ($isTuitionInvoice) {
+                        $existingTuitionTotal = Invoice::where('student_id', $studentId)
+                            ->where('academic_session_id', $session->id)
+                            ->with(['items.feeStructure.feeType'])
+                            ->get()
+                            ->flatMap(fn($inv) => $inv->items)
+                            ->filter(fn($item) => $item->feeStructure && $item->feeStructure->feeType && stripos($item->feeStructure->feeType->name, 'Tuition') !== false)
+                            ->sum('amount'); // Sum of previous invoices (gross or net depends on policy, usually gross for caps)
+
+                        // Check if adding this invoice exceeds cap
+                        // Note: We check against the GROSS fee ($totalFeeAmount), not net, because caps usually apply to sticker price.
+                        // Discounts reduce what they pay, but the cap is on the 'price'.
+                        if (($existingTuitionTotal + $totalFeeAmount) > ($annualCap + 0.01)) {
+                            $skippedCount++; continue;
+                        }
                     }
                 }
 
-                // 4. Duplicate Item Check
+                // D. Duplicate Item Check
                 $feesToProcess = $fees;
                 $alreadyInvoicedFees = InvoiceItem::whereHas('invoice', fn($q) => $q->where('student_id', $studentId)->where('academic_session_id', $session->id))
                     ->whereIn('fee_structure_id', $fees->pluck('id'))
@@ -323,6 +366,7 @@ class InvoiceController extends BaseController
                     if ($feesToProcess->isEmpty()) { $skippedCount++; continue; }
                 }
 
+                // E. Create Invoice
                 $invoice = Invoice::create([
                     'institution_id' => $institutionId,
                     'academic_session_id' => $session->id,
@@ -343,7 +387,7 @@ class InvoiceController extends BaseController
                     ]);
                 }
 
-                // Add Negative Line Item for Discount
+                // F. Add Negative Line Item for Discount
                 if ($discountValue > 0) {
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,

@@ -151,14 +151,14 @@
                 @endif
 
                 {{-- NEW: RESULT CARD MODULE --}}
-                @if($hasModule('results') || $hasModule('exams')) 
+                @if($hasModule('results') || $hasModule('examinations')) 
                     @if(auth()->user()->can('view result_card') || auth()->user()->hasRole(['Super Admin', 'Head Officer', 'Teacher', 'Student']))
                     <li><a class="ai-icon" href="{{ route('results.index') }}"><i class="la la-certificate"></i><span class="nav-text">{{ __('sidebar.results') }}</span></a></li>
                     @endif
                 @endif
 
                 {{-- NEW: ACADEMIC REPORTS (Bulletins/Transcripts) --}}
-                @if($hasModule('exams')) 
+                @if($hasModule('examinations')) 
                     <li><a class="ai-icon" href="{{ route('reports.index') }}"><i class="la la-file-pdf-o"></i><span class="nav-text">{{ __('sidebar.academic_reports') }}</span></a></li>
                 @endif
 
@@ -225,40 +225,64 @@
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
                 
                 {{-- Consolidated Finance Check --}}
-                @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices') || $hasModule('payrolls'))
-                    @can('fee_structure.view')
+                @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices') || $hasModule('payrolls') || $hasModule('budgets'))
+                    {{-- Removed restrictive @can('fee_structure.view') wrapper --}}
                     <li>
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
                             <i class="la la-money"></i><span class="nav-text">{{ __('sidebar.finance') }}</span>
                         </a>
                         <ul aria-expanded="false">
                             @if($hasModule('fee_types'))
+                                @can('fee_type.view')
                                 <li><a href="{{ route('fee-types.index') }}">{{ __('sidebar.fee_types.title') }}</a></li>
+                                @endcan
                             @endif
                             @if($hasModule('fee_structures'))
+                                @can('fee_structure.view')
                                 <li><a href="{{ route('fees.index') }}">{{ __('sidebar.fee_structures.title') }}</a></li>
+                                @endcan
                             @endif
                             @if($hasModule('invoices'))
+                                @can('invoice.create')
                                 <li><a href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
+                                @endcan
+                                @can('invoice.view')
                                 <li><a href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
+                                <li><a href="{{ route('finance.balances.index') }}">{{ __('sidebar.student_balances') }}</a></li>
+                                @endcan
                             @endif
                             
+                            {{-- Financial Reports - Assuming Open to those who can view invoices or finance --}}
+                            @can('invoice.view')
                             <li><a href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
+                            @endcan
 
                             {{-- NEW PAYROLL MODULES --}}
                             @if($hasModule('payrolls'))
+                                @can('payroll.view')
                                 <li><a href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
                                 <li><a href="{{ route('payroll.index') }}">{{ __('sidebar.generate_payroll') }}</a></li>
+                                @endcan
+                            @endif
+
+                            {{-- NEW BUDGET MODULES --}}
+                            @if($hasModule('budgets'))
+                                @can('budget.view')
+                                <li><a href="{{ route('budgets.categories') }}">{{ __('sidebar.budget_categories') }}</a></li>
+                                <li><a href="{{ route('budgets.index') }}">{{ __('sidebar.budget_allocation') }}</a></li>
+                                <li><a href="{{ route('budgets.requests') }}">{{ __('sidebar.fund_requests') }}</a></li>
+                                @endcan
                             @endif
                         </ul>
                     </li>
-                    @can('institution.view') {{-- Assuming Head Officer has this --}}
+                    
+                    {{-- BILLING (For Head Officer View) --}}
+                    @can('institution.view')
                     <li>
                         <a href="{{ route('subscriptions.invoices') }}" class="ai-icon" aria-expanded="false">
                             <i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.billing') }}</span>
                         </a>
                     </li>
-                    @endcan
                     @endcan
                 @endif
 

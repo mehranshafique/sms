@@ -57,7 +57,7 @@ use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\FinancialReportController;
 use App\Http\Controllers\Finance\StudentFinanceController; // Add import
 use App\Http\Controllers\SalaryStructureController; // Add this import
-
+use App\Http\Controllers\Finance\BudgetController; 
 // --- Middleware ---
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -273,6 +273,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
          // NEW: Student Finance Dashboard (Tabbed View)
         Route::get('student/{student}/dashboard', [StudentFinanceController::class, 'index'])
             ->name('finance.student.dashboard');
+        
+            // NEW: Student Balances Overview
+        Route::get('balances', [App\Http\Controllers\Finance\StudentBalanceController::class, 'index'])->name('finance.balances.index');
+        Route::get('balances/class/{id}', [App\Http\Controllers\Finance\StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); // Added this
+
+
+        // BUDGET MODULE
+        // Categories
+        Route::get('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'categories'])->name('budgets.categories');
+        Route::post('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
+        
+        // Allocations & Index
+        Route::get('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'index'])->name('budgets.index');
+        Route::post('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'store'])->name('budgets.store');
+        
+        // Requests
+        Route::get('budgets/requests', [App\Http\Controllers\Finance\BudgetController::class, 'fundRequests'])->name('budgets.requests');
+        Route::post('budgets/requests/store', [App\Http\Controllers\Finance\BudgetController::class, 'storeFundRequest'])->name('budgets.requests.store');
+        
+        // Approvals (Using 'update' naming convention for clarity, maps to approveFundRequest)
+        Route::post('budgets/requests/{id}/update', [App\Http\Controllers\Finance\BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
+
         
         // Invoices - AJAX Routes (Must be before resource route to avoid collision with {invoice})
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');

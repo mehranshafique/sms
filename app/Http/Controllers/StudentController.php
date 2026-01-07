@@ -125,7 +125,8 @@ class StudentController extends BaseController
         
         $sections = $sectionsQuery->get()->mapWithKeys(function($item) {
              $gradeName = $item->gradeLevel->name ?? '';
-             return [$item->id => $item->name . ($gradeName ? ' (' . $gradeName . ')' : '')];
+             // Format: Grade + Section Name (e.g., "1er A")
+             return [$item->id => ($gradeName ? $gradeName . ' ' : '') . $item->name];
         });
         
         return response()->json($sections);

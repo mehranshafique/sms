@@ -31,7 +31,11 @@ class FinancialReportController extends BaseController
             ->with('gradeLevel')
             ->get()
             ->mapWithKeys(function ($item) {
-                return [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')'];
+                // Fixed: Format as "Grade Section" (e.g. "1er A")
+                $gradeName = $item->gradeLevel->name ?? '';
+                $name = ($gradeName ? $gradeName . ' ' : '') . $item->name;
+                
+                return [$item->id => $name];
             });
 
         $reportData = [];
