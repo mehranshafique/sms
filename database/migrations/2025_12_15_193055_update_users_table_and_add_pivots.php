@@ -29,10 +29,10 @@ return new class extends Migration
             if (!Schema::hasColumn('users', 'language')) {
                 $table->string('language', 10)->default('en')->after('is_active');
             }
-            // Direct link for simple users (Staff/Student) if needed, usually managed via profile tables
-            // but can be kept nullable here for quick lookups.
+            // Direct link for simple users (Staff/Student) if needed
             if (!Schema::hasColumn('users', 'institute_id')) {
-                 $table->foreignId('institute_id')->nullable()->constrained('institutions')->onDelete('set null')->after('id');
+                 $table->unsignedBigInteger('institute_id')->nullable()->after('id');
+                 $table->foreign('institute_id')->references('id')->on('institutions')->onDelete('set null');
             }
         });
 
@@ -60,8 +60,25 @@ return new class extends Migration
         Schema::dropIfExists('institution_head_officers');
         
         Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['institute_id']);
-            $table->dropColumn(['institute_id', 'phone', 'address', 'user_type', 'is_active', 'language']);
+            // Check if column exists before attempting to drop it or its foreign key
+            if (Schema::hasColumn('users', 'institute_id')) {
+                // Safely attempt to drop foreign key
+                try {
+                    $table->dropForeign(['institute_id']);
+                } catch (\Exception $e) {
+                    // Key might have been created with a different name or already dropped
+                }
+                
+                $table->dropColumn('institute_id');
+            }
+
+            // Clean up remaining columns if they exist
+            $columnsToDrop = ['phone', 'address', 'user_type', 'is_active', 'language'];
+            foreach ($columnsToDrop as $column) {
+                if (Schema::hasColumn('users', $column)) {
+                    $table->dropColumn($column);
+                }
+            }
         });
     }
 };

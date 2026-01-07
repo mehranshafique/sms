@@ -45,8 +45,13 @@ return new class extends Migration
                     $table->dropUnique(['name', 'guard_name', 'institution_id']);
                 } catch (\Exception $e) {}
 
-                // 2. Drop the foreign key constraint
-                $table->dropForeign(['institution_id']);
+                // 2. Drop the foreign key constraint safely
+                // Wrapping in try-catch to prevent "Can't DROP FOREIGN KEY" failure
+                try {
+                    $table->dropForeign(['institution_id']);
+                } catch (\Exception $e) {
+                    // Key might have been created with a different name or already dropped
+                }
                 
                 // 3. Drop the column
                 $table->dropColumn('institution_id');
