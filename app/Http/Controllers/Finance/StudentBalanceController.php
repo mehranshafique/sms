@@ -17,7 +17,8 @@ class StudentBalanceController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
-        $this->setPageTitle('Financial Overview');
+        // Permission check can be added here if needed, e.g., view_financial_reports
+        $this->setPageTitle(__('finance.balance_overview')); 
     }
 
     /**
@@ -36,17 +37,15 @@ class StudentBalanceController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('class_name', function($row){
-                    return $row->name . ' (' . ($row->gradeLevel->name ?? '-') . ')';
+                    // Format: Grade + Section (e.g. 1er A)
+                    $grade = $row->gradeLevel->name ?? '';
+                    return ($grade ? $grade . ' ' : '') . $row->name;
                 })
                 ->addColumn('students_count', function($row){
                     // Count active enrollments
                     return $row->enrollments()->where('status', 'active')->count();
                 })
                 ->addColumn('total_invoiced', function($row){
-                    // Sum invoices for students currently in this class
-                    // Note: Ideally, invoices should be linked to class_id, but usually linked to student.
-                    // We sum invoices generated for students while they are in this class (snapshot approximation)
-                    // Precise way: Invoice has `academic_session_id`. We filter by current session.
                     return CurrencySymbol::default() . ' ' . number_format($this->getClassFinancials($row->id, 'total'), 2);
                 })
                 ->addColumn('total_collected', function($row){
@@ -57,9 +56,9 @@ class StudentBalanceController extends BaseController
                     return '<span class="text-danger fw-bold">' . CurrencySymbol::default() . ' ' . number_format($due, 2) . '</span>';
                 })
                 ->addColumn('action', function($row){
-                    // The button that triggers the bottom view
+                    // Localized button
                     return '<button type="button" class="btn btn-primary btn-sm shadow btn-rounded view-class-btn" data-id="'.$row->id.'" data-name="'.$row->name.'">
-                                <i class="fa fa-eye me-1"></i> View Details
+                                <i class="fa fa-eye me-1"></i> ' . __('finance.view_details') . '
                             </button>';
                 })
                 ->rawColumns(['total_collected', 'balance', 'action'])
@@ -77,8 +76,13 @@ class StudentBalanceController extends BaseController
         $institutionId = $this->getInstitutionId();
         $classSection = ClassSection::findOrFail($id);
         
+        // --- SECURITY CHECK ---
+        // Prevent accessing class details from another institution context
+        if ($institutionId && $classSection->institution_id != $institutionId) {
+            abort(403, __('finance.unauthorized_access'));
+        }
+
         // 1. Identify Installments / Fee Groups
-        // We look at fee structures assigned to this Grade/Class to determine tabs
         $feeStructures = FeeStructure::where('institution_id', $institutionId)
             ->where(function($q) use ($classSection) {
                 $q->where('grade_level_id', $classSection->grade_level_id)
@@ -91,7 +95,7 @@ class StudentBalanceController extends BaseController
         
         // A. Global Tab
         if ($feeStructures->where('payment_mode', 'global')->isNotEmpty()) {
-            $tabs[] = ['id' => 'global', 'label' => 'Annual / Global Fees'];
+            $tabs[] = ['id' => 'global', 'label' => __('finance.annual_fee')];
         }
 
         // B. Installment Tabs
@@ -100,9 +104,10 @@ class StudentBalanceController extends BaseController
             ->sortKeys();
 
         foreach ($installments as $order => $fees) {
-            $label = $fees->first()->name; // Use first fee name or "Installment X"
-            // If multiple fees have same order, maybe just "Installment X"
-            if ($fees->count() > 1) $label = "Installment $order";
+            $label = $fees->first()->name; 
+            if ($fees->count() > 1) {
+                $label = __('finance.installment_label') . " $order";
+            }
             
             $tabs[] = ['id' => 'inst_'.$order, 'label' => $label, 'order' => $order];
         }
@@ -118,7 +123,7 @@ class StudentBalanceController extends BaseController
                     'name' => $enrollment->student->full_name,
                     'photo' => $enrollment->student->student_photo,
                     'admission_no' => $enrollment->student->admission_number,
-                    'invoices' => $enrollment->student->invoices // Eager loaded
+                    'invoices' => $enrollment->student->invoices 
                 ];
             });
 
@@ -131,10 +136,10 @@ class StudentBalanceController extends BaseController
             ];
 
             foreach ($tabs as $tab) {
-                $status = 'N/A'; // Not Invoiced
+                $status = 'N/A';
                 $style = 'secondary';
+                $label = 'N/A'; // Default localized label if needed
                 
-                // Logic: Find an invoice for this student that matches the Tab's Fee Structure
                 $matchingInvoice = null;
 
                 if ($tab['id'] === 'global') {
@@ -144,7 +149,6 @@ class StudentBalanceController extends BaseController
                         });
                     });
                 } else {
-                    // Installment Tab
                     $order = $tab['order'];
                     $matchingInvoice = $student['invoices']->first(function($inv) use ($order) {
                         return $inv->items->contains(function($item) use ($order) {
@@ -154,14 +158,27 @@ class StudentBalanceController extends BaseController
                 }
 
                 if ($matchingInvoice) {
-                    $status = ucfirst($matchingInvoice->status); // paid, partial, unpaid
-                    if ($status === 'Paid') $style = 'success';
-                    elseif ($status === 'Partial') $style = 'warning';
-                    elseif ($status === 'Unpaid') $style = 'danger';
-                    elseif ($status === 'Overdue') $style = 'dark';
+                    $rawStatus = ucfirst($matchingInvoice->status); 
+                    
+                    // Localize Status
+                    if ($rawStatus === 'Paid') {
+                        $style = 'success';
+                        $label = __('finance.paid');
+                    } elseif ($rawStatus === 'Partial') {
+                        $style = 'warning';
+                        $label = __('finance.status_partial') ?? 'Partial';
+                    } elseif ($rawStatus === 'Unpaid') {
+                        $style = 'danger';
+                        $label = __('finance.status_unpaid') ?? 'Unpaid';
+                    } elseif ($rawStatus === 'Overdue') {
+                        $style = 'dark';
+                        $label = __('finance.status_overdue') ?? 'Overdue';
+                    } else {
+                        $label = $rawStatus;
+                    }
                 }
 
-                $row['statuses'][$tab['id']] = ['label' => $status, 'style' => $style];
+                $row['statuses'][$tab['id']] = ['label' => $label, 'style' => $style];
             }
             $studentRows[] = $row;
         }
@@ -175,8 +192,6 @@ class StudentBalanceController extends BaseController
     // --- Helper ---
     private function getClassFinancials($classId, $type)
     {
-        // Simplified Logic: Sum invoices for students currently in this class
-        // For production, ensure invoices belong to the correct academic session
         $studentIds = StudentEnrollment::where('class_section_id', $classId)
             ->where('status', 'active')
             ->pluck('student_id');

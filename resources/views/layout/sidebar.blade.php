@@ -5,11 +5,46 @@
             @php
                 $user = auth()->user();
                 $isSuperAdmin = $user->hasRole('Super Admin');
-                $modules = $enabledModules ?? []; // Shared via Middleware
                 
-                // Helper to check if a specific module is enabled
+                // --- FIX: Ensure $enabledModules is populated ---
+                if (!isset($enabledModules)) {
+                    $enabledModules = [];
+                    $institutionId = session('active_institution_id') ?: $user->institute_id;
+                    
+                    if ($institutionId && $institutionId !== 'global') {
+                        // 1. Check Settings
+                        $setting = \App\Models\InstitutionSetting::where('institution_id', $institutionId)
+                            ->where('key', 'enabled_modules')
+                            ->first();
+                        
+                        if ($setting && $setting->value) {
+                            $enabledModules = is_array($setting->value) ? $setting->value : json_decode($setting->value, true);
+                        } else {
+                            // 2. Fallback to Active Subscription
+                            $sub = \App\Models\Subscription::with('package')
+                                ->where('institution_id', $institutionId)
+                                ->where('status', 'active')
+                                ->where('end_date', '>=', now()->startOfDay())
+                                ->latest('created_at')
+                                ->first();
+                                
+                            if ($sub && $sub->package) {
+                                $enabledModules = $sub->package->modules ?? [];
+                            }
+                        }
+                    }
+                }
+                
+                $modules = $enabledModules ?? [];
+
+                // Helper to check if a specific module is enabled (Case Insensitive)
                 $hasModule = function($slug) use ($modules, $isSuperAdmin) {
-                    return $isSuperAdmin || in_array($slug, $modules);
+                    if ($isSuperAdmin) return true;
+                    
+                    $slug = strtolower(trim($slug));
+                    $cleanModules = array_map(fn($m) => strtolower(trim($m)), $modules);
+                    
+                    return in_array($slug, $cleanModules);
                 };
             @endphp
 
@@ -226,7 +261,6 @@
                 
                 {{-- Consolidated Finance Check --}}
                 @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices') || $hasModule('payrolls') || $hasModule('budgets'))
-                    {{-- Removed restrictive @can('fee_structure.view') wrapper --}}
                     <li>
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
                             <i class="la la-money"></i><span class="nav-text">{{ __('sidebar.finance') }}</span>
@@ -252,7 +286,7 @@
                                 @endcan
                             @endif
                             
-                            {{-- Financial Reports - Assuming Open to those who can view invoices or finance --}}
+                            {{-- Financial Reports --}}
                             @can('invoice.view')
                             <li><a href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
                             @endcan

@@ -18,6 +18,8 @@ class PayrollController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
+        // FIX: Secure the controller
+        $this->authorizeResource(Payroll::class, 'payroll');
         $this->setPageTitle('Payroll Management');
     }
 
@@ -38,6 +40,9 @@ class PayrollController extends BaseController
      */
     public function generate(Request $request)
     {
+        // FIX: Explicitly check for create/generate permission
+        $this->authorize('create', Payroll::class);
+
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2020|max:'.(date('Y')+1),

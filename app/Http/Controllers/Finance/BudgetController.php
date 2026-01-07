@@ -17,12 +17,17 @@ class BudgetController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
+        // FIX: Authorize Resource to protect methods
+        $this->authorizeResource(Budget::class, 'budget');
         $this->setPageTitle(__('budget.page_title'));
     }
 
     // --- BUDGET CATEGORIES ---
     public function categories(Request $request)
     {
+        // FIX: Ensure user has permission to view categories
+        $this->authorize('viewAny', Budget::class);
+
         $institutionId = $this->getInstitutionId();
         
         if ($request->ajax()) {
@@ -41,6 +46,9 @@ class BudgetController extends BaseController
 
     public function storeCategory(Request $request)
     {
+        // FIX: Check Create Permission
+        $this->authorize('create', Budget::class);
+
         $request->validate(['name' => 'required|string|max:255']);
         BudgetCategory::create([
             'institution_id' => $this->getInstitutionId(),
@@ -106,6 +114,10 @@ class BudgetController extends BaseController
     // --- FUND REQUESTS ---
     public function storeFundRequest(Request $request)
     {
+        // Any authenticated user with access to the budget module can likely request funds
+        // But let's check general create permissions
+        $this->authorize('create', Budget::class);
+
         $request->validate([
             'budget_id' => 'required|exists:budgets,id',
             'amount' => 'required|numeric|min:1',
@@ -135,6 +147,7 @@ class BudgetController extends BaseController
 
     public function fundRequests(Request $request)
     {
+        $this->authorize('viewAny', Budget::class);
         $institutionId = $this->getInstitutionId();
         
         if ($request->ajax()) {
@@ -146,7 +159,6 @@ class BudgetController extends BaseController
                 ->editColumn('status', function($row){
                     $badges = ['pending'=>'warning', 'approved'=>'success', 'rejected'=>'danger'];
                     $statusKey = 'budget.' . $row->status;
-                    // Fallback to ucfirst if key doesn't exist, but we have keys
                     return '<span class="badge badge-'.$badges[$row->status].'">'.__($statusKey).'</span>';
                 })
                 ->addColumn('requester_name', function($row){
