@@ -4,6 +4,14 @@
         @method('PUT')
     @endif
 
+    {{-- Read Only Indicator --}}
+    @if(isset($isReadOnly) && $isReadOnly)
+        <div class="alert alert-info solid alert-dismissible fade show">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="me-2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <strong>{{ __('roles.read_only_mode') ?? 'Read Only Mode' }}:</strong> {{ __('roles.cannot_edit_own_role_permissions') ?? 'This is your active role. You cannot edit permissions assigned to yourself.' }}
+        </div>
+    @endif
+
     <div class="row">
         <!-- Role Name Input -->
         <div class="col-xl-12">
@@ -15,7 +23,12 @@
                     <div class="basic-form">
                         <div class="mb-3">
                             <label class="form-label">{{ __('roles.role_name') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="name" value="{{ old('name', $role->name ?? '') }}" class="form-control" placeholder="{{ __('roles.enter_role_name') }}" required {{ (isset($role) && $role->name === 'Super Admin') ? 'readonly' : '' }}>
+                            <input type="text" name="name" 
+                                   value="{{ old('name', $role->name ?? '') }}" 
+                                   class="form-control" 
+                                   placeholder="{{ __('roles.enter_role_name') }}" 
+                                   required 
+                                   {{ (isset($role) && $role->name === 'Super Admin') || (isset($isReadOnly) && $isReadOnly) ? 'disabled' : '' }}>
                         </div>
                     </div>
                 </div>
@@ -27,18 +40,21 @@
             <div class="card">
                 <div class="card-header border-0 pb-0 d-flex justify-content-between align-items-center">
                     <h4 class="card-title">{{ __('roles.assign_permissions') }}</h4>
+                    
+                    @if(!isset($isReadOnly) || !$isReadOnly)
                     <div class="form-check custom-checkbox">
                         <input type="checkbox" class="form-check-input" id="checkAllPermissions">
                         <label class="form-check-label fw-bold" for="checkAllPermissions">{{ __('roles.select_all') }}</label>
                     </div>
+                    @endif
                 </div>
                 <div class="card-body">
                     <div class="row">
                         @forelse($modules as $module)
                             @php
-                                $isDisabled = !$module->is_subscribed;
+                                $isDisabled = !$module->is_subscribed || (isset($isReadOnly) && $isReadOnly);
                                 $opacity = $isDisabled ? '0.6' : '1';
-                                $badge = $isDisabled ? '<span class="badge badge-xs badge-danger ms-2">Inactive</span>' : '';
+                                $badge = !$module->is_subscribed ? '<span class="badge badge-xs badge-danger ms-2">Inactive</span>' : '';
                             @endphp
                             <div class="col-md-6 col-lg-4 mb-4">
                                 <div class="border rounded h-100 shadow-sm" style="opacity: {{ $opacity }};">
@@ -48,6 +64,7 @@
                                             <h5 class="mb-0 text-primary fw-bold text-uppercase fs-14">{{ $module->name }}</h5>
                                             {!! $badge !!}
                                         </div>
+                                        @if(!isset($isReadOnly) || !$isReadOnly)
                                         <div class="form-check custom-checkbox">
                                             <input type="checkbox" 
                                                    class="form-check-input module-check" 
@@ -56,6 +73,7 @@
                                                    {{ $isDisabled ? 'disabled' : '' }}>
                                             <label class="form-check-label" for="mod_check_{{ $module->id }}"></label>
                                         </div>
+                                        @endif
                                     </div>
                                     
                                     {{-- Permission List --}}
@@ -84,11 +102,13 @@
                         @endforelse
                     </div>
                     
+                    @if(!isset($isReadOnly) || !$isReadOnly)
                     <div class="mt-4 text-end">
                         <button type="submit" class="btn btn-primary btn-lg shadow-sm px-5">
                             {{ isset($role) ? __('roles.update_role') : __('roles.save_role') }}
                         </button>
                     </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -97,11 +117,16 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        @if(!isset($isReadOnly) || !$isReadOnly)
         // 1. Global Select All
         document.getElementById('checkAllPermissions').addEventListener('change', function() {
             const isChecked = this.checked;
-            document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = isChecked);
-            document.querySelectorAll('.module-check').forEach(cb => cb.checked = isChecked);
+            document.querySelectorAll('.permission-checkbox').forEach(cb => {
+                if(!cb.disabled) cb.checked = isChecked;
+            });
+            document.querySelectorAll('.module-check').forEach(cb => {
+                if(!cb.disabled) cb.checked = isChecked;
+            });
         });
 
         // 2. Module Select All
@@ -109,7 +134,9 @@
             moduleCb.addEventListener('change', function() {
                 const moduleId = this.getAttribute('data-module-id');
                 const isChecked = this.checked;
-                document.querySelectorAll(`.module-${moduleId}`).forEach(permCb => permCb.checked = isChecked);
+                document.querySelectorAll(`.module-${moduleId}`).forEach(permCb => {
+                    if(!permCb.disabled) permCb.checked = isChecked;
+                });
             });
         });
 
@@ -134,5 +161,6 @@
                 }
             });
         });
+        @endif
     });
 </script>

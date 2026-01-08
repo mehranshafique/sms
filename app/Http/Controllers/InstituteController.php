@@ -108,11 +108,10 @@ class InstituteController extends BaseController
             'city'      => 'required|exists:cities,id',
             'address'   => 'nullable|string',
             'full_phone'=> 'required|string|max:30',
-            // Check unique in institutions AND users table
             'email'     => ['required', 'email', 'unique:institutions,email', 'unique:users,email'],
             'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            'password'  => 'required|string|min:6', // REQUIRED for creation
+            'password'  => 'required|string|min:6',
         ];
 
         $messages = [
@@ -127,10 +126,7 @@ class InstituteController extends BaseController
 
         $validated = $request->validate($rules, $messages);
 
-        // --- Capitalize Text Fields ---
         $textFields = ['name', 'acronym', 'address'];
-        
-        // Exclude 'password' so it isn't passed to Institution::fill()
         $data = $request->except(['logo', 'password', 'full_phone', 'commune']); 
         
         foreach ($textFields as $field) {
@@ -141,13 +137,8 @@ class InstituteController extends BaseController
 
         DB::transaction(function () use ($validated, $request, $data) {
             $institute = new Institution();
-            
-            // $data already excludes 'password', so this won't throw SQL error
             $institute->fill($data);
-            
-            // To be safe and maintain "meaningless" structure (1-5-001) as requested
             $institute->code = IdGeneratorService::generateInstitutionCode($request->state, $request->city);
-            
             $institute->phone = $request->full_phone;
 
             if ($request->hasFile('logo')) {
@@ -156,27 +147,21 @@ class InstituteController extends BaseController
 
             $institute->save();
 
-            // FIX: Re-assign the Audit Log context to the created Institution ID.
-            // The trait creates the log as "Global" because the admin's context is global during creation.
-            // We find the most recent log by this user and fix it.
+            // Fix Audit Log Context
             try {
                 \App\Models\AuditLog::where('user_id', Auth::id())
-                    ->where('created_at', '>=', now()->subSeconds(10)) // Just created
+                    ->where('created_at', '>=', now()->subSeconds(10))
                     ->where(function($q) {
-                        $q->where('event', 'Create') // Capitalized as per LogsActivity trait
-                          ->orWhere('event', 'created');
+                        $q->where('event', 'Create')->orWhere('event', 'created');
                     })
                     ->latest()
                     ->first()
                     ?->update(['institution_id' => $institute->id]);
-            } catch (\Exception $e) {
-                // Fail silently if audit log table structure differs or model missing
-            }
+            } catch (\Exception $e) {}
 
             $this->createInstituteRoles($institute);
 
             if($request->filled('email') && $request->filled('password')) {
-                // Use capitalized Name/Acronym for admin name
                 $adminName = __('institute.admin_default_name', ['name' => ($data['acronym'] ?? $data['name'])]);
                 
                 $adminUser = User::create([
@@ -184,16 +169,17 @@ class InstituteController extends BaseController
                     'email'         => $request->email,
                     'password'      => Hash::make($request->password),
                     'institute_id'  => $institute->id,
-                    'user_type'     => UserType::HEAD_OFFICER->value,
+                    'user_type'     => UserType::SCHOOL_ADMIN->value, // Changed from HEAD_OFFICER
                     'mobile_number' => $request->full_phone,
                 ]);
 
-                $headOfficerRole = Role::where('name', RoleEnum::HEAD_OFFICER->value)
-                                       ->where('institution_id', $institute->id)
-                                       ->first();
+                // Assign SCHOOL_ADMIN Role
+                $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
+                            ->where('institution_id', $institute->id)
+                            ->first();
 
-                if ($headOfficerRole) {
-                    $adminUser->assignRole($headOfficerRole);
+                if ($role) {
+                    $adminUser->assignRole($role);
                 }
 
                 $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
@@ -216,7 +202,7 @@ class InstituteController extends BaseController
     public function update(Request $request, Institution $institute)
     {
         $adminUser = User::where('institute_id', $institute->id)
-                         ->where('user_type', UserType::HEAD_OFFICER->value)
+                         ->whereIn('user_type', [UserType::SCHOOL_ADMIN->value, UserType::HEAD_OFFICER->value]) // Check both to support legacy
                          ->first();
         $adminUserId = $adminUser ? $adminUser->id : null;
 
@@ -231,11 +217,9 @@ class InstituteController extends BaseController
             'full_phone'=> 'required|string|max:30',
             'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
-            'password'  => 'nullable|string|min:6', // Optional for update
+            'password'  => 'nullable|string|min:6',
             'email'     => [
-                'required', 
-                'email', 
-                // Fix: Ensure correct table name 'institutions'
+                'required', 'email', 
                 Rule::unique('institutions')->ignore($institute->id),
                 Rule::unique('users')->ignore($adminUserId)
             ],
@@ -252,10 +236,7 @@ class InstituteController extends BaseController
 
         $validated = $request->validate($rules, $messages);
 
-        // --- Capitalize Text Fields ---
         $textFields = ['name', 'acronym', 'address'];
-        
-        // Exclude 'password' so it isn't passed to Institution::fill()
         $data = $request->except(['logo', 'password', 'full_phone', 'commune']);
 
         foreach ($textFields as $field) {
@@ -275,8 +256,6 @@ class InstituteController extends BaseController
 
         DB::transaction(function () use ($validated, $request, $institute, $adminUser, $data) {
             
-            // Password is NOT stored on Institution model, do NOT add it to $data
-            // If it was in $data, remove it:
             if(isset($data['password'])) unset($data['password']);
 
             $institute->update($data);
@@ -285,19 +264,19 @@ class InstituteController extends BaseController
             if($request->filled('email')) {
                 if($adminUser) {
                     $updateData = ['email' => $request->email];
-                    
-                    // Only update User password if provided
                     if ($request->filled('password')) {
                         $updateData['password'] = Hash::make($request->password);
                     }
                     
                     $adminUser->update($updateData);
 
-                    $headOfficerRole = Role::where('name', RoleEnum::HEAD_OFFICER->value)
+                    // Ensure School Admin Role
+                    $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
                         ->where('institution_id', $institute->id)
                         ->first();
-                    if($headOfficerRole && !$adminUser->hasRole($headOfficerRole)) {
-                        $adminUser->assignRole($headOfficerRole);
+                        
+                    if($role && !$adminUser->hasRole($role)) {
+                        $adminUser->assignRole($role);
                     }
 
                     if ($request->filled('password')) {
@@ -314,7 +293,6 @@ class InstituteController extends BaseController
     {
         DB::transaction(function () use ($institute) {
             User::where('institute_id', $institute->id)->delete();
-            
             if ($institute->logo) {
                 Storage::disk('public')->delete($institute->logo);
             }
@@ -331,26 +309,48 @@ class InstituteController extends BaseController
         $ids = $request->ids;
         if (!empty($ids)) {
             $institutes = Institution::whereIn('id', $ids)->get();
-            
             DB::transaction(function () use ($institutes) {
                 foreach ($institutes as $institute) {
                     User::where('institute_id', $institute->id)->delete();
-
                     if ($institute->logo) {
                         Storage::disk('public')->delete($institute->logo);
                     }
                     $institute->delete();
                 }
             });
-            
             return response()->json(['success' => __('institute.messages.success_delete')]);
         }
         return response()->json(['error' => __('institute.something_went_wrong')]);
     }
 
+    /**
+     * Check if email exists in Users or Institutions table.
+     */
+    public function checkEmail(Request $request)
+    {
+        $email = $request->input('email');
+        
+        $existsUser = User::where('email', $email)->exists();
+        $existsInst = Institution::where('email', $email)->exists();
+
+        if ($existsUser || $existsInst) {
+            return response()->json(['exists' => true, 'message' => __('institute.validation_email_unique')]);
+        }
+
+        return response()->json(['exists' => false]);
+    }
+
     private function createInstituteRoles($institute)
     {
-        $roles = [RoleEnum::HEAD_OFFICER->value, RoleEnum::TEACHER->value, RoleEnum::STUDENT->value];
+        // Added RoleEnum::SCHOOL_ADMIN to the list as per request
+        // Kept RoleEnum::HEAD_OFFICER as per previous instruction to keep both
+        $roles = [
+            RoleEnum::SCHOOL_ADMIN->value, 
+            RoleEnum::HEAD_OFFICER->value, 
+            RoleEnum::TEACHER->value, 
+            RoleEnum::STUDENT->value
+        ];
+        
         foreach ($roles as $roleName) {
             Role::firstOrCreate([
                 'name' => $roleName,

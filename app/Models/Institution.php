@@ -79,6 +79,22 @@ class Institution extends Model
         return $this->hasMany(Student::class);
     }
 
+    // --- Location Relationships ---
+    
+    public function cityRelation()
+    {
+        return $this->belongsTo(City::class, 'city');
+    }
+
+    public function stateRelation()
+    {
+        return $this->belongsTo(State::class, 'state');
+    }
+
+    public function countryRelation()
+    {
+        return $this->belongsTo(Country::class, 'country');
+    }
     /**
      * Relationship: An Institution has many Streams (Options).
      * Added for Option/Stream Module.

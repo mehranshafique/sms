@@ -29,11 +29,11 @@ class RolesController extends BaseController
             abort(403, __('roles.messages.unauthorized_action'));
         }
 
-        $isSuperAdmin = Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value);
+        $user = Auth::user();
+        $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            // Join to get code and name efficiently, avoiding N+1
             $query = Role::leftJoin('institutions', 'roles.institution_id', '=', 'institutions.id')
                 ->select([
                     'roles.*', 
@@ -41,26 +41,20 @@ class RolesController extends BaseController
                     'institutions.name as institution_name'
                 ]);
 
-            // 2. User Count Logic (Scoped to Context)
             $query->withCount(['users' => function ($q) use ($institutionId) {
                 if ($institutionId) {
                     $q->where('users.institute_id', $institutionId);
                 }
             }]);
 
-            // 3. Multi-tenancy Filter for Rows
             if (!$isSuperAdmin) {
-                // Head Officer sees: Their own roles AND Global roles
-                $query->where(function($q) use ($institutionId) {
-                    $q->where('roles.institution_id', $institutionId)
-                      ->orWhereNull('roles.institution_id');
-                });
+                // RULE 3: Show institution roles ONLY.
+                $query->where('roles.institution_id', $institutionId);
                 
+                // FIX: Only hide Super Admin. 
+                // Allow Head Officer / School Admin to see their own roles in the list.
                 $query->where('roles.name', '!=', RoleEnum::SUPER_ADMIN->value);
             } else {
-                // Super Admin Logic:
-                // If a specific institution is selected in session, show THAT institution's roles + Global roles.
-                // If Global View (institutionId is null), show ALL roles.
                 if ($institutionId) {
                      $query->where(function($q) use ($institutionId) {
                         $q->where('roles.institution_id', $institutionId)
@@ -74,7 +68,6 @@ class RolesController extends BaseController
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->editColumn('name', function($row) use ($isSuperAdmin) {
-                    // Show role name with institution code for Super Admin
                     if ($isSuperAdmin && $row->institution_code) {
                         return $row->name . ' (' . $row->institution_code . ')';
                     }
@@ -87,7 +80,7 @@ class RolesController extends BaseController
                     $count = $row->users_count ?? 0;
                     return '<span class="badge badge-primary">'.$count.'</span>';
                 })
-                ->addColumn('action', function($row) use ($isSuperAdmin, $institutionId) {
+                ->addColumn('action', function($row) use ($isSuperAdmin, $institutionId, $user) {
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     
                     $isGlobal = is_null($row->institution_id);
@@ -96,27 +89,35 @@ class RolesController extends BaseController
                     $canEdit = auth()->user()->can('role.update') || $isSuperAdmin;
                     $canDelete = auth()->user()->can('role.delete') || $isSuperAdmin;
 
-                    // --- EDIT LOGIC UPDATE ---
+                    $isAssignedToMe = $user->hasRole($row->name);
                     $isHeadOfficer = $row->name === RoleEnum::HEAD_OFFICER->value;
                     $isSuperAdminRole = $row->name === RoleEnum::SUPER_ADMIN->value;
-
+                    
                     $allowEdit = false;
+                    $allowView = false;
                     
                     if ($isSuperAdmin) {
-                        // Super Admin can edit Head Officer, Teacher, Student, etc.
-                        // Only prevent editing 'Super Admin' role itself to be safe
                         if (!$isSuperAdminRole) {
                             $allowEdit = true;
                         }
                     } else {
-                        // Normal User: Can edit own roles, but NOT Head Officer
-                        if ($canEdit && (!$isGlobal && $isOwnRole) && !$isHeadOfficer) {
+                        // School Admin Logic
+                        
+                        // 1. If it's MY role (even if Head Officer) -> Allow VIEW (Read Only)
+                        if ($isAssignedToMe) {
+                            $allowView = true;
+                        } 
+                        // 2. If NOT my role, check if I can Edit
+                        elseif ($canEdit && (!$isGlobal && $isOwnRole) && !$isHeadOfficer) {
                             $allowEdit = true;
                         }
                     }
 
                     if ($allowEdit) {
                         $btn .= '<a href="'.route('roles.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('roles.edit').'"><i class="fa fa-pencil"></i></a>';
+                    } elseif ($allowView) {
+                        // READ ONLY BUTTON
+                        $btn .= '<a href="'.route('roles.edit', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1" title="'.__('roles.view').'"><i class="fa fa-eye"></i></a>';
                     }
 
                     // --- DELETE LOGIC ---
@@ -124,11 +125,13 @@ class RolesController extends BaseController
                         RoleEnum::SUPER_ADMIN->value, 
                         RoleEnum::HEAD_OFFICER->value,
                         RoleEnum::TEACHER->value,
-                        RoleEnum::STUDENT->value
+                        RoleEnum::STUDENT->value,
+                        RoleEnum::SCHOOL_ADMIN->value
                     ];
 
                     $allowDelete = false;
-                    if ($canDelete && !in_array($row->name, $protectedNames)) {
+                    
+                    if ($canDelete && !in_array($row->name, $protectedNames) && !$isAssignedToMe) {
                         if ($isSuperAdmin || (!$isGlobal && $isOwnRole)) {
                             $allowDelete = true;
                         }
@@ -190,16 +193,28 @@ class RolesController extends BaseController
     public function edit(Role $role)
     {
         $isSuperAdmin = Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value);
+        $isReadOnly = false;
 
         // Allow Super Admin to edit 'Head Officer'
         if (!$isSuperAdmin && $role->name === RoleEnum::HEAD_OFFICER->value) {
-            abort(403, __('roles.messages.cannot_edit_system'));
+            // FIX: Don't abort immediately. Check if it's own role.
+            if (Auth::user()->hasRole($role->name)) {
+                $isReadOnly = true;
+            } else {
+                abort(403, __('roles.messages.cannot_edit_system'));
+            }
+        }
+        
+        // RULE 1: If own role, set Read Only
+        if (!$isSuperAdmin && Auth::user()->hasRole($role->name)) {
+            $isReadOnly = true;
         }
 
         $this->authorizeRoleAccess($role);
         $modules = $this->getAccessiblePermissions();
         $rolePermissions = $role->permissions->pluck('name')->toArray();
-        return view('roles.edit', compact('role', 'modules', 'rolePermissions'));
+        
+        return view('roles.edit', compact('role', 'modules', 'rolePermissions', 'isReadOnly'));
     }
 
     public function update(Request $request, Role $role)
@@ -208,17 +223,15 @@ class RolesController extends BaseController
         $user = Auth::user();
         $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
 
-        // 1. Prevent user from updating their own role (except Super Admin)
+        // RULE 1: STRICT Prevent user from updating their own role
         if (!$isSuperAdmin && $user->hasRole($role->name)) {
             return response()->json(['message' => __('roles.cannot_update_own_role')], 403);
         }
 
-        // 2. Head Officer Check: Only Super Admin can edit
         if (!$isSuperAdmin && $role->name === RoleEnum::HEAD_OFFICER->value) {
             return response()->json(['message' => __('roles.messages.cannot_edit_system')], 403);
         }
 
-        // 3. System Roles Check: Only Super Admin can edit global roles
         if($role->institution_id === null && !$isSuperAdmin) {
              return response()->json(['message' => __('roles.messages.cannot_edit_system')], 403);
         }
@@ -244,10 +257,10 @@ class RolesController extends BaseController
                 RoleEnum::SUPER_ADMIN->value, 
                 RoleEnum::HEAD_OFFICER->value,
                 RoleEnum::TEACHER->value,
-                RoleEnum::STUDENT->value
+                RoleEnum::STUDENT->value,
+                RoleEnum::SCHOOL_ADMIN->value
             ];
 
-            // Only update name if not protected (Even Super Admin shouldn't rename system roles to avoid logic breaks)
             if (!in_array($role->name, $systemProtectedNames)) {
                 $role->update(['name' => $request->name]);
             }
@@ -261,16 +274,23 @@ class RolesController extends BaseController
     public function destroy(Role $role)
     {
         $this->authorizeRoleAccess($role);
+        $user = Auth::user();
+        $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
         
         $protectedRoles = [
             RoleEnum::SUPER_ADMIN->value, 
             RoleEnum::HEAD_OFFICER->value,
             RoleEnum::TEACHER->value,
-            RoleEnum::STUDENT->value
+            RoleEnum::STUDENT->value,
+            RoleEnum::SCHOOL_ADMIN->value
         ];
 
         if (in_array($role->name, $protectedRoles)) {
             return response()->json(['message' => __('roles.messages.cannot_delete_system')], 403);
+        }
+        
+        if (!$isSuperAdmin && $user->hasRole($role->name)) {
+            return response()->json(['message' => __('roles.cannot_delete_own_role')], 403);
         }
         
         if ($role->users()->count() > 0) {
@@ -372,11 +392,14 @@ class RolesController extends BaseController
     private function authorizeRoleAccess($role)
     {
         if(Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value)) return true;
+        
         if($role->institution_id && $role->institution_id != $this->getInstitutionId()) {
             abort(403, __('roles.messages.unauthorized_access'));
         }
+        
         if(is_null($role->institution_id)) {
-            abort(403, __('roles.messages.cannot_edit_system'));
+            // Allow viewing system roles if logic elsewhere permits, e.g. View Only
+            return true; 
         }
     }
 }

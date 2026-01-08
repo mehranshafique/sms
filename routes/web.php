@@ -119,10 +119,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Infrastructure Management (Institutes, Campuses)
+    Route::get('institutes/check-email', [App\Http\Controllers\InstituteController::class, 'checkEmail'])->name('institutes.check_email');
     Route::delete('institutes/bulk-delete', [InstituteController::class, 'bulkDelete'])->name('institutes.bulkDelete');
     Route::resource('institutes', InstituteController::class);
     Route::get('institution/switch/{id}', [InstitutionContextController::class, 'switch'])->name('institution.switch');
-
+    
     Route::delete('campuses/bulk-delete', [CampusController::class, 'bulkDelete'])->name('campuses.bulkDelete');
     Route::resource('campuses', CampusController::class);
 
@@ -295,7 +296,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Approvals (Using 'update' naming convention for clarity, maps to approveFundRequest)
         Route::post('budgets/requests/{id}/update', [App\Http\Controllers\Finance\BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
 
-        
+
         // Invoices - AJAX Routes (Must be before resource route to avoid collision with {invoice})
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
         Route::get('invoices/get-students', [InvoiceController::class, 'getStudents'])->name('invoices.get_students'); // Added this

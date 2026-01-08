@@ -3,6 +3,8 @@
 <style>
     /* Fix for intl-tel-input dropdown width */
     .iti { width: 100%; }
+    .valid-feedback-custom { color: #28a745; font-size: 0.875em; display: none; margin-top: 0.25rem; }
+    .invalid-feedback-custom { color: #dc3545; font-size: 0.875em; display: none; margin-top: 0.25rem; }
 </style>
 
 <form action="{{ isset($institute) ? route('institutes.update', $institute->id) : route('institutes.store') }}" method="POST" id="instituteForm" enctype="multipart/form-data">
@@ -98,7 +100,7 @@
                                 </select>
                             </div>
 
-                            {{-- 2. State Select (Was City) --}}
+                            {{-- 2. State Select --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('locations.state') ?? 'State' }} <span class="text-danger">*</span></label>
                                 <select name="state" id="stateSelect" class="form-control default-select" required disabled>
@@ -106,7 +108,7 @@
                                 </select>
                             </div>
 
-                            {{-- 3. City Select (Was Commune) --}}
+                            {{-- 3. City Select --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('locations.city') }} <span class="text-danger">*</span></label>
                                 <select name="city" id="citySelect" class="form-control default-select" required disabled>
@@ -114,16 +116,21 @@
                                 </select>
                             </div>
 
+                            {{-- Email with Live Check --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('institute.admin_email') }} <span class="text-danger">*</span></label>
-                                <input type="email" name="email" value="{{ old('email', $institute->email ?? '') }}" class="form-control" placeholder="{{ __('institute.email_placeholder') }}" required>
+                                <div class="position-relative">
+                                    <input type="email" name="email" id="emailInput" value="{{ old('email', $institute->email ?? '') }}" class="form-control" placeholder="{{ __('institute.email_placeholder') }}" required autocomplete="off">
+                                    <div class="valid-feedback-custom" id="emailValid"><i class="fa fa-check-circle"></i> Email available</div>
+                                    <div class="invalid-feedback-custom" id="emailInvalid"><i class="fa fa-times-circle"></i> Email already exists</div>
+                                    <div id="emailLoading" class="spinner-border text-primary spinner-border-sm position-absolute" style="top: 10px; right: 10px; display: none;" role="status"></div>
+                                </div>
                             </div>
                             
                             {{-- Phone with intl-tel-input --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('institute.phone_number') }} <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    {{-- Hidden input to store the full number with country code --}}
                                     <input type="hidden" name="full_phone" id="fullPhoneInput">
                                     <input type="tel" id="phoneInput" class="form-control" value="{{ old('phone', $institute->phone ?? '') }}" required>
                                 </div>
@@ -145,7 +152,7 @@
                                 <textarea name="address" class="form-control" rows="3" placeholder="{{ __('institute.address_placeholder') }}">{{ old('address', $institute->address ?? '') }}</textarea>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary mt-3">{{ isset($institute) ? __('institute.update_btn') : __('institute.save_btn') }}</button>
+                        <button type="submit" id="submitBtn" class="btn btn-primary mt-3">{{ isset($institute) ? __('institute.update_btn') : __('institute.save_btn') }}</button>
                     </div>
                 </div>
             </div>
@@ -160,7 +167,6 @@
     document.addEventListener('DOMContentLoaded', function() {
         // --- Helper to refresh NiceSelect/Select2 ---
         function refreshSelect(element) {
-            // Check for jQuery and NiceSelect
             if (typeof $ !== 'undefined' && $(element).is('select')) {
                 if($.fn.niceSelect) {
                     $(element).niceSelect('update');
@@ -170,7 +176,53 @@
             }
         }
 
-        // --- 1. Phone Input Integration (intl-tel-input) ---
+        // --- 1. Email Availability Check ---
+        const emailInput = document.getElementById('emailInput');
+        const emailValid = document.getElementById('emailValid');
+        const emailInvalid = document.getElementById('emailInvalid');
+        const emailLoading = document.getElementById('emailLoading');
+        const submitBtn = document.getElementById('submitBtn');
+        let typingTimer;
+
+        if(emailInput) {
+            emailInput.addEventListener('keyup', function() {
+                clearTimeout(typingTimer);
+                emailValid.style.display = 'none';
+                emailInvalid.style.display = 'none';
+                
+                if(this.value.length > 5 && this.value.includes('@')) {
+                    emailLoading.style.display = 'block';
+                    typingTimer = setTimeout(checkEmail, 800);
+                }
+            });
+
+            function checkEmail() {
+                const email = emailInput.value;
+                const url = "{{ route('institutes.check_email') }}";
+                
+                fetch(`${url}?email=${encodeURIComponent(email)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        emailLoading.style.display = 'none';
+                        if(data.exists) {
+                            emailInput.classList.add('is-invalid');
+                            emailInput.classList.remove('is-valid');
+                            emailInvalid.style.display = 'block';
+                            submitBtn.disabled = true;
+                        } else {
+                            emailInput.classList.add('is-valid');
+                            emailInput.classList.remove('is-invalid');
+                            emailValid.style.display = 'block';
+                            submitBtn.disabled = false;
+                        }
+                    })
+                    .catch(err => {
+                        emailLoading.style.display = 'none';
+                    });
+            }
+        }
+
+        // --- 2. Phone Input Integration (intl-tel-input) ---
         const phoneInput = document.querySelector("#phoneInput");
         const fullPhoneInput = document.querySelector("#fullPhoneInput");
         const form = document.querySelector("#instituteForm");
@@ -192,7 +244,7 @@
             });
         }
 
-        // --- 2. Location Logic (Country -> State -> City) ---
+        // --- 3. Location Logic (Country -> State -> City) ---
         const countrySelect = document.getElementById('countrySelect');
         const stateSelect = document.getElementById('stateSelect');
         const citySelect = document.getElementById('citySelect');

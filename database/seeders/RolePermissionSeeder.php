@@ -93,7 +93,7 @@ class RolePermissionSeeder extends Seeder
                 // Formatting: singular_module.action (e.g. academic_session.view)
                 $singularKey = Str::singular($slug);
                 
-                // Exceptional cases for collective words
+                // Exceptional cases
                 if ($slug === 'settings') $singularKey = 'setting';
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
                 if ($slug === 'sms_templates') $singularKey = 'sms_template';
@@ -107,7 +107,6 @@ class RolePermissionSeeder extends Seeder
                     'module_id' => $module->id
                 ]);
 
-                // Ensure link exists if record was previously created without module_id
                 if (!$permission->module_id) {
                     $permission->update(['module_id' => $module->id]);
                 }
@@ -123,8 +122,8 @@ class RolePermissionSeeder extends Seeder
             'institution_id' => null
         ]);
 
-        $headOfficerRole = Role::firstOrCreate([
-            'name' => RoleEnum::HEAD_OFFICER->value, 
+        $schoolAdminRole = Role::firstOrCreate([
+            'name' => RoleEnum::SCHOOL_ADMIN->value, 
             'guard_name' => 'web', 
             'institution_id' => null
         ]);
@@ -138,11 +137,12 @@ class RolePermissionSeeder extends Seeder
         // 5. Assign Permissions
         $superAdminRole->syncPermissions($allPermissions);
 
-        // Head Officer (Template)
-        $headOfficerPermissions = array_filter($allPermissions, function($perm) {
+        // School Admin (Template)
+        // Gets all permissions except super-admin specific ones
+        $schoolAdminPermissions = array_filter($allPermissions, function($perm) {
             return !Str::startsWith($perm, ['institution.', 'package.', 'subscription.', 'audit_log.', 'module.']);
         });
-        $headOfficerRole->syncPermissions($headOfficerPermissions);
+        $schoolAdminRole->syncPermissions($schoolAdminPermissions);
 
         // 6. Setup Initial System User
         $user = User::updateOrCreate(
