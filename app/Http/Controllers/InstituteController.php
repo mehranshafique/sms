@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 class InstituteController extends BaseController
 {
@@ -149,25 +150,27 @@ class InstituteController extends BaseController
             
             $institute->phone = $request->full_phone;
 
-            // Note: Password is NOT stored on Institution model, only on User model.
-            // We removed $institute->password assignment here.
-
             if ($request->hasFile('logo')) {
                 $institute->logo = $request->file('logo')->store('institutes', 'public');
             }
 
             $institute->save();
 
-            // FIX: Re-assign the Audit Log context to the created Institution ID instead of "Global"
+            // FIX: Re-assign the Audit Log context to the created Institution ID.
+            // The trait creates the log as "Global" because the admin's context is global during creation.
+            // We find the most recent log by this user and fix it.
             try {
-                \App\Models\AuditLog::where('subject_type', get_class($institute))
-                    ->where('subject_id', $institute->id)
-                    ->where('event', 'created')
+                \App\Models\AuditLog::where('user_id', Auth::id())
+                    ->where('created_at', '>=', now()->subSeconds(10)) // Just created
+                    ->where(function($q) {
+                        $q->where('event', 'Create') // Capitalized as per LogsActivity trait
+                          ->orWhere('event', 'created');
+                    })
                     ->latest()
                     ->first()
                     ?->update(['institution_id' => $institute->id]);
             } catch (\Exception $e) {
-                // Log failure silently or handle error
+                // Fail silently if audit log table structure differs or model missing
             }
 
             $this->createInstituteRoles($institute);
