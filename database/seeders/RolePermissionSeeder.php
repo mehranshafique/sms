@@ -62,7 +62,7 @@ class RolePermissionSeeder extends Seeder
             'Payments' => ['view', 'create'],
             'Payrolls' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added Payrolls
             'Salary Structures' => ['view', 'create', 'update', 'delete'], // Added Salary Structures
-            'Budgets' => ['view', 'create', 'update', 'delete', 'approve_funds'], // Added Budgets
+            'Budgets' => ['view', 'create', 'update', 'delete', 'approve_funds', 'viewAny'], // Added Budgets
             
             // Security & Config
             'Audit Logs' => ['view'],

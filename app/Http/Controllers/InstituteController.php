@@ -157,6 +157,19 @@ class InstituteController extends BaseController
             }
 
             $institute->save();
+
+            // FIX: Re-assign the Audit Log context to the created Institution ID instead of "Global"
+            try {
+                \App\Models\AuditLog::where('subject_type', get_class($institute))
+                    ->where('subject_id', $institute->id)
+                    ->where('event', 'created')
+                    ->latest()
+                    ->first()
+                    ?->update(['institution_id' => $institute->id]);
+            } catch (\Exception $e) {
+                // Log failure silently or handle error
+            }
+
             $this->createInstituteRoles($institute);
 
             if($request->filled('email') && $request->filled('password')) {
