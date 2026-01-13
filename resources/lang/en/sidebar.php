@@ -33,22 +33,24 @@ return [
     'audit_log' => 'Audit Log',
     
     'finance' => 'Finance',
+    'fees_collection' => 'Fees & Collection', // Added for split menu
+    'budget_payroll' => 'Budget & Payroll',   // Added for split menu
     'billing' => 'Billing',
     'billing_requests' => 'Billing Requests',
     'status_billing' => 'Status Billing',
     'financial_reports' => 'Class Report',
     'student_balances' => 'Student Balances', 
-    'budgets' => 'Budgets', // Added
-    'budget_allocation' => 'Budget Allocation', // Added
-    'fund_requests' => 'Fund Requests', // Added
-    'budget_categories' => 'Budget Categories', // Added
+    'budgets' => 'Budgets', 
+    'budget_allocation' => 'Budget Allocation', 
+    'fund_requests' => 'Fund Requests', 
+    'budget_categories' => 'Budget Categories', 
     
     // NEW ADDITIONS
     'communication' => 'Communication',
     'notices' => [
         'title' => 'Notices Board',
     ],
-    'my_notices' => 'My Notices', // Added
+    'my_notices' => 'My Notices', 
     'system_alerts' => 'System Alerts',
     'global_announcements' => 'Global Announcements',
     
@@ -57,7 +59,7 @@ return [
     'elections' => [
         'title' => 'Elections',
     ],
-    'my_elections' => 'My Elections', // Added
+    'my_elections' => 'My Elections',
 
     // School Admin Keys
     'academics' => 'Academics',

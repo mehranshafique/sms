@@ -55,9 +55,11 @@
                                             <option value="one_time" {{ (old('frequency', $feeStructure->frequency) == 'one_time') ? 'selected' : '' }}>{{ __('finance.one_time') }}</option>
                                         </select>
                                     </div>
+                                    
+                                    {{-- Grade Level Selector --}}
                                     <div class="mb-3 col-md-4">
                                         <label class="form-label">{{ __('finance.grade_level') }}</label>
-                                        <select name="grade_level_id" class="form-control default-select">
+                                        <select name="grade_level_id" id="gradeSelect" class="form-control default-select">
                                             <option value="">All Grades</option>
                                             @foreach($gradeLevels as $id => $name)
                                                 <option value="{{ $id }}" {{ (old('grade_level_id', $feeStructure->grade_level_id) == $id) ? 'selected' : '' }}>{{ $name }}</option>
@@ -65,7 +67,21 @@
                                         </select>
                                     </div>
 
-                                    {{-- NEW: Payment Mode --}}
+                                    {{-- NEW: Class Section (Optional) --}}
+                                    <div class="mb-3 col-md-4">
+                                        <label class="form-label">{{ __('finance.class_section') }} <small>({{ __('finance.optional') }})</small></label>
+                                        <select name="class_section_id" id="sectionSelect" class="form-control default-select" data-live-search="true">
+                                            <option value="">{{ __('finance.all_sections') }}</option>
+                                            {{-- Populated via AJAX or Pre-loaded --}}
+                                            @if(isset($classSections) && count($classSections) > 0)
+                                                @foreach($classSections as $id => $name)
+                                                    <option value="{{ $id }}" {{ (old('class_section_id', $feeStructure->class_section_id) == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
+
+                                    {{-- Payment Mode --}}
                                     <div class="mb-3 col-md-4">
                                         <label class="form-label">{{ __('finance.payment_mode') }}</label>
                                         <select name="payment_mode" id="paymentMode" class="form-control default-select">
@@ -74,7 +90,7 @@
                                         </select>
                                     </div>
 
-                                    {{-- NEW: Installment Order --}}
+                                    {{-- Installment Order --}}
                                     <div class="mb-3 col-md-4 {{ $feeStructure->payment_mode == 'installment' ? '' : 'd-none' }}" id="installmentOrderDiv">
                                         <label class="form-label">Installment Order</label>
                                         <input type="number" name="installment_order" value="{{ $feeStructure->installment_order }}" class="form-control" placeholder="1, 2, 3..." min="1">
@@ -106,6 +122,33 @@
                 $('#installmentOrderDiv').removeClass('d-none');
             } else {
                 $('#installmentOrderDiv').addClass('d-none');
+            }
+        });
+        
+        // AJAX: Fetch Sections when Grade is selected
+        $('#gradeSelect').change(function(){
+            let gradeId = $(this).val();
+            let $sectionSelect = $('#sectionSelect');
+            
+            // Clear current options
+            $sectionSelect.html('<option value="">{{ __("finance.all_sections") }}</option>');
+            $sectionSelect.selectpicker('refresh');
+
+            if(gradeId) {
+                $.ajax({
+                    url: "{{ route('fees.get_sections') }}", 
+                    type: "GET",
+                    data: { grade_id: gradeId },
+                    success: function(data) {
+                        $.each(data, function(id, name){
+                            $sectionSelect.append('<option value="'+id+'">'+name+'</option>');
+                        });
+                        $sectionSelect.selectpicker('refresh');
+                    },
+                    error: function() {
+                        console.error("Failed to fetch sections");
+                    }
+                });
             }
         });
 

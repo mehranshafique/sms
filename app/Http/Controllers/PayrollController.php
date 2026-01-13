@@ -20,14 +20,14 @@ class PayrollController extends BaseController
         $this->middleware('auth');
         // FIX: Secure the controller
         $this->authorizeResource(Payroll::class, 'payroll');
-        $this->setPageTitle('Payroll Management');
+        $this->setPageTitle(__('payroll.page_title'));
     }
 
     public function index(Request $request)
     {
         $institutionId = $this->getInstitutionId();
         
-        $payrolls = Payroll::with('staff')
+        $payrolls = Payroll::with(['staff.user'])
             ->where('institution_id', $institutionId)
             ->latest('month_year')
             ->paginate(15);
@@ -72,11 +72,7 @@ class PayrollController extends BaseController
                 ->get();
 
             $present = $attendance->whereIn('status', ['present', 'late', 'half_day'])->count();
-            $absent = $daysInMonth - $present; // Simplified logic (ignoring weekends/holidays for now)
-            
-            // Refined Logic: Absent is only marked days? Or total days minus present? 
-            // Usually, payroll assumes paid unless marked absent or LOP (Loss of Pay).
-            // For this basic version, we'll calculate deduction based on strict 'absent' marks if any.
+            // Simplified logic (ignoring weekends/holidays for now)
             $explicitAbsent = $attendance->where('status', 'absent')->count();
 
             // 2. Calculate Pay
@@ -113,14 +109,45 @@ class PayrollController extends BaseController
         }
 
         return redirect()->route('payroll.index')
-            ->with('success', "Payroll generated for {$generatedCount} staff members.");
+            ->with('success', __('payroll.success_generated', ['count' => $generatedCount]));
     }
 
-    public function payslip(Payroll $payroll)
+    public function payslip(Request $request, Payroll $payroll)
     {
-        $this->authorize('view', $payroll); // Ensure policy exists or check ID
+        $this->authorize('view', $payroll); 
         
-        $pdf = PDF::loadView('payroll.payslip', compact('payroll'));
-        return $pdf->stream('Payslip_'.$payroll->staff->id.'.pdf');
+        // Eager load necessary relationships
+        $payroll->load(['staff.user', 'staff.salaryStructure', 'staff.institution']);
+
+        $format = $request->query('format', 'a4'); 
+        $view = 'payroll.payslip';
+        $paper = 'a4'; 
+        
+        // Define Custom Paper Sizes for Thermal Printers (in points)
+        // 1mm = 2.83465 points
+        if ($format === 'pos80') {
+            $view = 'payroll.payslip_receipt';
+            // 80mm width = ~226pt. Height set to 800pt (auto-cut usually handles length)
+            $paper = [0, 0, 226.77, 800]; 
+        } elseif ($format === 'pos58') {
+            $view = 'payroll.payslip_receipt';
+            // 58mm width = ~164pt.
+            $paper = [0, 0, 164.41, 800];
+        }
+
+        $pdf = PDF::loadView($view, compact('payroll', 'format'));
+        
+        if (is_array($paper)) {
+            $pdf->setPaper($paper);
+        } else {
+            $pdf->setPaper($paper, 'portrait');
+        }
+
+        // Use DomPDF options to ensure images/fonts load
+        $pdf->setOptions(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
+        
+        $filename = 'Payslip_'.$payroll->staff->id.'_'.$format.'.pdf';
+        
+        return $pdf->stream($filename);
     }
 }

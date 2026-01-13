@@ -266,7 +266,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // =========================================================================
-    // 5. FINANCE MODULE
+    // 5. FINANCE MODULE 
     // =========================================================================
     
     Route::prefix('finance')->group(function () {
@@ -309,6 +309,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
 
         Route::middleware([CheckModuleAccess::class . ':fee_structures'])->group(function () {
+            Route::get('fees/get-sections', [FeeStructureController::class, 'getClassSections'])->name('fees.get_sections'); // Added for AJAX
             Route::get('reports/class-summary', [FinancialReportController::class, 'index'])->name('finance.reports.class_summary');
             Route::resource('fees', FeeStructureController::class);
         });

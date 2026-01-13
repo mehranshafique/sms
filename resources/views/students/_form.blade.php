@@ -31,12 +31,18 @@
                 <div class="tab-pane fade show active" id="official" role="tabpanel" aria-labelledby="official-tab">
                     <div class="row">
                         
-                        {{-- LOGIC: Auto-Assign vs Select Institute --}}
                         @php
                             $hasContext = isset($institutionId) && $institutionId;
                             $isSuperAdmin = auth()->user()->hasRole('Super Admin');
-                            // Helper to get enrollment data if available
                             $enrollment = isset($student) ? $student->enrollments()->latest()->first() : null;
+                            
+                            // Safe Accessors for Edit Mode
+                            $currentGradeId = old('grade_level_id', $student->grade_level_id ?? $enrollment->classSection->grade_level_id ?? '');
+                            $currentSectionId = old('class_section_id', $student->class_section_id ?? $enrollment->class_section_id ?? '');
+                            
+                            $savedCountry = old('country', $student->country ?? '');
+                            $savedState = old('state', $student->state ?? '');
+                            $savedCity = old('city', $student->city ?? '');
                         @endphp
 
                         @if($hasContext && !$isSuperAdmin)
@@ -66,7 +72,6 @@
                             </select>
                         </div>
                         
-                        {{-- Academic Year --}}
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.academic_year') }}</label>
                             <input type="text" class="form-control" value="{{ isset($currentSession) ? $currentSession->name : 'N/A' }}" readonly disabled>
@@ -77,7 +82,7 @@
                             <select name="grade_level_id" id="gradeLevelSelect" class="form-control default-select" required>
                                 <option value="">{{ __('student.select_class') }}</option>
                                 @foreach($gradeLevels as $id => $name)
-                                    <option value="{{ $id }}" {{ (old('grade_level_id', $student->grade_level_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                    <option value="{{ $id }}" {{ ($currentGradeId == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                 @endforeach
                             </select>
                             <div class="invalid-feedback">Please select a class.</div>
@@ -98,7 +103,6 @@
                             <div class="invalid-feedback">Admission date is required.</div>
                         </div>
 
-                        {{-- Payment Mode --}}
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.payment_mode') }}</label>
                             <select name="payment_mode" class="form-control default-select">
@@ -107,7 +111,6 @@
                             </select>
                         </div>
 
-                        {{-- SCHOLARSHIP / DISCOUNT SECTION --}}
                         <div class="col-12 mt-2">
                             <div class="p-3 border rounded bg-light">
                                 <h5 class="text-primary mb-3"><i class="fa fa-percent me-2"></i> {{ __('student.scholarship_discount') }}</h5>
@@ -138,7 +141,7 @@
                     </div>
                 </div>
 
-                {{-- Tab 2: Personal Details --}}
+                <!-- Tab 2: Personal Details -->
                 <div class="tab-pane fade" id="personal" role="tabpanel" aria-labelledby="personal-tab">
                     <div class="row">
                         <div class="col-md-12 mb-3 text-center">
@@ -198,7 +201,6 @@
                              <div class="invalid-feedback">Gender is required.</div>
                         </div>
                         
-                        <!-- Religion & Blood Group -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.religion') }}</label>
                             <select name="religion" class="form-control default-select">
@@ -227,12 +229,10 @@
                             <input type="text" name="mobile_number" class="form-control" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                         </div>
 
-                        {{-- Location Logic --}}
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.country') }}</label>
                             <select name="country" id="countrySelect" class="form-control default-select">
                                 <option value="">{{ __('student.select_country') }}</option>
-                                {{-- Populated via AJAX or Controller --}}
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
@@ -256,7 +256,7 @@
                     </div>
                 </div>
 
-                {{-- Tab 3: Parents/Guardian --}}
+                <!-- Tab 3: Parents/Guardian -->
                 <div class="tab-pane fade" id="parents" role="tabpanel" aria-labelledby="parents-tab">
                     <div class="row">
                         <div class="col-md-12 mb-3">
@@ -291,7 +291,7 @@
                     </div>
                 </div>
 
-                {{-- Tab 4: Identity --}}
+                <!-- Tab 4: Identity -->
                 <div class="tab-pane fade" id="identity" role="tabpanel" aria-labelledby="identity-tab">
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -319,31 +319,45 @@
     </div>
 </form>
 
+{{-- REQUIRED LIBRARY: SWEETALERT2 --}}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+{{-- CENTRALIZED JAVASCRIPT LOGIC --}}
 <script>
-    // Image Preview Logic (Pure JS)
+    // 1. Localization Keys
+    const LANG_LOADING = "{{ __('student.loading') }}";
+    const LANG_SELECT_OPTION = "{{ __('student.select_option_placeholder') }}";
+    const LANG_NO_OPTIONS = "{{ __('student.no_options') }}";
+    const LANG_ERROR = "{{ __('student.error_loading') }}";
+    const LANG_SELECT_CLASS_FIRST = "{{ __('student.select_class_first') }}";
+
+    // 2. Saved Values from Controller (For Edit/Error State)
+    const savedGradeId = "{{ $currentGradeId }}";
+    const savedSectionId = "{{ $currentSectionId }}";
+    const savedCountry = "{{ $savedCountry }}";
+    const savedState = "{{ $savedState }}";
+    const savedCity = "{{ $savedCity }}";
+
+    // 3. Image Preview Logic
     const imageUpload = document.getElementById('imageUpload');
     if(imageUpload){
         imageUpload.onchange = function (evt) {
-            var tgt = evt.target || window.event.srcElement,
-                files = tgt.files;
-
+            var tgt = evt.target || window.event.srcElement, files = tgt.files;
             if (FileReader && files && files.length) {
                 var fr = new FileReader();
                 fr.onload = function () {
                     var preview = document.getElementById('imagePreview');
-                    if(!preview) return;
-
-                    if(preview.tagName === 'IMG') {
-                        preview.src = fr.result;
-                    } else {
-                        var img = document.createElement('img');
-                        img.id = 'imagePreview';
-                        img.src = fr.result;
-                        img.style.width = '100%';
-                        img.style.height = '100%';
-                        img.style.objectFit = 'cover';
-                        if(preview.parentNode) {
-                            preview.parentNode.replaceChild(img, preview);
+                    if(preview) {
+                        if(preview.tagName === 'IMG') {
+                            preview.src = fr.result;
+                        } else {
+                            var img = document.createElement('img');
+                            img.id = 'imagePreview';
+                            img.src = fr.result;
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = 'cover';
+                            if(preview.parentNode) preview.parentNode.replaceChild(img, preview);
                         }
                     }
                 }
@@ -352,111 +366,134 @@
         }
     }
 
-    // Localization Keys
-    const LANG_LOADING = "{{ __('student.loading') }}";
-    const LANG_SELECT_OPTION = "{{ __('student.select_option_placeholder') }}";
-    const LANG_NO_OPTIONS = "{{ __('student.no_options') }}";
-    const LANG_ERROR = "{{ __('student.error_loading') }}";
-    const LANG_SELECT_CLASS_FIRST = "{{ __('student.select_class_first') }}";
-
     window.addEventListener('load', function() {
         if (typeof $ !== 'undefined') {
             $(document).ready(function() {
-                // --- 1. Tab Validation Logic ---
+                
+                // --- A. VALIDATION & SUBMIT HANDLER ---
                 $('#studentForm').on('submit', function(e) {
+                    // Prevent Standard Submission Immediately
+                    e.preventDefault(); 
+
+                    // Browser Validity Check
                     if (!this.checkValidity()) {
-                        e.preventDefault();
                         e.stopPropagation();
-                        
-                        // Find first invalid field
+                        $(this).addClass('was-validated');
+
+                        // Find first invalid field & Switch Tab
                         let $invalid = $(this).find(':invalid').first();
-                        
-                        // Find its tab pane
                         let $tabPane = $invalid.closest('.tab-pane');
                         let tabId = $tabPane.attr('id');
                         
-                        // Switch to that tab
                         if(tabId) {
                             let triggerEl = document.querySelector(`button[data-bs-target="#${tabId}"]`);
-                            if(triggerEl) {
-                                bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-                            }
+                            if(triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
                         }
-                        
-                        // Focus on field
                         $invalid.focus();
-                        
-                        // Show generic error toast/alert
-                        if(typeof Swal !== 'undefined') {
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: '{{ __("student.validation_error") }}',
+                            text: '{{ __("student.fill_required_fields") }}'
+                        });
+                        return; // STOP EXECUTION
+                    }
+
+                    // Proceed to AJAX Submission
+                    let formData = new FormData(this);
+                    $.ajax({
+                        url: $(this).attr('action'),
+                        type: "POST",
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+                        success: function(response){
+                            Swal.fire({
+                                icon: 'success',
+                                title: '{{ __("student.success") }}',
+                                text: response.message
+                            }).then(() => {
+                                window.location.href = response.redirect;
+                            });
+                        },
+                        error: function(xhr){
+                            let msg = '{{ __("student.error_occurred") }}';
+                            if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                            if(xhr.responseJSON && xhr.responseJSON.errors) {
+                                msg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
+                            }
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Missing Information',
-                                text: 'Please fill in all required fields in the ' + $tabPane.attr('id').replace('_', ' ') + ' section.'
+                                title: '{{ __("student.validation_error") }}',
+                                html: msg
                             });
-                        } else {
-                            alert('Please fill in all required fields.');
                         }
-                    }
-                    $(this).addClass('was-validated');
+                    });
                 });
 
-                // --- 2. Grade & Section Logic ---
-                $('#gradeLevelSelect').on('change', function() {
-                    let gradeId = $(this).val();
+                // --- B. CLASS SECTIONS LOGIC ---
+                function loadSections(gradeId, selectedId = null) {
                     let $sectionSelect = $('#sectionSelect'); 
-                    $sectionSelect.html('');
-                    
-                    if(gradeId) {
-                        $sectionSelect.append(`<option value="">${LANG_LOADING}</option>`);
-                        $sectionSelect.prop('disabled', true);
-                        if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
+                    $sectionSelect.html(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
+                    if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
 
-                        $.ajax({
-                            url: "{{ route('students.get_sections') }}", 
-                            data: { grade_id: gradeId },
-                            success: function(data) {
-                                $sectionSelect.empty();
-                                if($.isEmptyObject(data)) {
-                                    $sectionSelect.append(`<option value="">${LANG_NO_OPTIONS}</option>`);
-                                    $sectionSelect.prop('disabled', true);
-                                } else {
-                                    $sectionSelect.append(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                                    $.each(data, function(key, value) {
-                                        $sectionSelect.append(`<option value="${key}">${value}</option>`);
-                                    });
-                                    $sectionSelect.prop('disabled', false);
-                                }
-                                if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
-                            },
-                            error: function() {
-                                $sectionSelect.empty().append(`<option value="">${LANG_ERROR}</option>`);
-                                if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
+                    $.ajax({
+                        url: "{{ route('students.get_sections') }}", 
+                        data: { grade_id: gradeId },
+                        success: function(data) {
+                            $sectionSelect.empty();
+                            if($.isEmptyObject(data)) {
+                                $sectionSelect.append(`<option value="">${LANG_NO_OPTIONS}</option>`);
+                            } else {
+                                $sectionSelect.append(`<option value="">${LANG_SELECT_OPTION}</option>`);
+                                $.each(data, function(key, value) {
+                                    let isSelected = (selectedId && selectedId == key) ? 'selected' : '';
+                                    $sectionSelect.append(`<option value="${key}" ${isSelected}>${value}</option>`);
+                                });
+                                $sectionSelect.prop('disabled', false);
                             }
-                        });
-                    } else {
-                        $sectionSelect.empty().append(`<option value="">${LANG_SELECT_CLASS_FIRST}</option>`);
-                        $sectionSelect.prop('disabled', true);
-                        if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
+                            if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
+                        },
+                        error: function() {
+                            $sectionSelect.empty().append(`<option value="">${LANG_ERROR}</option>`);
+                            if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
+                        }
+                    });
+                }
+
+                $('#gradeLevelSelect').change(function() {
+                    let gradeId = $(this).val();
+                    if(gradeId) loadSections(gradeId);
+                    else {
+                        $('#sectionSelect').html(`<option value="">${LANG_SELECT_CLASS_FIRST}</option>`).prop('disabled', true);
+                        if($.fn.selectpicker) $('#sectionSelect').selectpicker('refresh');
                     }
                 });
-                
-                // --- 3. Location Logic (Country > State > City) ---
+
+                // Init Sections
+                if(savedGradeId) loadSections(savedGradeId, savedSectionId);
+
+
+                // --- C. LOCATION LOGIC (Country > State > City) ---
                 const $country = $('#countrySelect');
                 const $state = $('#stateSelect');
                 const $city = $('#citySelect');
-                
-                // Load Countries on Init
+
+                // 1. Load Countries
                 $.get("{{ route('locations.countries') }}", function(data) {
                     $country.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
                     $.each(data, function(i, item) {
-                        let selected = "{{ old('country', $student->country ?? '') }}" == item.name ? 'selected' : '';
+                        let selected = (savedCountry && savedCountry == item.name) ? 'selected' : '';
                         $country.append(`<option value="${item.name}" data-id="${item.id}" ${selected}>${item.name}</option>`);
                     });
                     if($.fn.selectpicker) $country.selectpicker('refresh');
-                    // Trigger change if value exists
-                    if($country.val()) $country.trigger('change');
+                    
+                    // Trigger cascade if saved value exists
+                    if(savedCountry) $country.trigger('change');
                 });
 
+                // 2. Load States
                 $country.change(function() {
                     let countryId = $(this).find(':selected').data('id');
                     $state.empty().append(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
@@ -467,16 +504,24 @@
                         $.get("{{ route('locations.states') }}", { country_id: countryId }, function(data) {
                             $state.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
                             $.each(data, function(i, item) {
-                                let selected = "{{ old('state', $student->state ?? '') }}" == item.name ? 'selected' : '';
+                                let selected = (savedState && savedState == item.name) ? 'selected' : '';
                                 $state.append(`<option value="${item.name}" data-id="${item.id}" ${selected}>${item.name}</option>`);
                             });
                             $state.prop('disabled', false);
                             if($.fn.selectpicker) $state.selectpicker('refresh');
-                            if($state.val()) $state.trigger('change');
+                            
+                            // Trigger cascade if saved value exists AND matches current parent
+                            if(savedState && $state.find('option[selected]').length > 0) {
+                                $state.trigger('change');
+                            }
                         });
+                    } else {
+                        $state.html(`<option value="">${LANG_SELECT_OPTION}</option>`);
+                        if($.fn.selectpicker) $state.selectpicker('refresh');
                     }
                 });
 
+                // 3. Load Cities
                 $state.change(function() {
                     let stateId = $(this).find(':selected').data('id');
                     $city.empty().append(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
@@ -485,14 +530,18 @@
                         $.get("{{ route('locations.cities') }}", { state_id: stateId }, function(data) {
                             $city.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
                             $.each(data, function(i, item) {
-                                let selected = "{{ old('city', $student->city ?? '') }}" == item.name ? 'selected' : '';
+                                let selected = (savedCity && savedCity == item.name) ? 'selected' : '';
                                 $city.append(`<option value="${item.name}" ${selected}>${item.name}</option>`);
                             });
                             $city.prop('disabled', false);
                             if($.fn.selectpicker) $city.selectpicker('refresh');
                         });
+                    } else {
+                        $city.html(`<option value="">${LANG_SELECT_OPTION}</option>`);
+                        if($.fn.selectpicker) $city.selectpicker('refresh');
                     }
                 });
+
             });
         }
     });

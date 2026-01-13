@@ -45,6 +45,33 @@ class StudentBalanceController extends BaseController
                     // Count active enrollments
                     return $row->enrollments()->where('status', 'active')->count();
                 })
+                ->addColumn('paid_students_count', function($row){
+                    // FIX: Ensure we only count students who HAVE invoices and have paid them off.
+                    
+                    // 1. Get all active students in class
+                    $studentIds = $row->enrollments()->where('status', 'active')->pluck('student_id');
+                    
+                    if($studentIds->isEmpty()) return 0;
+
+                    // 2. Find students who actually HAVE invoices (Billed Students)
+                    $invoicedStudentIds = Invoice::whereIn('student_id', $studentIds)
+                        ->distinct()
+                        ->pluck('student_id');
+
+                    // If no one is billed, paid count is 0
+                    if($invoicedStudentIds->isEmpty()) return 0;
+
+                    // 3. Find students who HAVE debt (due > 0.01)
+                    $debtorIds = Invoice::whereIn('student_id', $studentIds)
+                        ->selectRaw('student_id, SUM(total_amount - paid_amount) as due')
+                        ->groupBy('student_id')
+                        ->having('due', '>', 0.01) 
+                        ->pluck('student_id');
+                    
+                    // 4. Paid Students = (Billed Students) - (Students with Debt)
+                    // This excludes students who have never been invoiced.
+                    return $invoicedStudentIds->diff($debtorIds)->count();
+                })
                 ->addColumn('total_invoiced', function($row){
                     return CurrencySymbol::default() . ' ' . number_format($this->getClassFinancials($row->id, 'total'), 2);
                 })
@@ -56,8 +83,12 @@ class StudentBalanceController extends BaseController
                     return '<span class="text-danger fw-bold">' . CurrencySymbol::default() . ' ' . number_format($due, 2) . '</span>';
                 })
                 ->addColumn('action', function($row){
+                    // Construct Full Name for the Title (Grade + Section)
+                    $grade = $row->gradeLevel->name ?? '';
+                    $fullName = ($grade ? $grade . ' ' : '') . $row->name;
+
                     // Localized button
-                    return '<button type="button" class="btn btn-primary btn-sm shadow btn-rounded view-class-btn" data-id="'.$row->id.'" data-name="'.$row->name.'">
+                    return '<button type="button" class="btn btn-primary btn-sm shadow btn-rounded view-class-btn" data-id="'.$row->id.'" data-name="'.$fullName.'">
                                 <i class="fa fa-eye me-1"></i> ' . __('finance.view_details') . '
                             </button>';
                 })
@@ -138,7 +169,9 @@ class StudentBalanceController extends BaseController
             foreach ($tabs as $tab) {
                 $status = 'N/A';
                 $style = 'secondary';
-                $label = 'N/A'; // Default localized label if needed
+                $label = 'N/A'; // Default localized label
+                $paidAmount = 0;
+                $dueAmount = 0;
                 
                 $matchingInvoice = null;
 
@@ -160,6 +193,10 @@ class StudentBalanceController extends BaseController
                 if ($matchingInvoice) {
                     $rawStatus = ucfirst($matchingInvoice->status); 
                     
+                    // Amounts
+                    $paidAmount = $matchingInvoice->paid_amount;
+                    $dueAmount = $matchingInvoice->total_amount - $matchingInvoice->paid_amount;
+
                     // Localize Status
                     if ($rawStatus === 'Paid') {
                         $style = 'success';
@@ -178,7 +215,12 @@ class StudentBalanceController extends BaseController
                     }
                 }
 
-                $row['statuses'][$tab['id']] = ['label' => $label, 'style' => $style];
+                $row['statuses'][$tab['id']] = [
+                    'label' => $label, 
+                    'style' => $style,
+                    'paid' => CurrencySymbol::default() . ' ' . number_format($paidAmount, 2),
+                    'due' => CurrencySymbol::default() . ' ' . number_format($dueAmount, 2)
+                ];
             }
             $studentRows[] = $row;
         }

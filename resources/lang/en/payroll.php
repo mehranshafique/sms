@@ -10,32 +10,69 @@ return [
     
     // Table Headers
     'staff_name' => 'Staff Name',
+    'staff' => 'Staff',
     'designation' => 'Designation',
+    'department' => 'Department',
     'base_salary' => 'Base Salary',
     'allowances' => 'Allowances',
     'deductions' => 'Deductions',
     'net_salary' => 'Net Salary',
+    'net_pay' => 'Net Pay',
     'actions' => 'Actions',
+    'action' => 'Action',
+    'period' => 'Period',
+    'work_units' => 'Work Units',
+    'earnings' => 'Earnings',
+    'amount' => 'Amount',
+    'staff_id' => 'Staff ID',
+    'name' => 'Name',
+    'join_date' => 'Joining Date',
+    'authorized_sign' => 'Authorized Signature',
     
-    // Form Fields
+    // Form Fields & Labels
     'select_staff' => 'Select Staff',
+    'base_configuration' => 'Base Configuration',
     'payment_basis' => 'Payment Basis',
     'monthly' => 'Monthly',
     'hourly' => 'Hourly',
+    'monthly_desc' => 'Monthly (Fixed Salary)',
+    'hourly_desc' => 'Hourly (Pay Per Hour)',
     'hourly_rate' => 'Hourly Rate',
+    'hourly_rate_label' => 'Hourly Rate (Per Hour)',
+    'base_salary_label' => 'Base Salary (Monthly Fixed)',
+    'select_month' => 'Select Month',
+    'select_year' => 'Select Year',
+    'note_title' => 'Note:',
+    
+    // Help Text
+    'help_hourly' => 'Staff paid based on clock-in/out hours recorded in Attendance.',
+    'help_monthly' => 'Staff paid a fixed amount. Absences deduct from this base.',
+    'allowance_help' => 'Fixed amounts added to every pay cycle (e.g., Housing, Transport).',
+    'deduction_help' => 'Fixed amounts deducted (e.g., Tax, Insurance).',
+    'deduction_note' => 'Note: Absent days are deducted automatically.',
+    'configure_rules' => 'Configure pay rules for',
+    'generate_note' => 'Generating payroll will calculate salaries based on <strong>Attendance Records</strong> and <strong>Salary Structures</strong>. Existing records for the selected month will be updated.',
+    'back_to_list' => 'Back to List',
+    
+    // Dynamic Rows
     'allowance_label' => 'Allowance Label',
     'allowance_amount' => 'Amount',
     'deduction_label' => 'Deduction Label',
     'deduction_amount' => 'Amount',
+    'label_placeholder' => 'Label',
+    'amount_placeholder' => '0.00',
     'add_row' => 'Add Row',
     'remove' => 'Remove',
     'total_allowance' => 'Total Allowances',
     'total_deduction' => 'Total Deductions',
+    'gross_salary' => 'Gross Salary',
+    'total_earnings' => 'Total Earnings',
+    'lop' => 'Loss of Pay (Absent)',
     
     // Payroll Generation
     'month' => 'Month',
     'year' => 'Year',
-    'generate_btn' => 'Generate',
+    'generate_btn' => 'Process Payroll',
     'total_days' => 'Total Days',
     'present' => 'Present',
     'absent' => 'Absent',
@@ -43,10 +80,19 @@ return [
     'paid' => 'Paid',
     'generated' => 'Generated',
     'payslip' => 'Payslip',
+    'download_payslip' => 'Download Payslip',
+    'hourly_short' => 'Hrs',
+    'days_short' => 'Days',
+    'no_records' => 'No payroll records found. Generate one above.',
     
+    // Buttons
+    'save_structure' => 'Save Structure',
+    'save_changes' => 'Save Changes',
+
     // Messages
     'success_created' => 'Salary structure created successfully.',
     'success_updated' => 'Salary structure updated successfully.',
     'success_generated' => 'Payroll generated successfully.',
+    'success_generated_count' => 'Successfully generated payroll for :count staff members.',
     'no_staff_found' => 'No active staff found.',
 ];

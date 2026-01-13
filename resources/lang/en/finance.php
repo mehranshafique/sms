@@ -71,7 +71,8 @@ return [
     'payment_mode' => 'Payment Mode',
     'global' => 'Global',
     'installment' => 'Installment',
-
+    'class_section' => 'Class Section',
+    'optional' => 'Optional',
     // Student Finance Dashboard & General Keys
     'student_finance_dashboard' => 'Student Finance Dashboard',
     'back_to_profile' => 'Back to Profile',
@@ -113,6 +114,7 @@ return [
     'all_classes' => 'All Classes',
     'class_name' => 'Class Name',
     'students_count' => 'Students',
+    'paid_students' => 'Paid Students', // Added
     'total_invoiced' => 'Total Invoiced',
     'total_collected' => 'Collected',
     'total_outstanding' => 'Outstanding',
@@ -121,4 +123,9 @@ return [
     'no_fee_structures_class' => 'No fee structures or installments defined for this class yet.',
     'view_dashboard' => 'View Dashboard',
     'error_loading' => 'Error loading data. Please try again.',
+    'paid_amount' => 'Paid Amount', // Added
+    'due_amount' => 'Due Amount', // Added
+    'status_partial' => 'Partial', // Explicitly added for JS fallback
+    'status_unpaid' => 'Unpaid',   // Explicitly added for JS fallback
+    'status_overdue' => 'Overdue', // Explicitly added for JS fallback
 ];

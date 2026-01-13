@@ -60,7 +60,10 @@
                 { data: 'action', name: 'action', orderable: false, searchable: false },
             ],
             language: {
-                paginate: { next: '<i class="fa fa-angle-right"></i>', previous: '<i class="fa fa-angle-left"></i>' }
+                paginate: { next: '<i class="fa fa-angle-right"></i>', previous: '<i class="fa fa-angle-left"></i>' },
+                search: "{{ __('pagination.search') ?? 'Search' }}",
+                lengthMenu: "{{ __('pagination.show') ?? 'Show' }} _MENU_ {{ __('pagination.entries') ?? 'entries' }}",
+                info: "Showing _START_ to _END_ of _TOTAL_ entries" // Add specific keys if needed
             }
         });
     });

@@ -6,6 +6,7 @@ use App\Http\Controllers\BaseController;
 use App\Models\FeeStructure;
 use App\Models\FeeType;
 use App\Models\GradeLevel;
+use App\Models\ClassSection; // Added Model
 use App\Models\AcademicSession;
 use App\Models\Institution;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Middleware\PermissionMiddleware;
+use Illuminate\Support\Facades\DB; // Added DB
 
 class FeeStructureController extends BaseController
 {
@@ -28,7 +30,8 @@ class FeeStructureController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $data = FeeStructure::with(['feeType', 'gradeLevel'])
+            // Eager load classSection as well
+            $data = FeeStructure::with(['feeType', 'gradeLevel', 'classSection'])
                 ->select('fee_structures.*');
 
             if ($institutionId) {
@@ -41,7 +44,14 @@ class FeeStructureController extends BaseController
                     return $row->feeType->name ?? 'N/A';
                 })
                 ->addColumn('grade', function($row){
-                    return $row->gradeLevel->name ?? 'All Grades';
+                    $grade = $row->gradeLevel->name ?? 'All Grades';
+                    // Append Section Name if exists
+                    if($row->classSection) {
+                        $grade .= ' (' . $row->classSection->name . ')';
+                    } elseif($row->grade_level_id && is_null($row->class_section_id)) {
+                        $grade .= ' (' . __('finance.all_sections') . ')';
+                    }
+                    return $grade;
                 })
                 ->editColumn('amount', function($row){
                     return number_format($row->amount, 2);
@@ -96,6 +106,27 @@ class FeeStructureController extends BaseController
         return view('finance.fees.create', compact('feeTypes', 'gradeLevels', 'session'));
     }
 
+    /**
+     * AJAX Method to get Sections based on Grade
+     */
+    public function getClassSections(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        $gradeId = $request->grade_id;
+
+        if (!$gradeId) {
+            return response()->json([]);
+        }
+
+        $sections = ClassSection::where('grade_level_id', $gradeId);
+        
+        if ($institutionId) {
+            $sections->where('institution_id', $institutionId);
+        }
+
+        return response()->json($sections->pluck('name', 'id'));
+    }
+
     public function store(Request $request)
     {
         $institutionId = $this->getInstitutionId();
@@ -115,6 +146,7 @@ class FeeStructureController extends BaseController
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:one_time,monthly,termly,yearly',
             'grade_level_id' => 'nullable|exists:grade_levels,id',
+            'class_section_id' => 'nullable|exists:class_sections,id', // Added validation
             'payment_mode' => 'required|in:global,installment',
             'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
         ]);
@@ -134,6 +166,7 @@ class FeeStructureController extends BaseController
         if ($request->payment_mode === 'installment' && $request->grade_level_id) {
             
             // 1. Check for Existing Global Fee for this Grade/Session
+            // Note: Global fee is typically at Grade level, so we check grade_level_id generally
             $globalFee = FeeStructure::where('institution_id', $institutionId)
                 ->where('grade_level_id', $request->grade_level_id)
                 ->where('payment_mode', 'global')
@@ -148,11 +181,17 @@ class FeeStructureController extends BaseController
             }
 
             // Rule 2: Installments Sum check
-            $existingInstallments = FeeStructure::where('institution_id', $institutionId)
+            $existingInstallmentsQuery = FeeStructure::where('institution_id', $institutionId)
                 ->where('grade_level_id', $request->grade_level_id)
                 ->where('payment_mode', 'installment')
-                ->where('academic_session_id', $session->id)
-                ->sum('amount');
+                ->where('academic_session_id', $session->id);
+            
+            // If this is a section-specific fee, we should still check against the Grade's global limit
+            // But we only sum installments that apply to this student scope. 
+            // For simplicity in this logic: Sum ALL installments for this Grade to prevent over-billing configuration.
+            // A more complex check would be: Sum(GradeWideInstallments) + Sum(ThisSectionInstallments)
+            
+            $existingInstallments = $existingInstallmentsQuery->sum('amount');
 
             $newTotal = $existingInstallments + $request->amount;
 
@@ -175,6 +214,7 @@ class FeeStructureController extends BaseController
             'amount' => $request->amount,
             'frequency' => $request->frequency,
             'grade_level_id' => $request->grade_level_id,
+            'class_section_id' => $request->class_section_id, // Save Section
             'payment_mode' => $request->payment_mode,
             'installment_order' => $request->installment_order,
         ]);
@@ -195,8 +235,16 @@ class FeeStructureController extends BaseController
 
         $feeTypes = FeeType::where('institution_id', $targetId)->where('is_active', true)->pluck('name', 'id');
         $gradeLevels = GradeLevel::where('institution_id', $targetId)->pluck('name', 'id');
+        
+        // Load sections if grade is selected
+        $classSections = [];
+        if($feeStructure->grade_level_id) {
+            $classSections = ClassSection::where('grade_level_id', $feeStructure->grade_level_id)
+                                         ->where('institution_id', $targetId)
+                                         ->pluck('name', 'id');
+        }
 
-        return view('finance.fees.edit', compact('feeStructure', 'feeTypes', 'gradeLevels'));
+        return view('finance.fees.edit', compact('feeStructure', 'feeTypes', 'gradeLevels', 'classSections'));
     }
 
     public function update(Request $request, $id)
@@ -214,6 +262,7 @@ class FeeStructureController extends BaseController
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:one_time,monthly,termly,yearly',
             'grade_level_id' => 'nullable|exists:grade_levels,id',
+            'class_section_id' => 'nullable|exists:class_sections,id',
             'payment_mode' => 'required|in:global,installment',
             'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
         ]);
@@ -265,6 +314,7 @@ class FeeStructureController extends BaseController
             'amount' => $request->amount,
             'frequency' => $request->frequency,
             'grade_level_id' => $request->grade_level_id,
+            'class_section_id' => $request->class_section_id,
             'payment_mode' => $request->payment_mode,
             'installment_order' => $request->installment_order,
         ]);

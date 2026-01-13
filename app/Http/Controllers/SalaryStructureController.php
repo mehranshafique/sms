@@ -22,11 +22,10 @@ class SalaryStructureController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            // Fetch Staff with their Salary Structure
             $data = Staff::with(['salaryStructure', 'user'])
                 ->where('institution_id', $institutionId)
                 ->where('status', 'active')
-                ->select('staff.*'); // Select * to avoid column collisions
+                ->select('staff.*'); 
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -34,9 +33,11 @@ class SalaryStructureController extends BaseController
                     return $row->full_name ?? $row->user->name ?? 'N/A';
                 })
                 ->addColumn('base_salary', function($row){
-                    return $row->salaryStructure 
-                        ? number_format($row->salaryStructure->base_salary, 2) 
-                        : '<span class="badge badge-warning">Not Set</span>';
+                    if($row->salaryStructure) {
+                        return number_format($row->salaryStructure->base_salary, 2) . 
+                               ($row->salaryStructure->payment_basis === 'hourly' ? ' /hr' : '');
+                    }
+                    return '<span class="badge badge-warning text-white">Not Set</span>';
                 })
                 ->addColumn('allowances', function($row){
                     if (!$row->salaryStructure || empty($row->salaryStructure->allowances)) return '-';
@@ -47,6 +48,7 @@ class SalaryStructureController extends BaseController
                     $s = $row->salaryStructure;
                     $totalA = array_sum($s->allowances ?? []);
                     $totalD = array_sum($s->deductions ?? []);
+                    // Rough estimate, doesn't account for hourly variations
                     return number_format(($s->base_salary + $totalA) - $totalD, 2);
                 })
                 ->addColumn('action', function($row){
@@ -86,7 +88,6 @@ class SalaryStructureController extends BaseController
             'deduction_values.*' => 'nullable|numeric|min:0',
         ]);
 
-        // Process Dynamic Arrays into Key-Value Pairs
         $allowances = [];
         if ($request->has('allowance_keys')) {
             foreach ($request->allowance_keys as $index => $key) {

@@ -259,11 +259,11 @@
                 {{-- FINANCE GROUP --}}
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
                 
-                {{-- Consolidated Finance Check --}}
-                @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices') || $hasModule('payrolls') || $hasModule('budgets'))
+                {{-- 1. FEES & COLLECTIONS (Invoices, Structures, Types) --}}
+                @if($hasModule('fee_structures') || $hasModule('fee_types') || $hasModule('invoices'))
                     <li>
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
-                            <i class="la la-money"></i><span class="nav-text">{{ __('sidebar.finance') }}</span>
+                            <i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fees_collection') ?? 'Fees & Collection' }}</span>
                         </a>
                         <ul aria-expanded="false">
                             @if($hasModule('fee_types'))
@@ -290,8 +290,18 @@
                             @can('invoice.view')
                             <li><a href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
                             @endcan
+                        </ul>
+                    </li>
+                @endif
 
-                            {{-- NEW PAYROLL MODULES --}}
+                {{-- 2. BUDGET & PAYROLL (Salaries, Expenses) --}}
+                @if($hasModule('payrolls') || $hasModule('budgets'))
+                    <li>
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
+                            <i class="la la-wallet"></i><span class="nav-text">{{ __('sidebar.budget_payroll') ?? 'Budget & Payroll' }}</span>
+                        </a>
+                        <ul aria-expanded="false">
+                            {{-- PAYROLL MODULES --}}
                             @if($hasModule('payrolls'))
                                 @can('payroll.view')
                                 <li><a href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
@@ -299,7 +309,7 @@
                                 @endcan
                             @endif
 
-                            {{-- NEW BUDGET MODULES --}}
+                            {{-- BUDGET MODULES --}}
                             @if($hasModule('budgets'))
                                 @can('budget.view')
                                 <li><a href="{{ route('budgets.categories') }}">{{ __('sidebar.budget_categories') }}</a></li>
@@ -309,16 +319,16 @@
                             @endif
                         </ul>
                     </li>
-                    
-                    {{-- BILLING (For Head Officer View) --}}
-                    @can('institution.view')
-                    <li>
-                        <a href="{{ route('subscriptions.invoices') }}" class="ai-icon" aria-expanded="false">
-                            <i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.billing') }}</span>
-                        </a>
-                    </li>
-                    @endcan
                 @endif
+                
+                {{-- BILLING (For Head Officer View) --}}
+                @can('institution.view')
+                <li>
+                    <a href="{{ route('subscriptions.invoices') }}" class="ai-icon" aria-expanded="false">
+                        <i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.billing') }}</span>
+                    </a>
+                </li>
+                @endcan
 
                 {{-- SETTINGS GROUP --}}
                 <li class="nav-label">{{ __('sidebar.settings') }}</li>

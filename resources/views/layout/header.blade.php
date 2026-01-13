@@ -149,8 +149,10 @@
                                 $allowedInstitutions = collect();
                                 $isActiveGlobal = session('active_institution_id') === 'global';
                                 $hasMultipleSchools = false;
+                                $currentSessionTitle = null; // Variable for Session Year
 
                                 if ($user) {
+                                    // Switcher Logic
                                     if ($user->hasRole('Super Admin')) {
                                         $allowedInstitutions = \App\Models\Institution::select('id', 'name', 'code')->orderBy('name')->get();
                                         $showSwitcher = true;
@@ -163,12 +165,23 @@
                                         $activeInstitutionName = $user->institute->name ?? __('header.my_institute');
                                     }
                                     
+                                    // Resolve Active ID
                                     $activeId = session('active_institution_id', $user->institute_id);
+                                    
                                     if ($activeId && $activeId !== 'global') {
                                         $activeInst = $allowedInstitutions->where('id', $activeId)->first();
                                         if (!$activeInst && $user->institute) $activeInst = $user->institute;
                                         if ($activeInst) {
                                             $activeInstitutionName = $activeInst->name;
+                                        }
+
+                                        // FETCH CURRENT SESSION
+                                        $sessionObj = \App\Models\AcademicSession::where('institution_id', $activeId)
+                                            ->where('is_current', true)
+                                            ->select('name')
+                                            ->first();
+                                        if ($sessionObj) {
+                                            $currentSessionTitle = $sessionObj->name;
                                         }
                                     }
                                     
@@ -177,6 +190,15 @@
                                     }
                                 }
                             @endphp
+
+                            {{-- NEW: Current Session Display --}}
+                            @if($currentSessionTitle)
+                            <li class="nav-item d-flex align-items-center me-3 d-none d-sm-flex">
+                                <span class="badge badge-warning light text-warning fs-12 font-w600 shadow-sm">
+                                    <i class="fa fa-calendar me-1"></i> {{ $currentSessionTitle }}
+                                </span>
+                            </li>
+                            @endif
 
                             @if($showSwitcher)
                             <li class="nav-item dropdown notification_dropdown">

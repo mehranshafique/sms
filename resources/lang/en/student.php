@@ -7,7 +7,7 @@ return [
         'success_update' => 'Student details updated successfully!',
         'success_delete' => 'Student record deleted successfully!',
         'cannot_delete_linked_data' => 'Cannot delete student because they are linked to other records (e.g. Grades, Attendance).',
-        'error_occurred' => 'An error occurred while deleting the student.',
+        'error_occurred' => 'An error occurred while processing the request.',
     ],
     
     // Headers & Stats
@@ -136,6 +136,7 @@ return [
     'error_occurred' => 'Error Occurred',
     'something_went_wrong' => 'Something went wrong!',
     'validation_error' => 'Validation Error',
+    'fill_required_fields' => 'Please fill in all required fields.',
     'success' => 'Success!',
     'no_active_session' => 'No active academic session found for this institution.',
     'unauthorized_access' => 'Unauthorized access.',

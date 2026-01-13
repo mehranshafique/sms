@@ -28,6 +28,7 @@
                                         <th>#</th>
                                         <th>{{ __('finance.class_name') }}</th>
                                         <th>{{ __('finance.students_count') }}</th>
+                                        <th>{{ __('finance.paid_students') ?? 'Paid Students' }}</th> {{-- New Column --}}
                                         <th>{{ __('finance.total_invoiced') }}</th>
                                         <th>{{ __('finance.total_collected') }}</th>
                                         <th>{{ __('finance.total_outstanding') }}</th>
@@ -47,6 +48,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        {{-- Title updated via JS --}}
                         <h4 class="card-title text-white mb-0" id="selectedClassName">{{ __('finance.class_details') }}</h4>
                         <div class="d-flex align-items-center">
                             {{-- Search Input --}}
@@ -96,31 +98,20 @@
                     data: 'class_name', 
                     name: 'name',
                     render: function(data, type, row) {
-                        // Extract Grade and Section
-                        // Assuming 'class_name' from controller is formatted like "SectionName (GradeName)"
-                        // We want "GradeName SectionName" (e.g. "1er A")
-                        
-                        if (!data) return '';
-                        
-                        // Parse the existing format "Name (Grade)"
-                        let parts = data.match(/^(.*)\s\((.*)\)$/);
-                        
-                        if (parts && parts.length === 3) {
-                            let section = parts[1]; // "A"
-                            let grade = parts[2];   // "1er Primaire"
-                            
-                            // Simply return "Grade Section"
-                            // You might want to trim 'Primaire' if it's too long, but requested format is "1er A"
-                            // Assuming Grade is "1er" or "1er Primaire"
-                            
-                            // Simple logic: Grade + " " + Section
-                            return grade + " " + section;
-                        }
-                        
-                        return data; // Fallback
+                        // Format is already "Grade Section" from controller if available,
+                        // or "Section (Grade)" depending on logic.
+                        // Controller now sets 'class_name' as "Grade Section" directly or "Section"
+                        return data;
                     }
                 },
                 { data: 'students_count', searchable: false },
+                { 
+                    data: 'paid_students_count', 
+                    searchable: false,
+                    render: function(data, type, row) {
+                        return '<span class="badge badge-success light">' + data + '</span>';
+                    }
+                },
                 { data: 'total_invoiced', searchable: false },
                 { data: 'total_collected', searchable: false },
                 { data: 'balance', searchable: false },
@@ -131,13 +122,11 @@
         // 2. Handle "View Details" Click
         $(document).on('click', '.view-class-btn', function() {
             let classId = $(this).data('id');
-            let className = $(this).data('name'); // This is usually just the Section name (e.g. "A")
-
-            // We can fetch the grade name from the table row if needed for the header title
-            // But usually 'name' is sufficient or we can update the data attribute in controller
+            let className = $(this).data('name'); // Now contains "Grade Section"
             
-            // UI Updates
+            // UI Updates: Set Title to "Class Details: Grade Section"
             $('#selectedClassName').text("{{ __('finance.class_details') }}: " + className);
+            
             $('#detailsSection').removeClass('d-none');
             $('#studentSearchInput').val(''); // Clear search on open
             
@@ -196,7 +185,7 @@
                         let rowsHtml = '';
                         response.students.forEach(item => {
                             let student = item.student;
-                            let status = item.statuses[tab.id]; // {label: 'Paid', style: 'success'}
+                            let status = item.statuses[tab.id]; // {label, style, paid, due}
                             let photoUrl = student.photo ? '/storage/'+student.photo : null;
                             let avatar = photoUrl 
                                 ? `<img src="${photoUrl}" class="rounded-circle me-2" width="35" height="35">`
@@ -217,6 +206,8 @@
                                         </div>
                                     </td>
                                     <td><span class="badge badge-${status.style} light">${status.label}</span></td>
+                                    <td class="text-success fw-bold">${status.paid}</td>
+                                    <td class="text-danger fw-bold">${status.due}</td>
                                     <td>
                                         <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow" target="_blank" title="{{ __('finance.view_dashboard') }}">
                                             <i class="fa fa-arrow-right"></i>
@@ -233,6 +224,8 @@
                                             <tr>
                                                 <th>{{ __('finance.student_identity') }}</th>
                                                 <th>{{ __('finance.status') }}</th>
+                                                <th>{{ __('finance.paid_amount') ?? 'Paid' }}</th>
+                                                <th>{{ __('finance.due_amount') ?? 'Balance' }}</th>
                                                 <th>{{ __('finance.action') }}</th>
                                             </tr>
                                         </thead>
@@ -257,7 +250,6 @@
             var value = $(this).val().toLowerCase();
             
             // Search in all tables within the active tab content
-            // Assuming filter applies to all tabs for simplicity, or just visible one
             $('.student-table tbody tr').filter(function() {
                 var name = $(this).find('.student-name').text().toLowerCase();
                 var id = $(this).find('.student-id').text().toLowerCase();
