@@ -27,7 +27,6 @@
                                 
                                 @php
                                     $examCount = count($exams);
-                                    // Prepare single exam data if count is 1
                                     $singleExamId = null;
                                     $singleExamName = '';
                                     if($examCount === 1) {
@@ -39,7 +38,6 @@
                                 @endphp
 
                                 @if($examCount > 1)
-                                    {{-- Multiple Exams: Show Dropdown --}}
                                     <select id="exam_select" class="form-control default-select">
                                         <option value="">-- {{ __('marks.select_exam') }} --</option>
                                         @foreach($exams as $id => $name)
@@ -47,13 +45,12 @@
                                         @endforeach
                                     </select>
                                 @else
-                                    {{-- Single Exam: Show Text & Auto-Select via Hidden Input --}}
                                     <input type="hidden" id="exam_select" value="{{ $singleExamId }}">
                                     <input type="text" class="form-control" value="{{ $singleExamName }}" readonly disabled style="background-color: #f8f9fa;">
                                 @endif
                             </div>
 
-                            {{-- 2. Class (Loaded via AJAX) --}}
+                            {{-- 2. Class --}}
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">{{ __('marks.select_class') }} <span class="text-danger">*</span></label>
                                 <select id="class_select" class="form-control default-select" disabled>
@@ -61,13 +58,12 @@
                                 </select>
                             </div>
 
-                            {{-- 3. Subject (Loaded via AJAX) --}}
+                            {{-- 3. Subject --}}
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">{{ __('marks.select_subject') }} <span class="text-danger">*</span></label>
                                 <select id="subject_select" class="form-control default-select" disabled>
                                     <option value="">-- Select Class First --</option>
                                 </select>
-                                {{-- Total Marks Display --}}
                                 <div id="total_marks_display" class="mt-2 text-info fw-bold d-none" style="font-size: 0.9rem;">
                                     Total Marks: <span id="total_marks_value" class="text-dark"></span>
                                 </div>
@@ -95,18 +91,42 @@
                 <input type="hidden" name="subject_id" id="form_subject_id">
 
                 <div class="card shadow-sm border-0" style="border-radius: 12px;">
-                    <div class="card-header border-0 pb-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                        <h4 class="card-title mb-0 fw-bold fs-18 text-primary"><i class="fa fa-users me-2"></i> {{ __('marks.student_list') }}</h4>
-                        <span class="badge badge-primary light" id="student_count_badge">0 Students</span>
+                    
+                    {{-- UPDATED HEADER: Details + Search --}}
+                    <div class="card-header bg-white border-bottom py-3">
+                        <div class="row align-items-center w-100 g-3">
+                            <div class="col-md-8">
+                                <div class="d-flex flex-wrap gap-4">
+                                    <div class="d-flex align-items-center">
+                                        <span class="text-uppercase fw-bold text-muted small me-2" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('marks.class') }}:</span>
+                                        <span class="fw-bold text-dark" id="header_class_name">-</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="text-uppercase fw-bold text-muted small me-2" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('marks.subject') }}:</span>
+                                        <span class="fw-bold text-dark" id="header_subject_name">-</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="text-uppercase fw-bold text-muted small me-2" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('marks.teacher') }}:</span>
+                                        <span class="fw-bold text-primary" id="header_teacher_name">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-light border-end-0 ps-3"><i class="fa fa-search text-muted"></i></span>
+                                    <input type="text" id="table_search" class="form-control border-start-0 bg-light" placeholder="{{ __('marks.search_student') ?? 'Search Student...' }}" style="font-size: 14px;">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body p-0 pt-3">
+
+                    <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover table-striped mb-0">
                                 <thead class="bg-light">
                                     <tr>
                                         <th class="ps-4" width="5%">#</th>
                                         <th width="35%">{{ __('marks.student_name') }}</th>
-                                        {{-- Updated header to Admission No --}}
                                         <th width="20%">{{ __('marks.admission_no') ?? 'Admission No' }}</th>
                                         <th width="25%">{{ __('marks.marks_obtained') }} <span class="text-muted small" id="table_header_total"></span></th>
                                         <th class="text-center" width="15%">{{ __('marks.is_absent') }}</th>
@@ -118,10 +138,15 @@
                             </table>
                         </div>
                     </div>
-                    <div class="card-footer bg-white border-0 text-end pb-4 pe-4">
-                        <button type="submit" class="btn btn-primary btn-lg shadow px-5">
-                            <i class="fa fa-save me-2"></i> {{ __('marks.save_marks') }}
-                        </button>
+                    <div class="card-footer bg-white border-0 text-end pb-4 pe-4 pt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">
+                                <i class="fa fa-info-circle me-1"></i> {{ __('marks.auto_save_info') ?? 'Remember to save your changes.' }}
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg shadow px-5">
+                                <i class="fa fa-save me-2"></i> {{ __('marks.save_marks') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -143,19 +168,15 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
-        // --- Helper to refresh NiceSelect/Select2/Selectpicker ---
         function refreshSelect(element) {
             if (typeof $ !== 'undefined' && $(element).is('select')) {
-                // Conflict Fix: Ensure no other library is hogging the element
                 if ($.fn.selectpicker && $(element).parent().hasClass('bootstrap-select')) {
                      try { $(element).selectpicker('destroy'); } catch(e){}
                      $(element).removeClass('selectpicker');
                 }
-
                 if($.fn.niceSelect) {
                     $(element).niceSelect('update');
                 } else if ($.fn.select2) {
-                     // Check if not initialized or update
                      if (!$(element).hasClass("select2-hidden-accessible")) {
                          $(element).select2();
                      } else {
@@ -165,12 +186,11 @@
             }
         }
 
-        // --- SAFE INITIALIZATION (Fixes "Not Showing" Issue) ---
+        // --- SAFE INITIALIZATION ---
         setTimeout(function() {
             if (typeof $ !== 'undefined' && $.fn.select2) {
                 $('.default-select').each(function() {
                     let $el = $(this);
-                    // Destroy bootstrap-select if present to reveal the element for Select2
                     if ($.fn.selectpicker && ($el.data('selectpicker') || $el.parent().hasClass('bootstrap-select'))) {
                         try { $el.selectpicker('destroy'); } catch(e){}
                         $el.removeClass('selectpicker');
@@ -185,32 +205,33 @@
         const examSelect = document.getElementById('exam_select');
         const classSelect = document.getElementById('class_select');
         const subjectSelect = document.getElementById('subject_select');
+        const tableSearch = document.getElementById('table_search');
         
         const marksContainer = document.getElementById('marks_container');
         const emptyState = document.getElementById('empty_state');
         const loadingSpinner = document.getElementById('loading_spinner');
         
-        // Total Marks Elements
+        // Header Info Elements
+        const headerClass = document.getElementById('header_class_name');
+        const headerSubject = document.getElementById('header_subject_name');
+        const headerTeacher = document.getElementById('header_teacher_name');
+
         const totalMarksDisplay = document.getElementById('total_marks_display');
         const totalMarksValue = document.getElementById('total_marks_value');
         const tableHeaderTotal = document.getElementById('table_header_total');
 
         // --- 1. Exam Logic ---
         if (examSelect) {
-            // If it's a SELECT element (Multiple Exams)
             if(examSelect.tagName === 'SELECT') {
-                $(examSelect).on('change', function() { // Use jQuery on for Select2 compatibility
+                $(examSelect).on('change', function() {
                     loadClasses(this.value);
                 });
-            } 
-            // If it's HIDDEN (Single Exam)
-            else if (examSelect.type === 'hidden' && examSelect.value) {
+            } else if (examSelect.type === 'hidden' && examSelect.value) {
                 loadClasses(examSelect.value);
             }
         }
 
         function loadClasses(examId) {
-            // Reset dependent dropdowns
             resetSelect(classSelect, '-- {{ __('marks.select_class') }} --');
             resetSelect(subjectSelect, '-- Select Class First --');
             hideTable();
@@ -222,22 +243,15 @@
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    // Clear and Populate
                     classSelect.innerHTML = '<option value="">-- {{ __("marks.select_class") }} --</option>';
-                    
                     Object.entries(data).forEach(([id, name]) => {
                         let option = new Option(name, id);
                         classSelect.add(option);
                     });
-
                     classSelect.disabled = false;
                     refreshSelect(classSelect);
                 })
-                .catch(error => {
-                    console.error('Error loading classes:', error);
-                    classSelect.innerHTML = '<option value="">Error loading classes</option>';
-                    refreshSelect(classSelect);
-                });
+                .catch(error => { console.error(error); });
         }
 
         // --- 2. Class Logic ---
@@ -260,16 +274,15 @@
                 .then(data => {
                     subjectSelect.innerHTML = '<option value="">-- {{ __("marks.select_subject") }} --</option>';
                     
-                    // Handle Array of Objects [{id, name, total_marks}]
                     if (Array.isArray(data)) {
                         data.forEach(subject => {
                             let option = new Option(subject.name, subject.id);
-                            // Store total marks in data attribute
-                            option.setAttribute('data-total', subject.total_marks); 
+                            option.setAttribute('data-total', subject.total_marks);
+                            // Set Teacher Name Data Attribute
+                            option.setAttribute('data-teacher', subject.teacher_name || 'N/A');
                             subjectSelect.add(option);
                         });
                     } else {
-                        // Fallback for simple key-value object (backward compatibility)
                         Object.entries(data).forEach(([id, name]) => {
                              subjectSelect.add(new Option(name, id));
                         });
@@ -278,11 +291,7 @@
                     subjectSelect.disabled = false;
                     refreshSelect(subjectSelect);
                 })
-                .catch(error => {
-                    console.error('Error loading subjects:', error);
-                    subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
-                    refreshSelect(subjectSelect);
-                });
+                .catch(error => { console.error(error); });
         }
 
         // --- 3. Subject Logic & Total Marks ---
@@ -292,10 +301,20 @@
                 const examId = $(examSelect).val(); 
                 const classId = $(classSelect).val();
 
-                // Show Total Marks Logic
+                // Get Info from Selected Option
                 const selectedOption = this.options[this.selectedIndex];
                 const totalMarks = selectedOption ? selectedOption.getAttribute('data-total') : null;
+                const teacherName = selectedOption ? selectedOption.getAttribute('data-teacher') : '-';
                 
+                // Update Header Info
+                if(classSelect.selectedIndex > 0) {
+                    headerClass.textContent = classSelect.options[classSelect.selectedIndex].text;
+                }
+                if(selectedOption) {
+                    headerSubject.textContent = selectedOption.text;
+                }
+                headerTeacher.textContent = teacherName;
+
                 if (totalMarks) {
                     totalMarksValue.textContent = totalMarks;
                     totalMarksDisplay.classList.remove('d-none');
@@ -318,12 +337,10 @@
             marksContainer.classList.add('d-none');
             emptyState.classList.add('d-none');
 
-            // Set Form Inputs
             document.getElementById('form_exam_id').value = examId;
             document.getElementById('form_class_id').value = classId;
             document.getElementById('form_subject_id').value = subjectId;
 
-            // Using jQuery for the AJAX call to load the table content
             $.ajax({
                 url: "{{ route('marks.get_students') }}",
                 type: "GET",
@@ -340,9 +357,7 @@
 
                     if (students.length > 0) {
                         let rows = '';
-                        
-                        // Get current Total Marks Limit
-                        const maxMarks = totalMarksValue.textContent || 100; // Fallback to 100
+                        const maxMarks = totalMarksValue.textContent || 100;
 
                         students.forEach((student, index) => {
                             let markData = marks[student.id] || { marks_obtained: '', is_absent: 0 };
@@ -350,16 +365,16 @@
                             let isInputDisabled = markData.is_absent ? 'disabled' : '';
                             let markValue = markData.is_absent ? '' : markData.marks_obtained;
 
+                            // Add class for search targeting
                             rows += `
-                                <tr>
+                                <tr class="student-row">
                                     <td class="ps-4 fw-bold">${index + 1}</td>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            <span class="w-space-no fw-bold text-dark">${student.name}</span>
+                                            <span class="w-space-no fw-bold text-dark student-name">${student.name}</span>
                                         </div>
                                     </td>
-                                    <!-- Updated JS to use admission_number -->
-                                    <td><span class="badge badge-light badge-sm text-dark">${student.admission_number}</span></td>
+                                    <td><span class="badge badge-light badge-sm text-dark student-admission">${student.admission_number}</span></td>
                                     <td>
                                         <input type="number" 
                                                name="marks[${student.id}]" 
@@ -383,25 +398,41 @@
                         });
 
                         document.getElementById('student_table_body').innerHTML = rows;
-                        document.getElementById('student_count_badge').innerText = students.length + ' Students';
+                        // document.getElementById('student_count_badge').innerText = students.length + ' Students'; // Removed in new design
                         marksContainer.classList.remove('d-none');
                         
                         bindAbsentLogic();
-                        bindMarkValidation(maxMarks); // Apply instant validation
+                        bindMarkValidation(maxMarks);
                     } else {
                         emptyState.classList.remove('d-none');
                     }
                 },
                 error: function(xhr) {
                     loadingSpinner.classList.add('d-none');
-                    let msg = "Unauthorized or Error fetching data.";
-                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                    Swal.fire({ icon: 'error', title: 'Error', text: msg });
+                    Swal.fire({ icon: 'error', title: 'Error', text: "Error fetching data." });
                 }
             });
         }
 
-        // --- Helper Utilities ---
+        // --- 4. Table Search Functionality ---
+        if(tableSearch) {
+            tableSearch.addEventListener('keyup', function() {
+                const term = this.value.toLowerCase();
+                const rows = document.querySelectorAll('.student-row');
+                
+                rows.forEach(row => {
+                    const name = row.querySelector('.student-name').textContent.toLowerCase();
+                    const admission = row.querySelector('.student-admission').textContent.toLowerCase();
+                    
+                    if(name.includes(term) || admission.includes(term)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
         function resetSelect(selectElement, placeholder) {
             selectElement.innerHTML = `<option value="">${placeholder}</option>`;
             selectElement.disabled = true;
@@ -420,33 +451,28 @@
                 let input = row.find('.mark-input');
                 if($(this).is(':checked')) {
                     input.prop('disabled', true).val(''); 
-                    input.removeClass('is-invalid'); // Clear errors if marked absent
+                    input.removeClass('is-invalid');
                 } else {
                     input.prop('disabled', false).focus();
                 }
             });
         }
 
-        // New: Validate marks as you type
         function bindMarkValidation(maxMarks) {
             $('.mark-input').off('input').on('input', function() {
                 let val = parseFloat($(this).val());
                 let max = parseFloat(maxMarks);
-                
                 if (val > max) {
                     $(this).addClass('is-invalid');
-                    // Optional: Show tooltip or small text, but class red border is usually enough
                 } else {
                     $(this).removeClass('is-invalid');
                 }
             });
         }
 
-        // --- Form Submission ---
         $('#marksForm').submit(function(e){
             e.preventDefault();
             
-            // 1. Client-Side Validation Check
             let maxMarks = parseFloat(totalMarksValue.textContent || 100);
             let hasError = false;
             
@@ -462,9 +488,9 @@
                 Swal.fire({
                     icon: 'warning',
                     title: 'Invalid Marks',
-                    text: `Marks cannot exceed total marks (${maxMarks}). Please correct the highlighted fields.`
+                    text: `Marks cannot exceed total marks (${maxMarks}).`
                 });
-                return; // Stop submission
+                return;
             }
 
             let btn = $(this).find('button[type="submit"]');

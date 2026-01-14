@@ -50,10 +50,12 @@ class ExamMarkController extends BaseController
         if(!$request->exam_id) return response()->json([]);
         $classes = $this->fetchClassesForExam($request->exam_id);
         
-        // Rule 2: Section (Grade)
+        // UPDATED: Format as "$ClassName $SectionName" (e.g. "Six A")
         $formattedClasses = $classes->mapWithKeys(function($item) {
              $grade = $item->gradeLevel->name ?? '';
-             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
+             // If grade name exists, concatenate. Otherwise just use section name.
+             $displayName = $grade ? ($grade . ' ' . $item->name) : $item->name;
+             return [$item->id => $displayName];
         });
 
         return response()->json($formattedClasses);
@@ -64,13 +66,25 @@ class ExamMarkController extends BaseController
         if(!$request->class_section_id) return response()->json([]);
         $subjects = $this->fetchSubjectsForClass($request->class_section_id);
         
-        // UPDATED: Return object structure with total_marks
-        $formattedSubjects = $subjects->map(function($subject) {
+        // UPDATED: Include Teacher Name from Timetable
+        $formattedSubjects = $subjects->map(function($subject) use ($request) {
+            
+            $teacherName = 'N/A';
+            // Find teacher assigned to this subject & class in timetable
+            $timetable = Timetable::with('teacher.user')
+                ->where('class_section_id', $request->class_section_id)
+                ->where('subject_id', $subject->id)
+                ->first();
+                
+            if ($timetable && $timetable->teacher && $timetable->teacher->user) {
+                $teacherName = $timetable->teacher->user->name;
+            }
+
             return [
                 'id' => $subject->id,
                 'name' => $subject->name,
-                // Default to 100 if column doesn't exist or is null
-                'total_marks' => $subject->total_marks ?? 100 
+                'total_marks' => $subject->total_marks ?? 100, 
+                'teacher_name' => $teacherName // Added field
             ];
         });
 

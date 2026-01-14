@@ -9,17 +9,18 @@ use App\Models\Exam;
 use App\Models\ExamRecord;
 use App\Models\StudentEnrollment;
 use App\Models\ClassSection;
+use App\Models\InstitutionSetting; 
+use App\Enums\AcademicType; 
+use App\Models\Subject; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Barryvdh\DomPDF\Facade\Pdf; // Use explicit Facade import to avoid alias issues
+use Barryvdh\DomPDF\Facade\Pdf; 
 
 class ReportController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
-        // Add permission middleware here if needed, e.g.
-        // $this->middleware('permission:reports.view'); 
         $this->setPageTitle(__('reports.page_title'));
     }
 
@@ -52,42 +53,52 @@ class ReportController extends BaseController
     {
         $request->validate([
             'student_id' => 'required|exists:students,id',
-            'exam_id' => 'required|exists:exams,id',
+            'trimester' => 'nullable|integer|in:1,2,3',
+            'semester' => 'nullable|integer|in:1,2',
+            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6', // Added Period support
+            'type' => 'nullable|in:period,term', // New: Report Type
         ]);
 
-        $student = Student::with('institution')->findOrFail($request->student_id);
-        $exam = Exam::with('academicSession')->findOrFail($request->exam_id);
-
-        // Security Check: Ensure context matches
+        $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
+        
+        // Security Check
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) {
-            abort(403, 'Unauthorized access to student record.');
+            abort(403, 'Unauthorized access.');
         }
 
-        // Fetch Exam Records
-        $records = ExamRecord::with('subject')
-            ->where('student_id', $student->id)
-            ->where('exam_id', $exam->id)
-            ->get();
+        $enrollment = $student->enrollments()->latest()->first();
+        if (!$enrollment) return back()->with('error', __('reports.no_enrollment'));
 
-        if ($records->isEmpty()) {
-            return back()->with('error', __('reports.no_records_found'));
+        // Cycle Logic
+        $cycle = $enrollment->classSection->gradeLevel->education_cycle ?? AcademicType::PRIMARY; 
+        
+        if ($cycle instanceof AcademicType) {
+            $cycleValue = $cycle->value;
+        } else {
+            $cycleValue = $cycle; 
         }
 
-        // Calculate Totals & Grades
-        $summary = $this->calculateExamSummary($records);
+        // Fetch Settings
+        $threshold = InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50);
+        $gradingScale = json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true);
 
-        // Fetch Attendance Summary for the Term (Optional but recommended)
-        $attendance = [
-            'present' => 0,
-            'absent' => 0,
-            'total' => 0
-        ]; 
-        
-        // Load View for PDF
-        $pdf = Pdf::loadView('reports.bulletin', compact('student', 'exam', 'records', 'summary', 'attendance'));
-        
-        return $pdf->stream('Bulletin_' . $student->admission_number . '.pdf');
+        // Branch Logic
+        if ($cycleValue === 'university' || $cycleValue === 'lmd') {
+            return $this->generateLmdTranscript($student, $enrollment, $request->semester, $threshold, $gradingScale);
+        } elseif ($cycleValue === 'secondary') {
+            // Check if Period Only or Full Semester
+            if ($request->type === 'period' && $request->period) {
+                return $this->generatePeriodBulletin($student, $enrollment, $request->period, $gradingScale);
+            }
+            return $this->generateSecondaryBulletin($student, $enrollment, $request->semester, $gradingScale);
+        } else {
+            // Primary Logic (can be expanded for periods too)
+            if ($request->type === 'period' && $request->period) {
+                return $this->generatePeriodBulletin($student, $enrollment, $request->period, $gradingScale);
+            }
+            return $this->generatePrimaryBulletin($student, $enrollment, $request->trimester, $gradingScale);
+        }
     }
 
     /**
@@ -101,14 +112,12 @@ class ReportController extends BaseController
 
         $student = Student::with('institution')->findOrFail($request->student_id);
         
-        // Security Check
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) {
             abort(403, 'Unauthorized access.');
         }
 
-        // Fetch Academic History (All Sessions)
-        // Group by Session -> Exam
+        // Fetch Academic History
         $history = ExamRecord::with(['exam.academicSession', 'subject'])
             ->where('student_id', $student->id)
             ->get()
@@ -119,38 +128,167 @@ class ReportController extends BaseController
         return $pdf->stream('Transcript_' . $student->admission_number . '.pdf');
     }
 
-    /**
-     * Helper to calculate totals, percentage, grade.
-     */
-    private function calculateExamSummary($records)
-    {
-        $totalMarks = 0;
-        $obtainedMarks = 0;
-        $subjectsCount = $records->count();
+    // --- HELPER METHODS FOR BULLETINS ---
 
-        foreach ($records as $record) {
-            $max = $record->subject->total_marks ?? 100;
-            $totalMarks += $max;
-            $obtainedMarks += $record->marks_obtained;
+    private function generateLmdTranscript($student, $enrollment, $semester, $threshold, $gradingScale)
+    {
+        $query = ExamRecord::with(['subject', 'exam'])
+            ->where('student_id', $student->id)
+            ->whereHas('exam', function($q) use ($enrollment) {
+                $q->where('academic_session_id', $enrollment->academic_session_id);
+            });
+
+        if ($semester) {
+            $query->whereHas('exam', function($q) use ($semester) {
+                $q->where('category', 'like', "%session_$semester%");
+            });
         }
 
-        $percentage = ($totalMarks > 0) ? ($obtainedMarks / $totalMarks) * 100 : 0;
-        
-        // Simple Grading Logic (Can be moved to a service or GradeLevel model)
-        $grade = 'F';
-        if ($percentage >= 90) $grade = 'A+';
-        elseif ($percentage >= 80) $grade = 'A';
-        elseif ($percentage >= 70) $grade = 'B';
-        elseif ($percentage >= 60) $grade = 'C';
-        elseif ($percentage >= 50) $grade = 'D';
-        elseif ($percentage >= 40) $grade = 'E';
+        $records = $query->get();
 
-        return [
-            'total_marks' => $totalMarks,
-            'obtained_marks' => $obtainedMarks,
-            'percentage' => round($percentage, 2),
-            'grade' => $grade,
-            'subjects_count' => $subjectsCount
-        ];
+        $pdf = Pdf::loadView('reports.transcript_lmd', compact('student', 'enrollment', 'records', 'semester', 'threshold', 'gradingScale'));
+        return $pdf->stream('LMD_Transcript_'.$student->admission_number.'.pdf');
+    }
+
+    /**
+     * Generates a simple bulletin for a single period (P1, P2, etc.)
+     */
+    private function generatePeriodBulletin($student, $enrollment, $period, $gradingScale)
+    {
+        // 1. Fetch Subjects
+        $subjects = Subject::where('grade_level_id', $enrollment->classSection->grade_level_id)
+            ->where('institution_id', $student->institution_id)
+            ->orderBy('name')
+            ->get();
+
+        // 2. Fetch Marks for this specific period
+        $records = ExamRecord::with(['subject', 'exam'])
+            ->where('student_id', $student->id)
+            ->whereHas('exam', function($q) use ($enrollment, $period) {
+                $q->where('academic_session_id', $enrollment->academic_session_id)
+                  ->where('category', $period);
+            })->get()->keyBy('subject_id');
+
+        $data = [];
+        foreach($subjects as $subject) {
+            $rec = $records->get($subject->id);
+            $data[] = [
+                'subject' => $subject,
+                'obtained' => $rec ? $rec->marks_obtained : '-',
+                'max' => $subject->total_marks ?? 20,
+                'percentage' => $rec ? ($rec->marks_obtained / ($subject->total_marks ?: 20)) * 100 : 0
+            ];
+        }
+
+        $pdf = Pdf::loadView('reports.bulletin_period', compact('student', 'enrollment', 'period', 'data', 'gradingScale'));
+        return $pdf->stream('Bulletin_Period_'.$period.'_'.$student->admission_number.'.pdf');
+    }
+
+    private function generatePrimaryBulletin($student, $enrollment, $trimester, $gradingScale)
+    {
+        $trimester = $trimester ?? 1;
+        $pA = "p" . (($trimester * 2) - 1); 
+        $pB = "p" . ($trimester * 2);       
+        $examCat = "trimester_exam_$trimester";
+
+        $records = ExamRecord::with(['subject', 'exam'])
+            ->where('student_id', $student->id)
+            ->whereHas('exam', function($q) use ($enrollment) {
+                $q->where('academic_session_id', $enrollment->academic_session_id);
+            })->get();
+
+        $data = [];
+        foreach ($records as $r) {
+            $subId = $r->subject_id;
+            if (!isset($data[$subId])) {
+                $data[$subId] = [
+                    'subject' => $r->subject,
+                    'p1_score' => 0, 'p2_score' => 0, 'exam_score' => 0,
+                    'p_max' => $r->subject->total_marks ?? 20,
+                    'exam_max' => ($r->subject->total_marks ?? 20) * 2 
+                ];
+            }
+            
+            if ($r->exam->category == $pA) $data[$subId]['p1_score'] = $r->marks_obtained;
+            if ($r->exam->category == $pB) $data[$subId]['p2_score'] = $r->marks_obtained;
+            if ($r->exam->category == $examCat) $data[$subId]['exam_score'] = $r->marks_obtained;
+        }
+
+        $pdf = Pdf::loadView('reports.bulletin_primary', compact('student', 'enrollment', 'data', 'trimester', 'gradingScale'));
+        return $pdf->stream('Bulletin_Primary_'.$student->admission_number.'.pdf');
+    }
+
+    private function generateSecondaryBulletin($student, $enrollment, $semester, $gradingScale)
+    {
+        $semester = $semester ?? 1;
+        
+        $startPeriod = ($semester * 2) - 1; 
+        $pA = "p" . $startPeriod;       
+        $pB = "p" . ($startPeriod + 1); 
+        $examCat = "semester_exam_$semester";
+
+        $subjects = Subject::where('grade_level_id', $enrollment->classSection->grade_level_id)
+            ->where('institution_id', $student->institution_id)
+            ->orderBy('name')
+            ->get();
+
+        $records = ExamRecord::with(['subject', 'exam'])
+            ->where('student_id', $student->id)
+            ->whereHas('exam', function($q) use ($enrollment, $pA, $pB, $examCat) {
+                $q->where('academic_session_id', $enrollment->academic_session_id)
+                  ->whereIn('category', [$pA, $pB, $examCat]);
+            })->get();
+
+        $data = [];
+        
+        foreach($subjects as $subject) {
+            $max = $subject->total_marks ?? 20; 
+            $data[$subject->id] = [
+                'subject' => $subject,
+                'p1_score' => '-',
+                'p2_score' => '-',
+                'exam_score' => '-',
+                'p_max' => $max,
+                'exam_max' => $max * 2, 
+                'total_score' => 0,
+                'total_max' => ($max * 2) + ($max * 2), 
+                'has_marks' => false
+            ];
+        }
+
+        foreach ($records as $r) {
+            $subId = $r->subject_id;
+            if (isset($data[$subId])) {
+                $cat = $r->exam->category;
+                
+                if ($cat == $pA) {
+                    $data[$subId]['p1_score'] = $r->marks_obtained;
+                    $data[$subId]['has_marks'] = true;
+                }
+                elseif ($cat == $pB) {
+                    $data[$subId]['p2_score'] = $r->marks_obtained;
+                    $data[$subId]['has_marks'] = true;
+                }
+                elseif ($cat == $examCat) {
+                    $data[$subId]['exam_score'] = $r->marks_obtained;
+                    $data[$subId]['has_marks'] = true;
+                }
+            }
+        }
+
+        foreach($data as $id => &$row) {
+            $s1 = is_numeric($row['p1_score']) ? $row['p1_score'] : 0;
+            $s2 = is_numeric($row['p2_score']) ? $row['p2_score'] : 0;
+            $ex = is_numeric($row['exam_score']) ? $row['exam_score'] : 0;
+            
+            if($row['has_marks']) {
+                $row['total_score'] = $s1 + $s2 + $ex;
+            } else {
+                $row['total_score'] = '-';
+            }
+        }
+
+        $pdf = Pdf::loadView('reports.bulletin_secondary', compact('student', 'enrollment', 'semester', 'data', 'gradingScale'));
+        return $pdf->stream('Bulletin_Secondary_'.$student->admission_number.'.pdf');
     }
 }

@@ -32,14 +32,37 @@
                                 <input type="text" name="name" class="form-control" value="{{ old('name', $exam->name ?? '') }}" placeholder="{{ __('exam.enter_name') }}" required>
                             </div>
 
-                            {{-- Dates --}}
+                            {{-- Exam Category - Flattened List to avoid Select2 Optgroup issues --}}
                             <div class="mb-3 col-md-6">
-                                <label class="form-label">{{ __('exam.start_date') }} <span class="text-danger">*</span></label>
-                                <input type="text" name="start_date" class="form-control datepicker" value="{{ old('start_date', isset($exam) ? $exam->start_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
-                            </div>
-                            <div class="mb-3 col-md-6">
-                                <label class="form-label">{{ __('exam.end_date') }} <span class="text-danger">*</span></label>
-                                <input type="text" name="end_date" class="form-control datepicker" value="{{ old('end_date', isset($exam) ? $exam->end_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
+                                <label class="form-label">{{ __('exam.category') }} <span class="text-danger">*</span></label>
+                                <select name="category" class="form-control default-select" required>
+                                    <option value="">{{ __('exam.select_category') }}</option>
+                                    
+                                    {{-- Periods --}}
+                                    <option value="p1" {{ (old('category', $exam->category ?? '') == 'p1') ? 'selected' : '' }}>-- {{ __('exam.p1') }} --</option>
+                                    <option value="p2" {{ (old('category', $exam->category ?? '') == 'p2') ? 'selected' : '' }}>-- {{ __('exam.p2') }} --</option>
+                                    <option value="p3" {{ (old('category', $exam->category ?? '') == 'p3') ? 'selected' : '' }}>-- {{ __('exam.p3') }} --</option>
+                                    <option value="p4" {{ (old('category', $exam->category ?? '') == 'p4') ? 'selected' : '' }}>-- {{ __('exam.p4') }} --</option>
+                                    <option value="p5" {{ (old('category', $exam->category ?? '') == 'p5') ? 'selected' : '' }}>-- {{ __('exam.p5') }} --</option>
+                                    <option value="p6" {{ (old('category', $exam->category ?? '') == 'p6') ? 'selected' : '' }}>-- {{ __('exam.p6') }} --</option>
+                                    
+                                    {{-- Primary --}}
+                                    <option disabled>──────────</option>
+                                    <option value="trimester_exam_1" {{ (old('category', $exam->category ?? '') == 'trimester_exam_1') ? 'selected' : '' }}>{{ __('exam.trimester_exam_1') }}</option>
+                                    <option value="trimester_exam_2" {{ (old('category', $exam->category ?? '') == 'trimester_exam_2') ? 'selected' : '' }}>{{ __('exam.trimester_exam_2') }}</option>
+                                    <option value="trimester_exam_3" {{ (old('category', $exam->category ?? '') == 'trimester_exam_3') ? 'selected' : '' }}>{{ __('exam.trimester_exam_3') }}</option>
+                                    
+                                    {{-- Secondary --}}
+                                    <option disabled>──────────</option>
+                                    <option value="semester_exam_1" {{ (old('category', $exam->category ?? '') == 'semester_exam_1') ? 'selected' : '' }}>{{ __('exam.semester_exam_1') }}</option>
+                                    <option value="semester_exam_2" {{ (old('category', $exam->category ?? '') == 'semester_exam_2') ? 'selected' : '' }}>{{ __('exam.semester_exam_2') }}</option>
+                                    
+                                    {{-- University --}}
+                                    <option disabled>──────────</option>
+                                    <option value="university_session_1" {{ (old('category', $exam->category ?? '') == 'university_session_1') ? 'selected' : '' }}>{{ __('exam.university_session_1') }}</option>
+                                    <option value="university_session_2" {{ (old('category', $exam->category ?? '') == 'university_session_2') ? 'selected' : '' }}>{{ __('exam.university_session_2') }}</option>
+                                </select>
+                                <small class="text-muted">Used for report card aggregation (e.g. P1 + P2 + Trimester Exam 1).</small>
                             </div>
 
                             {{-- Status --}}
@@ -51,6 +74,16 @@
                                     <option value="completed" {{ (old('status', $exam->status ?? '') == 'completed') ? 'selected' : '' }}>{{ __('exam.completed') }}</option>
                                     <option value="published" {{ (old('status', $exam->status ?? '') == 'published') ? 'selected' : '' }}>{{ __('exam.published') }}</option>
                                 </select>
+                            </div>
+
+                            {{-- Dates --}}
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label">{{ __('exam.start_date') }} <span class="text-danger">*</span></label>
+                                <input type="text" name="start_date" class="form-control datepicker" value="{{ old('start_date', isset($exam) ? $exam->start_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
+                            </div>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label">{{ __('exam.end_date') }} <span class="text-danger">*</span></label>
+                                <input type="text" name="end_date" class="form-control datepicker" value="{{ old('end_date', isset($exam) ? $exam->end_date->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
                             </div>
 
                             {{-- Description --}}

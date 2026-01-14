@@ -11,11 +11,13 @@ return [
 
     'select_institution_first' => 'Please select an institution context first.',
     'save_changes' => 'Save Changes',
+    'save_settings' => 'Save Settings', // Added
     
     // Tabs
     'tab_attendance' => 'Attendance',
     'tab_exams' => 'Exams',
     'tab_general' => 'General',
+    'tab_academic' => 'Academic', // Added for Academic Settings
 
     // Attendance Settings
     'attendance_settings' => 'Attendance Configuration',
@@ -30,6 +32,15 @@ return [
     'lock_exams_help' => 'If enabled, regular users (teachers) cannot create or update exams.',
     'exam_grace_period' => 'Modification Grace Period (Days)',
     'exam_grace_help' => 'Number of past days regular users are allowed to edit exam details after the start date.',
+
+    // Academic / LMD Settings (New)
+    'lmd_config' => 'LMD / University Configuration',
+    'validation_threshold' => 'Validation Threshold',
+    'threshold_hint' => 'Minimum percentage required to validate a credit (e.g., 50).',
+    'grading_scale' => 'Grading Scale',
+    'grade_label' => 'Grade Label',
+    'min_percentage' => 'Min Percentage',
+    'remark' => 'Remark',
 
     'enabled' => 'Enabled (Blocked)',
     'disabled' => 'Disabled (Open)',

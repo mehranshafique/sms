@@ -21,6 +21,7 @@ return [
     // Table
     'table_no' => '#',
     'exam_name' => 'Exam Name',
+    'category' => 'Category', // Added
     'session' => 'Session',
     'start_date' => 'Start Date',
     'status' => 'Status',
@@ -35,11 +36,34 @@ return [
     
     'select_session' => 'Select Academic Session',
     'name' => 'Exam Name',
+    'enter_name' => 'e.g. Mid-Term 2025',
+    'select_category' => 'Select Category', // Added
     'end_date' => 'End Date',
     'description' => 'Description (Optional)',
     'status_label' => 'Current Status',
 
-    'enter_name' => 'e.g. Mid-Term 2025',
+    // Categories (New)
+    'cat_periods' => 'Periods (Evaluations)',
+    'cat_primary_exams' => 'Primary Exams (Trimesters)',
+    'cat_secondary_exams' => 'Secondary Exams (Semesters)',
+    'cat_university_exams' => 'University (Sessions)',
+
+    'p1' => 'Period 1',
+    'p2' => 'Period 2',
+    'p3' => 'Period 3',
+    'p4' => 'Period 4',
+    'p5' => 'Period 5',
+    'p6' => 'Period 6',
+    
+    'trimester_exam_1' => 'Trimester 1 Final Exam',
+    'trimester_exam_2' => 'Trimester 2 Final Exam',
+    'trimester_exam_3' => 'Trimester 3 Final Exam',
+    
+    'semester_exam_1' => 'Semester 1 Final Exam',
+    'semester_exam_2' => 'Semester 2 Final Exam',
+    
+    'university_session_1' => 'First Session Exam',
+    'university_session_2' => 'Second Session Exam',
     
     // Statuses
     'scheduled' => 'Scheduled',

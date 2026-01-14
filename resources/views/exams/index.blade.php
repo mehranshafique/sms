@@ -46,6 +46,7 @@
                                         @endcan
                                         <th>{{ __('exam.table_no') }}</th>
                                         <th>{{ __('exam.exam_name') }}</th>
+                                        <th>{{ __('exam.category') }}</th> <!-- Added Category Column -->
                                         <th>{{ __('exam.session') }}</th>
                                         <th>{{ __('exam.start_date') }}</th>
                                         <th>{{ __('exam.status') }}</th>
@@ -82,6 +83,7 @@
                 @endcan
                 { data: 'DT_RowIndex', name: 'id' },
                 { data: 'name', name: 'name' },
+                { data: 'category', name: 'category' }, // Added Category
                 { data: 'session', name: 'academicSession.name' },
                 { data: 'start_date', name: 'start_date' },
                 { data: 'status', name: 'status' },
@@ -90,7 +92,9 @@
         });
 
         // Add Bulk Delete Logic here (similar to previous modules)
-        // ...
+        $('#checkAll').on('click', function() {
+            $('.single-checkbox').prop('checked', this.checked);
+        });
     });
 </script>
 @endsection

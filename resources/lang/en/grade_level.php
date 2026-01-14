@@ -37,12 +37,18 @@ return [
     'order_index' => 'Order Index',
     'education_cycle' => 'Education Cycle',
     
-    // Dropdown
+    // Dropdown / Values (Used in _form and controller display)
     'select_cycle' => 'Select Cycle',
     'primary' => 'Primary',
     'secondary' => 'Secondary',
     'university' => 'University',
     'vocational' => 'Vocational',
+
+    // Cycle Keys for Enum (Matches AcademicType.php)
+    'cycle_primary' => 'Primary',
+    'cycle_secondary' => 'Secondary',
+    'cycle_lmd' => 'University',
+    'cycle_vocational' => 'Vocational',
 
     // Buttons
     'save' => 'Save Grade',

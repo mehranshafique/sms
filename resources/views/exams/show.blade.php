@@ -53,6 +53,13 @@
                         
                         <div class="profile-personal-info">
                             <h5 class="text-primary mb-3">{{ __('exam.basic_information') }}</h5>
+                            
+                            {{-- NEW: Category Display --}}
+                            <div class="row mb-2">
+                                <div class="col-5"><span class="fw-bold">{{ __('exam.category') }}:</span></div>
+                                <div class="col-7"><span>{{ $exam->category ? ucwords(str_replace('_', ' ', $exam->category)) : '-' }}</span></div>
+                            </div>
+
                             <div class="row mb-2">
                                 <div class="col-5"><span class="fw-bold">{{ __('exam.start_date') }}:</span></div>
                                 <div class="col-7"><span>{{ $exam->start_date->format('d M, Y') }}</span></div>

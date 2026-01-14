@@ -136,6 +136,7 @@
                                         </th>
                                         @endcan
                                         <th>{{ __('grade_level.table_no') }}</th>
+                                        <th>{{ __('grade_level.institution') }}</th>
                                         <th>{{ __('grade_level.name') }}</th>
                                         <th>{{ __('grade_level.code') }}</th>
                                         <th>{{ __('grade_level.order') }}</th>
@@ -208,6 +209,7 @@
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endcan
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
+                { data: 'institution_name', name: 'institution.name' }, // Make sure controller sends this
                 { data: 'name', name: 'name' },
                 { data: 'code', name: 'code' },
                 { data: 'order_index', name: 'order_index' },
@@ -272,9 +274,13 @@
                         type: 'POST',
                         data: { ids: ids, _token: "{{ csrf_token() }}" },
                         success: function(response) {
-                            Swal.fire("{{ __('grade_level.success') }}", response.success, 'success');
-                            table.ajax.reload();
-                            $('#checkAll').prop('checked', false);
+                            if(response.success) {
+                                Swal.fire("{{ __('grade_level.success') }}", response.success, 'success');
+                                table.ajax.reload();
+                                $('#checkAll').prop('checked', false);
+                            } else {
+                                Swal.fire("{{ __('grade_level.error_occurred') }}", response.error, 'error');
+                            }
                         },
                         error: function() {
                             Swal.fire("{{ __('grade_level.error_occurred') }}", "{{ __('grade_level.something_went_wrong') }}", 'error');

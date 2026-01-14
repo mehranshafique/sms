@@ -71,6 +71,9 @@ class ExamController extends BaseController
                 ->addColumn('session', function($row){
                     return $row->academicSession->name ?? 'N/A';
                 })
+                ->addColumn('category', function($row){
+                    return $row->category ? ucwords(str_replace('_', ' ', $row->category)) : '-';
+                })
                 ->editColumn('start_date', function($row){
                     return $row->start_date->format('d M, Y');
                 })
@@ -181,6 +184,7 @@ class ExamController extends BaseController
                                  ->where('institution_id', $session->institution_id);
                 })
             ],
+            'category' => 'required|string|max:50', // NEW VALIDATION
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'status' => 'required|in:scheduled,ongoing,completed,published',
@@ -290,6 +294,7 @@ class ExamController extends BaseController
                                  ->where('institution_id', $exam->institution_id);
                 })
             ],
+            'category' => 'required|string|max:50', // NEW VALIDATION
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'status' => 'required|in:scheduled,ongoing,completed,published',

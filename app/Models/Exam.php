@@ -13,15 +13,18 @@ class Exam extends Model
         'institution_id',
         'academic_session_id',
         'name',
+        'category', // NEW: p1, p2, p3, p4, p5, p6, trimester_exam, semester_exam
         'start_date',
         'end_date',
         'status',
         'description',
+        'finalized_at',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'finalized_at' => 'datetime',
     ];
 
     public function academicSession()

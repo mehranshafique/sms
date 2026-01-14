@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\AcademicType; // Import the Enum
 
 class GradeLevel extends Model
 {
@@ -17,6 +18,13 @@ class GradeLevel extends Model
         'education_cycle',
     ];
 
+    /**
+     * Cast the education_cycle to the AcademicType Enum.
+     */
+    protected $casts = [
+        'education_cycle' => AcademicType::class,
+    ];
+
     /*
     |--------------------------------------------------------------------------
     | RELATIONSHIPS
@@ -28,10 +36,10 @@ class GradeLevel extends Model
         return $this->belongsTo(Institution::class);
     }
 
-    // Future relationship for Class Sections
-    // public function classSections() {
-    //     return $this->hasMany(ClassSection::class);
-    // }
+    public function subjects()
+    {
+        return $this->hasMany(Subject::class);
+    }
 
     /*
     |--------------------------------------------------------------------------
