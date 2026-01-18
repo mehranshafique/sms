@@ -6,8 +6,9 @@ use App\Models\Staff;
 use App\Models\User;
 use App\Models\Institution;
 use App\Models\Campus;
-use App\Services\NotificationService; // New Import
+use App\Services\NotificationService;
 use Spatie\Permission\Models\Role;
+use App\Enums\RoleEnum;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Hash;
@@ -107,7 +108,7 @@ class StaffController extends BaseController
         $institutions = [];
         if ($institutionId) {
             $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
-        } elseif (Auth::user()->hasRole('Super Admin')) {
+        } elseif (Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value)) {
             $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         }
         
@@ -117,7 +118,20 @@ class StaffController extends BaseController
         }
         $campuses = $campusesQuery->pluck('name', 'id');
         
-        $roles = Role::where('name', '!=', 'Super Admin')->get();
+        $rolesQuery = Role::where('name', '!=', RoleEnum::SUPER_ADMIN->value);
+
+        // Apply filtering logic: Always check institution_id not null unless handled specifically
+        // But per request: apply $rolesQuery->whereNotNull('institution_id') for ALL users including Head/SuperAdmin when selecting staff roles
+        // This effectively hides global platform roles from being assigned to staff via this form.
+        
+        $rolesQuery->whereNotNull('institution_id');
+
+        // Additionally filter by current institution context if set
+        if ($institutionId) {
+            $rolesQuery->where('institution_id', $institutionId);
+        }
+
+        $roles = $rolesQuery->get();
         
         return view('staff.create', compact('institutions', 'campuses', 'roles', 'institutionId'));
     }
@@ -130,7 +144,19 @@ class StaffController extends BaseController
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
-            'role' => 'required|exists:roles,name',
+            'role' => [
+                'required',
+                // Validate role exists AND belongs to the correct institution context (NOT NULL)
+                Rule::exists('roles', 'name')->where(function ($query) use ($institutionId) {
+                    $query->where('name', '!=', RoleEnum::SUPER_ADMIN->value)
+                          ->whereNotNull('institution_id'); // Enforce Not Null check
+
+                    if ($institutionId) {
+                        $query->where('institution_id', $institutionId);
+                    }
+                    return $query;
+                }),
+            ],
             'phone' => 'nullable|string',
             'profile_picture' => 'nullable|image|max:2048',
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
@@ -198,7 +224,19 @@ class StaffController extends BaseController
         
         $institutions = Institution::where('id', $staff->institution_id)->pluck('name', 'id');
         $campuses = Campus::where('institution_id', $staff->institution_id)->pluck('name', 'id');
-        $roles = Role::where('name', '!=', 'Super Admin')->get();
+        
+        $rolesQuery = Role::where('name', '!=', RoleEnum::SUPER_ADMIN->value);
+
+        // Apply Not Null check for all users
+        $rolesQuery->whereNotNull('institution_id');
+
+        // Apply Institution Context Filter
+        $instId = $staff->institution_id;
+        if ($instId) {
+            $rolesQuery->where('institution_id', $instId);
+        }
+
+        $roles = $rolesQuery->get();
         
         return view('staff.edit', compact('staff', 'institutions', 'campuses', 'roles', 'institutionId'));
     }
@@ -209,11 +247,25 @@ class StaffController extends BaseController
         if ($institutionId && $staff->institution_id != $institutionId) abort(403);
 
         $user = $staff->user;
+        
+        // Determine the relevant institution ID for validation (current staff's institution)
+        $targetInstitutionId = $staff->institution_id;
 
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,'.$user->id,
-            'role' => 'required|exists:roles,name',
+            'role' => [
+                'required',
+                Rule::exists('roles', 'name')->where(function ($query) use ($targetInstitutionId) {
+                    $query->where('name', '!=', RoleEnum::SUPER_ADMIN->value)
+                          ->whereNotNull('institution_id'); // Enforce Not Null check
+
+                    if ($targetInstitutionId) {
+                        $query->where('institution_id', $targetInstitutionId);
+                    }
+                    return $query;
+                }),
+            ],
             'profile_picture' => 'nullable|image|max:2048',
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
         ]);

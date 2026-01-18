@@ -17,7 +17,7 @@ return [
     'inactive' => 'Inactive',
     'new_this_month' => 'New This Month',
     'recent_analytics' => 'Recent analytics',
-
+    'institute_details' => 'Institute Details',
     // Table Headers
     'institute_list' => 'Institute List',
     'search_placeholder' => 'Search...',

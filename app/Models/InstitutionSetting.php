@@ -32,4 +32,14 @@ class InstitutionSetting extends Model
             ['value' => $value, 'group' => $group]
         );
     }
+
+    /**
+     * Check if a specific period is open for marks entry.
+     * Periods are stored as a JSON array in 'active_periods'.
+     */
+    public static function isPeriodOpen($institutionId, $periodKey)
+    {
+        $activePeriods = json_decode(self::get($institutionId, 'active_periods', '[]'), true);
+        return in_array($periodKey, $activePeriods);
+    }
 }

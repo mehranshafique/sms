@@ -35,7 +35,8 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
 use App\Http\Controllers\StudentPromotionController;
-use App\Http\Controllers\TransferController; // Add import
+use App\Http\Controllers\TransferController; 
+
 // --- Controllers: Examinations ---
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
@@ -55,8 +56,8 @@ use App\Http\Controllers\Finance\FeeStructureController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\FinancialReportController;
-use App\Http\Controllers\Finance\StudentFinanceController; // Add import
-use App\Http\Controllers\SalaryStructureController; // Add this import
+use App\Http\Controllers\Finance\StudentFinanceController; 
+use App\Http\Controllers\SalaryStructureController; 
 use App\Http\Controllers\Finance\BudgetController; 
 // --- Middleware ---
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -177,7 +178,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
     // 3. PEOPLE & HR MODULE
     // =========================================================================
-
+    // Parent / Guardian Management
+    Route::get('parents/check', [App\Http\Controllers\ParentController::class, 'check'])->name('parents.check');
     // Students
     Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
     Route::resource('students', StudentController::class);
@@ -233,7 +235,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware([CheckModuleAccess::class . ':exams'])->group(function () {
         Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
         Route::post('exams/{exam}/finalize', [ExamController::class, 'finalize'])->name('exams.finalize');
+        
+        // --- PRINT ROUTES ---
+        // General Exam Result (Whole Class/All Subjects)
         Route::get('exams/{exam}/print-result', [ExamController::class, 'printClassResult'])->name('exams.print_result');
+        // Specific Award List (Single Subject)
+        Route::get('exams/print-award-list', [ExamMarkController::class, 'printAwardList'])->name('exams.print_award_list'); // Added This Line
+
         Route::resource('exams', ExamController::class);
         
         // Result Cards
@@ -250,10 +258,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware([CheckModuleAccess::class . ':exam_marks'])->group(function () {
         Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
         Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
-        // AJAX Helpers
-        Route::get('marks/get-classes', [ExamMarkController::class, 'getClasses'])->name('marks.get_classes');
+        
+        // AJAX Helpers (NEW: Split Grade & Section)
+        Route::get('marks/get-grades', [ExamMarkController::class, 'getGrades'])->name('marks.get_grades'); 
+        Route::get('marks/get-sections', [ExamMarkController::class, 'getSections'])->name('marks.get_sections'); 
         Route::get('marks/get-subjects', [ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
         Route::get('marks/get-students', [ExamMarkController::class, 'getStudents'])->name('marks.get_students');
+        
         // Student View
         Route::get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
     });
@@ -277,7 +288,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
             // NEW: Student Balances Overview
         Route::get('balances', [App\Http\Controllers\Finance\StudentBalanceController::class, 'index'])->name('finance.balances.index');
-        Route::get('balances/class/{id}', [App\Http\Controllers\Finance\StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); // Added this
+        Route::get('balances/class/{id}', [App\Http\Controllers\Finance\StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); 
 
 
         // BUDGET MODULE
@@ -297,19 +308,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('budgets/requests/{id}/update', [App\Http\Controllers\Finance\BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
 
 
-        // Invoices - AJAX Routes (Must be before resource route to avoid collision with {invoice})
+        // Invoices - AJAX Routes
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
-        Route::get('invoices/get-students', [InvoiceController::class, 'getStudents'])->name('invoices.get_students'); // Added this
-        // Invoices - AJAX Routes (Must be before resource route to avoid collision with {invoice})
-        Route::get('invoices/get-fees', [InvoiceController::class, 'getFees'])->name('invoices.get_fees'); // Added this
-        Route::get('invoices/check-duplicates', [InvoiceController::class, 'checkDuplicates'])->name('invoices.check_duplicates'); // Added this    
+        Route::get('invoices/get-students', [InvoiceController::class, 'getStudents'])->name('invoices.get_students'); 
+        Route::get('invoices/get-fees', [InvoiceController::class, 'getFees'])->name('invoices.get_fees'); 
+        Route::get('invoices/check-duplicates', [InvoiceController::class, 'checkDuplicates'])->name('invoices.check_duplicates'); 
+        
         // Fee Settings
         Route::middleware([CheckModuleAccess::class . ':fee_types'])->group(function () {
             Route::resource('fee-types', FeeTypeController::class);
         });
 
         Route::middleware([CheckModuleAccess::class . ':fee_structures'])->group(function () {
-            Route::get('fees/get-sections', [FeeStructureController::class, 'getClassSections'])->name('fees.get_sections'); // Added for AJAX
+            Route::get('fees/get-sections', [FeeStructureController::class, 'getClassSections'])->name('fees.get_sections'); 
             Route::get('reports/class-summary', [FinancialReportController::class, 'index'])->name('finance.reports.class_summary');
             Route::resource('fees', FeeStructureController::class);
         });

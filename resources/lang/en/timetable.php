@@ -13,6 +13,7 @@ return [
     'manage_list_subtitle' => 'Manage class schedules and routines',
     'create_new' => 'Add Routine',
     'filter_by_class' => 'Filter by Class',
+    'all_grades' => 'All Grades', // Added
     'class_routine' => 'Class Routine',
     'weekly_schedule' => 'Weekly Schedule',
     'print_routine' => 'Print Routine',
@@ -39,12 +40,14 @@ return [
     'add_routine' => 'Add Routine',
     'edit_routine' => 'Edit Routine',
     'basic_information' => 'Schedule Details',
-    'view' => 'View Routine', // Added
+    'view' => 'View Routine',
     
     'select_class' => 'Select Class',
+    'select_class_first' => 'Select Grade First', // Added for better UX
     'select_subject' => 'Select Subject',
     'select_teacher' => 'Select Teacher',
     'select_day' => 'Select Day',
+    'select_room' => 'Select Room', // Added
     
     'start_time' => 'Start Time',
     'end_time' => 'End Time',
@@ -63,7 +66,7 @@ return [
     // Errors
     'no_active_session' => 'No active academic session found. Please create one first.',
     'teacher_busy' => 'The selected teacher is already booked for this time slot.',
-    'room_busy' => 'The selected room is already booked for this time slot.', // Added
+    'room_busy' => 'The selected room is already booked for this time slot.',
 
     // Buttons
     'save_routine' => 'Save Routine',

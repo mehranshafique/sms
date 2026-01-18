@@ -17,6 +17,8 @@ use App\Models\Timetable;
 use App\Models\Subject;
 use App\Models\Exam;
 use App\Models\StudentEnrollment;
+use App\Models\Payment; // Added Payment Model
+use App\Models\FeeStructure; // Added FeeStructure
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -37,7 +39,7 @@ class DashboardController extends BaseController
         $activeInstId = session('active_institution_id');
 
         // 1. MAIN ADMIN (PLATFORM OWNER) CHECK
-        if ($user->hasRole('Super Admin')) {
+        if ($user->hasRole('Super Admin') || $user->hasRole('School Admin')) {
             // If Super Admin switched to a specific school
             if ($activeInstId && $activeInstId !== 'global') {
                 return $this->schoolAdminDashboard($activeInstId);
@@ -177,14 +179,13 @@ class DashboardController extends BaseController
     }
 
     /**
-     * School Admin View (Head Officer)
+     * School Admin View (Head Officer) - OVERHAULED FINANCIALS
      */
     private function schoolAdminDashboard($institutionId)
     {
         // Core Counts (Scoped to Institution)
         $studentsQuery = Student::where('institution_id', $institutionId);
         $staffQuery = Staff::where('institution_id', $institutionId);
-        $invoiceQuery = Invoice::where('institution_id', $institutionId);
         
         $totalStudents = $studentsQuery->count();
         $totalStaff = $staffQuery->count();
@@ -192,24 +193,23 @@ class DashboardController extends BaseController
         $totalCampuses = Campus::where('institution_id', $institutionId)->count();
         $totalInstitutes = 1;
 
-        // Finance Stats (School Level)
-        $totalFees = $invoiceQuery->sum('total_amount');
-        $feesCollected = $invoiceQuery->sum('paid_amount');
-        $pendingFees = $totalFees - $feesCollected;
-
-        // Recent Students
-        $recentStudents = $studentsQuery->with('institution')->latest()->take(5)->get();
-
         // Current Session
         $currentSession = AcademicSession::where('institution_id', $institutionId)
             ->where('is_current', true)
             ->first();
 
-        // Counters
+        // --- ENROLLMENT-BASED FINANCIAL LOGIC ---
+        $expectedTotal = 0;
+        $collectedTotal = 0;
+        $remainingToCollect = 0;
+        $paidCount = 0;
+        $unpaidCount = 0;
+        $installmentStats = [];
+
         $totalEnrollment = 0;
         $newComers = 0;
-        $sessionFeesPaid = 0;
-        $sessionFeesRest = 0;
+        
+        // Other Stats
         $budgetSpend = 0; 
         $budgetRest = 0;  
         $totalCourses = Subject::where('institution_id', $institutionId)->count();
@@ -218,18 +218,115 @@ class DashboardController extends BaseController
         $totalCommunication = 0; 
 
         if ($currentSession) {
-            $totalEnrollment = StudentEnrollment::where('academic_session_id', $currentSession->id)
-                ->where('institution_id', $institutionId)->count();
+            // 1. Enrollment Counts
+            $enrollments = StudentEnrollment::where('academic_session_id', $currentSession->id)
+                ->where('institution_id', $institutionId)
+                ->where('status', 'active')
+                ->get();
+            
+            $totalEnrollment = $enrollments->count();
 
             $newComers = Student::where('institution_id', $institutionId)
                 ->whereBetween('admission_date', [$currentSession->start_date, $currentSession->end_date])
                 ->count();
 
-            $sessionInvoices = Invoice::where('academic_session_id', $currentSession->id)
-                ->where('institution_id', $institutionId);
-            $sessionFeesPaid = $sessionInvoices->sum('paid_amount');
-            $sessionFeesTotal = $sessionInvoices->sum('total_amount');
-            $sessionFeesRest = $sessionFeesTotal - $sessionFeesPaid;
+            // 2. EXPECTED REVENUE CALCULATION
+            // Formula: Sum of (Student Grade's Fee Amount) for all active students
+            // We need to fetch fee structures for the current session
+            
+            $feeStructures = FeeStructure::where('institution_id', $institutionId)
+                ->where('academic_session_id', $currentSession->id)
+                ->get();
+
+            // Calculate Expected Revenue per Student
+            // Optimized: Group students by Grade Level
+            $studentsByGrade = $enrollments->groupBy('grade_level_id');
+
+            foreach ($studentsByGrade as $gradeId => $gradeEnrollments) {
+                // Get fees applicable to this grade
+                $gradeFeeTotal = 0;
+                
+                // Check if a GLOBAL fee structure exists for this grade
+                $globalFee = $feeStructures->where('grade_level_id', $gradeId)
+                    ->where('payment_mode', 'global')
+                    ->first();
+
+                if ($globalFee) {
+                    $gradeFeeTotal = $globalFee->amount;
+                } else {
+                    // Sum installments if no global fee defined
+                    $gradeFeeTotal = $feeStructures->where('grade_level_id', $gradeId)
+                        ->where('payment_mode', 'installment')
+                        ->sum('amount');
+                }
+
+                $expectedTotal += ($gradeFeeTotal * $gradeEnrollments->count());
+            }
+
+            // 3. COLLECTED REVENUE (Real Payments)
+            // Sum payments linked to invoices for this session
+            $collectedTotal = Payment::where('institution_id', $institutionId)
+                ->whereHas('invoice', function($q) use ($currentSession) {
+                    $q->where('academic_session_id', $currentSession->id);
+                })
+                ->sum('amount');
+
+            $remainingToCollect = $expectedTotal - $collectedTotal;
+
+            // 4. PAID vs UNPAID STUDENTS COUNT
+            // A student is "Paid" if their total payments >= their grade's expected fee
+            
+            // Get total paid per student for this session
+            // FIX: Qualified column names to prevent ambiguity error
+            $studentPayments = Payment::where('payments.institution_id', $institutionId)
+                ->whereHas('invoice', function($q) use ($currentSession) {
+                    $q->where('academic_session_id', $currentSession->id);
+                })
+                ->join('invoices', 'payments.invoice_id', '=', 'invoices.id')
+                ->selectRaw('invoices.student_id, SUM(payments.amount) as total_paid')
+                ->groupBy('invoices.student_id')
+                ->pluck('total_paid', 'invoices.student_id');
+
+            foreach ($enrollments as $enrollment) {
+                $studentId = $enrollment->student_id;
+                $gradeId = $enrollment->grade_level_id;
+                
+                // Determine expected fee for this student
+                $globalFee = $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'global')->first();
+                $expected = $globalFee ? $globalFee->amount : $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'installment')->sum('amount');
+                
+                // Get actual paid
+                $paid = $studentPayments[$studentId] ?? 0;
+
+                // Threshold: 99% paid counts as Paid (to handle rounding errors)
+                if ($expected > 0 && $paid >= ($expected * 0.99)) {
+                    $paidCount++;
+                } else {
+                    $unpaidCount++;
+                }
+            }
+
+            // 5. INSTALLMENT BREAKDOWN
+            // Calculate progress for TR1, TR2, etc.
+            $installmentFees = $feeStructures->where('payment_mode', 'installment')
+                ->groupBy('installment_order')
+                ->sortKeys();
+
+            foreach ($installmentFees as $order => $fees) {
+                $instExpected = 0;
+                
+                foreach ($fees as $fee) {
+                    // How many students in this grade?
+                    $count = isset($studentsByGrade[$fee->grade_level_id]) ? $studentsByGrade[$fee->grade_level_id]->count() : 0;
+                    $instExpected += ($fee->amount * $count);
+                }
+                
+                $installmentStats[] = [
+                    'label' => $fees->first()->name ?? "Installment $order",
+                    'expected' => $instExpected,
+                    'order' => $order
+                ];
+            }
 
             $totalResults = Exam::where('academic_session_id', $currentSession->id)
                 ->where('institution_id', $institutionId)
@@ -239,7 +336,7 @@ class DashboardController extends BaseController
                 ->where('institution_id', $institutionId)->count();
         }
 
-        // Attendance Snippet
+        // Attendance Snippet (Same as before)
         $today = Carbon::today();
         $todaysAttendance = StudentAttendance::where('institution_id', $institutionId)
             ->whereDate('attendance_date', $today);
@@ -247,11 +344,11 @@ class DashboardController extends BaseController
         $absentCount = (clone $todaysAttendance)->where('status', 'absent')->count();
         $lateCount = (clone $todaysAttendance)->where('status', 'late')->count();
 
-        // Chart Data (School Specific)
+        // Chart Data (Same as before)
         $startDate = Carbon::now()->subDays(6);
         $endDate = Carbon::now();
         
-        $chartQuery = Student::where('institution_id', $institutionId) // Explicit Scope
+        $chartQuery = Student::where('institution_id', $institutionId) 
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
             ->whereBetween('created_at', [$startDate, $endDate])
             ->groupBy('date')
@@ -268,11 +365,13 @@ class DashboardController extends BaseController
             $chartValues[] = $record ? $record->count : 0;
         }
 
+        // Pass new financial variables
         return view('dashboard.super_admin', compact(
             'totalStudents', 'totalTeachers', 'totalStaff', 'totalCampuses', 'totalInstitutes', 
-            'recentStudents', 'chartLabels', 'chartValues', 'currentSession',
-            'totalFees', 'feesCollected', 'pendingFees', 'presentCount', 'absentCount', 'lateCount',
-            'totalEnrollment', 'newComers', 'sessionFeesPaid', 'sessionFeesRest',
+            'chartLabels', 'chartValues', 'currentSession',
+            'presentCount', 'absentCount', 'lateCount',
+            'totalEnrollment', 'newComers', 
+            'expectedTotal', 'collectedTotal', 'remainingToCollect', 'paidCount', 'unpaidCount', 'installmentStats',
             'budgetSpend', 'budgetRest', 'totalCourses', 'totalResults', 'totalTimetables', 'totalCommunication'
         ));
     }

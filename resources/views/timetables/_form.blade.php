@@ -14,7 +14,7 @@
                     <div class="basic-form">
                         <div class="row">
                             
-                            {{-- LOGIC: Auto-Assign vs Select Institute --}}
+                            {{-- Institution Field (Auto or Select) --}}
                             @php
                                 $hasContext = isset($institutionId) && $institutionId;
                                 $isSuperAdmin = auth()->user()->hasRole('Super Admin');
@@ -43,8 +43,8 @@
                                     <option value="">-- Select Grade --</option>
                                     @if(isset($gradeLevels))
                                         @foreach($gradeLevels as $id => $name)
-                                            {{-- If editing, check parent grade of the current section --}}
                                             @php
+                                                // Pre-select if editing or old input exists
                                                 $selected = old('grade_level_id', isset($timetable) ? $timetable->classSection->grade_level_id : '') == $id;
                                             @endphp
                                             <option value="{{ $id }}" {{ $selected ? 'selected' : '' }}>{{ $name }}</option>
@@ -56,13 +56,8 @@
                             {{-- 2. Class Selection (Dependent) --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('timetable.select_class') }} <span class="text-danger">*</span></label>
-                                <select name="class_section_id" id="classSelect" class="form-control default-select" required {{ isset($timetable) ? '' : 'disabled' }}>
-                                    <option value="">{{ isset($timetable) ? '-- Select Class --' : 'Select Grade First' }}</option>
-                                    @if(isset($classes))
-                                        @foreach($classes as $id => $name)
-                                            <option value="{{ $id }}" {{ (old('class_section_id', isset($timetable) ? $timetable->class_section_id : '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
-                                        @endforeach
-                                    @endif
+                                <select name="class_section_id" id="classSelect" class="form-control default-select" required disabled>
+                                    <option value="">{{ __('timetable.select_class_first') }}</option>
                                 </select>
                             </div>
                             
@@ -112,7 +107,7 @@
                                 <input type="text" name="room_number" class="form-control" value="{{ old('room_number', isset($timetable) ? $timetable->room_number : '') }}" placeholder="{{ __('timetable.enter_room') }}">
                             </div>
 
-                            {{-- Start Time (Using Class 'timepicker') --}}
+                            {{-- Start Time --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.start_time') }} <span class="text-danger">*</span></label>
                                 <div class="input-group clockpicker">
@@ -121,7 +116,7 @@
                                 </div>
                             </div>
 
-                            {{-- End Time (Using Class 'timepicker') --}}
+                            {{-- End Time --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.end_time') }} <span class="text-danger">*</span></label>
                                 <div class="input-group clockpicker">
@@ -142,63 +137,72 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Requirement No 4: Ensure options are shown and selected correctly with Ajax
-        $('#gradeSelect').on('change', function() {
-            var gradeId = $(this).val();
-            var $classSelect = $('#classSelect');
-            var selectedClassId = "{{ old('class_section_id', isset($timetable) ? $timetable->class_section_id : '') }}";
-            
-            // Show loading state
-            $classSelect.empty().append('<option value="">Loading...</option>').prop('disabled', true);
-            if($.fn.selectpicker) $classSelect.selectpicker('refresh');
-
-            if(gradeId) {
-                // Reusing the Students getSections route as it provides the same data
-                $.ajax({
-                    url: "{{ route('students.get_sections') }}",
-                    type: "GET",
-                    data: { grade_id: gradeId },
-                    success: function(data) {
-                        $classSelect.empty().append('<option value="">-- Select Class --</option>');
-                        if(Object.keys(data).length > 0) {
-                            $.each(data, function(key, value) {
-                                // Requirement No 4: Check dependent selection box value
-                                var isSelected = (selectedClassId == key) ? 'selected' : '';
-                                $classSelect.append('<option value="'+key+'" '+isSelected+'>'+value+'</option>');
-                            });
-                            $classSelect.prop('disabled', false);
-                        } else {
-                            $classSelect.append('<option value="">No classes found</option>');
-                        }
-                        
-                        // Requirement No 4: Refresh logic to show selected option
-                        // Using setTimeout ensures the DOM update is processed before refresh
-                        setTimeout(function(){
-                            if($.fn.selectpicker) {
-                                $classSelect.selectpicker('refresh');
-                                // Force render if value exists but UI didn't update
-                                if(selectedClassId && $classSelect.find('option[value="'+selectedClassId+'"]').length > 0) {
-                                    $classSelect.val(selectedClassId);
-                                    $classSelect.selectpicker('render');
-                                }
-                            }
-                        }, 100);
-                    },
-                    error: function() {
-                        $classSelect.empty().append('<option value="">Error loading classes</option>');
-                        if($.fn.selectpicker) $classSelect.selectpicker('refresh');
-                    }
-                });
-            } else {
-                $classSelect.empty().append('<option value="">Select Grade First</option>');
-                if($.fn.selectpicker) $classSelect.selectpicker('refresh');
+        
+        // --- HELPER: Refresh UI Library (Bootstrap-Select) ---
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select')) {
+                if ($.fn.selectpicker) {
+                     $(element).selectpicker('refresh');
+                }
             }
-        });
+        }
 
-        // Trigger change if Grade is pre-selected (Edit mode or Validation error)
-        var preSelectedGrade = $('#gradeSelect').val();
-        if(preSelectedGrade) {
-            $('#gradeSelect').trigger('change');
+        // --- HELPER: Trigger Native Change ---
+        function triggerChangeEvent(element) {
+            element.dispatchEvent(new Event('change'));
+        }
+
+        // --- LOGIC: Grade -> Class Section ---
+        const gradeSelect = document.getElementById('gradeSelect');
+        const classSelect = document.getElementById('classSelect');
+        // Get old value for Edit mode or Validation redirect
+        const oldClassId = "{{ old('class_section_id', isset($timetable) ? $timetable->class_section_id : '') }}";
+
+        if (gradeSelect) {
+            gradeSelect.addEventListener('change', function() {
+                // 1. Reset Class Dropdown
+                classSelect.innerHTML = '<option value="">{{ __('timetable.select_class_first') }}</option>';
+                classSelect.disabled = true;
+                refreshSelect(classSelect);
+
+                // 2. Fetch if value exists
+                if (this.value) {
+                    // Update Loading State
+                    classSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                    refreshSelect(classSelect);
+
+                    fetch(`{{ route('students.get_sections') }}?grade_id=${this.value}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            classSelect.innerHTML = '<option value="">{{ __('timetable.select_class') }}</option>';
+                            
+                            // Iterate Object {id: name}
+                            Object.entries(data).forEach(([id, name]) => {
+                                let option = new Option(name, id);
+                                if (String(id) === String(oldClassId)) option.selected = true;
+                                classSelect.add(option);
+                            });
+
+                            if (Object.keys(data).length > 0) {
+                                classSelect.disabled = false;
+                            } else {
+                                classSelect.innerHTML = '<option value="">{{ __('student.no_options') }}</option>';
+                            }
+                            
+                            refreshSelect(classSelect);
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            classSelect.innerHTML = '<option value="">{{ __('student.error_loading') }}</option>';
+                            refreshSelect(classSelect);
+                        });
+                }
+            });
+
+            // 3. Trigger Initial Load (Edit Mode)
+            if (gradeSelect.value) {
+                triggerChangeEvent(gradeSelect);
+            }
         }
     });
 </script>

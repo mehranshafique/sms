@@ -8,7 +8,7 @@ use App\Models\Subject;
 use App\Models\Staff;
 use App\Models\AcademicSession;
 use App\Models\Institution;
-use App\Models\GradeLevel; // Added
+use App\Models\GradeLevel;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -29,19 +29,15 @@ class TimetableController extends BaseController
         $user = Auth::user();
 
         if ($request->ajax()) {
-            // FIX: Select 'day_of_week' as 'day' so DataTables can sort/filter
-            $query = Timetable::with(['classSection.gradeLevel', 'subject', 'teacher.user']) // Eager load gradeLevel via classSection
+            $query = Timetable::with(['classSection.gradeLevel', 'subject', 'teacher.user'])
                 ->select('timetables.*', 'timetables.day_of_week as day')
-                ->latest('timetables.created_at'); // Show Latest First (Requirement No 3)
+                ->latest('timetables.created_at');
 
-            // 1. Institution Scoping (Strictly prefixed)
             if ($institutionId) {
                 $query->where('timetables.institution_id', $institutionId);
             }
 
-            // 2. Role-Based Scoping
             if ($user->hasRole('Teacher')) {
-                // Teachers see only their own schedule
                 $staff = $user->staff; 
                 if ($staff) {
                     $query->where('timetables.teacher_id', $staff->id);
@@ -49,7 +45,6 @@ class TimetableController extends BaseController
                     $query->whereRaw('1 = 0'); 
                 }
             } elseif ($user->hasRole('Student')) {
-                // Students see only their class schedule
                 $student = $user->student; 
                 if ($student) {
                     $currentClassId = $student->enrollments()
@@ -70,6 +65,12 @@ class TimetableController extends BaseController
             if ($request->has('class_section_id') && $request->class_section_id) {
                 $query->where('timetables.class_section_id', $request->class_section_id);
             }
+            // Optional: Filter by Grade if Class is not selected but Grade is
+            if ($request->has('grade_level_id') && $request->grade_level_id && !$request->class_section_id) {
+                $query->whereHas('classSection', function($q) use ($request) {
+                    $q->where('grade_level_id', $request->grade_level_id);
+                });
+            }
 
             return DataTables::of($query)
                 ->addIndexColumn()
@@ -83,7 +84,6 @@ class TimetableController extends BaseController
                     return '';
                 })
                 ->addColumn('class', function($row){
-                    // Requirement No 2: Show section with parent grade name
                     $gradeName = $row->classSection->gradeLevel->name ?? '';
                     $sectionName = $row->classSection->name ?? 'N/A';
                     return $sectionName . ($gradeName ? ' (' . $gradeName . ')' : '');
@@ -119,21 +119,31 @@ class TimetableController extends BaseController
         }
 
         $classSections = [];
+        $gradeLevels = [];
+
         if (!$user->hasRole(['Student', 'Teacher'])) {
-            $classSectionsQuery = ClassSection::with('gradeLevel'); // Eager load for display
+            // Fetch Grades
+            $gradeLevelsQuery = GradeLevel::query();
+            if ($institutionId) {
+                $gradeLevelsQuery->where('institution_id', $institutionId);
+            }
+            $gradeLevels = $gradeLevelsQuery->orderBy('order_index')->pluck('name', 'id');
+
+            // Initial Classes (All, or empty if we strictly depend on grade)
+            // Keeping it empty initially forces user to select grade, or you can load all.
+            // Let's load all initially to match previous behavior, but Filter JS will handle it.
+            $classSectionsQuery = ClassSection::with('gradeLevel');
             if ($institutionId) {
                 $classSectionsQuery->where('institution_id', $institutionId);
             }
-            // Requirement No 2 for filter dropdown as well
             $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) {
-                 return [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')'];
+                 return [$item->id => $item->name];
             });
         }
 
-        return view('timetables.index', compact('classSections'));
+        return view('timetables.index', compact('classSections', 'gradeLevels'));
     }
 
-    // ... (classRoutine, getScheduleData, generateWeeklyView methods remain same) ...
     public function classRoutine(Request $request)
     {
         $institutionId = $this->getInstitutionId();
@@ -177,14 +187,22 @@ class TimetableController extends BaseController
         }
         
         $classes = collect();
+        $gradeLevels = collect();
         $teachers = collect();
         $rooms = collect();
 
         if (!$user->hasRole(['Student', 'Teacher'])) {
+            $gradeLevelsQuery = GradeLevel::query();
+            if ($institutionId) {
+                $gradeLevelsQuery->where('institution_id', $institutionId);
+            }
+            $gradeLevels = $gradeLevelsQuery->orderBy('order_index')->pluck('name', 'id');
+
+            // UPDATED: No concatenation
             $classesQuery = ClassSection::with('gradeLevel');
             if ($institutionId) $classesQuery->where('institution_id', $institutionId);
             $classes = $classesQuery->get()->mapWithKeys(function($item) {
-                 return [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')'];
+                 return [$item->id => $item->name];
             });
 
             $teachersQuery = Staff::with('user');
@@ -197,14 +215,30 @@ class TimetableController extends BaseController
         }
 
         if ($selectedClass || !empty($filters)) {
-            return $this->generateWeeklyView($selectedClass, true, null, $classes, $teachers, $rooms, $filters);
+            return $this->generateWeeklyView($selectedClass, true, null, $classes, $teachers, $rooms, $filters, $gradeLevels);
         }
 
-        return view('timetables.viewer', compact('classes', 'teachers', 'rooms'));
+        return view('timetables.viewer', compact('classes', 'teachers', 'rooms', 'gradeLevels'));
+    }
+
+    private function generateWeeklyView($classSection = null, $isViewer = false, $timetable = null, $classes = null, $teachers = null, $rooms = null, $filters = [], $gradeLevels = null)
+    {
+        $data = $this->getScheduleData($classSection, $filters);
+        
+        $viewName = $isViewer ? 'timetables.viewer' : 'timetables.show';
+        $timetable = $timetable ?? ($data['timetable'] ?? null);
+
+        $classes = $classes ?? collect();
+        $teachers = $teachers ?? collect();
+        $rooms = $rooms ?? collect();
+        $gradeLevels = $gradeLevels ?? collect();
+
+        return view($viewName, array_merge($data, compact('classSection', 'classes', 'teachers', 'rooms', 'timetable', 'gradeLevels')));
     }
 
     private function getScheduleData($classSection = null, $filters = [])
     {
+        // ... (No change to logic, just standard code) ...
         $institutionId = $this->getInstitutionId();
 
         if (!$institutionId) {
@@ -221,13 +255,7 @@ class TimetableController extends BaseController
             $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         }
 
-        // Requirement No 3: Always show the latest records first (orderBy created_at desc)
-        // Note: For a schedule view, chronological order by start_time is usually preferred for display logic, 
-        // but I will add latest() as secondary sort or primary if that is the strict requirement for the data fetch.
-        // However, for a "Routine" view, time order is critical. I will keep time order for the schedule display 
-        // but ensure the query structure aligns with your standard. 
-        
-        $query = Timetable::with(['subject', 'teacher.user', 'classSection.gradeLevel', 'academicSession']) // Eager load gradeLevel
+        $query = Timetable::with(['subject', 'teacher.user', 'classSection.gradeLevel', 'academicSession'])
             ->select('timetables.*')
             ->orderBy('timetables.start_time'); 
 
@@ -255,16 +283,13 @@ class TimetableController extends BaseController
             return strtolower($item->day_of_week);
         });
             
-        // Requirement No 1: Use language keys for days
         $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $weeklySchedule = collect($days)->mapWithKeys(function($day) use ($schedules) {
             return [$day => $schedules->get($day) ?? collect()];
         });
 
-        // Requirement No 1: Use language keys for titles
         $headerTitle = __('timetable.class_routine');
         if ($classSection) {
-            // Requirement No 2: Show section with parent grade name
             $gradeName = $classSection->gradeLevel->name ?? '';
             $headerTitle = $classSection->name . ($gradeName ? ' (' . $gradeName . ')' : '');
         } elseif (isset($filters['teacher_id'])) {
@@ -279,21 +304,6 @@ class TimetableController extends BaseController
 
         return compact('weeklySchedule', 'headerTitle', 'session', 'institution', 'timetable');
     }
-
-    private function generateWeeklyView($classSection = null, $isViewer = false, $timetable = null, $classes = null, $teachers = null, $rooms = null, $filters = [])
-    {
-        $data = $this->getScheduleData($classSection, $filters);
-        
-        $viewName = $isViewer ? 'timetables.viewer' : 'timetables.show';
-        $timetable = $timetable ?? ($data['timetable'] ?? null);
-
-        $classes = $classes ?? collect();
-        $teachers = $teachers ?? collect();
-        $rooms = $rooms ?? collect();
-
-        return view($viewName, array_merge($data, compact('classSection', 'classes', 'teachers', 'rooms', 'timetable')));
-    }
-
     public function create()
     {
         $institutionId = $this->getInstitutionId();
@@ -397,7 +407,6 @@ class TimetableController extends BaseController
         return view('timetables.edit', compact('timetable', 'gradeLevels', 'classes', 'subjects', 'teachers', 'institutions', 'institutionId'));
     }
 
-    // ... (update, destroy, bulkDelete, validateTimetable, printFiltered, downloadPdf, print methods remain the same) ...
     public function update(Request $request, Timetable $timetable)
     {
         $institutionId = $this->getInstitutionId() ?? $timetable->institution_id;

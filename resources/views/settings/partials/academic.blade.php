@@ -1,6 +1,37 @@
 <form action="{{ route('settings.update') }}" method="POST" class="ajax-form">
     @csrf
     <div class="row">
+        {{-- 1. Active Periods Management --}}
+        <div class="col-md-12 mb-4">
+            <h5 class="text-primary border-bottom pb-2">{{ __('settings.active_periods_title') ?? 'Active Periods for Marks Entry' }}</h5>
+            <p class="text-muted small">{{ __('settings.active_periods_help') ?? 'Select the periods currently open for teachers to enter marks.' }}</p>
+            
+            <div class="row">
+                @php
+                    $periods = [
+                        'p1' => 'Period 1', 'p2' => 'Period 2', 'p3' => 'Period 3',
+                        'p4' => 'Period 4', 'p5' => 'Period 5', 'p6' => 'Period 6',
+                        'trimester_exam_1' => 'Trimester 1 Exam',
+                        'trimester_exam_2' => 'Trimester 2 Exam',
+                        'trimester_exam_3' => 'Trimester 3 Exam',
+                        'semester_exam_1' => 'Semester 1 Exam',
+                        'semester_exam_2' => 'Semester 2 Exam'
+                    ];
+                @endphp
+
+                @foreach($periods as $key => $label)
+                <div class="col-md-3 mb-2">
+                    <div class="form-check custom-checkbox mb-3">
+                        <input type="checkbox" name="active_periods[]" value="{{ $key }}" class="form-check-input" id="period_{{ $key }}" 
+                            {{ in_array($key, $activePeriods) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="period_{{ $key }}">{{ $label }}</label>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+
+        {{-- 2. LMD Configuration --}}
         <div class="col-md-12 mb-4">
             <h5 class="text-primary border-bottom pb-2">{{ __('settings.lmd_config') }}</h5>
             <div class="row">
@@ -12,6 +43,7 @@
             </div>
         </div>
 
+        {{-- 3. Grading Scale Configuration --}}
         <div class="col-md-12">
             <h5 class="text-primary border-bottom pb-2 d-flex justify-content-between">
                 {{ __('settings.grading_scale') }}

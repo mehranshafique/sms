@@ -20,22 +20,47 @@ return [
     'student_by_year' => 'Student by Year',
     'module_activated' => 'Module Activated',
     
-    // General Cards (Shared)
+    // Financial / School Admin Stats
     'total_enrollment' => 'Total Enrollment',
+    'students' => 'Students',
     'new_comers' => 'New Comers',
+    'this_session' => 'This Session',
+    
+    // Enrollment-Based Finance Keys (NEW)
+    'paid_students' => 'Paid Students',
+    'fully_settled' => 'Fully Settled',
+    'unpaid_students' => 'Unpaid Students',
+    'pending_dues' => 'Pending Dues',
+    
+    'financial_health' => 'Financial Health',
+    'expected_revenue' => 'Expected Revenue',
+    'based_on_enrollment' => 'Based on Active Enrollments',
+    'collected_revenue' => 'Collected Revenue',
+    'collected' => 'Collected',
+    'remaining_balance' => 'Remaining Balance',
+    'outstanding' => 'Outstanding',
+    
+    'installment_breakdown' => 'Installment Projections',
+    'installment' => 'Installment',
+    'expected' => 'Expected',
+    'no_installments' => 'No installment data available.',
+    
     'fees_summary' => 'Fees Summary',
     'budget_spend' => 'Budget Spend',
     'personnel' => 'Personnel',
+    'active_staff' => 'Active Staff',
+    
+    // Academic Stats
     'courses_teachers' => 'Courses & Teachers',
     'results' => 'Results',
+    'published' => 'Published',
     'timetables' => 'Timetables',
+    'classes' => 'Classes',
     'communication' => 'Communication',
-    'this_session' => 'This Session',
+    
     'paid' => 'Paid',
     'rest' => 'Rest',
     'spend' => 'Spend',
-    'published' => 'Published',
-    'classes' => 'Classes',
     
     // Teacher Dashboard
     'teacher_dashboard' => 'Teacher Dashboard',
@@ -51,7 +76,7 @@ return [
     'subject' => 'Subject',
     'room' => 'Room',
     'action' => 'Action',
-    
+    'staff' => 'Staff',
     // Student Dashboard
     'student_dashboard' => 'Student Dashboard',
     'my_fees' => 'My Fees',
@@ -66,56 +91,30 @@ return [
     'context_switched_success' => 'School context switched successfully.',
     'unauthorized_access' => 'Unauthorized access.',
 
-    //head officer dashboard
-    // Page Titles & Headings
-    'page_title' => 'Dashboard',
-    'main_admin_title' => 'Platform Admin',
-    'platform_overview' => 'System Overview & Statistics',
+    // Head Officer Dashboard
     'my_schools_overview' => 'My Institutions Overview',
     'global_dashboard' => 'Global Dashboard',
     'global_view' => 'Global View',
-
-    // Stats Widgets
-    'total_institutions' => 'Total Institutions',
-    'institution_newcomer' => 'New Institutions (30 Days)',
-    'active_institutions' => 'Active Institutions',
-    'total_enrollment' => 'Total Enrollment',
     'my_schools' => 'My Schools',
     'total_students' => 'Total Students',
     'total_staff' => 'Total Staff',
     'active_schools' => 'Active Schools',
-    'personnel' => 'Personnel',
-
-    // Financial Section
     'financial_overview' => 'Financial Overview (All Schools)',
-    'funds_request' => 'Funds Request',
     'total_invoiced' => 'Total Invoiced',
-    'collected' => 'Collected',
-    'pending' => 'Pending',
-    'validated' => 'Validated',
-    'view_details' => 'View Details',
-
-    // Activity & Logs
+    
     'recent_activity' => 'Recent Activity',
     'actions' => 'Actions',
     'system_actions_desc' => 'System actions recorded in last 24h across your schools.',
     'view_logs' => 'View Logs',
-    'view_all' => 'View All',
-
-    // Lists & Tables
+    
     'my_institutions_list' => 'My Institutions',
-    'student_by_year' => 'Student Admissions by Month',
     'name' => 'Name',
     'code' => 'Code',
     'city' => 'City',
-    'students' => 'Students',
-    'staff' => 'Staff',
     'status' => 'Status',
-    'action' => 'Action',
     'active' => 'Active',
     'inactive' => 'Inactive',
-
-    // Buttons & Actions
+    
     'add_new_school' => 'Add New School',
     'switch_dashboard' => 'Switch Dashboard',
     'edit' => 'Edit',

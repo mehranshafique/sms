@@ -10,8 +10,6 @@ class SettingsController extends BaseController
 {
     public function __construct()
     {
-        // Assuming 'settings.manage' permission exists or role check
-        // $this->middleware('permission:settings.manage'); 
         $this->setPageTitle(__('settings.page_title'));
     }
 
@@ -35,9 +33,12 @@ class SettingsController extends BaseController
         $examsLocked = $settings['exams_locked'] ?? 0;
         $examsGracePeriod = $settings['exams_grace_period'] ?? 30; 
 
-        // Academic / LMD Defaults (FIXED: Added missing variables)
+        // Academic / LMD Defaults
         $lmdThreshold = $settings['lmd_validation_threshold'] ?? 50;
         $gradingScale = isset($settings['grading_scale']) ? json_decode($settings['grading_scale'], true) : [];
+
+        // NEW: Active Periods (for Marks Entry Control)
+        $activePeriods = isset($settings['active_periods']) ? json_decode($settings['active_periods'], true) : [];
 
         return view('settings.index', compact(
             'attendanceLocked', 
@@ -45,7 +46,8 @@ class SettingsController extends BaseController
             'examsLocked', 
             'examsGracePeriod',
             'lmdThreshold',
-            'gradingScale'
+            'gradingScale',
+            'activePeriods' // Pass to view
         ));
     }
 
@@ -66,10 +68,13 @@ class SettingsController extends BaseController
             'exams_locked' => 'sometimes|boolean',
             'exams_grace_period' => 'sometimes|integer|min:0|max:365',
 
-            // Academic (FIXED: Added validation)
+            // Academic
             'lmd_validation_threshold' => 'sometimes|numeric|min:0|max:100',
             'grade' => 'sometimes|array',
             'grade_min' => 'sometimes|array',
+            
+            // NEW: Active Periods
+            'active_periods' => 'sometimes|array'
         ]);
 
         $keysToSave = [
@@ -77,7 +82,6 @@ class SettingsController extends BaseController
             'attendance_grace_period' => 'attendance',
             'exams_locked' => 'exams',
             'exams_grace_period' => 'exams',
-            // Academic Keys
             'lmd_validation_threshold' => 'academic',
         ];
 
@@ -87,7 +91,22 @@ class SettingsController extends BaseController
             }
         }
 
-        // FIXED: Handle Grading Scale Logic (Convert Arrays to JSON)
+        // Handle Active Periods (Save as JSON)
+        if ($request->has('active_periods')) {
+            InstitutionSetting::set($institutionId, 'active_periods', json_encode($request->active_periods), 'academic');
+        } else {
+            // If empty (all unchecked), save empty array if form was submitted
+            // Check a hidden field to confirm form submission type if needed, 
+            // but usually 'sometimes' validation handles it. 
+            // Better: If we are updating academic settings specifically:
+            if ($request->has('lmd_validation_threshold')) { 
+                 // Assuming this is the academic form
+                 $periods = $request->input('active_periods', []);
+                 InstitutionSetting::set($institutionId, 'active_periods', json_encode($periods), 'academic');
+            }
+        }
+
+        // Handle Grading Scale Logic
         if ($request->has('grade')) {
             $scale = [];
             $grades = $request->grade;

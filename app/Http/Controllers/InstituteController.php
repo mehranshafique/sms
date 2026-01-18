@@ -31,7 +31,9 @@ class InstituteController extends BaseController
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = Institution::select('*');
+            // Eager load the cityRelation to get city names
+            $data = Institution::with('cityRelation')->select('institutions.*');
+            
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
@@ -52,6 +54,10 @@ class InstituteController extends BaseController
                                 <span class="fs-14 fw-bold">'.$row->acronym.'</span>
                                 <span class="fs-12 text-muted">'.$row->phone.'</span>
                             </div>';
+                })
+                // Show City Name instead of ID
+                ->editColumn('city', function($row){
+                    return $row->cityRelation ? $row->cityRelation->name : '-';
                 })
                 ->editColumn('is_active', function($row){
                     return $row->is_active 
@@ -348,7 +354,8 @@ class InstituteController extends BaseController
             RoleEnum::SCHOOL_ADMIN->value, 
             RoleEnum::HEAD_OFFICER->value, 
             RoleEnum::TEACHER->value, 
-            RoleEnum::STUDENT->value
+            RoleEnum::STUDENT->value,
+            RoleEnum::GUARDIAN->value
         ];
         
         foreach ($roles as $roleName) {

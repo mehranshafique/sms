@@ -2,7 +2,7 @@
 
 @section('styles')
 <style>
-    /* Base Table Styles */
+    /* ... (Same styles as before) ... */
     .routine-table th, .routine-table td {
         vertical-align: middle;
         border-color: #eee;
@@ -26,8 +26,6 @@
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.05);
     }
-
-    /* Dark Mode Overrides */
     [data-theme-version="dark"] .card {
         background-color: #1e1e1e !important;
         color: #fff;
@@ -80,21 +78,30 @@
                     <div class="card-body p-3">
                         <form method="GET" action="{{ route('timetables.routine') }}" id="filterForm">
                             <div class="row align-items-end">
-                                {{-- Class Filter --}}
-                                <div class="col-md-4 mb-2">
-                                    <label class="form-label mb-1">{{ __('timetable.select_class') }}</label>
-                                    <select name="class_section_id" class="form-control default-select form-control-sm">
-                                        <option value="">-- {{ __('timetable.select_class') }} --</option>
-                                        @if(isset($classes))
-                                            @foreach($classes as $id => $name)
-                                                <option value="{{ $id }}" {{ (request('class_section_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                
+                                {{-- Grade Filter --}}
+                                <div class="col-md-3 mb-2">
+                                    <label class="form-label mb-1">{{ __('grade_level.grade_name') }}</label>
+                                    <select id="filter_grade" name="grade_id" class="form-control default-select form-control-sm">
+                                        <option value="">-- {{ __('timetable.all_grades') }} --</option>
+                                        @if(isset($gradeLevels))
+                                            @foreach($gradeLevels as $id => $name)
+                                                <option value="{{ $id }}" {{ (request('grade_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                             @endforeach
                                         @endif
                                     </select>
                                 </div>
 
-                                {{-- Teacher Filter --}}
+                                {{-- Class Filter --}}
                                 <div class="col-md-3 mb-2">
+                                    <label class="form-label mb-1">{{ __('timetable.select_class') }}</label>
+                                    <select name="class_section_id" id="filter_class" class="form-control default-select form-control-sm">
+                                        <option value="">-- {{ __('timetable.select_class') }} --</option>
+                                    </select>
+                                </div>
+
+                                {{-- Teacher Filter --}}
+                                <div class="col-md-2 mb-2">
                                     <label class="form-label mb-1">{{ __('timetable.select_teacher') }}</label>
                                     <select name="teacher_id" class="form-control default-select form-control-sm">
                                         <option value="">-- {{ __('timetable.select_teacher') }} --</option>
@@ -107,7 +114,7 @@
                                 </div>
 
                                 {{-- Room Filter --}}
-                                <div class="col-md-3 mb-2">
+                                <div class="col-md-2 mb-2">
                                     <label class="form-label mb-1">{{ __('timetable.room') }}</label>
                                     <select name="room_number" class="form-control default-select form-control-sm">
                                         <option value="">-- {{ __('timetable.select_room') }} --</option>
@@ -252,9 +259,60 @@
 
 @section('js')
 <script>
-    $(document).ready(function() {
-        if($.fn.selectpicker) {
-            $('.default-select').selectpicker('refresh');
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- HELPER: Refresh UI Library ---
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
+                 $(element).selectpicker('refresh');
+            }
+        }
+
+        // --- FILTER LOGIC ---
+        const gradeFilter = document.getElementById('filter_grade');
+        const classFilter = document.getElementById('filter_class');
+        // Get pre-selected class if any (from URL request)
+        const oldClassId = "{{ request('class_section_id') }}";
+
+        if(gradeFilter) {
+            gradeFilter.addEventListener('change', function() {
+                // 1. Reset Class Filter
+                classFilter.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                classFilter.disabled = true;
+                refreshSelect(classFilter);
+
+                // 2. Fetch
+                if(this.value) {
+                    fetch(`{{ route('students.get_sections') }}?grade_id=${this.value}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            classFilter.innerHTML = '<option value="">-- {{ __('timetable.select_class') }} --</option>';
+                            
+                            Object.entries(data).forEach(([id, name]) => {
+                                let option = new Option(name, id);
+                                if(String(id) === String(oldClassId)) option.selected = true;
+                                classFilter.add(option);
+                            });
+                            classFilter.disabled = false;
+                            refreshSelect(classFilter);
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            classFilter.innerHTML = '<option value="">Error</option>';
+                            refreshSelect(classFilter);
+                        });
+                } else {
+                    // Reset to default
+                    classFilter.innerHTML = '<option value="">-- {{ __('timetable.select_class') }} --</option>';
+                    refreshSelect(classFilter);
+                }
+            });
+
+            // 3. Trigger on load if value exists
+            if(gradeFilter.value) {
+                // Dispatch native change event so the listener above fires
+                gradeFilter.dispatchEvent(new Event('change'));
+            }
         }
     });
 </script>

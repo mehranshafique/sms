@@ -33,14 +33,21 @@ return [
     'exam_grace_period' => 'Modification Grace Period (Days)',
     'exam_grace_help' => 'Number of past days regular users are allowed to edit exam details after the start date.',
 
-    // Academic / LMD Settings (New)
+    // Academic Tab
+    'tab_academic' => 'Academic',
     'lmd_config' => 'LMD / University Configuration',
     'validation_threshold' => 'Validation Threshold',
     'threshold_hint' => 'Minimum percentage required to validate a credit (e.g., 50).',
+    
+    // NEW KEYS
+    'active_periods_title' => 'Active Periods Management',
+    'active_periods_help' => 'Select the periods currently open for teachers to enter marks. Unchecked periods will be hidden from the teacher interface.',
+    
     'grading_scale' => 'Grading Scale',
     'grade_label' => 'Grade Label',
     'min_percentage' => 'Min Percentage',
     'remark' => 'Remark',
+    'save_settings' => 'Save Settings',
 
     'enabled' => 'Enabled (Blocked)',
     'disabled' => 'Disabled (Open)',

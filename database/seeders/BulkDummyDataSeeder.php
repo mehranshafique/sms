@@ -16,6 +16,7 @@ use App\Models\ClassSection;
 use App\Models\Subject;
 use App\Models\Staff;
 use App\Models\Student;
+use App\Models\StudentParent; // Added Parent Model
 use App\Models\StudentEnrollment;
 use App\Models\FeeType;
 use App\Models\FeeStructure;
@@ -48,7 +49,7 @@ class BulkDummyDataSeeder extends Seeder
 
         $faker = Faker::create('fr_FR'); // French Locale for DRC context
         
-        $this->command->info('🌱 Seeding Data for E-Digitex System...');
+        $this->command->info('🌱 Seeding Data for E-Digitex System (Multi-Tenant)...');
 
         // ---------------------------------------------------------
         // 0. Locations (NEW LOGIC: Required for Institute)
@@ -68,14 +69,14 @@ class BulkDummyDataSeeder extends Seeder
             'name' => 'Kinshasa', 'country_id' => $countryId, 'created_at' => now(), 'updated_at' => now()
         ]);
         $cityId = DB::table('cities')->insertGetId([
-            'name' => 'Lemba', 'state_id' => $stateId, 'created_at' => now(), 'updated_at' => now()
+            'name' => 'Gombe', 'state_id' => $stateId, 'created_at' => now(), 'updated_at' => now()
         ]);
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Text names for Student address fields
         $countryName = 'Democratic Republic of the Congo';
         $stateName = 'Kinshasa';
-        $cityName = 'Lemba';
+        $cityName = 'Gombe';
 
         // ---------------------------------------------------------
         // 1. Packages (Platform Level)
@@ -132,7 +133,7 @@ class BulkDummyDataSeeder extends Seeder
                 'country' => $countryId, // ID
                 'state' => $stateId,     // ID (Was City)
                 'city' => $cityId,       // ID (Was Commune)
-                'address' => '123 Tech Avenue, Innovation Park',
+                'address' => '123 Tech Avenue, Gombe',
                 'phone' => '+243815550000',
                 'is_active' => true,
             ]
@@ -321,86 +322,125 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // ---------------------------------------------------------
-        // 8. Students (UPDATED LOGIC)
+        // 8. Parents & Students (RELATIONAL SPLIT)
         // ---------------------------------------------------------
+        $this->command->info('👥 Seeding Parents and Students (Linked)...');
+        
         $students = [];
         $studentRole = Role::where('name', RoleEnum::STUDENT->value)
                            ->where('institution_id', $institution->id)
                            ->first();
 
-        for ($i = 1; $i <= 20; $i++) {
-            $firstName = $faker->firstName;
-            $lastName = $faker->lastName;
+        // Create 20 families (Parents), each with 1-2 children to simulate a robust database
+        for ($p = 1; $p <= 20; $p++) {
             
-            // A. Create User First (Updated email domain)
-            $sUser = User::firstOrCreate(
-                ['email' => "student$i@e-digitex.com"],
+            // A. Create the Parent Record (Single Truth)
+            // Use updateOrCreate to avoid duplicates if re-seeding without refresh
+            $parent = StudentParent::updateOrCreate(
+                ['institution_id' => $institution->id, 'father_phone' => '+24381' . str_pad($p, 7, '0', STR_PAD_LEFT)],
                 [
-                    'name' => "$firstName $lastName",
-                    'password' => Hash::make('password'),
-                    'user_type' => UserType::STUDENT->value,
-                    'institute_id' => $institution->id,
-                    'is_active' => true,
-                ]
-            );
-            
-            if($studentRole) $sUser->assignRole($studentRole);
-
-            // B. Generate ID using User ID seed (Updated)
-            $admissionNumber = IdGeneratorService::generateStudentId($institution, $session, $sUser->id);
-
-            // C. Create Student (Updated with Location Strings and New ID)
-            $student = Student::firstOrCreate(
-                ['user_id' => $sUser->id],
-                [
-                    'institution_id' => $institution->id,
-                    'campus_id' => $campus->id,
-                    'admission_number' => $admissionNumber,
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'gender' => $faker->randomElement(['male', 'female']),
-                    'dob' => $faker->dateTimeBetween('-18 years', '-6 years'),
-                    'admission_date' => '2024-09-04',
                     'father_name' => $faker->name('male'),
-                    'father_phone' => '+24381' . $faker->numerify('#######'),
-                    // Using text strings for student details as per controller logic
-                    'country' => $countryName,
-                    'state' => $stateName,
-                    'city' => $cityName,
-                    'status' => 'active'
+                    'mother_name' => $faker->name('female'),
+                    'mother_phone' => '+24382' . str_pad($p, 7, '0', STR_PAD_LEFT),
+                    'family_address' => $faker->address,
                 ]
             );
-            
-            $students[] = $student;
 
-            // Enroll Student
-            $randomGradeCode = $faker->randomElement(array_keys($gradeModels));
-            $section = $sections[$randomGradeCode];
-            
-            StudentEnrollment::firstOrCreate(
-                ['academic_session_id' => $session->id, 'student_id' => $student->id],
-                [
-                    'institution_id' => $institution->id,
-                    'grade_level_id' => $section->grade_level_id,
-                    'class_section_id' => $section->id,
-                    'roll_number' => $i,
-                    'status' => 'active',
-                    'enrolled_at' => now(),
-                ]
-            );
+            // B. Create 1 or 2 children for this parent (Siblings)
+            $childCount = rand(1, 2);
+            for ($c = 1; $c <= $childCount; $c++) {
+                $firstName = $faker->firstName;
+                $lastName = $parent->father_name ? explode(' ', $parent->father_name)[0] : $faker->lastName;
+                
+                // Create User Account for Student
+                $sUser = User::firstOrCreate(
+                    ['email' => strtolower($firstName . "." . $lastName . $p . $c . "@e-digitex.com")],
+                    [
+                        'name' => "$firstName $lastName",
+                        'password' => Hash::make('password'),
+                        'user_type' => UserType::STUDENT->value,
+                        'institute_id' => $institution->id,
+                        'is_active' => true,
+                    ]
+                );
+                
+                if($studentRole) $sUser->assignRole($studentRole);
+
+                // Generate ID
+                $admissionNumber = IdGeneratorService::generateStudentId($institution, $session, $sUser->id);
+
+                // Create Student Record (Linked to Parent)
+                $student = Student::firstOrCreate(
+                    ['user_id' => $sUser->id],
+                    [
+                        'parent_id' => $parent->id, // LINK TO PARENT (Relational Key)
+                        'institution_id' => $institution->id,
+                        'campus_id' => $campus->id,
+                        'admission_number' => $admissionNumber,
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'gender' => $faker->randomElement(['male', 'female']),
+                        'dob' => $faker->dateTimeBetween('-15 years', '-6 years'),
+                        'admission_date' => '2024-09-04',
+                        // Using text strings for location as updated in migration
+                        'country' => $countryName,
+                        'state' => $stateName,
+                        'city' => $cityName,
+                        'avenue' => $faker->streetName,
+                        'status' => 'active',
+                        'qr_code_token' => $faker->unique()->bothify('QR-####-????'),
+                        'nfc_tag_uid' => $faker->unique()->numerify('##########'),
+                        'payment_mode' => 'installment'
+                    ]
+                );
+
+                $students[] = $student;
+
+                // Enroll Student in a random Grade
+                $randomGradeCode = $faker->randomElement(array_keys($gradeModels));
+                $section = $sections[$randomGradeCode];
+                
+                StudentEnrollment::firstOrCreate(
+                    ['academic_session_id' => $session->id, 'student_id' => $student->id],
+                    [
+                        'institution_id' => $institution->id,
+                        'grade_level_id' => $section->grade_level_id,
+                        'class_section_id' => $section->id,
+                        'status' => 'active',
+                        'enrolled_at' => now(),
+                    ]
+                );
+            }
         }
 
         // ---------------------------------------------------------
-        // 9. Finance (Fees)
+        // 9. Finance (Fees & Invoices)
         // ---------------------------------------------------------
         $tuitionType = FeeType::firstOrCreate(['institution_id' => $institution->id, 'name' => 'Frais Scolaires']);
-        $fee = FeeStructure::firstOrCreate(
-            ['institution_id' => $institution->id, 'name' => 'Minerval T1'],
+        
+        // Create a Global Fee for Primary
+        $primaryGrade = $gradeModels['1P'];
+        $globalFee = FeeStructure::firstOrCreate(
+            ['institution_id' => $institution->id, 'name' => 'Minerval Annuel 1P', 'grade_level_id' => $primaryGrade->id],
+            [
+                'academic_session_id' => $session->id,
+                'fee_type_id' => $tuitionType->id,
+                'amount' => 500.00,
+                'frequency' => 'yearly',
+                'payment_mode' => 'global'
+            ]
+        );
+
+        // Create Installments for Primary
+        FeeStructure::firstOrCreate(
+            ['institution_id' => $institution->id, 'name' => 'Tranche 1', 'grade_level_id' => $primaryGrade->id],
             [
                 'academic_session_id' => $session->id,
                 'fee_type_id' => $tuitionType->id,
                 'amount' => 150.00,
-                'frequency' => 'termly'
+                'frequency' => 'termly',
+                'payment_mode' => 'installment',
+                'installment_order' => 1
             ]
         );
 
@@ -464,7 +504,6 @@ class BulkDummyDataSeeder extends Seeder
         $posVice = ElectionPosition::firstOrCreate(['election_id' => $election->id, 'name' => 'Vice-Doyen'], ['sequence' => 2]);
 
         // Candidates (Pick random students)
-        // Ensure we have enough students seeded
         if (count($students) >= 4) {
             $candidateStudents = $faker->randomElements($students, 4);
             
@@ -493,9 +532,36 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
 
-        // Re-enable mass assignment protection
+        // ---------------------------------------------------------
+        // 12. Exams & Marks (Seeding Dummy Results)
+        // ---------------------------------------------------------
+        $exam = Exam::firstOrCreate(
+            ['institution_id' => $institution->id, 'name' => 'P1 Assessment', 'academic_session_id' => $session->id],
+            ['category' => 'p1', 'start_date' => now(), 'end_date' => now()->addDays(7), 'status' => 'ongoing']
+        );
+
+        // Seed some marks for the first few students
+        if(count($students) > 0) {
+            $student = $students[0];
+            $subjects = Subject::where('institution_id', $institution->id)->get();
+            $enrollment = StudentEnrollment::where('student_id', $student->id)->first();
+            
+            if($enrollment && $subjects->count() > 0) {
+                foreach($subjects as $sub) {
+                    ExamRecord::firstOrCreate(
+                        ['exam_id' => $exam->id, 'student_id' => $student->id, 'subject_id' => $sub->id],
+                        [
+                            'class_section_id' => $enrollment->class_section_id,
+                            'marks_obtained' => rand(10, 20),
+                            'is_absent' => false
+                        ]
+                    );
+                }
+            }
+        }
+
         Model::reguard();
 
-        $this->command->info('✅ Bulk Dummy Data Seeded Successfully!');
+        $this->command->info('✅ Bulk Dummy Data Seeded Successfully with Parent/Student relations!');
     }
 }

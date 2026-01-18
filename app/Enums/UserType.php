@@ -5,12 +5,13 @@ namespace App\Enums;
 enum UserType: int
 {
     case SUPER_ADMIN = 1;
-    case HEAD_OFFICER = 2; // Kept as requested
+    case HEAD_OFFICER = 2;
     case BRANCH_ADMIN = 3;
-    case STAFF = 4; // Teacher/Staff
+    case STAFF = 4;
     case STUDENT = 5;
-    case PARENT = 6;
-    case SCHOOL_ADMIN = 7; // Added as a distinct type
+    case GUARDIAN = 6; // Changed from PARENT to GUARDIAN to match Controller
+    case SCHOOL_ADMIN = 7;
+
     public function label(): string
     {
         return match($this) {
@@ -19,7 +20,8 @@ enum UserType: int
             self::BRANCH_ADMIN => __('enums.user_type.branch_admin'),
             self::STAFF => __('enums.user_type.staff'),
             self::STUDENT => __('enums.user_type.student'),
-            self::PARENT => __('enums.user_type.parent'),
+            self::GUARDIAN => __('enums.user_type.parent'), // Label usually remains 'Parent' in UI
+            self::SCHOOL_ADMIN => 'School Admin',
         };
     }
 }

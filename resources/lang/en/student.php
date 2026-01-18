@@ -3,11 +3,17 @@
 return [
     'page_title' => 'Students',
     'messages' => [
+        'success' => 'Success!',
+        'error' => 'Error!',
         'success_create' => 'Student admitted successfully!',
         'success_update' => 'Student details updated successfully!',
         'success_delete' => 'Student record deleted successfully!',
+        'success_default' => 'Action completed successfully.',
+        'check_form' => 'Please check the form for errors.',
+        'generic_error' => 'Something went wrong. Please try again.',
         'cannot_delete_linked_data' => 'Cannot delete student because they are linked to other records (e.g. Grades, Attendance).',
         'error_occurred' => 'An error occurred while processing the request.',
+        'validation_error' => 'Validation Error',
     ],
     
     // Headers & Stats
@@ -86,6 +92,9 @@ return [
     'guardian_relation' => 'Relation',
     'guardian_email' => 'Guardian Email',
     'guardian_phone' => 'Guardian Phone',
+    'linked_to' => 'Linked to',
+    'parent_found' => 'Parent Found',
+    'records_autofilled' => 'Records auto-filled for',
     
     'photo' => 'Student Photo',
     'scan_for_details' => 'Scan for Student Details',
@@ -97,6 +106,10 @@ return [
     'nfc_tag_uid' => 'NFC Tag UID',
     'enter_qr_token' => 'Scan or enter QR Code Token',
     'enter_nfc_uid' => 'Scan or enter NFC UID',
+    'scanned' => 'Scanned!',
+    'not_supported' => 'Not Supported',
+    'web_nfc_not_supported' => 'Web NFC is not supported on this device/browser. Use Android Chrome.',
+    'nfc_read_error' => 'Cannot read data from the NFC tag. Try again.',
     
     // Selects
     'select_institute' => 'Select Institute',
@@ -125,6 +138,7 @@ return [
     'delete' => 'Delete',
     'edit' => 'Edit',
     'view' => 'View',
+    'ok' => 'OK',
 
     // Alerts & Errors
     'are_you_sure' => 'Are you sure?',
@@ -133,11 +147,8 @@ return [
     'are_you_sure_bulk' => 'Delete selected students?',
     'bulk_delete_warning' => "Selected students will be permanently deleted!",
     'yes_bulk_delete' => 'Yes, delete them!',
-    'error_occurred' => 'Error Occurred',
     'something_went_wrong' => 'Something went wrong!',
-    'validation_error' => 'Validation Error',
     'fill_required_fields' => 'Please fill in all required fields.',
-    'success' => 'Success!',
     'no_active_session' => 'No active academic session found for this institution.',
     'unauthorized_access' => 'Unauthorized access.',
     'no_enrollment_found' => 'No enrollment history found.',

@@ -11,60 +11,53 @@ return new class extends Migration
         Schema::create('students', function (Blueprint $table) {
             $table->id();
             
-            // Link to User Table (Auth)
+            // --- 1. RELATIONSHIPS & AUTH ---
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
-
-            // Core Links
+            $table->foreignId('parent_id')->nullable()->constrained('parents')->onDelete('set null');
             $table->foreignId('institution_id')->constrained('institutions')->cascadeOnDelete();
             $table->foreignId('campus_id')->nullable()->constrained('campuses')->onDelete('set null');
             
-            // Academic Info
+            // --- 2. ACADEMIC INFO ---
             $table->unsignedBigInteger('grade_level_id')->nullable(); 
             $table->unsignedBigInteger('class_section_id')->nullable();
             
-            // Identity
+            // --- 3. IDENTITY ---
             $table->string('admission_number', 50)->unique();
             $table->string('roll_number', 20)->nullable();
             $table->date('admission_date');
 
-            // Personal Info
+            // --- 4. PERSONAL INFO ---
             $table->string('first_name', 100);
             $table->string('last_name', 100);
+            $table->string('post_name')->nullable();
             $table->string('gender', 10);
             $table->date('dob');
+            $table->string('place_of_birth')->nullable();
             $table->string('blood_group', 5)->nullable();
             $table->string('religion', 50)->nullable();
             $table->string('category', 50)->nullable();
             
-            // Contact
+            // --- 5. CONTACT & LOCATION ---
             $table->string('mobile_number', 20)->nullable();
             $table->string('email', 100)->nullable();
+            $table->string('country')->nullable();
+            $table->string('state')->nullable();
+            $table->string('city')->nullable();
+            $table->string('province')->nullable();
+            $table->string('avenue')->nullable();
             $table->text('current_address')->nullable();
             $table->text('permanent_address')->nullable();
             
-            // Parents / Guardian
-            $table->string('father_name', 100)->nullable();
-            $table->string('father_phone', 20)->nullable();
-            $table->string('father_occupation', 100)->nullable();
-            
-            $table->string('mother_name', 100)->nullable();
-            $table->string('mother_phone', 20)->nullable();
-            $table->string('mother_occupation', 100)->nullable();
-            
-            $table->string('guardian_name', 100)->nullable();
-            $table->string('guardian_relation', 50)->nullable();
-            $table->string('guardian_phone', 20)->nullable();
-            $table->string('guardian_email', 100)->nullable();
+            $table->string('primary_guardian')->default('father');
 
-            // Media & Access
+            // --- 6. MEDIA & ACCESS ---
             $table->string('student_photo')->nullable();
-            
-            // NEW FIELDS
             $table->string('qr_code_token', 100)->nullable()->unique();
             $table->string('nfc_tag_uid', 100)->nullable()->unique();
 
-            // Status
+            // --- 7. STATUS & FINANCE ---
             $table->enum('status', ['active', 'inactive', 'transferred', 'suspended', 'graduated'])->default('active');
+            $table->enum('payment_mode', ['global', 'installment'])->default('installment');
             
             $table->timestamps();
             $table->softDeletes();

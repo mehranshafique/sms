@@ -1,3 +1,10 @@
+<!-- Add intl-tel-input CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/css/intlTelInput.css">
+<style>
+    /* Fix for intl-tel-input dropdown width */
+    .iti { width: 100%; z-index: 99; }
+</style>
+
 <form action="{{ isset($staff) ? route('staff.update', $staff->id) : route('staff.store') }}" method="POST" id="staffForm" enctype="multipart/form-data">
     @csrf
     @if(isset($staff))
@@ -38,10 +45,19 @@
                             <label class="form-label">{{ __('staff.email') }} <span class="text-danger">*</span></label>
                             <input type="email" name="email" class="form-control" value="{{ old('email', $staff->user->email ?? '') }}" required>
                         </div>
+                        
+                        {{-- Phone with intl-tel-input --}}
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('staff.phone') }}</label>
-                            <input type="text" name="phone" class="form-control" value="{{ old('phone', $staff->user->phone ?? '') }}">
+                            <label class="form-label">{{ __('staff.phone') }} <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="hidden" name="full_phone" id="fullPhoneInput">
+                                <input type="tel" id="phoneInput" class="form-control" value="{{ old('phone', $staff->user->phone ?? '') }}" required>
+                            </div>
+                            @error('phone')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
+
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.gender') }} <span class="text-danger">*</span></label>
                             <select name="gender" class="form-control default-select" required>
@@ -56,11 +72,28 @@
                             <input type="password" name="password" class="form-control" placeholder="{{ isset($staff) ? __('staff.leave_blank_password') : '' }}" {{ isset($staff) ? '' : 'required' }}>
                         </div>
                         
+                        {{-- Role Selection (Filtered) --}}
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.select_role') }} <span class="text-danger">*</span></label>
                             <select name="role" class="form-control default-select" required>
                                 <option value="">{{ __('staff.select_role') }}</option>
                                 @foreach($roles as $role)
+                                    @php
+                                        $user = auth()->user();
+                                        
+                                        // 1. Hide Super Admin if current user is not Super Admin
+                                        if ($role->name === 'Super Admin' && !$user->hasRole('Super Admin')) continue;
+
+                                        // 2. Hide Head Officer if current user is not Head Officer or Super Admin
+                                        if ($role->name === 'Head Officer' && !$user->hasRole(['Super Admin', 'Head Officer'])) continue;
+                                        
+                                        // 3. Hide Roles with NULL institution_id (Platform Global Roles) unless user is Super Admin
+                                        // Assumption: 'institution_id' exists on Role model. If not, rely on name check above.
+                                        if (isset($role->institution_id) && is_null($role->institution_id) && !$user->hasRole('Super Admin') && $role->name !== 'Head Officer') continue;
+
+                                        // 4. Hide Roles not relevant to Staff context (e.g. Student, Parent)
+                                        if (in_array($role->name, ['Student', 'Parent'])) continue;
+                                    @endphp
                                     <option value="{{ $role->name }}" {{ (isset($staff) && $staff->user->hasRole($role->name)) ? 'selected' : '' }}>{{ $role->name }}</option>
                                 @endforeach
                             </select>
@@ -101,6 +134,8 @@
                             </div>
                         @endif
 
+                        {{-- Hide Campus dropdown if no campuses available --}}
+                        @if(isset($campuses) && count($campuses) > 0)
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.select_campus') }}</label>
                             <select name="campus_id" class="form-control default-select">
@@ -110,6 +145,7 @@
                                 @endforeach
                             </select>
                         </div>
+                        @endif
                         
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('staff.employee_id') }}</label>
@@ -153,3 +189,32 @@
         </div>
     </div>
 </form>
+
+<!-- Add intl-tel-input JS -->
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/intlTelInput.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- Phone Input Integration (intl-tel-input) ---
+        const phoneInput = document.querySelector("#phoneInput");
+        const fullPhoneInput = document.querySelector("#fullPhoneInput");
+        const form = document.querySelector("#staffForm");
+
+        if (phoneInput) {
+            const iti = window.intlTelInput(phoneInput, {
+                utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js",
+                initialCountry: "cd",
+                separateDialCode: true,
+                preferredCountries: ['cd', 'us', 'fr'],
+            });
+
+            form.addEventListener('submit', function() {
+                if (iti.isValidNumber()) {
+                    fullPhoneInput.value = iti.getNumber();
+                } else {
+                    fullPhoneInput.value = iti.getNumber(); 
+                }
+            });
+        }
+    });
+</script>

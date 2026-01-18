@@ -5,111 +5,172 @@ namespace App\Http\Controllers;
 use App\Models\Exam;
 use App\Models\ExamRecord;
 use App\Models\ClassSection;
+use App\Models\GradeLevel;
 use App\Models\Subject;
 use App\Models\StudentEnrollment;
 use App\Models\Timetable;
+use App\Models\InstitutionSetting; 
+use App\Enums\RoleEnum;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Middleware\PermissionMiddleware;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ExamMarkController extends BaseController
 {
     public function __construct()
     {
-        $this->middleware(PermissionMiddleware::class . ':exam_mark.create')->only(['create', 'store']);
+        $this->middleware(PermissionMiddleware::class . ':exam_mark.create')->only(['create', 'store', 'printAwardList']);
         $this->setPageTitle(__('marks.page_title'));
     }
 
     public function create(Request $request)
     {
-        // FIX: Respect the header context switch
-        $institutionId = session('active_institution_id') ?? Auth::user()->institute_id;
+        $user = Auth::user();
+        $institutionId = session('active_institution_id') ?? $user->institute_id;
 
-        // 1. Fetch Exams (Strictly 'ongoing' only)
+        // 1. Get List of Authorized Periods from Settings
+        $settingVal = InstitutionSetting::get($institutionId, 'active_periods', '[]');
+        $activePeriods = json_decode($settingVal ?? '[]', true);
+
+        // 2. Fetch Exams filtered by: 
+        //    a) Ongoing Status 
+        //    b) Must belong to an "Active Period" (if user is Teacher AND NOT Admin)
+        
         $examsQuery = Exam::where('status', 'ongoing');
+        
         if ($institutionId) {
             $examsQuery->where('institution_id', $institutionId);
         }
+
+        // Determine Role Context
+        $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
+        $isAdmin = $user->hasRole([
+            RoleEnum::SUPER_ADMIN->value, 
+            RoleEnum::HEAD_OFFICER->value, 
+            RoleEnum::SCHOOL_ADMIN->value // Ensure School Admin is included
+        ]);
+
+        // RESTRICTION LOGIC:
+        // Only restrict if user is a Teacher AND NOT an Admin.
+        // This prevents Admins (who might also have a teacher role for testing) from being blocked.
+        if ($isTeacher && !$isAdmin) {
+            if (!empty($activePeriods)) {
+                $examsQuery->whereIn('category', $activePeriods);
+            } else {
+                // If no periods are active, show nothing to teacher
+                $examsQuery->whereRaw('1 = 0'); 
+            }
+        }
+
         $exams = $examsQuery->pluck('name', 'id');
 
-        // Initial load only requires Exams. 
-        // Classes and Subjects will be loaded via AJAX for security and UX.
-        $classes = []; 
-        $subjects = [];
-        $students = [];
-        $existingMarks = [];
-
-        return view('marks.create', compact('exams', 'classes', 'subjects', 'students', 'existingMarks'));
+        return view('marks.create', compact('exams'));
     }
 
-    // --- AJAX HELPER METHODS ---
+    // =========================================================================
+    // AJAX HELPER METHODS
+    // =========================================================================
 
-    public function getClasses(Request $request)
+    public function getGrades(Request $request)
     {
         if(!$request->exam_id) return response()->json([]);
-        $classes = $this->fetchClassesForExam($request->exam_id);
         
-        // UPDATED: Format as "$ClassName $SectionName" (e.g. "Six A")
-        $formattedClasses = $classes->mapWithKeys(function($item) {
-             $grade = $item->gradeLevel->name ?? '';
-             // If grade name exists, concatenate. Otherwise just use section name.
-             $displayName = $grade ? ($grade . ' ' . $item->name) : $item->name;
-             return [$item->id => $displayName];
-        });
+        $exam = Exam::find($request->exam_id);
+        if(!$exam) return response()->json([]);
 
-        return response()->json($formattedClasses);
+        $grades = GradeLevel::where('institution_id', $exam->institution_id)
+            ->orderBy('order_index')
+            ->pluck('name', 'id');
+
+        return response()->json($grades);
+    }
+
+    public function getSections(Request $request)
+    {
+        if(!$request->grade_level_id) return response()->json([]);
+        
+        $query = ClassSection::where('grade_level_id', $request->grade_level_id)
+                             ->where('is_active', true);
+
+        $user = Auth::user();
+        // Check for Teacher role strictly for data filtering
+        if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
+            $staffId = $user->staff->id;
+            $query->where(function($q) use ($staffId) {
+                $q->where('staff_id', $staffId) // Class Teacher
+                  ->orWhereHas('timetables', function($t) use ($staffId) { 
+                      $t->where('teacher_id', $staffId); // Subject Teacher
+                  }); 
+            });
+        }
+        
+        return response()->json($query->pluck('name', 'id'));
     }
 
     public function getSubjects(Request $request)
     {
-        if(!$request->class_section_id) return response()->json([]);
-        $subjects = $this->fetchSubjectsForClass($request->class_section_id);
+        if(!$request->grade_level_id) return response()->json([]);
         
-        // UPDATED: Include Teacher Name from Timetable
-        $formattedSubjects = $subjects->map(function($subject) use ($request) {
+        $user = Auth::user();
+        
+        // 1. Teacher Logic: Trust the Timetable
+        // If the teacher has a timetable for this Grade (and optionally Section), they see the subject.
+        if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
+            $staffId = $user->staff->id;
             
-            $teacherName = 'N/A';
-            // Find teacher assigned to this subject & class in timetable
-            $timetable = Timetable::with('teacher.user')
-                ->where('class_section_id', $request->class_section_id)
-                ->where('subject_id', $subject->id)
-                ->first();
-                
-            if ($timetable && $timetable->teacher && $timetable->teacher->user) {
-                $teacherName = $timetable->teacher->user->name;
+            $timetableQuery = Timetable::where('teacher_id', $staffId);
+
+            // If a specific section is selected, filter by it. 
+            // Otherwise filter by all sections in the Grade.
+            if ($request->class_section_id) {
+                $timetableQuery->where('class_section_id', $request->class_section_id);
+            } else {
+                $timetableQuery->whereHas('classSection', function($q) use ($request) {
+                    $q->where('grade_level_id', $request->grade_level_id);
+                });
             }
 
+            $subjectIds = $timetableQuery->pluck('subject_id')->unique()->toArray();
+
+            if (empty($subjectIds)) return response()->json([]);
+
+            // Fetch Subjects by ID (Ignore grade_level_id of subject to trust timetable)
+            $query = Subject::whereIn('id', $subjectIds)->where('is_active', true);
+        
+        } else {
+            // 2. Admin Logic: Show all subjects defined for the Grade
+            $query = Subject::where('grade_level_id', $request->grade_level_id)
+                            ->where('is_active', true);
+        }
+
+        $formattedSubjects = $query->get()->map(function($subject) use ($request) {
+            $teacherName = $this->getSubjectTeacher($request->class_section_id, $subject->id);
             return [
                 'id' => $subject->id,
                 'name' => $subject->name,
                 'total_marks' => $subject->total_marks ?? 100, 
-                'teacher_name' => $teacherName // Added field
+                'teacher_name' => $teacherName
             ];
         });
 
         return response()->json($formattedSubjects);
     }
 
-    /**
-     * AJAX Method to fetch student list and existing marks.
-     * Securely validates teacher access before returning data.
-     */
     public function getStudents(Request $request)
     {
         if(!$request->exam_id || !$request->class_section_id || !$request->subject_id) {
-            return response()->json(['message' => 'Missing required fields'], 400);
+            return response()->json(['message' => __('marks.messages.missing_fields')], 400);
         }
 
-        // Security Check
         if(!$this->validateAccess($request->exam_id, $request->class_section_id, $request->subject_id)) {
             return response()->json(['message' => __('marks.messages.unauthorized')], 403);
         }
 
         $exam = Exam::find($request->exam_id);
-        if(!$exam) return response()->json(['message' => 'Exam not found'], 404);
+        if(!$exam) return response()->json(['message' => __('marks.messages.exam_not_found')], 404);
 
-        // Fetch Students
         $students = StudentEnrollment::with('student')
             ->where('class_section_id', $request->class_section_id)
             ->where('academic_session_id', $exam->academic_session_id)
@@ -119,13 +180,11 @@ class ExamMarkController extends BaseController
                 return [
                     'id' => $enrollment->student->id,
                     'name' => $enrollment->student->full_name,
-                    // FIX: Use admission_number from student profile instead of table ID or roll_number
                     'admission_number' => $enrollment->student->admission_number ?? '-',
                 ];
             })
             ->values();
 
-        // Fetch Existing Marks
         $marks = ExamRecord::where('exam_id', $request->exam_id)
             ->where('subject_id', $request->subject_id)
             ->where('class_section_id', $request->class_section_id)
@@ -134,7 +193,7 @@ class ExamMarkController extends BaseController
             ->map(function($record) {
                 return [
                     'marks_obtained' => $record->marks_obtained,
-                    'is_absent' => $record->is_absent
+                    'is_absent' => (bool)$record->is_absent
                 ];
             });
 
@@ -144,85 +203,9 @@ class ExamMarkController extends BaseController
         ]);
     }
 
-    // --- PRIVATE HELPERS ---
-
-    private function fetchClassesForExam($examId)
-    {
-        $exam = Exam::find($examId);
-        if(!$exam) return collect();
-
-        // FIX: Ensure we only show classes for the exam's institution
-        $query = ClassSection::with('gradeLevel')
-                             ->where('institution_id', $exam->institution_id)
-                             ->where('is_active', true);
-
-        $user = Auth::user();
-        if ($user->hasRole('Teacher')) {
-             if ($user->staff) {
-                 $staffId = $user->staff->id;
-                 $query->where(function($q) use ($staffId) {
-                     $q->where('staff_id', $staffId)
-                       ->orWhereHas('timetables', function($t) use ($staffId) { 
-                           $t->where('teacher_id', $staffId); 
-                       }); 
-                 });
-             } else {
-                 $query->whereRaw('1 = 0');
-             }
-        }
-        
-        return $query->get();
-    }
-
-    private function fetchSubjectsForClass($classId)
-    {
-        $class = ClassSection::find($classId);
-        if(!$class) return collect();
-
-        $query = Subject::where('grade_level_id', $class->grade_level_id)
-                        ->where('institution_id', $class->institution_id) // FIX: Strict Institution Check
-                        ->where('is_active', true);
-
-        $user = Auth::user();
-        if ($user->hasRole('Teacher')) {
-            if ($user->staff) {
-                $staffId = $user->staff->id;
-                
-                $validSubjectIds = Timetable::where('class_section_id', $classId)
-                    ->where('teacher_id', $staffId) 
-                    ->pluck('subject_id')
-                    ->unique()
-                    ->toArray();
-                
-                if (empty($validSubjectIds)) {
-                     return collect();
-                }
-                    
-                $query->whereIn('id', $validSubjectIds);
-            } else {
-                return collect();
-            }
-        }
-
-        return $query->get();
-    }
-
-    private function validateAccess($examId, $classId, $subjectId)
-    {
-        $user = Auth::user();
-        if ($user->hasRole(['Super Admin', 'Head Officer'])) return true;
-
-        if ($user->hasRole('Teacher')) {
-            if (!$user->staff) return false;
-
-            $hasClasses = $this->fetchClassesForExam($examId)->pluck('id')->toArray();
-            if(!in_array($classId, $hasClasses)) return false;
-
-            $hasSubjects = $this->fetchSubjectsForClass($classId)->pluck('id')->toArray();
-            if(!in_array($subjectId, $hasSubjects)) return false;
-        }
-        return true;
-    }
+    // =========================================================================
+    // STORE MARKS
+    // =========================================================================
 
     public function store(Request $request)
     {
@@ -234,14 +217,14 @@ class ExamMarkController extends BaseController
             'exam_id' => 'required|exists:exams,id',
             'class_section_id' => 'required|exists:class_sections,id',
             'subject_id' => 'required|exists:subjects,id',
-            'marks' => 'required|array',
-            'marks.*' => 'numeric|min:0',
+            'marks' => 'nullable|array', 
             'absent' => 'nullable|array',
         ]);
 
         $exam = Exam::findOrFail($request->exam_id);
         
-        if (($exam->finalized_at || $exam->status == 'published') && !Auth::user()->hasRole(['Super Admin', 'Head Officer'])) {
+        $isAdmin = Auth::user()->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value]);
+        if (($exam->finalized_at || $exam->status == 'published') && !$isAdmin) {
              return response()->json(['message' => __('exam.messages.exam_finalized_error')], 403);
         }
 
@@ -249,13 +232,24 @@ class ExamMarkController extends BaseController
         $maxMarks = $subject->total_marks ?? 100;
 
         DB::transaction(function () use ($request, $maxMarks) {
-            foreach ($request->marks as $studentId => $mark) {
+            $marksInput = $request->input('marks', []);
+            $absentInput = $request->input('absent', []);
+            
+            $allStudentIds = array_unique(array_merge(array_keys($marksInput), array_keys($absentInput)));
+
+            foreach ($allStudentIds as $studentId) {
                 
-                $isAbsent = isset($request->absent[$studentId]);
-                $finalMark = $isAbsent ? 0 : $mark;
+                $isAbsent = isset($absentInput[$studentId]); 
+                $val = $marksInput[$studentId] ?? 0;
+                $finalMark = $isAbsent ? 0 : $val;
 
                 if ($finalMark > $maxMarks) {
-                    throw new \Illuminate\Validation\ValidationException(\Illuminate\Support\Facades\Validator::make([], []), new \Illuminate\Http\JsonResponse(['message' => "Marks for student ID {$studentId} cannot exceed total marks ({$maxMarks})."], 422));
+                    throw new \Illuminate\Validation\ValidationException(
+                        \Illuminate\Support\Facades\Validator::make([], []), 
+                        new \Illuminate\Http\JsonResponse([
+                            'message' => __('marks.messages.exceeds_max', ['id' => $studentId, 'max' => $maxMarks])
+                        ], 422)
+                    );
                 }
 
                 ExamRecord::updateOrCreate(
@@ -274,8 +268,133 @@ class ExamMarkController extends BaseController
         });
 
         return response()->json([
-            'message' =>(__('marks.messages.success_save')), 
+            'message' => __('marks.messages.success_save'), 
             'redirect' => null 
         ]);
+    }
+
+    // =========================================================================
+    // PRINT AWARD LIST
+    // =========================================================================
+
+    public function printAwardList(Request $request)
+    {
+        $request->validate([
+            'exam_id' => 'required|exists:exams,id',
+            'class_section_id' => 'required|exists:class_sections,id',
+            'subject_id' => 'required|exists:subjects,id',
+        ]);
+
+        if(!$this->validateAccess($request->exam_id, $request->class_section_id, $request->subject_id)) {
+            abort(403, __('marks.messages.unauthorized'));
+        }
+
+        $exam = Exam::with('academicSession', 'institution')->findOrFail($request->exam_id);
+        $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
+        $subject = Subject::findOrFail($request->subject_id);
+        
+        $students = StudentEnrollment::with('student')
+            ->where('class_section_id', $classSection->id)
+            ->where('academic_session_id', $exam->academic_session_id)
+            ->where('status', 'active')
+            ->orderBy('roll_number')
+            ->get();
+
+        $marks = ExamRecord::where('exam_id', $exam->id)
+            ->where('class_section_id', $classSection->id)
+            ->where('subject_id', $subject->id)
+            ->get()
+            ->keyBy('student_id');
+
+        $totalStudents = $students->count();
+        $absentCount = $marks->where('is_absent', true)->count();
+        $presentCount = $marks->where('is_absent', false)->count();
+        
+        $teacherName = $this->getSubjectTeacher($classSection->id, $subject->id);
+
+        $gradingScale = json_decode(InstitutionSetting::get($exam->institution_id, 'grading_scale', '[]'), true);
+        
+        if (empty($gradingScale)) {
+            $gradingScale = [
+                ['grade' => 'A', 'min' => 90], ['grade' => 'B', 'min' => 70],
+                ['grade' => 'C', 'min' => 50], ['grade' => 'F', 'min' => 0]
+            ];
+        }
+
+        $pdf = Pdf::loadView('marks.print_award_list', compact(
+            'exam', 'classSection', 'subject', 'students', 'marks', 
+            'totalStudents', 'absentCount', 'presentCount', 'teacherName',
+            'gradingScale' 
+        ));
+
+        return $pdf->stream('Award_List_'.$classSection->name.'_'.$subject->name.'.pdf');
+    }
+
+    public function myMarks()
+    {
+        $user = Auth::user();
+        if (!$user->hasRole(RoleEnum::STUDENT->value)) {
+            abort(403, __('marks.messages.unauthorized'));
+        }
+
+        $student = $user->student;
+        if (!$student) abort(404);
+
+        $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+        if (!$enrollment) {
+            return view('marks.my_marks', ['error' => __('marks.messages.not_enrolled')]);
+        }
+
+        $records = ExamRecord::with(['exam', 'subject'])
+            ->where('student_id', $student->id)
+            ->whereHas('exam', function($q) use ($enrollment) {
+                $q->where('academic_session_id', $enrollment->academic_session_id)
+                  ->where('status', 'published'); 
+            })
+            ->get()
+            ->groupBy('exam_id');
+
+        return view('marks.my_marks', compact('records', 'student'));
+    }
+
+    // =========================================================================
+    // PRIVATE HELPERS
+    // =========================================================================
+
+    private function getSubjectTeacher($classId, $subjectId)
+    {
+        if(!$classId) return 'N/A';
+        $tt = Timetable::with('teacher.user')
+            ->where('class_section_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->first();
+        return $tt->teacher->user->name ?? 'N/A';
+    }
+
+    private function validateAccess($examId, $classId, $subjectId)
+    {
+        $user = Auth::user();
+        if ($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value])) {
+            return true;
+        }
+
+        if ($user->hasRole(RoleEnum::TEACHER->value)) {
+            if (!$user->staff) return false;
+            $staffId = $user->staff->id;
+
+            $isClassTeacher = ClassSection::where('id', $classId)
+                ->where('staff_id', $staffId)
+                ->exists();
+            if ($isClassTeacher) return true;
+
+            $isSubjectTeacher = Timetable::where('class_section_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->where('teacher_id', $staffId)
+                ->exists();
+
+            return $isSubjectTeacher;
+        }
+        
+        return false;
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use App\Models\StudentParent;
 use App\Models\User;
 use App\Models\Institution;
 use App\Models\Campus;
@@ -13,15 +14,13 @@ use App\Models\StudentEnrollment;
 use App\Services\IdGeneratorService;
 use App\Services\NotificationService;
 use App\Enums\UserType;
-use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class StudentController extends BaseController
 {
@@ -38,32 +37,78 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $data = Student::with(['institution', 'campus', 'gradeLevel'])
-                ->select('students.*')
-                ->latest('students.created_at');
+            // OPTIMIZED QUERY: Join 'parents' to allow sorting/searching by parent name
+            $query = Student::leftJoin('parents', 'students.parent_id', '=', 'parents.id')
+                ->select([
+                    'students.id',
+                    'students.institution_id',
+                    'students.first_name',
+                    'students.last_name',
+                    'students.admission_number',
+                    'students.student_photo',
+                    'students.status',
+                    'students.created_at',
+                    'students.grade_level_id', 
+                    // Select Parent fields with aliases to avoid Accessor collision (getFatherNameAttribute)
+                    'parents.father_name as parent_father_name',
+                    'parents.mother_name as parent_mother_name',
+                    'parents.guardian_name as parent_guardian_name',
+                    'parents.father_phone as parent_father_phone',
+                    'parents.mother_phone as parent_mother_phone',
+                    'parents.guardian_phone as parent_guardian_phone'
+                ]);
 
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $query->where('students.institution_id', $institutionId);
             }
 
             if ($request->has('grade_level_id') && $request->grade_level_id) {
-                $data->where('grade_level_id', $request->grade_level_id);
+                $query->where('students.grade_level_id', $request->grade_level_id);
             }
 
-            return DataTables::of($data)
+            $query->orderBy('students.created_at', 'desc');
+
+            return DataTables::of($query)
                 ->addIndexColumn()
+                // --- FIX MALFORMED UTF-8 CHARACTERS ---
+                // Force UTF-8 encoding on sensitive text fields to handle French accents
+                ->editColumn('first_name', fn($row) => mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8'))
+                ->editColumn('last_name', fn($row) => mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8'))
+                // Use the aliased parent columns here
+                ->editColumn('parent_father_name', fn($row) => mb_convert_encoding($row->parent_father_name ?? '', 'UTF-8', 'UTF-8'))
+                ->editColumn('parent_mother_name', fn($row) => mb_convert_encoding($row->parent_mother_name ?? '', 'UTF-8', 'UTF-8'))
+                ->editColumn('parent_guardian_name', fn($row) => mb_convert_encoding($row->parent_guardian_name ?? '', 'UTF-8', 'UTF-8'))
+                // --------------------------------------
+                
                 ->addColumn('checkbox', function($row){
                     return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3"><input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'"><label class="form-check-label"></label></div>';
                 })
                 ->addColumn('details', function($row){
                     $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
-                    $initial = strtoupper(substr($row->first_name, 0, 1));
-                    $avatarHtml = $img ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
                     
-                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$row->full_name.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.($row->admission_number ?? '-').'</span></div></div>';
+                    // FIX: Use multibyte safe string functions for the initial
+                    $nameForInitial = trim($row->first_name) ?: 'S';
+                    $initial = mb_strtoupper(mb_substr($nameForInitial, 0, 1, 'UTF-8'));
+                    
+                    $avatarHtml = $img 
+                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' 
+                        : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold; font-size: 18px;">'.$initial.'</div>';
+                    
+                    // Force UTF-8 on concatenated name
+                    $fName = mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8');
+                    $lName = mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8');
+                    $fullName = $fName . ' ' . $lName;
+                    
+                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$fullName.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.($row->admission_number ?? '-').'</span></div></div>';
                 })
                 ->addColumn('parent_info', function($row){
-                    return '<div><i class="fa fa-user me-1"></i> '.$row->father_name.'</div><div class="text-muted"><i class="fa fa-phone me-1"></i> '.$row->father_phone.'</div>';
+                    // Use the ALIASED column names to get data from the Join, not the Accessor
+                    $name = $row->parent_father_name ?? $row->parent_mother_name ?? $row->parent_guardian_name ?? 'N/A';
+                    $phone = $row->parent_father_phone ?? $row->parent_mother_phone ?? $row->parent_guardian_phone ?? 'N/A';
+                    
+                    $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
+                    
+                    return '<div><i class="fa fa-user me-1"></i> '.$name.'</div><div class="text-muted"><i class="fa fa-phone me-1"></i> '.$phone.'</div>';
                 })
                 ->editColumn('status', function($row){
                     $badges = ['active' => 'badge-success', 'transferred' => 'badge-warning', 'suspended' => 'badge-danger', 'graduated' => 'badge-info', 'inactive' => 'badge-secondary'];
@@ -109,27 +154,61 @@ class StudentController extends BaseController
     {
         $gradeId = $request->grade_id;
         $institutionId = $this->getInstitutionId();
-
-        $grade = GradeLevel::find($gradeId);
-        if (!$grade || ($institutionId && $grade->institution_id != $institutionId)) {
-            return response()->json([]);
+        
+        $sectionsQuery = ClassSection::where('is_active', true);
+        
+        if($gradeId) {
+            $sectionsQuery->where('grade_level_id', $gradeId);
         }
-
-        $sectionsQuery = ClassSection::with('gradeLevel')
-            ->where('grade_level_id', $gradeId)
-            ->where('is_active', true);
-            
+        
         if ($institutionId) {
             $sectionsQuery->where('institution_id', $institutionId);
         }
         
-        $sections = $sectionsQuery->get()->mapWithKeys(function($item) {
-             $gradeName = $item->gradeLevel->name ?? '';
-             // Format: Grade + Section Name (e.g., "1er A")
-             return [$item->id => ($gradeName ? $gradeName . ' ' : '') . $item->name];
+        // UPDATED: Return ONLY the section name. The grade context is provided by the parent dropdown.
+        $data = $sectionsQuery->get()->mapWithKeys(function($item) {
+            return [$item->id => mb_convert_encoding($item->name, 'UTF-8', 'UTF-8')];
         });
-        
-        return response()->json($sections);
+
+        return response()->json($data);
+    }
+
+    public function checkParent(Request $request)
+    {
+        $value = $request->query('value'); 
+        $type = $request->query('type'); 
+        $institutionId = $this->getInstitutionId();
+
+        if (!$value) return response()->json(['exists' => false]);
+
+        $query = StudentParent::where('institution_id', $institutionId);
+
+        if ($request->has('email') || strpos($value, '@') !== false) {
+            $query->where('guardian_email', $value);
+        } else {
+            $query->where(function($q) use ($value) {
+                $q->where('father_phone', $value)
+                  ->orWhere('mother_phone', $value)
+                  ->orWhere('guardian_phone', $value);
+            });
+        }
+
+        $parent = $query->first();
+
+        if ($parent) {
+            $displayName = $parent->father_name ?? $parent->mother_name ?? $parent->guardian_name ?? 'Parent';
+            return response()->json([
+                'exists' => true,
+                'name' => mb_convert_encoding($displayName, 'UTF-8', 'UTF-8'),
+                'father_name' => $parent->father_name,
+                'mother_name' => $parent->mother_name,
+                'guardian_name' => $parent->guardian_name,
+                'guardian_email' => $parent->guardian_email,
+                'parent_id' => $parent->id
+            ]);
+        }
+
+        return response()->json(['exists' => false]);
     }
 
     public function store(Request $request)
@@ -143,79 +222,116 @@ class StudentController extends BaseController
             'admission_date' => 'required|date',
             'dob' => 'required|date',
             'grade_level_id' => 'required|exists:grade_levels,id',
-            'class_section_id' => 'nullable|exists:class_sections,id',
-            'email' => 'nullable|email|unique:users,email',
-            'country' => 'nullable|string',
-            'state' => 'nullable|string',
-            'city' => 'nullable|string',
-            'religion' => 'nullable|string',
-            'blood_group' => 'nullable|string',
-            'avenue' => 'nullable|string',
-            'place_of_birth' => 'nullable|string',
-            // Discount Validation
-            'discount_amount' => 'nullable|numeric|min:0',
-            'discount_type' => 'required_with:discount_amount|in:fixed,percentage',
-            'scholarship_reason' => 'nullable|string|max:255',
+            'primary_guardian' => 'required|in:father,mother,guardian',
+            'guardian_email' => 'nullable|email',
         ]);
 
-        $data = $request->except(['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason']);
-
-        // --- Capitalize Text Fields (Title Case) ---
-        $textFields = [
-            'first_name', 'last_name', 'post_name', 'place_of_birth', 
-            'avenue', 'father_name', 'mother_name', 'country', 'state', 'city', 'religion'
+        $parentFields = [
+            'father_name', 'father_phone', 'father_occupation',
+            'mother_name', 'mother_phone', 'mother_occupation',
+            'guardian_name', 'guardian_relation', 'guardian_phone', 'guardian_email'
         ];
         
+        $data = $request->except(array_merge(
+            $parentFields, 
+            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'primary_guardian']
+        ));
+
+        // Clean text fields
+        $textFields = ['first_name', 'last_name', 'post_name', 'place_of_birth', 'avenue', 'country', 'state', 'city', 'religion'];
         foreach ($textFields as $field) {
             if (!empty($data[$field])) {
-                $data[$field] = ucwords(strtolower($data[$field]));
+                $data[$field] = mb_convert_case($data[$field], MB_CASE_TITLE, "UTF-8");
             }
         }
 
         DB::transaction(function () use ($request, $data, $institutionId) {
             $institution = Institution::findOrFail($institutionId);
-            $currentSession = AcademicSession::where('institution_id', $institutionId)
-                ->where('is_current', true)
-                ->first();
+            $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->firstOrFail();
 
-            if (!$currentSession) {
-                throw ValidationException::withMessages(['institution_id' => __('student.no_active_session')]);
+            // 1. Find Parent
+            $phones = array_filter([$request->father_phone, $request->mother_phone, $request->guardian_phone]);
+            $email = $request->guardian_email;
+
+            $parent = StudentParent::where('institution_id', $institutionId)
+                ->where(function($q) use ($phones, $email) {
+                    if(!empty($phones)) {
+                        $q->where(function($sub) use ($phones) {
+                            $sub->whereIn('father_phone', $phones)
+                                ->orWhereIn('mother_phone', $phones)
+                                ->orWhereIn('guardian_phone', $phones);
+                        });
+                    }
+                    if($email) {
+                        $q->orWhere('guardian_email', $email);
+                    }
+                })->first();
+
+            // 2. Parent User Account
+            $parentUserId = $parent ? $parent->user_id : null;
+
+            if ($email) {
+                $existingUser = User::where('email', $email)->first();
+                if ($existingUser) {
+                    $parentUserId = $existingUser->id;
+                    if(!$existingUser->hasRole('Guardian')) {
+                        $existingUser->assignRole('Guardian');
+                    }
+                } else {
+                    $plainPassword = 'Parent' . rand(1000, 9999) . '!';
+                    $phone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
+                    $name = $request->guardian_name ?? $request->father_name ?? $request->mother_name ?? 'Parent';
+
+                    $newUser = User::create([
+                        'name' => $name,
+                        'email' => $email,
+                        'password' => Hash::make($plainPassword),
+                        'phone' => $phone,
+                        'user_type' => UserType::GUARDIAN->value,
+                        'institute_id' => $institutionId,
+                        'is_active' => true,
+                    ]);
+                    $newUser->assignRole('Guardian'); 
+                    $parentUserId = $newUser->id;
+                }
             }
 
-            $data['institution_id'] = $institutionId; 
-            
-            // 1. CREATE USER FIRST
-            $user = null;
-            if ($request->email) {
-                $plainPassword = 'Student' . rand(1000, 9999) . '!';
-                
-                $user = User::create([
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $request->email,
-                    'password' => Hash::make($plainPassword),
-                    'user_type' => UserType::STUDENT->value,
-                    'institute_id' => $institutionId,
-                    'is_active' => true,
+            // 3. Create/Link Parent Record
+            if (!$parent) {
+                $parent = StudentParent::create([
+                    'institution_id' => $institutionId,
+                    'user_id' => $parentUserId,
+                    'father_name' => $request->father_name,
+                    'father_phone' => $request->father_phone,
+                    'father_occupation' => $request->father_occupation,
+                    'mother_name' => $request->mother_name,
+                    'mother_phone' => $request->mother_phone,
+                    'mother_occupation' => $request->mother_occupation,
+                    'guardian_name' => $request->guardian_name,
+                    'guardian_relation' => $request->primary_guardian,
+                    'guardian_phone' => $request->guardian_phone,
+                    'guardian_email' => $request->guardian_email,
+                    'family_address' => $request->avenue, 
                 ]);
-                
-                $user->assignRole('Student');
-                $data['user_id'] = $user->id;
-                
-                // Send credentials later
-                $this->notificationService->sendUserCredentials($user, $plainPassword, 'Student');
+            } else {
+                if (!$parent->user_id && $parentUserId) {
+                    $parent->update(['user_id' => $parentUserId]);
+                }
             }
 
-            // 2. GENERATE ID
-            $userId = $user ? $user->id : null;
-            $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession, $userId);
+            // 4. Create Student
+            $data['institution_id'] = $institutionId;
+            $data['parent_id'] = $parent->id; 
+            $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
+            $data['primary_guardian'] = $request->primary_guardian; 
 
             if ($request->hasFile('student_photo')) {
                 $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
             }
 
-            // 3. CREATE STUDENT
             $student = Student::create($data);
 
+            // 5. Enroll
             $sectionId = $request->class_section_id;
             if (!$sectionId) {
                 $section = ClassSection::where('grade_level_id', $request->grade_level_id)
@@ -223,8 +339,7 @@ class StudentController extends BaseController
                     ->first();
                 $sectionId = $section ? $section->id : null;
             }
-
-            // 4. CREATE ENROLLMENT WITH DISCOUNT
+            
             if ($sectionId) {
                 StudentEnrollment::create([
                     'institution_id' => $institutionId,
@@ -234,21 +349,10 @@ class StudentController extends BaseController
                     'class_section_id' => $sectionId,
                     'status' => 'active',
                     'enrolled_at' => now(),
-                    // Save Discount Details
                     'discount_amount' => $request->discount_amount ?? 0,
                     'discount_type' => $request->discount_type ?? 'fixed',
                     'scholarship_reason' => $request->scholarship_reason,
                 ]);
-            }
-
-            $phone = $student->mobile_number ?? $student->father_phone;
-            if ($phone) {
-                $smsData = [
-                    'StudentName' => $student->full_name,
-                    'AdmissionNumber' => $student->admission_number,
-                    'SchoolName' => $institution->name
-                ];
-                $this->notificationService->sendSmsEvent('student_admission', $phone, $smsData, $institutionId);
             }
         });
 
@@ -258,10 +362,7 @@ class StudentController extends BaseController
     public function edit(Student $student)
     {
         $institutionId = $this->getInstitutionId();
-
-        if ($institutionId && $student->institution_id != $institutionId) {
-            abort(403, __('student.unauthorized_access'));
-        }
+        if ($institutionId && $student->institution_id != $institutionId) abort(403);
 
         $institutes = Institution::where('id', $student->institution_id)->pluck('name', 'id');
         $campuses = Campus::where('institution_id', $student->institution_id)->pluck('name', 'id');
@@ -275,7 +376,7 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) abort(403);
         
-        $student->load(['institution', 'campus', 'gradeLevel', 'enrollments.academicSession', 'enrollments.classSection']);
+        $student->load(['institution', 'campus', 'gradeLevel', 'parent', 'enrollments.academicSession', 'enrollments.classSection']);
         return view('students.show', compact('student'));
     }
 
@@ -284,57 +385,47 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) abort(403);
         
-        $request->validate([
-            'first_name' => 'required',
-            'last_name' => 'required',
-            'dob' => 'required|date',
-            'country' => 'nullable|string',
-            'state' => 'nullable|string',
-            'city' => 'nullable|string',
-            // Discount Validation
-            'discount_amount' => 'nullable|numeric|min:0',
-            'discount_type' => 'required_with:discount_amount|in:fixed,percentage',
-            'scholarship_reason' => 'nullable|string|max:255',
-        ]);
+        $request->validate(['first_name' => 'required', 'last_name' => 'required']);
 
-        $data = $request->except(['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason']);
-        unset($data['admission_number']); 
-        unset($data['institution_id']); 
-
-        // --- Capitalize Text Fields (Title Case) ---
-        $textFields = [
-            'first_name', 'last_name', 'post_name', 'place_of_birth', 
-            'avenue', 'father_name', 'mother_name', 'country', 'state', 'city', 'religion'
-        ];
+        $parentFields = ['father_name', 'father_phone', 'mother_name', 'mother_phone', 'guardian_name', 'guardian_phone', 'guardian_email'];
+        $parentData = $request->only($parentFields);
         
-        foreach ($textFields as $field) {
-            if (!empty($data[$field])) {
-                $data[$field] = ucwords(strtolower($data[$field]));
-            }
-        }
+        $studentData = $request->except(array_merge(
+            $parentFields, 
+            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'admission_number', 'institution_id']
+        ));
 
-        if ($request->hasFile('student_photo')) {
-            if ($student->student_photo) {
-                Storage::disk('public')->delete($student->student_photo);
+        DB::transaction(function () use ($student, $studentData, $parentData, $request) {
+            if ($request->hasFile('student_photo')) {
+                if ($student->student_photo) Storage::disk('public')->delete($student->student_photo);
+                $studentData['student_photo'] = $request->file('student_photo')->store('students', 'public');
             }
-            $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
-        }
-
-        // DB Transaction to update Student AND Enrollment discount
-        DB::transaction(function () use ($student, $data, $request) {
-            $student->update($data);
             
-            if($student->user_id) {
-                $userLink = User::find($student->user_id);
-                if($userLink) {
-                    $userLink->update([
-                        'name' => $data['first_name'] . ' ' . $data['last_name'],
-                        'email' => $request->email ?? $userLink->email,
-                    ]);
+            $student->update($studentData);
+
+            if ($student->parent) {
+                $student->parent->update($parentData);
+                
+                if (!empty($parentData['guardian_email']) && !$student->parent->user_id) {
+                    $existingUser = User::where('email', $parentData['guardian_email'])->first();
+                    if ($existingUser) {
+                        $student->parent->update(['user_id' => $existingUser->id]);
+                    } else {
+                        $plainPassword = 'Parent' . rand(1000, 9999) . '!';
+                        $newUser = User::create([
+                            'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
+                            'email' => $parentData['guardian_email'],
+                            'password' => Hash::make($plainPassword),
+                            'user_type' => UserType::GUARDIAN->value,
+                            'institute_id' => $student->institution_id,
+                            'is_active' => true,
+                        ]);
+                        $newUser->assignRole('Guardian');
+                        $student->parent->update(['user_id' => $newUser->id]);
+                    }
                 }
             }
 
-            // Update Current Enrollment Discount
             $enrollment = $student->enrollments()->latest()->first();
             if ($enrollment) {
                 $enrollment->update([
@@ -355,25 +446,13 @@ class StudentController extends BaseController
         
         try {
             DB::transaction(function () use ($student) {
-                if ($student->student_photo) {
-                    Storage::disk('public')->delete($student->student_photo);
-                }
-                if($student->user_id) {
-                    User::destroy($student->user_id);
-                }
+                if ($student->student_photo) Storage::disk('public')->delete($student->student_photo);
+                if($student->user_id) User::destroy($student->user_id);
                 $student->delete();
             });
-            
             return response()->json(['message' => __('student.messages.success_delete')]);
-
         } catch (QueryException $e) {
-            if ($e->errorInfo[1] == 1451) {
-                return response()->json([
-                    'message' => __('student.messages.cannot_delete_linked_data') ?? 'Cannot delete student because they are linked to other records (e.g. Grades, Attendance).'
-                ], 422);
-            }
-            
-            return response()->json(['message' => __('student.messages.error_occurred') ?? 'An error occurred while deleting the student.'], 500);
+            return response()->json(['message' => 'Error deleting student.'], 500);
         }
     }
 }

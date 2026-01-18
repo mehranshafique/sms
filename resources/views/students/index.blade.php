@@ -67,10 +67,12 @@
             serverSide: true,
             ajax: "{{ route('students.index') }}",
             columns: [
-                { data: 'DT_RowIndex', name: 'id' },
-                { data: 'details', name: 'first_name' },
-                { data: 'parent_info', name: 'father_name' },
-                { data: 'status', name: 'status' },
+                { data: 'DT_RowIndex', name: 'students.id' },
+                // Name matches Controller select fields for correct searching
+                { data: 'details', name: 'students.first_name' }, 
+                // Updated to search by parent name fields
+                { data: 'parent_info', name: 'parents.father_name' }, 
+                { data: 'status', name: 'students.status' },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
             ]
         });

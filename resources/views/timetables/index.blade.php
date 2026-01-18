@@ -67,15 +67,27 @@
 
         {{-- Filter Row --}}
         <div class="row mb-4">
-            <div class="col-xl-4 col-lg-6">
+            {{-- Grade Filter --}}
+            <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
                 <div class="form-group">
-                    <select id="filter_class" class="form-control default-select">
-                        <option value="">{{ __('timetable.filter_by_class') }}</option>
-                        @if(isset($classSections))
-                            @foreach($classSections as $id => $name)
-                                <option value="{{ $id }}">{{ $name }}</option>
+                    <label class="form-label">{{ __('grade_level.grade_name') }}</label>
+                    <select id="filter_grade" class="form-control default-select">
+                        <option value="">{{ __('timetable.all_grades') ?? 'All Grades' }}</option>
+                        @if(isset($gradeLevels))
+                            @foreach($gradeLevels as $id => $name)
+                                <option value="{{ $id }}" {{ (request('grade_level_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                             @endforeach
                         @endif
+                    </select>
+                </div>
+            </div>
+
+            {{-- Class Filter (Dependent) --}}
+            <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+                <div class="form-group">
+                    <label class="form-label">{{ __('timetable.class') }}</label>
+                    <select id="filter_class" class="form-control default-select" disabled>
+                        <option value="">{{ __('timetable.filter_by_class') }}</option>
                     </select>
                 </div>
             </div>
@@ -138,17 +150,103 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
-        // Refresh SelectPicker for Filter Dropdown
-        if(jQuery().selectpicker) {
-            $('.default-select').selectpicker('refresh');
+        // --- CONSTANTS ---
+        const LANG_LOADING = "{{ __('timetable.loading') }}";
+        const LANG_FILTER_CLASS = "{{ __('timetable.filter_by_class') }}";
+        const LANG_NO_OPTIONS = "{{ __('timetable.no_options') }}";
+        const LANG_ERROR = "{{ __('timetable.error_loading') }}";
+
+        // --- DOM Elements ---
+        const gradeFilter = document.getElementById('filter_grade');
+        const classFilter = document.getElementById('filter_class');
+        
+        // Pre-selected value from request (if any)
+        const initialClassId = "{{ request('class_section_id') }}";
+
+        // --- HELPER: Refresh UI ---
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
+                 $(element).selectpicker('refresh');
+            }
         }
 
+        // --- LOAD CLASSES FUNCTION ---
+        // Decoupled from event to allow safe calling on Init and Change
+        function loadClasses(gradeId, preSelectedId = null) {
+            // 1. UI Loading State
+            classFilter.innerHTML = `<option value="">${LANG_LOADING}</option>`;
+            classFilter.disabled = true;
+            refreshSelect(classFilter);
+
+            if (!gradeId) {
+                // Reset if empty
+                classFilter.innerHTML = `<option value="">${LANG_FILTER_CLASS}</option>`;
+                refreshSelect(classFilter);
+                if(typeof table !== 'undefined') table.draw();
+                return;
+            }
+
+            // 2. Fetch Data
+            fetch(`{{ route('students.get_sections') }}?grade_id=${gradeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Reset
+                    classFilter.innerHTML = `<option value="">${LANG_FILTER_CLASS}</option>`;
+                    
+                    // Populate
+                    if(Object.keys(data).length > 0) {
+                        Object.entries(data).forEach(([id, name]) => {
+                            let option = new Option(name, id);
+                            if (String(id) === String(preSelectedId)) {
+                                option.selected = true;
+                            }
+                            classFilter.add(option);
+                        });
+                        classFilter.disabled = false;
+                    } else {
+                        classFilter.innerHTML = `<option value="">${LANG_NO_OPTIONS}</option>`;
+                        classFilter.disabled = true;
+                    }
+                    
+                    refreshSelect(classFilter);
+                    
+                    // Reload Table after classes are loaded/selected
+                    if(typeof table !== 'undefined') table.draw();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    classFilter.innerHTML = `<option value="">${LANG_ERROR}</option>`;
+                    refreshSelect(classFilter);
+                });
+        }
+
+        // --- EVENT LISTENER ---
+        if(gradeFilter) {
+            gradeFilter.addEventListener('change', function() {
+                loadClasses(this.value);
+            });
+        }
+
+        if(classFilter) {
+            classFilter.addEventListener('change', function() {
+                if(typeof table !== 'undefined') table.draw();
+            });
+        }
+
+        // --- INITIALIZATION ---
+        // If a grade is already selected (e.g. from server render or back button), load classes.
+        if (gradeFilter && gradeFilter.value) {
+            loadClasses(gradeFilter.value, initialClassId);
+        }
+
+        // --- DATATABLE CONFIG ---
         const table = $('#timetableTable').DataTable({
             processing: true,
             serverSide: true,
             ajax: {
                 url: "{{ route('timetables.index') }}",
                 data: function(d) {
+                    d.grade_level_id = $('#filter_grade').val();
                     d.class_section_id = $('#filter_class').val();
                 }
             },
@@ -209,10 +307,7 @@
             }
         });
 
-        $('#filter_class').on('change', function() {
-            table.draw();
-        });
-
+        // --- BULK DELETE LOGIC ---
         $('#checkAll').on('click', function() {
             const isChecked = this.checked;
             $('.single-checkbox').prop('checked', isChecked);

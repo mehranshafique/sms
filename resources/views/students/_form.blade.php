@@ -1,3 +1,16 @@
+<!-- Add intl-tel-input CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/css/intlTelInput.css">
+<style>
+    .iti { width: 100%; display: block; }
+    .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid var(--primary); color: var(--primary); }
+    .scan-btn { cursor: pointer; }
+    .auto-filled { background-color: #e8f0fe !important; border-color: #4285f4; transition: background-color 0.5s; }
+    .parent-status-msg { font-size: 0.85rem; margin-top: 5px; font-weight: 500; }
+    /* Hide spin buttons for number inputs */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+</style>
+
 <form action="{{ isset($student) ? route('students.update', $student->id) : route('students.store') }}" method="POST" id="studentForm" enctype="multipart/form-data" novalidate>
     @csrf
     @if(isset($student))
@@ -5,38 +18,156 @@
     @endif
 
     <div class="card">
-        <div class="card-header">
-            <h4 class="card-title">{{ __('student.admission_form') }}</h4>
+        <div class="card-header border-bottom">
+            <h4 class="card-title">{{ isset($student) ? __('student.edit_student') : __('student.admission_form') }}</h4>
         </div>
         <div class="card-body">
             
+            {{-- TABS --}}
             <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
                 <li class="nav-item">
-                    <button class="nav-link active" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button" role="tab" aria-controls="official" aria-selected="true">{{ __('student.official_details') }}</button>
+                    <button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab"><i class="fa fa-user me-2"></i> {{ __('student.personal_details') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab" aria-controls="personal" aria-selected="false">{{ __('student.personal_details') }}</button>
+                    <button class="nav-link" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button" role="tab"><i class="fa fa-building me-2"></i> {{ __('student.official_details') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab" aria-controls="parents" aria-selected="false">{{ __('student.parents_guardian') }}</button>
+                    <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab"><i class="fa fa-users me-2"></i> {{ __('student.parents_guardian') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="identity-tab" data-bs-toggle="tab" data-bs-target="#identity" type="button" role="tab" aria-controls="identity" aria-selected="false">{{ __('student.identity_access') }}</button>
+                    <button class="nav-link" id="identity-tab" data-bs-toggle="tab" data-bs-target="#identity" type="button" role="tab"><i class="fa fa-id-card me-2"></i> {{ __('student.identity_access') }}</button>
                 </li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
                 
-                <!-- Tab 1: Official Details -->
-                <div class="tab-pane fade show active" id="official" role="tabpanel" aria-labelledby="official-tab">
+                <!-- Tab 1: Personal Details -->
+                <div class="tab-pane fade show active" id="personal" role="tabpanel">
                     <div class="row">
+                        {{-- Photo Upload --}}
+                        <div class="col-md-12 mb-4 text-center">
+                            <label class="form-label d-block fw-bold">{{ __('student.photo') }}</label>
+                            <div class="avatar-upload d-inline-block position-relative">
+                                <div class="position-relative">
+                                    <div class="change-btn d-flex align-items-center justify-content-center">
+                                        <input type='file' class="form-control d-none" name="student_photo" id="imageUpload" accept=".png, .jpg, .jpeg" />
+                                        <label for="imageUpload" class="btn btn-primary btn-sm rounded-circle p-2 mb-0 shadow"><i class="fa fa-camera"></i></label>
+                                    </div>
+                                    <div class="avatar-preview rounded-circle" style="width: 120px; height: 120px; overflow: hidden; border: 4px solid #f0f0f0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                        @if(isset($student) && $student->student_photo)
+                                            <img id="imagePreview" src="{{ asset('storage/'.$student->student_photo) }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                        @else
+                                            <div id="imagePreview" style="width: 100%; height: 100%; background: #f8f9fa; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fa fa-user text-secondary fa-3x"></i>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Personal Identifiers --}}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.first_name') }} <span class="text-danger">*</span></label>
+                            <input type="text" name="first_name" class="form-control" value="{{ old('first_name', $student->first_name ?? '') }}" required>
+                            <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.last_name') }} <span class="text-danger">*</span></label>
+                            <input type="text" name="last_name" class="form-control" value="{{ old('last_name', $student->last_name ?? '') }}" required>
+                            <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.post_name') }}</label>
+                            <input type="text" name="post_name" class="form-control" value="{{ old('post_name', $student->post_name ?? '') }}">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.dob') }} <span class="text-danger">*</span></label>
+                            <input type="text" name="dob" class="datepicker form-control" value="{{ old('dob', isset($student) ? $student->dob->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
+                            <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.gender') }} <span class="text-danger">*</span></label>
+                            <select name="gender" class="form-control default-select" required>
+                                <option value="male" {{ (old('gender', $student->gender ?? '') == 'male') ? 'selected' : '' }}>{{ __('student.male') ?? 'Male' }}</option>
+                                <option value="female" {{ (old('gender', $student->gender ?? '') == 'female') ? 'selected' : '' }}>{{ __('student.female') ?? 'Female' }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.place_of_birth') }}</label>
+                            <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}">
+                        </div>
+
+                        {{-- Additional Details --}}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.religion') }}</label>
+                            <select name="religion" class="form-control default-select">
+                                <option value="">{{ __('student.select_option') }}</option>
+                                @foreach(['Christian', 'Muslim', 'Hindu', 'Buddhist', 'Other'] as $rel)
+                                    <option value="{{ $rel }}" {{ (old('religion', $student->religion ?? '') == $rel) ? 'selected' : '' }}>{{ $rel }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.blood_group') }}</label>
+                            <select name="blood_group" class="form-control default-select">
+                                <option value="">{{ __('student.select_option') }}</option>
+                                @foreach(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] as $bg)
+                                    <option value="{{ $bg }}" {{ (old('blood_group', $student->blood_group ?? '') == $bg) ? 'selected' : '' }}>{{ $bg }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        {{-- Contact --}}
+                        <div class="col-md-12"><hr class="my-3"></div>
                         
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.email') }}</label>
+                            <input type="email" name="email" class="form-control" value="{{ old('email', $student->email ?? '') }}" placeholder="student@example.com">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.mobile_no') }}</label>
+                            <div class="input-group">
+                                <input type="hidden" name="mobile_number" id="hidden_mobile_number">
+                                <input type="tel" id="mobile_number_input" class="form-control phone-input" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
+                            </div>
+                        </div>
+
+                        {{-- Address --}}
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.country') }}</label>
+                            <select name="country" id="countrySelect" class="form-control default-select">
+                                <option value="">{{ __('student.select_country') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.state') }}</label>
+                            <select name="state" id="stateSelect" class="form-control default-select" disabled>
+                                <option value="">{{ __('student.select_state') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.city') }}</label>
+                            <select name="city" id="citySelect" class="form-control default-select" disabled>
+                                <option value="">{{ __('student.select_city') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">{{ __('student.avenue_address') }}</label>
+                            <input type="text" name="avenue" class="form-control" value="{{ old('avenue', $student->avenue ?? '') }}" placeholder="Street address, Apt, etc.">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Official Details -->
+                <div class="tab-pane fade" id="official" role="tabpanel">
+                    <div class="row">
                         @php
                             $hasContext = isset($institutionId) && $institutionId;
                             $isSuperAdmin = auth()->user()->hasRole('Super Admin');
                             $enrollment = isset($student) ? $student->enrollments()->latest()->first() : null;
                             
-                            // Safe Accessors for Edit Mode
                             $currentGradeId = old('grade_level_id', $student->grade_level_id ?? $enrollment->classSection->grade_level_id ?? '');
                             $currentSectionId = old('class_section_id', $student->class_section_id ?? $enrollment->class_section_id ?? '');
                             
@@ -58,10 +189,11 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="invalid-feedback">Please select an institute.</div>
                             </div>
                         @endif
 
+                        {{-- Campus --}}
+                        @if(isset($campuses) && count($campuses) > 0)
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.select_campus') }}</label>
                             <select name="campus_id" class="form-control default-select">
@@ -71,12 +203,14 @@
                                 @endforeach
                             </select>
                         </div>
+                        @endif
                         
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.academic_year') }}</label>
                             <input type="text" class="form-control" value="{{ isset($currentSession) ? $currentSession->name : 'N/A' }}" readonly disabled>
                         </div>
 
+                        {{-- Grade Level (Main) --}}
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.select_class') }} <span class="text-danger">*</span></label>
                             <select name="grade_level_id" id="gradeLevelSelect" class="form-control default-select" required>
@@ -85,9 +219,9 @@
                                     <option value="{{ $id }}" {{ ($currentGradeId == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                 @endforeach
                             </select>
-                            <div class="invalid-feedback">Please select a class.</div>
                         </div>
 
+                        {{-- Section (Dependent) --}}
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.select_section') }}</label>
                             <select name="class_section_id" id="sectionSelect" class="form-control default-select" disabled>
@@ -100,7 +234,6 @@
                             <input type="text" name="admission_date" 
                                    value="{{ old('admission_date', (isset($student) && $student->admission_date) ? $student->admission_date->format('Y-m-d') : date('Y-m-d')) }}" 
                                    class="datepicker form-control" placeholder="YYYY-MM-DD" required>
-                            <div class="invalid-feedback">Admission date is required.</div>
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -111,6 +244,7 @@
                             </select>
                         </div>
 
+                        {{-- Scholarship --}}
                         <div class="col-12 mt-2">
                             <div class="p-3 border rounded bg-light">
                                 <h5 class="text-primary mb-3"><i class="fa fa-percent me-2"></i> {{ __('student.scholarship_discount') }}</h5>
@@ -137,173 +271,98 @@
                                 </div>
                             </div>
                         </div>
-
-                    </div>
-                </div>
-
-                <!-- Tab 2: Personal Details -->
-                <div class="tab-pane fade" id="personal" role="tabpanel" aria-labelledby="personal-tab">
-                    <div class="row">
-                        <div class="col-md-12 mb-3 text-center">
-                            <label class="form-label d-block">{{ __('student.photo') }}</label>
-                            <div class="avatar-upload d-inline-block position-relative">
-                                <div class="position-relative">
-                                    <div class="change-btn d-flex align-items-center justify-content-center">
-                                        <input type='file' class="form-control d-none" name="student_photo" id="imageUpload" accept=".png, .jpg, .jpeg" />
-                                        <label for="imageUpload" class="btn btn-primary btn-sm rounded-circle p-2 mb-0"><i class="fa fa-camera"></i></label>
-                                    </div>
-                                    <div class="avatar-preview rounded-circle" style="width: 100px; height: 100px; overflow: hidden; border: 3px solid var(--border-color);">
-                                        @if(isset($student) && $student->student_photo)
-                                            <img id="imagePreview" src="{{ asset('storage/'.$student->student_photo) }}" style="width: 100%; height: 100%; object-fit: cover;">
-                                        @else
-                                            <div id="imagePreview" style="width: 100%; height: 100%; background: #e1e1e1; display: flex; align-items: center; justify-content: center;">
-                                                <i class="fa fa-user text-white fa-2x"></i>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.first_name') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="first_name" class="form-control" value="{{ old('first_name', $student->first_name ?? '') }}" required>
-                            <div class="invalid-feedback">First name is required.</div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.last_name') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="last_name" class="form-control" value="{{ old('last_name', $student->last_name ?? '') }}" required>
-                            <div class="invalid-feedback">Last name is required.</div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.post_name') }}</label>
-                            <input type="text" name="post_name" class="form-control" value="{{ old('post_name', $student->post_name ?? '') }}">
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.dob') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="dob" 
-                                   value="{{ old('dob', (isset($student) && $student->dob) ? $student->dob->format('Y-m-d') : '') }}" 
-                                   class="datepicker form-control" placeholder="YYYY-MM-DD" required>
-                            <div class="invalid-feedback">Date of birth is required.</div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.place_of_birth') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}" required>
-                             <div class="invalid-feedback">Place of birth is required.</div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.gender') }} <span class="text-danger">*</span></label>
-                            <select name="gender" class="form-control default-select" required>
-                                <option value="male" {{ (old('gender', $student->gender ?? '') == 'male') ? 'selected' : '' }}>Male</option>
-                                <option value="female" {{ (old('gender', $student->gender ?? '') == 'female') ? 'selected' : '' }}>Female</option>
-                            </select>
-                             <div class="invalid-feedback">Gender is required.</div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.religion') }}</label>
-                            <select name="religion" class="form-control default-select">
-                                <option value="">{{ __('student.select_option') }}</option>
-                                @foreach(['Christian', 'Muslim', 'Hindu', 'Buddhist', 'Other'] as $rel)
-                                    <option value="{{ $rel }}" {{ (old('religion', $student->religion ?? '') == $rel) ? 'selected' : '' }}>{{ $rel }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.blood_group') }}</label>
-                            <select name="blood_group" class="form-control default-select">
-                                <option value="">{{ __('student.select_option') }}</option>
-                                @foreach(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] as $bg)
-                                    <option value="{{ $bg }}" {{ (old('blood_group', $student->blood_group ?? '') == $bg) ? 'selected' : '' }}>{{ $bg }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.email') }}</label>
-                            <input type="email" name="email" class="form-control" value="{{ old('email', $student->email ?? '') }}">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.mobile_no') }}</label>
-                            <input type="text" name="mobile_number" class="form-control" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.country') }}</label>
-                            <select name="country" id="countrySelect" class="form-control default-select">
-                                <option value="">{{ __('student.select_country') }}</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.state') }}</label>
-                            <select name="state" id="stateSelect" class="form-control default-select" disabled>
-                                <option value="">{{ __('student.select_state') }}</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.city') }}</label>
-                            <select name="city" id="citySelect" class="form-control default-select" disabled>
-                                <option value="">{{ __('student.select_city') }}</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-12 mb-3">
-                            <label class="form-label">{{ __('student.avenue_address') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="avenue" class="form-control" value="{{ old('avenue', $student->avenue ?? '') }}" required>
-                             <div class="invalid-feedback">Address is required.</div>
-                        </div>
                     </div>
                 </div>
 
                 <!-- Tab 3: Parents/Guardian -->
-                <div class="tab-pane fade" id="parents" role="tabpanel" aria-labelledby="parents-tab">
+                <div class="tab-pane fade" id="parents" role="tabpanel">
                     <div class="row">
-                        <div class="col-md-12 mb-3">
-                            <label class="form-label">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
-                            <select name="primary_guardian" class="form-control default-select" required>
-                                <option value="father" {{ (old('primary_guardian', $student->primary_guardian ?? '') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
-                                <option value="mother" {{ (old('primary_guardian', $student->primary_guardian ?? '') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
-                                <option value="guardian" {{ (old('primary_guardian', $student->primary_guardian ?? '') == 'guardian') ? 'selected' : '' }}>{{ __('student.guardian_name') }}</option>
-                            </select>
+                        <div class="col-md-12 mb-4">
+                            <div class="alert alert-primary light border-primary shadow-sm">
+                                <i class="fa fa-info-circle me-2 fs-5"></i> 
+                                <strong>Auto-Fetch:</strong> Enter a <u>Phone Number</u> or <u>Email</u> to automatically load existing parent details.
+                            </div>
                         </div>
 
+                        {{-- Father --}}
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.father_name') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="father_name" class="form-control" value="{{ old('father_name', $student->father_name ?? '') }}" required>
-                             <div class="invalid-feedback">Father name is required.</div>
+                            <label class="form-label fw-bold">{{ __('student.father_name') }}</label>
+                            <input type="text" name="father_name" id="father_name" class="form-control" value="{{ old('father_name', $student->parent->father_name ?? '') }}">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.father_phone') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="father_phone" class="form-control" value="{{ old('father_phone', $student->father_phone ?? '') }}" required>
-                             <div class="invalid-feedback">Phone is required.</div>
+                            <label class="form-label fw-bold">{{ __('student.father_phone') }}</label>
+                            <div class="input-group">
+                                <input type="hidden" name="father_phone" id="hidden_father_phone">
+                                <input type="tel" id="father_phone_input" class="form-control phone-input parent-lookup" data-type="father" value="{{ old('father_phone', $student->parent->father_phone ?? '') }}">
+                            </div>
+                            <div id="father_status" class="parent-status-msg d-none"></div>
                         </div>
-                        
+
+                        {{-- Mother --}}
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.mother_name') }} <span class="text-danger">*</span></label>
-                            <input type="text" name="mother_name" class="form-control" value="{{ old('mother_name', $student->mother_name ?? '') }}" required>
-                             <div class="invalid-feedback">Mother name is required.</div>
+                            <label class="form-label fw-bold">{{ __('student.mother_name') }}</label>
+                            <input type="text" name="mother_name" id="mother_name" class="form-control" value="{{ old('mother_name', $student->parent->mother_name ?? '') }}">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.mother_phone') }}</label>
-                            <input type="text" name="mother_phone" class="form-control" value="{{ old('mother_phone', $student->mother_phone ?? '') }}">
+                            <label class="form-label fw-bold">{{ __('student.mother_phone') }}</label>
+                            <div class="input-group">
+                                <input type="hidden" name="mother_phone" id="hidden_mother_phone">
+                                <input type="tel" id="mother_phone_input" class="form-control phone-input parent-lookup" data-type="mother" value="{{ old('mother_phone', $student->parent->mother_phone ?? '') }}">
+                            </div>
+                            <div id="mother_status" class="parent-status-msg d-none"></div>
+                        </div>
+
+                        <div class="col-md-12 my-3"><hr class="border-secondary opacity-25"></div>
+
+                        {{-- Guardian --}}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('student.guardian_name') }}</label>
+                            <input type="text" name="guardian_name" id="guardian_name" class="form-control" value="{{ old('guardian_name', $student->parent->guardian_name ?? '') }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('student.guardian_email') }}</label>
+                            <input type="email" name="guardian_email" id="guardian_email" class="form-control parent-lookup-email" value="{{ old('guardian_email', $student->parent->guardian_email ?? '') }}" placeholder="For login access">
+                            <div id="guardian_email_status" class="parent-status-msg d-none"></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('student.guardian_phone') }}</label>
+                            <div class="input-group">
+                                <input type="hidden" name="guardian_phone" id="hidden_guardian_phone">
+                                <input type="tel" id="guardian_phone_input" class="form-control phone-input parent-lookup" data-type="guardian" value="{{ old('guardian_phone', $student->parent->guardian_phone ?? '') }}">
+                            </div>
+                            <div id="guardian_status" class="parent-status-msg d-none"></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
+                            <select name="primary_guardian" class="form-control default-select" required>
+                                <option value="father" {{ (old('primary_guardian') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
+                                <option value="mother" {{ (old('primary_guardian') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
+                                <option value="guardian" {{ (old('primary_guardian') == 'guardian') ? 'selected' : '' }}>{{ __('student.guardian_name') }}</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
                 <!-- Tab 4: Identity -->
-                <div class="tab-pane fade" id="identity" role="tabpanel" aria-labelledby="identity-tab">
+                <div class="tab-pane fade" id="identity" role="tabpanel">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.nfc_tag_uid') }}</label>
                             <div class="input-group">
-                                <input type="text" name="nfc_tag_uid" class="form-control" value="{{ old('nfc_tag_uid', $student->nfc_tag_uid ?? '') }}" placeholder="{{ __('student.enter_nfc_uid') }}">
-                                <span class="input-group-text"><i class="fa fa-id-card"></i></span>
+                                <span class="input-group-text"><i class="fa fa-wifi"></i></span>
+                                <input type="text" name="nfc_tag_uid" id="nfc_input" class="form-control" value="{{ old('nfc_tag_uid', $student->nfc_tag_uid ?? '') }}" placeholder="{{ __('student.enter_nfc_uid') }}" autocomplete="off">
+                                <button class="btn btn-secondary" type="button" id="btnScanNFC"><i class="fa fa-mobile me-1"></i> Scan</button>
                             </div>
+                            <small class="text-muted d-block mt-1">Tap card on reader (Desktop) or click Scan (Mobile).</small>
+                            <div id="nfcStatus" class="small mt-1 text-info d-none"><i class="fa fa-spinner fa-spin"></i> Scanning... Tap card on back of phone.</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.qr_code_token') }}</label>
-                            <input type="text" name="qr_code_token" class="form-control" value="{{ old('qr_code_token', $student->qr_code_token ?? '') }}" placeholder="{{ __('student.enter_qr_token') }}">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-qrcode"></i></span>
+                                <input type="text" name="qr_code_token" id="qr_token" class="form-control" value="{{ old('qr_code_token', $student->qr_code_token ?? '') }}" placeholder="{{ __('student.enter_qr_token') }}">
+                                <button class="btn btn-outline-primary" type="button" onclick="generateQR()"><i class="fa fa-refresh me-1"></i> Generate</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -311,238 +370,419 @@
             </div>
 
             <div class="row mt-4">
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary" id="saveStudentBtn">{{ isset($student) ? __('student.update_student') : __('student.save_student') }}</button>
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-primary btn-lg shadow">
+                        <i class="fa fa-save me-2"></i> {{ isset($student) ? __('student.update_student') : __('student.save_student') }}
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 </form>
 
-{{-- REQUIRED LIBRARY: SWEETALERT2 --}}
+{{-- SCRIPTS --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/intlTelInput.min.js"></script>
 
-{{-- CENTRALIZED JAVASCRIPT LOGIC --}}
 <script>
-    // 1. Localization Keys
+    // --- LOCALIZED CONSTANTS ---
     const LANG_LOADING = "{{ __('student.loading') }}";
     const LANG_SELECT_OPTION = "{{ __('student.select_option_placeholder') }}";
+    const LANG_SELECT_CLASS_FIRST = "{{ __('student.select_class_first') }}";
     const LANG_NO_OPTIONS = "{{ __('student.no_options') }}";
     const LANG_ERROR = "{{ __('student.error_loading') }}";
-    const LANG_SELECT_CLASS_FIRST = "{{ __('student.select_class_first') }}";
+    const LANG_SUCCESS_TITLE = "{{ __('student.messages.success') }}";
+    const LANG_ERROR_TITLE = "{{ __('student.messages.error') }}";
+    const LANG_BTN_OK = "{{ __('student.ok') }}";
 
-    // 2. Saved Values from Controller (For Edit/Error State)
-    const savedGradeId = "{{ $currentGradeId }}";
-    const savedSectionId = "{{ $currentSectionId }}";
-    const savedCountry = "{{ $savedCountry }}";
-    const savedState = "{{ $savedState }}";
-    const savedCity = "{{ $savedCity }}";
+    // --- HELPER FUNCTIONS ---
+    function generateQR() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 16; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+        const token = result.match(/.{1,4}/g).join('-');
+        document.getElementById('qr_token').value = token;
+    }
 
-    // 3. Image Preview Logic
-    const imageUpload = document.getElementById('imageUpload');
-    if(imageUpload){
-        imageUpload.onchange = function (evt) {
-            var tgt = evt.target || window.event.srcElement, files = tgt.files;
-            if (FileReader && files && files.length) {
-                var fr = new FileReader();
-                fr.onload = function () {
-                    var preview = document.getElementById('imagePreview');
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- 1. Phone Input Setup ---
+        const phoneOptions = {
+            utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js",
+            initialCountry: "cd",
+            separateDialCode: true,
+            preferredCountries: ['cd', 'us', 'fr'],
+        };
+
+        const inputs = [
+            { input: document.querySelector("#mobile_number_input"), hidden: document.querySelector("#hidden_mobile_number") },
+            { input: document.querySelector("#father_phone_input"), hidden: document.querySelector("#hidden_father_phone"), type: 'father' },
+            { input: document.querySelector("#mother_phone_input"), hidden: document.querySelector("#hidden_mother_phone"), type: 'mother' },
+            { input: document.querySelector("#guardian_phone_input"), hidden: document.querySelector("#hidden_guardian_phone"), type: 'guardian' }
+        ];
+
+        inputs.forEach(item => {
+            if (item.input) {
+                const iti = window.intlTelInput(item.input, phoneOptions);
+                item.input.addEventListener('blur', function() {
+                    if (iti.isValidNumber()) {
+                        const number = iti.getNumber();
+                        if(item.hidden) item.hidden.value = number;
+                        if(item.type) checkParent(number, item.type, 'phone');
+                    }
+                });
+            }
+        });
+
+        // --- 2. Email Lookup ---
+        const emailInput = document.querySelector('.parent-lookup-email');
+        if(emailInput) {
+            emailInput.addEventListener('blur', function() {
+                if(this.value && this.value.includes('@')) {
+                    checkParent(this.value, 'guardian', 'email');
+                }
+            });
+        }
+
+        // --- 3. AJAX CHECK PARENT ---
+        function checkParent(value, type, method) {
+            const url = "{{ route('parents.check') }}"; 
+            const params = new URLSearchParams();
+            if(method === 'email') params.append('email', value);
+            else params.append('phone', value);
+
+            fetch(`${url}?${params.toString()}`, {
+                headers: { 
+                    'X-Requested-With': 'XMLHttpRequest', 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}' 
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.exists) {
+                    fillParentData(data);
+                    const statusId = type === 'guardian' && method === 'email' ? 'guardian_email_status' : type + '_status';
+                    const statusDiv = document.getElementById(statusId);
+                    if(statusDiv) {
+                        statusDiv.innerHTML = `<span class="text-success"><i class="fa fa-check-circle"></i> {{ __('student.linked_to') }} ${data.name}</span>`;
+                        statusDiv.classList.remove('d-none');
+                    }
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: "{{ __('student.parent_found') }}",
+                        text: "{{ __('student.records_autofilled') }} " + data.name,
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+                }
+            })
+            .catch(err => console.error('Lookup Error:', err));
+        }
+
+        function fillParentData(data) {
+            const map = {
+                'father_name': data.father_name,
+                'father_phone_input': data.father_phone,
+                'hidden_father_phone': data.father_phone,
+                'mother_name': data.mother_name,
+                'mother_phone_input': data.mother_phone,
+                'hidden_mother_phone': data.mother_phone,
+                'guardian_name': data.guardian_name,
+                'guardian_email': data.guardian_email,
+                'guardian_phone_input': data.guardian_phone,
+                'hidden_guardian_phone': data.guardian_phone,
+            };
+
+            for (const [id, val] of Object.entries(map)) {
+                const field = document.getElementById(id);
+                if (field && val) {
+                    field.value = val;
+                    field.classList.add('auto-filled');
+                    if (id.endsWith('_input') && window.intlTelInputGlobals) {
+                        const instance = window.intlTelInputGlobals.getInstance(field);
+                        if (instance) instance.setNumber(val);
+                    }
+                }
+            }
+        }
+
+        // --- 4. NFC Reader Logic ---
+        const nfcInput = document.getElementById('nfc_input');
+        const btnScanNFC = document.getElementById('btnScanNFC');
+        const nfcStatus = document.getElementById('nfcStatus');
+
+        if (nfcInput) {
+            nfcInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault(); 
+                    this.blur(); 
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'NFC Tag Scanned',
+                        showConfirmButton: false,
+                        timer: 1500
+                    });
+                }
+            });
+        }
+
+        if (btnScanNFC) {
+            btnScanNFC.addEventListener('click', async () => {
+                if (!('NDEFReader' in window)) {
+                    Swal.fire("{{ __('student.not_supported') }}", "{{ __('student.web_nfc_not_supported') }}", 'warning');
+                    return;
+                }
+                try {
+                    const ndef = new NDEFReader();
+                    await ndef.scan();
+                    if(nfcStatus) nfcStatus.classList.remove('d-none');
+                    btnScanNFC.disabled = true;
+                    btnScanNFC.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+                    ndef.onreading = event => {
+                        const serialNumber = event.serialNumber;
+                        nfcInput.value = serialNumber;
+                        if(nfcStatus) nfcStatus.classList.add('d-none');
+                        btnScanNFC.disabled = false;
+                        btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
+                        Swal.fire({
+                            icon: 'success',
+                            title: "{{ __('student.scanned') }}",
+                            text: 'UID: ' + serialNumber,
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                    };
+                    ndef.onreadingerror = () => {
+                        Swal.fire(LANG_ERROR_TITLE, "{{ __('student.nfc_read_error') }}", 'error');
+                        if(nfcStatus) nfcStatus.classList.add('d-none');
+                        btnScanNFC.disabled = false;
+                        btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
+                    };
+                } catch (error) {
+                    Swal.fire(LANG_ERROR_TITLE, 'NFC Scan failed: ' + error, 'error');
+                    btnScanNFC.disabled = false;
+                    btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
+                }
+            });
+        }
+
+        // --- 5. DROPDOWNS (Native Fetch) ---
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select')) {
+                if ($.fn.selectpicker) {
+                     $(element).selectpicker('refresh');
+                } else if($.fn.niceSelect) {
+                    $(element).niceSelect('update');
+                }
+            }
+        }
+
+        function triggerChangeEvent(element) {
+            element.dispatchEvent(new Event('change'));
+        }
+
+        // LOCATIONS
+        const countrySelect = document.getElementById('countrySelect');
+        const stateSelect = document.getElementById('stateSelect');
+        const citySelect = document.getElementById('citySelect');
+        const savedCountry = "{{ $savedCountry ?? '' }}";
+        const savedState = "{{ $savedState ?? '' }}";
+        const savedCity = "{{ $savedCity ?? '' }}";
+
+        if (countrySelect) {
+            fetch("{{ route('locations.countries') }}")
+                .then(res => res.json())
+                .then(data => {
+                    countrySelect.innerHTML = '<option value="">{{ __('student.select_country') }}</option>';
+                    data.forEach(item => {
+                        let option = new Option(item.name, item.id);
+                        if(String(item.id) === String(savedCountry)) option.selected = true;
+                        countrySelect.add(option);
+                    });
+                    refreshSelect(countrySelect);
+                    if(savedCountry) triggerChangeEvent(countrySelect);
+                });
+
+            countrySelect.addEventListener('change', function() {
+                stateSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                stateSelect.disabled = true;
+                citySelect.innerHTML = '<option value="">{{ __('student.select_city') }}</option>';
+                citySelect.disabled = true;
+                refreshSelect(stateSelect);
+                refreshSelect(citySelect);
+
+                if(this.value) {
+                    fetch(`{{ route('locations.states') }}?country_id=${this.value}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            stateSelect.innerHTML = '<option value="">{{ __('student.select_state') }}</option>';
+                            data.forEach(item => {
+                                let option = new Option(item.name, item.id);
+                                if(String(item.id) === String(savedState)) option.selected = true;
+                                stateSelect.add(option);
+                            });
+                            stateSelect.disabled = false;
+                            refreshSelect(stateSelect);
+                            if(savedState) triggerChangeEvent(stateSelect);
+                        });
+                } else {
+                    stateSelect.innerHTML = '<option value="">{{ __('student.select_state') }}</option>';
+                    refreshSelect(stateSelect);
+                }
+            });
+        }
+
+        if (stateSelect) {
+            stateSelect.addEventListener('change', function() {
+                citySelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                citySelect.disabled = true;
+                refreshSelect(citySelect);
+
+                if(this.value) {
+                    fetch(`{{ route('locations.cities') }}?state_id=${this.value}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            citySelect.innerHTML = '<option value="">{{ __('student.select_city') }}</option>';
+                            data.forEach(item => {
+                                let option = new Option(item.name, item.id);
+                                if(String(item.id) === String(savedCity)) option.selected = true;
+                                citySelect.add(option);
+                            });
+                            citySelect.disabled = false;
+                            refreshSelect(citySelect);
+                        });
+                } else {
+                    citySelect.innerHTML = '<option value="">{{ __('student.select_city') }}</option>';
+                    refreshSelect(citySelect);
+                }
+            });
+        }
+
+        // ACADEMIC (Grade -> Section)
+        const gradeSelect = document.getElementById('gradeLevelSelect');
+        const sectionSelect = document.getElementById('sectionSelect');
+        const savedSectionId = "{{ $currentSectionId }}";
+
+        if(gradeSelect) {
+            gradeSelect.addEventListener('change', function() {
+                sectionSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                sectionSelect.disabled = true;
+                refreshSelect(sectionSelect);
+
+                if(this.value) {
+                    fetch(`{{ route('students.get_sections') }}?grade_id=${this.value}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            sectionSelect.innerHTML = '<option value="">{{ __('student.select_option') }}</option>';
+                            Object.entries(data).forEach(([id, name]) => {
+                                let option = new Option(name, id);
+                                if(String(id) === String(savedSectionId)) option.selected = true;
+                                sectionSelect.add(option);
+                            });
+                            sectionSelect.disabled = (Object.keys(data).length === 0);
+                            if(sectionSelect.disabled) sectionSelect.innerHTML = '<option value="">{{ __('student.no_options') }}</option>';
+                            refreshSelect(sectionSelect);
+                        });
+                } else {
+                    sectionSelect.innerHTML = '<option value="">{{ __('student.select_class_first') }}</option>';
+                    refreshSelect(sectionSelect);
+                }
+            });
+
+            if(gradeSelect.value) {
+                triggerChangeEvent(gradeSelect);
+            }
+        }
+
+        // --- 6. Image Preview ---
+        const imageUpload = document.getElementById('imageUpload');
+        if(imageUpload){
+            imageUpload.onchange = function (evt) {
+                const [file] = imageUpload.files;
+                if (file) {
+                    const preview = document.getElementById('imagePreview');
                     if(preview) {
                         if(preview.tagName === 'IMG') {
-                            preview.src = fr.result;
+                            preview.src = URL.createObjectURL(file);
                         } else {
-                            var img = document.createElement('img');
+                            const img = document.createElement('img');
                             img.id = 'imagePreview';
-                            img.src = fr.result;
+                            img.src = URL.createObjectURL(file);
                             img.style.width = '100%';
                             img.style.height = '100%';
                             img.style.objectFit = 'cover';
-                            if(preview.parentNode) preview.parentNode.replaceChild(img, preview);
+                            preview.parentNode.replaceChild(img, preview);
                         }
                     }
                 }
-                fr.readAsDataURL(files[0]);
             }
         }
-    }
 
-    window.addEventListener('load', function() {
-        if (typeof $ !== 'undefined') {
-            $(document).ready(function() {
-                
-                // --- A. VALIDATION & SUBMIT HANDLER ---
-                $('#studentForm').on('submit', function(e) {
-                    // Prevent Standard Submission Immediately
-                    e.preventDefault(); 
+        // --- 7. Submit Handler ---
+        $('#studentForm').on('submit', function(e) {
+            e.preventDefault();
+            let form = this;
+            let formData = new FormData(form);
+            let btn = $(form).find('button[type="submit"]');
+            let originalBtnHtml = btn.html();
 
-                    // Browser Validity Check
-                    if (!this.checkValidity()) {
-                        e.stopPropagation();
-                        $(this).addClass('was-validated');
+            $('.invalid-feedback').remove();
+            $('.is-invalid').removeClass('is-invalid');
 
-                        // Find first invalid field & Switch Tab
-                        let $invalid = $(this).find(':invalid').first();
-                        let $tabPane = $invalid.closest('.tab-pane');
-                        let tabId = $tabPane.attr('id');
-                        
-                        if(tabId) {
-                            let triggerEl = document.querySelector(`button[data-bs-target="#${tabId}"]`);
-                            if(triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-                        }
-                        $invalid.focus();
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Processing...');
 
+            $.ajax({
+                url: $(form).attr('action'),
+                method: $(form).attr('method'),
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    btn.prop('disabled', false).html(originalBtnHtml);
+                    if (response.redirect) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: LANG_SUCCESS_TITLE,
+                            text: response.message,
+                            showConfirmButton: true,
+                            confirmButtonText: LANG_BTN_OK
+                        }).then((result) => {
+                            if (result.isConfirmed || result.isDismissed) {
+                                window.location.href = response.redirect;
+                            }
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    btn.prop('disabled', false).html(originalBtnHtml);
+                    if (xhr.status === 422) {
+                        let errors = xhr.responseJSON.errors;
                         Swal.fire({
                             icon: 'error',
-                            title: '{{ __("student.validation_error") }}',
-                            text: '{{ __("student.fill_required_fields") }}'
+                            title: "{{ __('student.validation_error') }}",
+                            text: "{{ __('student.messages.check_form') }}",
                         });
-                        return; // STOP EXECUTION
+                        $.each(errors, function(field, messages) {
+                            let input = $('[name="' + field + '"]');
+                            input.addClass('is-invalid');
+                            if(input.next('.invalid-feedback').length === 0) {
+                                input.after('<div class="invalid-feedback d-block">' + messages[0] + '</div>');
+                            }
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: "{{ __('student.error_occurred') }}",
+                            text: xhr.responseJSON?.message || "{{ __('student.something_went_wrong') }}",
+                        });
                     }
-
-                    // Proceed to AJAX Submission
-                    let formData = new FormData(this);
-                    $.ajax({
-                        url: $(this).attr('action'),
-                        type: "POST",
-                        data: formData,
-                        processData: false,
-                        contentType: false,
-                        headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-                        success: function(response){
-                            Swal.fire({
-                                icon: 'success',
-                                title: '{{ __("student.success") }}',
-                                text: response.message
-                            }).then(() => {
-                                window.location.href = response.redirect;
-                            });
-                        },
-                        error: function(xhr){
-                            let msg = '{{ __("student.error_occurred") }}';
-                            if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                            if(xhr.responseJSON && xhr.responseJSON.errors) {
-                                msg = Object.values(xhr.responseJSON.errors).flat().join('<br>');
-                            }
-                            Swal.fire({
-                                icon: 'error',
-                                title: '{{ __("student.validation_error") }}',
-                                html: msg
-                            });
-                        }
-                    });
-                });
-
-                // --- B. CLASS SECTIONS LOGIC ---
-                function loadSections(gradeId, selectedId = null) {
-                    let $sectionSelect = $('#sectionSelect'); 
-                    $sectionSelect.html(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
-                    if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
-
-                    $.ajax({
-                        url: "{{ route('students.get_sections') }}", 
-                        data: { grade_id: gradeId },
-                        success: function(data) {
-                            $sectionSelect.empty();
-                            if($.isEmptyObject(data)) {
-                                $sectionSelect.append(`<option value="">${LANG_NO_OPTIONS}</option>`);
-                            } else {
-                                $sectionSelect.append(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                                $.each(data, function(key, value) {
-                                    let isSelected = (selectedId && selectedId == key) ? 'selected' : '';
-                                    $sectionSelect.append(`<option value="${key}" ${isSelected}>${value}</option>`);
-                                });
-                                $sectionSelect.prop('disabled', false);
-                            }
-                            if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
-                        },
-                        error: function() {
-                            $sectionSelect.empty().append(`<option value="">${LANG_ERROR}</option>`);
-                            if($.fn.selectpicker) $sectionSelect.selectpicker('refresh');
-                        }
-                    });
                 }
-
-                $('#gradeLevelSelect').change(function() {
-                    let gradeId = $(this).val();
-                    if(gradeId) loadSections(gradeId);
-                    else {
-                        $('#sectionSelect').html(`<option value="">${LANG_SELECT_CLASS_FIRST}</option>`).prop('disabled', true);
-                        if($.fn.selectpicker) $('#sectionSelect').selectpicker('refresh');
-                    }
-                });
-
-                // Init Sections
-                if(savedGradeId) loadSections(savedGradeId, savedSectionId);
-
-
-                // --- C. LOCATION LOGIC (Country > State > City) ---
-                const $country = $('#countrySelect');
-                const $state = $('#stateSelect');
-                const $city = $('#citySelect');
-
-                // 1. Load Countries
-                $.get("{{ route('locations.countries') }}", function(data) {
-                    $country.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                    $.each(data, function(i, item) {
-                        let selected = (savedCountry && savedCountry == item.name) ? 'selected' : '';
-                        $country.append(`<option value="${item.name}" data-id="${item.id}" ${selected}>${item.name}</option>`);
-                    });
-                    if($.fn.selectpicker) $country.selectpicker('refresh');
-                    
-                    // Trigger cascade if saved value exists
-                    if(savedCountry) $country.trigger('change');
-                });
-
-                // 2. Load States
-                $country.change(function() {
-                    let countryId = $(this).find(':selected').data('id');
-                    $state.empty().append(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
-                    $city.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`).prop('disabled', true);
-                    if($.fn.selectpicker) { $state.selectpicker('refresh'); $city.selectpicker('refresh'); }
-
-                    if(countryId) {
-                        $.get("{{ route('locations.states') }}", { country_id: countryId }, function(data) {
-                            $state.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                            $.each(data, function(i, item) {
-                                let selected = (savedState && savedState == item.name) ? 'selected' : '';
-                                $state.append(`<option value="${item.name}" data-id="${item.id}" ${selected}>${item.name}</option>`);
-                            });
-                            $state.prop('disabled', false);
-                            if($.fn.selectpicker) $state.selectpicker('refresh');
-                            
-                            // Trigger cascade if saved value exists AND matches current parent
-                            if(savedState && $state.find('option[selected]').length > 0) {
-                                $state.trigger('change');
-                            }
-                        });
-                    } else {
-                        $state.html(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                        if($.fn.selectpicker) $state.selectpicker('refresh');
-                    }
-                });
-
-                // 3. Load Cities
-                $state.change(function() {
-                    let stateId = $(this).find(':selected').data('id');
-                    $city.empty().append(`<option value="">${LANG_LOADING}</option>`).prop('disabled', true);
-                    
-                    if(stateId) {
-                        $.get("{{ route('locations.cities') }}", { state_id: stateId }, function(data) {
-                            $city.empty().append(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                            $.each(data, function(i, item) {
-                                let selected = (savedCity && savedCity == item.name) ? 'selected' : '';
-                                $city.append(`<option value="${item.name}" ${selected}>${item.name}</option>`);
-                            });
-                            $city.prop('disabled', false);
-                            if($.fn.selectpicker) $city.selectpicker('refresh');
-                        });
-                    } else {
-                        $city.html(`<option value="">${LANG_SELECT_OPTION}</option>`);
-                        if($.fn.selectpicker) $city.selectpicker('refresh');
-                    }
-                });
-
             });
-        }
+        });
     });
 </script>

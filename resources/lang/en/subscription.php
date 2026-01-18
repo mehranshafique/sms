@@ -4,7 +4,15 @@ return [
     'page_title' => 'Subscription Management',
     'package_title' => 'Packages',
     'invoice_title' => 'Platform Invoices',
-    
+    // Expired Subscription Page
+     'title' => 'Subscription Expired',
+    'expired_title' => 'Access Restricted',
+    'expired_message' => 'Your institution\'s subscription has expired.',
+    'contact_admin' => 'Please contact your system administrator or renew your subscription to restore full access to the platform.',
+    'go_to_dashboard' => 'Go to Dashboard (Limited Access)',
+    'back_to_login' => 'Back to Login',
+    'error_code' => '403',
+
     // Menu / Headers
     'manage_subscriptions' => 'Manage Subscriptions',
     'manage_packages' => 'Manage Packages',

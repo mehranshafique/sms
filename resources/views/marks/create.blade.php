@@ -12,31 +12,18 @@
             </div>
         </div>
 
-        {{-- Filter Section --}}
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm border-0" style="border-radius: 12px;">
                     <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
-                        <h5 class="text-primary fw-bold"><i class="fa fa-filter me-2"></i> Select Criteria</h5>
+                        <h5 class="text-primary fw-bold"><i class="fa fa-filter me-2"></i> {{ __('marks.select_criteria') }}</h5>
                     </div>
                     <div class="card-body pt-3">
                         <div class="row">
-                            {{-- 1. Exam (Smart Display) --}}
-                            <div class="col-md-4 mb-3">
+                            {{-- 1. Exam --}}
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label fw-bold">{{ __('marks.select_exam') }} <span class="text-danger">*</span></label>
-                                
-                                @php
-                                    $examCount = count($exams);
-                                    $singleExamId = null;
-                                    $singleExamName = '';
-                                    if($examCount === 1) {
-                                        foreach($exams as $id => $name) {
-                                            $singleExamId = $id;
-                                            $singleExamName = $name;
-                                        }
-                                    }
-                                @endphp
-
+                                @php $examCount = count($exams ?? []); @endphp
                                 @if($examCount > 1)
                                     <select id="exam_select" class="form-control default-select">
                                         <option value="">-- {{ __('marks.select_exam') }} --</option>
@@ -44,28 +31,39 @@
                                             <option value="{{ $id }}">{{ $name }}</option>
                                         @endforeach
                                     </select>
+                                @elseif($examCount == 1)
+                                    @php $id = array_key_first($exams->toArray()); @endphp
+                                    <input type="hidden" id="exam_select" value="{{ $id }}">
+                                    <input type="text" class="form-control" value="{{ $exams[$id] }}" readonly disabled>
                                 @else
-                                    <input type="hidden" id="exam_select" value="{{ $singleExamId }}">
-                                    <input type="text" class="form-control" value="{{ $singleExamName }}" readonly disabled style="background-color: #f8f9fa;">
+                                    <p class="text-danger">No ongoing exams found.</p>
                                 @endif
                             </div>
 
-                            {{-- 2. Class --}}
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label fw-bold">{{ __('marks.select_class') }} <span class="text-danger">*</span></label>
-                                <select id="class_select" class="form-control default-select" disabled>
-                                    <option value="">-- {{ $examCount > 1 ? 'Select Exam First' : 'Loading...' }} --</option>
+                            {{-- 2. Grade (Year Level) --}}
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">{{ __('marks.grade') }} <span class="text-danger">*</span></label>
+                                <select id="grade_select" class="form-control default-select" disabled>
+                                    <option value="">-- {{ __('marks.select_grade') }} --</option>
                                 </select>
                             </div>
 
-                            {{-- 3. Subject --}}
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label fw-bold">{{ __('marks.select_subject') }} <span class="text-danger">*</span></label>
-                                <select id="subject_select" class="form-control default-select" disabled>
-                                    <option value="">-- Select Class First --</option>
+                            {{-- 3. Section / Option --}}
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">{{ __('marks.section_option') }} <span class="text-danger">*</span></label>
+                                <select id="section_select" class="form-control default-select" disabled>
+                                    <option value="">-- {{ __('marks.select_section') }} --</option>
                                 </select>
-                                <div id="total_marks_display" class="mt-2 text-info fw-bold d-none" style="font-size: 0.9rem;">
-                                    Total Marks: <span id="total_marks_value" class="text-dark"></span>
+                            </div>
+
+                            {{-- 4. Subject --}}
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">{{ __('marks.subject') }} <span class="text-danger">*</span></label>
+                                <select id="subject_select" class="form-control default-select" disabled>
+                                    <option value="">-- {{ __('marks.select_subject') }} --</option>
+                                </select>
+                                <div id="total_marks_display" class="mt-2 text-info fw-bold d-none" style="font-size: 0.85rem;">
+                                    {{ __('marks.total_marks') }}: <span id="total_marks_value" class="text-dark"></span>
                                 </div>
                             </div>
                         </div>
@@ -74,74 +72,69 @@
             </div>
         </div>
 
-        {{-- Loading Spinner --}}
-        <div id="loading_spinner" class="text-center my-5 d-none">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 text-muted">Fetching student list...</p>
-        </div>
-
-        {{-- Marks Entry Table (Hidden Initially) --}}
+        {{-- Table Container --}}
         <div id="marks_container" class="d-none">
-            <form action="{{ route('marks.store') }}" method="POST" id="marksForm">
+            <form id="marksForm" action="{{ route('marks.store') }}" method="POST">
                 @csrf
                 <input type="hidden" name="exam_id" id="form_exam_id">
-                <input type="hidden" name="class_section_id" id="form_class_id">
+                <input type="hidden" name="class_section_id" id="form_section_id">
                 <input type="hidden" name="subject_id" id="form_subject_id">
 
                 <div class="card shadow-sm border-0" style="border-radius: 12px;">
-                    
-                    {{-- UPDATED HEADER: Details + Search --}}
                     <div class="card-header bg-white border-bottom py-3">
                         <div class="row align-items-center w-100 g-3">
-                            <div class="col-md-8">
-                                <div class="d-flex flex-wrap gap-4">
+                            <div class="col-md-6">
+                                <div class="d-flex flex-wrap gap-4 mb-2">
                                     <div class="d-flex align-items-center">
-                                        <span class="text-uppercase fw-bold text-muted small me-2" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('marks.class') }}:</span>
-                                        <span class="fw-bold text-dark" id="header_class_name">-</span>
+                                        <span class="text-uppercase fw-bold text-muted small me-2">{{ __('marks.grade') }}:</span>
+                                        <span class="fw-bold text-dark" id="header_grade">-</span>
                                     </div>
                                     <div class="d-flex align-items-center">
-                                        <span class="text-uppercase fw-bold text-muted small me-2" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('marks.subject') }}:</span>
-                                        <span class="fw-bold text-dark" id="header_subject_name">-</span>
+                                        <span class="text-uppercase fw-bold text-muted small me-2">{{ __('marks.section') }}:</span>
+                                        <span class="fw-bold text-dark" id="header_section">-</span>
                                     </div>
                                     <div class="d-flex align-items-center">
-                                        <span class="text-uppercase fw-bold text-muted small me-2" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('marks.teacher') }}:</span>
-                                        <span class="fw-bold text-primary" id="header_teacher_name">-</span>
+                                        <span class="text-uppercase fw-bold text-muted small me-2">{{ __('marks.teacher') }}:</span>
+                                        <span class="fw-bold text-primary" id="header_teacher">-</span>
                                     </div>
                                 </div>
+                                {{-- Total Students Badge --}}
+                                <span class="badge badge-light border text-dark">
+                                    <i class="fa fa-users me-1"></i> {{ __('marks.total_students') }}: <span id="total_students_count" class="fw-bold">0</span>
+                                </span>
                             </div>
-                            <div class="col-md-4">
-                                <div class="input-group shadow-sm">
+                            <div class="col-md-6 d-flex justify-content-end gap-2">
+                                <div class="input-group shadow-sm me-2" style="max-width: 250px;">
                                     <span class="input-group-text bg-light border-end-0 ps-3"><i class="fa fa-search text-muted"></i></span>
-                                    <input type="text" id="table_search" class="form-control border-start-0 bg-light" placeholder="{{ __('marks.search_student') ?? 'Search Student...' }}" style="font-size: 14px;">
+                                    <input type="text" id="table_search" class="form-control border-start-0 bg-light" placeholder="{{ __('marks.search_student') }}">
                                 </div>
+                                {{-- Print Award List Button --}}
+                                <button type="button" id="print_award_list" class="btn btn-secondary btn-sm shadow">
+                                    <i class="fa fa-print me-1"></i> {{ __('marks.award_list') }}
+                                </button>
                             </div>
                         </div>
                     </div>
-
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover table-striped mb-0">
+                            <table class="table table-hover mb-0">
                                 <thead class="bg-light">
                                     <tr>
                                         <th class="ps-4" width="5%">#</th>
                                         <th width="35%">{{ __('marks.student_name') }}</th>
-                                        <th width="20%">{{ __('marks.admission_no') ?? 'Admission No' }}</th>
-                                        <th width="25%">{{ __('marks.marks_obtained') }} <span class="text-muted small" id="table_header_total"></span></th>
+                                        <th width="20%">{{ __('marks.admission_no') }}</th>
+                                        <th width="25%">{{ __('marks.marks_obtained') }} <span id="table_max_label" class="text-muted small"></span></th>
                                         <th class="text-center" width="15%">{{ __('marks.is_absent') }}</th>
                                     </tr>
                                 </thead>
-                                <tbody id="student_table_body">
-                                    {{-- Rows injected via JS --}}
-                                </tbody>
+                                <tbody id="student_table_body"></tbody>
                             </table>
                         </div>
                     </div>
-                    <div class="card-footer bg-white border-0 text-end pb-4 pe-4 pt-3">
+                    <div class="card-footer bg-white border-0 text-end py-4 pe-4">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div class="text-muted small">
-                                <i class="fa fa-info-circle me-1"></i> {{ __('marks.auto_save_info') ?? 'Remember to save your changes.' }}
+                            <div class="text-muted small ps-4">
+                                <i class="fa fa-info-circle me-1"></i> {{ __('marks.auto_save_info') }}
                             </div>
                             <button type="submit" class="btn btn-primary btn-lg shadow px-5">
                                 <i class="fa fa-save me-2"></i> {{ __('marks.save_marks') }}
@@ -152,13 +145,16 @@
             </form>
         </div>
 
-        {{-- Empty State --}}
+        <div id="loading_spinner" class="text-center my-5 d-none">
+            <div class="spinner-border text-primary"></div>
+            <p class="mt-2 text-muted">{{ __('marks.load_students') }}...</p>
+        </div>
+        
         <div id="empty_state" class="text-center my-5 d-none">
             <div class="alert alert-warning d-inline-block px-5">
-                <i class="fa fa-exclamation-circle me-2"></i> No students found for the selected criteria.
+                <i class="fa fa-exclamation-circle me-2"></i> No students found.
             </div>
         </div>
-
     </div>
 </div>
 @endsection
@@ -166,360 +162,232 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    $(document).ready(function() {
+        const examSel = $('#exam_select');
+        const gradeSel = $('#grade_select');
+        const sectionSel = $('#section_select');
+        const subjectSel = $('#subject_select');
         
-        function refreshSelect(element) {
-            if (typeof $ !== 'undefined' && $(element).is('select')) {
-                if ($.fn.selectpicker && $(element).parent().hasClass('bootstrap-select')) {
-                     try { $(element).selectpicker('destroy'); } catch(e){}
-                     $(element).removeClass('selectpicker');
-                }
-                if($.fn.niceSelect) {
-                    $(element).niceSelect('update');
-                } else if ($.fn.select2) {
-                     if (!$(element).hasClass("select2-hidden-accessible")) {
-                         $(element).select2();
-                     } else {
-                         $(element).trigger('change');
-                     }
-                }
+        function updateUI(el) { 
+            if($.fn.select2 && !el.hasClass("select2-hidden-accessible")) {
+                el.select2();
+            } else if ($.fn.select2) {
+                el.trigger('change.select2'); 
             }
+            if($.fn.selectpicker) el.selectpicker('refresh');
         }
 
-        // --- SAFE INITIALIZATION ---
-        setTimeout(function() {
-            if (typeof $ !== 'undefined' && $.fn.select2) {
-                $('.default-select').each(function() {
-                    let $el = $(this);
-                    if ($.fn.selectpicker && ($el.data('selectpicker') || $el.parent().hasClass('bootstrap-select'))) {
-                        try { $el.selectpicker('destroy'); } catch(e){}
-                        $el.removeClass('selectpicker');
-                    }
-                    if (!$el.hasClass("select2-hidden-accessible")) {
-                        $el.select2();
-                    }
-                });
-            }
-        }, 100);
+        // --- Step 1: Load Grades ---
+        function loadGrades() {
+            let id = examSel.val();
+            gradeSel.prop('disabled', true).html('<option value="">Loading...</option>');
+            sectionSel.prop('disabled', true).html('<option value="">-- {{ __("marks.select_section") }} --</option>');
+            subjectSel.prop('disabled', true).html('<option value="">-- {{ __("marks.select_subject") }} --</option>');
+            $('#marks_container, #empty_state').addClass('d-none');
+            updateUI(gradeSel); updateUI(sectionSel); updateUI(subjectSel);
 
-        const examSelect = document.getElementById('exam_select');
-        const classSelect = document.getElementById('class_select');
-        const subjectSelect = document.getElementById('subject_select');
-        const tableSearch = document.getElementById('table_search');
+            if(!id) return;
+
+            $.get("{{ route('marks.get_grades') }}", {exam_id: id}, function(data) {
+                gradeSel.html('<option value="">-- {{ __("marks.select_grade") }} --</option>');
+                Object.entries(data).forEach(([id, name]) => gradeSel.append(new Option(name, id)));
+                gradeSel.prop('disabled', false); updateUI(gradeSel);
+            });
+        }
         
-        const marksContainer = document.getElementById('marks_container');
-        const emptyState = document.getElementById('empty_state');
-        const loadingSpinner = document.getElementById('loading_spinner');
-        
-        // Header Info Elements
-        const headerClass = document.getElementById('header_class_name');
-        const headerSubject = document.getElementById('header_subject_name');
-        const headerTeacher = document.getElementById('header_teacher_name');
+        examSel.on('change', loadGrades);
+        if(examSel.val()) loadGrades();
 
-        const totalMarksDisplay = document.getElementById('total_marks_display');
-        const totalMarksValue = document.getElementById('total_marks_value');
-        const tableHeaderTotal = document.getElementById('table_header_total');
+        // --- Helper: Fetch Subjects ---
+        function fetchSubjects(gradeId, sectionId = null) {
+            subjectSel.prop('disabled', true).html('<option value="">Loading...</option>');
+            updateUI(subjectSel);
+            
+            let params = { grade_level_id: gradeId };
+            if(sectionId) params.class_section_id = sectionId;
 
-        // --- 1. Exam Logic ---
-        if (examSelect) {
-            if(examSelect.tagName === 'SELECT') {
-                $(examSelect).on('change', function() {
-                    loadClasses(this.value);
+            $.get("{{ route('marks.get_subjects') }}", params, function(data) {
+                subjectSel.html('<option value="">-- {{ __("marks.select_subject") }} --</option>');
+                data.forEach(s => {
+                    let opt = new Option(s.name, s.id);
+                    $(opt).data('total', s.total_marks).data('teacher', s.teacher_name);
+                    subjectSel.append(opt);
                 });
-            } else if (examSelect.type === 'hidden' && examSelect.value) {
-                loadClasses(examSelect.value);
-            }
+                subjectSel.prop('disabled', false); 
+                updateUI(subjectSel);
+            });
         }
 
-        function loadClasses(examId) {
-            resetSelect(classSelect, '-- {{ __('marks.select_class') }} --');
-            resetSelect(subjectSelect, '-- Select Class First --');
-            hideTable();
+        // --- Step 2: Grade Change ---
+        gradeSel.on('change', function() {
+            let id = $(this).val();
+            sectionSel.prop('disabled', true).html('<option value="">Loading...</option>');
+            // Reset subjects
+            subjectSel.prop('disabled', true).html('<option value="">-- {{ __("marks.select_subject") }} --</option>');
+            updateUI(sectionSel); updateUI(subjectSel);
+            
+            if(!id) return;
 
-            if (!examId) return;
+            // Load Sections
+            $.get("{{ route('marks.get_sections') }}", {grade_level_id: id}, function(data) {
+                sectionSel.html('<option value="">-- {{ __("marks.select_section") }} --</option>');
+                Object.entries(data).forEach(([id, name]) => sectionSel.append(new Option(name, id)));
+                sectionSel.prop('disabled', false); updateUI(sectionSel);
+            });
+
+            // Load Subjects (General/Initial)
+            fetchSubjects(id, null);
+        });
+
+        // --- Step 2.5: Section Change ---
+        sectionSel.on('change', function() {
+            let secId = $(this).val();
+            let gradeId = gradeSel.val();
             
-            const url = "{{ route('marks.get_classes') }}?exam_id=" + examId;
+            // Reload subjects specifically for this section
+            if(gradeId && secId) {
+                fetchSubjects(gradeId, secId);
+            }
             
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    classSelect.innerHTML = '<option value="">-- {{ __("marks.select_class") }} --</option>';
-                    Object.entries(data).forEach(([id, name]) => {
-                        let option = new Option(name, id);
-                        classSelect.add(option);
+            // If user had already selected a subject and section, try load table
+            tryLoadStudents(); 
+        });
+
+        // --- Step 3: Load Students ---
+        function tryLoadStudents() {
+            let subId = subjectSel.val();
+            let secId = sectionSel.val();
+            let exId = examSel.val();
+            
+            if(!subId || !secId || !exId) { $('#marks_container').addClass('d-none'); return; }
+
+            let subjOpt = subjectSel.find(':selected');
+            $('#total_marks_value').text(subjOpt.data('total'));
+            $('#total_marks_display').removeClass('d-none');
+            $('#table_max_label').text('(Max: ' + subjOpt.data('total') + ')');
+            
+            $('#header_grade').text(gradeSel.find(':selected').text());
+            $('#header_section').text(sectionSel.find(':selected').text());
+            $('#header_teacher').text(subjOpt.data('teacher'));
+
+            $('#form_exam_id').val(exId); $('#form_section_id').val(secId); $('#form_subject_id').val(subId);
+
+            $('#loading_spinner').removeClass('d-none'); $('#marks_container').addClass('d-none'); $('#empty_state').addClass('d-none');
+
+            $.get("{{ route('marks.get_students') }}", {exam_id: exId, class_section_id: secId, subject_id: subId}, function(res) {
+                $('#loading_spinner').addClass('d-none');
+                if (res.students && res.students.length > 0) {
+                    let rows = '';
+                    let maxMarks = subjOpt.data('total') || 100;
+                    $('#total_students_count').text(res.students.length);
+
+                    res.students.forEach((s, i) => {
+                        let m = res.marks[s.id] || {marks_obtained: '', is_absent: 0};
+                        rows += `<tr class="s-row"><td class="ps-4 fw-bold">${i+1}</td><td><span class="s-name fw-bold text-dark">${s.name}</span></td><td><span class="s-adm badge badge-light badge-sm text-dark">${s.admission_number}</span></td><td><input type="number" name="marks[${s.id}]" class="form-control mark-input w-50 border-secondary" value="${m.is_absent ? '' : m.marks_obtained}" ${m.is_absent ? 'disabled' : ''} max="${maxMarks}" step="0.01" placeholder="0-${maxMarks}"></td><td class="text-center"><div class="form-check d-inline-block"><input type="checkbox" name="absent[${s.id}]" class="form-check-input abs-check" ${m.is_absent ? 'checked' : ''}></div></td></tr>`;
                     });
-                    classSelect.disabled = false;
-                    refreshSelect(classSelect);
-                })
-                .catch(error => { console.error(error); });
-        }
-
-        // --- 2. Class Logic ---
-        if (classSelect) {
-            $(classSelect).on('change', function() {
-                loadSubjects(this.value);
-            });
-        }
-
-        function loadSubjects(classId) {
-            resetSelect(subjectSelect, '-- {{ __('marks.select_subject') }} --');
-            hideTable();
-
-            if (!classId) return;
-
-            const url = "{{ route('marks.get_subjects') }}?class_section_id=" + classId;
-
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    subjectSelect.innerHTML = '<option value="">-- {{ __("marks.select_subject") }} --</option>';
-                    
-                    if (Array.isArray(data)) {
-                        data.forEach(subject => {
-                            let option = new Option(subject.name, subject.id);
-                            option.setAttribute('data-total', subject.total_marks);
-                            // Set Teacher Name Data Attribute
-                            option.setAttribute('data-teacher', subject.teacher_name || 'N/A');
-                            subjectSelect.add(option);
-                        });
-                    } else {
-                        Object.entries(data).forEach(([id, name]) => {
-                             subjectSelect.add(new Option(name, id));
-                        });
-                    }
-
-                    subjectSelect.disabled = false;
-                    refreshSelect(subjectSelect);
-                })
-                .catch(error => { console.error(error); });
-        }
-
-        // --- 3. Subject Logic & Total Marks ---
-        if (subjectSelect) {
-            $(subjectSelect).on('change', function() {
-                const subjectId = this.value;
-                const examId = $(examSelect).val(); 
-                const classId = $(classSelect).val();
-
-                // Get Info from Selected Option
-                const selectedOption = this.options[this.selectedIndex];
-                const totalMarks = selectedOption ? selectedOption.getAttribute('data-total') : null;
-                const teacherName = selectedOption ? selectedOption.getAttribute('data-teacher') : '-';
-                
-                // Update Header Info
-                if(classSelect.selectedIndex > 0) {
-                    headerClass.textContent = classSelect.options[classSelect.selectedIndex].text;
-                }
-                if(selectedOption) {
-                    headerSubject.textContent = selectedOption.text;
-                }
-                headerTeacher.textContent = teacherName;
-
-                if (totalMarks) {
-                    totalMarksValue.textContent = totalMarks;
-                    totalMarksDisplay.classList.remove('d-none');
-                    if(tableHeaderTotal) tableHeaderTotal.textContent = `(Max: ${totalMarks})`;
+                    $('#student_table_body').html(rows); $('#marks_container').removeClass('d-none');
                 } else {
-                    totalMarksDisplay.classList.add('d-none');
-                    if(tableHeaderTotal) tableHeaderTotal.textContent = '';
+                    $('#empty_state').removeClass('d-none');
                 }
-
-                if (examId && classId && subjectId) {
-                    loadStudents(examId, classId, subjectId);
-                } else {
-                    hideTable();
-                }
+            }).fail(function() {
+                $('#loading_spinner').addClass('d-none');
+                Swal.fire({icon: 'error', title: 'Error', text: 'Failed to load data.'});
             });
         }
 
-        function loadStudents(examId, classId, subjectId) {
-            loadingSpinner.classList.remove('d-none');
-            marksContainer.classList.add('d-none');
-            emptyState.classList.add('d-none');
+        subjectSel.on('change', tryLoadStudents);
 
-            document.getElementById('form_exam_id').value = examId;
-            document.getElementById('form_class_id').value = classId;
-            document.getElementById('form_subject_id').value = subjectId;
+        // --- Logic: Print Award List ---
+        $('#print_award_list').click(function() {
+            let examId = examSel.val();
+            let classId = sectionSel.val();
+            let subjectId = subjectSel.val();
 
-            $.ajax({
-                url: "{{ route('marks.get_students') }}",
-                type: "GET",
-                data: {
-                    exam_id: examId,
-                    class_section_id: classId,
-                    subject_id: subjectId
-                },
-                dataType: 'json',
-                success: function(response) {
-                    loadingSpinner.classList.add('d-none');
-                    const students = response.students;
-                    const marks = response.marks;
-
-                    if (students.length > 0) {
-                        let rows = '';
-                        const maxMarks = totalMarksValue.textContent || 100;
-
-                        students.forEach((student, index) => {
-                            let markData = marks[student.id] || { marks_obtained: '', is_absent: 0 };
-                            let isAbsentChecked = markData.is_absent ? 'checked' : '';
-                            let isInputDisabled = markData.is_absent ? 'disabled' : '';
-                            let markValue = markData.is_absent ? '' : markData.marks_obtained;
-
-                            // Add class for search targeting
-                            rows += `
-                                <tr class="student-row">
-                                    <td class="ps-4 fw-bold">${index + 1}</td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <span class="w-space-no fw-bold text-dark student-name">${student.name}</span>
-                                        </div>
-                                    </td>
-                                    <td><span class="badge badge-light badge-sm text-dark student-admission">${student.admission_number}</span></td>
-                                    <td>
-                                        <input type="number" 
-                                               name="marks[${student.id}]" 
-                                               class="form-control mark-input w-75 border-secondary" 
-                                               value="${markValue}" 
-                                               min="0" max="${maxMarks}" step="0.01" 
-                                               placeholder="Max: ${maxMarks}"
-                                               ${isInputDisabled}>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="form-check d-inline-block">
-                                            <input class="form-check-input absent-check" 
-                                                   type="checkbox" 
-                                                   name="absent[${student.id}]" 
-                                                   value="1"
-                                                   ${isAbsentChecked}>
-                                        </div>
-                                    </td>
-                                </tr>
-                            `;
-                        });
-
-                        document.getElementById('student_table_body').innerHTML = rows;
-                        // document.getElementById('student_count_badge').innerText = students.length + ' Students'; // Removed in new design
-                        marksContainer.classList.remove('d-none');
-                        
-                        bindAbsentLogic();
-                        bindMarkValidation(maxMarks);
-                    } else {
-                        emptyState.classList.remove('d-none');
-                    }
-                },
-                error: function(xhr) {
-                    loadingSpinner.classList.add('d-none');
-                    Swal.fire({ icon: 'error', title: 'Error', text: "Error fetching data." });
-                }
-            });
-        }
-
-        // --- 4. Table Search Functionality ---
-        if(tableSearch) {
-            tableSearch.addEventListener('keyup', function() {
-                const term = this.value.toLowerCase();
-                const rows = document.querySelectorAll('.student-row');
-                
-                rows.forEach(row => {
-                    const name = row.querySelector('.student-name').textContent.toLowerCase();
-                    const admission = row.querySelector('.student-admission').textContent.toLowerCase();
-                    
-                    if(name.includes(term) || admission.includes(term)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
-            });
-        }
-
-        function resetSelect(selectElement, placeholder) {
-            selectElement.innerHTML = `<option value="">${placeholder}</option>`;
-            selectElement.disabled = true;
-            refreshSelect(selectElement);
-            totalMarksDisplay.classList.add('d-none');
-        }
-
-        function hideTable() {
-            marksContainer.classList.add('d-none');
-            emptyState.classList.add('d-none');
-        }
-
-        function bindAbsentLogic() {
-            $('.absent-check').off('change').on('change', function(){
-                let row = $(this).closest('tr');
-                let input = row.find('.mark-input');
-                if($(this).is(':checked')) {
-                    input.prop('disabled', true).val(''); 
-                    input.removeClass('is-invalid');
-                } else {
-                    input.prop('disabled', false).focus();
-                }
-            });
-        }
-
-        function bindMarkValidation(maxMarks) {
-            $('.mark-input').off('input').on('input', function() {
-                let val = parseFloat($(this).val());
-                let max = parseFloat(maxMarks);
-                if (val > max) {
-                    $(this).addClass('is-invalid');
-                } else {
-                    $(this).removeClass('is-invalid');
-                }
-            });
-        }
-
-        $('#marksForm').submit(function(e){
-            e.preventDefault();
-            
-            let maxMarks = parseFloat(totalMarksValue.textContent || 100);
-            let hasError = false;
-            
-            $('.mark-input').each(function() {
-                let val = $(this).val();
-                if (val !== '' && parseFloat(val) > maxMarks) {
-                    $(this).addClass('is-invalid');
-                    hasError = true;
-                }
-            });
-
-            if(hasError) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Invalid Marks',
-                    text: `Marks cannot exceed total marks (${maxMarks}).`
-                });
+            if (!examId || !classId || !subjectId) {
+                Swal.fire({icon: 'warning', title: 'Incomplete Selection', text: 'Please select Exam, Grade, Section, and Subject first.'});
                 return;
             }
 
-            let btn = $(this).find('button[type="submit"]');
-            let originalText = btn.html();
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> Saving...');
+            let url = "{{ route('exams.print_award_list') }}?exam_id=" + examId + "&class_section_id=" + classId + "&subject_id=" + subjectId;
+            window.open(url, '_blank');
+        });
 
-            $.ajax({
-                url: $(this).attr('action'),
-                type: "POST",
-                data: $(this).serialize(),
-                success: function(response){
-                    btn.prop('disabled', false).html(originalText);
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Saved!',
-                        text: response.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                },
-                error: function(xhr){
-                    btn.prop('disabled', false).html(originalText);
-                    let msg = 'Error occurred';
-                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                    Swal.fire({ icon: 'error', title: 'Error', html: msg });
-                }
+        // --- Logic: Absent Toggle ---
+        $(document).on('change', '.abs-check', function() {
+            let input = $(this).closest('tr').find('.mark-input');
+            if($(this).is(':checked')) { input.prop('disabled', true).val('').removeClass('is-invalid'); } 
+            else { input.prop('disabled', false).focus(); }
+        });
+
+        // --- Logic: Validation ---
+        $(document).on('input', '.mark-input', function() {
+            let max = parseFloat($('#total_marks_value').text()) || 100;
+            if(parseFloat($(this).val()) > max) $(this).addClass('is-invalid'); else $(this).removeClass('is-invalid');
+        });
+
+        // --- Logic: Search ---
+        $('#table_search').on('keyup', function() {
+            let v = this.value.toLowerCase();
+            $('.s-row').each(function() {
+                let t = $(this).find('.s-name').text().toLowerCase() + " " + $(this).find('.s-adm').text().toLowerCase();
+                $(this).toggle(t.includes(v));
             });
         });
 
+        // --- Logic: Save (UPDATED: Empty Mark Validation) ---
+        $('#marksForm').on('submit', function(e) {
+            e.preventDefault();
+            let max = parseFloat($('#total_marks_value').text()) || 100;
+            let err = false;
+            let emptyErr = false;
+
+            $('.mark-input').each(function() { 
+                let val = $(this).val();
+                let isAbsent = $(this).closest('tr').find('.abs-check').is(':checked');
+
+                // Check Max
+                if(parseFloat(val) > max) { $(this).addClass('is-invalid'); err = true; } 
+                
+                // Check Empty (unless absent)
+                // Use strict check for empty string to avoid false positives on 0
+                if(!isAbsent && (val === '' || val === null)) {
+                    $(this).addClass('is-invalid');
+                    emptyErr = true;
+                } else if(!err) { // Only remove if no max error
+                    $(this).removeClass('is-invalid');
+                }
+            });
+
+            if(err) { Swal.fire({icon: 'warning', title: 'Invalid Marks', text: `Marks cannot exceed ${max}`}); return; }
+            
+            // New Validation Alert
+            if(emptyErr) { 
+                Swal.fire({
+                    icon: 'warning', 
+                    title: 'Missing Values', 
+                    text: 'Marks cannot be empty unless the student is marked as Absent.'
+                }); 
+                return; 
+            }
+
+            let btn = $(this).find('button[type="submit"]'); 
+            let txt = btn.text();
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+            
+            $.post(this.action, $(this).serialize(), function(r) {
+                btn.prop('disabled', false).text(txt);
+                Swal.fire({
+                    icon: 'success', 
+                    title: 'Success!', 
+                    text: r.message, 
+                    showConfirmButton: true,
+                    confirmButtonText: 'OK'
+                });
+            }).fail(x => { 
+                btn.prop('disabled', false).text(txt); 
+                Swal.fire('Error', x.responseJSON.message || 'Save failed', 'error'); 
+            });
+        });
     });
 </script>
 @endsection
