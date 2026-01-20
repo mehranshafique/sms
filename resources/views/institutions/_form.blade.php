@@ -11,6 +11,8 @@
     @csrf
     @if(isset($institute))
         @method('PUT')
+        {{-- Pass ID for JS check --}}
+        <input type="hidden" id="editInstituteId" value="{{ $institute->id }}">
     @endif
 
     <div class="row">
@@ -182,6 +184,7 @@
         const emailInvalid = document.getElementById('emailInvalid');
         const emailLoading = document.getElementById('emailLoading');
         const submitBtn = document.getElementById('submitBtn');
+        const editId = document.getElementById('editInstituteId') ? document.getElementById('editInstituteId').value : null;
         let typingTimer;
 
         if(emailInput) {
@@ -200,7 +203,12 @@
                 const email = emailInput.value;
                 const url = "{{ route('institutes.check_email') }}";
                 
-                fetch(`${url}?email=${encodeURIComponent(email)}`)
+                let checkUrl = `${url}?email=${encodeURIComponent(email)}`;
+                if(editId) {
+                    checkUrl += `&id=${editId}`;
+                }
+                
+                fetch(checkUrl)
                     .then(response => response.json())
                     .then(data => {
                         emailLoading.style.display = 'none';
