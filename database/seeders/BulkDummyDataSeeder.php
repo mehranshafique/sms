@@ -41,6 +41,8 @@ use App\Models\Budget;
 use App\Models\FundRequest;
 use App\Models\SalaryStructure;
 use App\Models\Payroll;
+// New Modules
+use App\Models\Assignment; 
 
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
@@ -110,7 +112,8 @@ class BulkDummyDataSeeder extends Seeder
                 'duration_days' => 365,
                 'modules' => [
                     'academics', 'students', 'staff', 'finance', 'examinations', 
-                    'communication', 'voting', 'exam_schedules', 'payrolls', 'budgets'
+                    'communication', 'voting', 'exam_schedules', 'payrolls', 'budgets',
+                    'assignments', 'library', 'transport'
                 ],
                 'student_limit' => 2000,
                 'staff_limit' => 200,
@@ -152,7 +155,8 @@ class BulkDummyDataSeeder extends Seeder
             RoleEnum::TEACHER->value,
             RoleEnum::STUDENT->value,
             'Accountant',        
-            'Librarian'  
+            'Librarian',
+            'Transport Manager'
         ];
 
         foreach ($rolesToCreate as $roleName) {
@@ -244,7 +248,7 @@ class BulkDummyDataSeeder extends Seeder
             ['role' => RoleEnum::TEACHER->value, 'dept' => 'Sciences', 'first_name' => 'John', 'last_name' => 'Doe'],
             ['role' => RoleEnum::TEACHER->value, 'dept' => 'Lettres', 'first_name' => 'Jane', 'last_name' => 'Smith'],
             ['role' => RoleEnum::TEACHER->value, 'dept' => 'Math', 'first_name' => 'Alan', 'last_name' => 'Turing'],
-            ['role' => RoleEnum::SCHOOL_ADMIN->value, 'dept' => 'Admin', 'first_name' => 'Admin', 'last_name' => 'User'], // Default Admin
+            ['role' => RoleEnum::SCHOOL_ADMIN->value, 'dept' => 'Admin', 'first_name' => 'Admin', 'last_name' => 'User'],
             ['role' => 'Accountant', 'dept' => 'Finance', 'first_name' => 'Alice', 'last_name' => 'Accountant'],
         ];
         
@@ -269,11 +273,9 @@ class BulkDummyDataSeeder extends Seeder
                 ]
             );
             
-            // Assign Roles (Ensure School Admin is assigned correctly)
             $role = Role::where('name', $roleName)->where('institution_id', $institution->id)->first();
             if ($role) $user->assignRole($role);
 
-            // Capture Admin ID for creator fields
             if ($roleName == RoleEnum::SCHOOL_ADMIN->value) {
                 $adminUserId = $user->id;
             }
@@ -298,7 +300,6 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
 
-        // Fallback admin if not found in loop
         if (!$adminUserId) $adminUserId = User::where('institute_id', $institution->id)->first()->id ?? 1;
 
         // ---------------------------------------------------------
@@ -336,7 +337,7 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // ---------------------------------------------------------
-        // 8. Timetables (NEW)
+        // 8. Timetables
         // ---------------------------------------------------------
         $this->command->info('📅 Seeding Timetables...');
         $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -345,7 +346,6 @@ class BulkDummyDataSeeder extends Seeder
         foreach ($sections as $section) {
             if (isset($subjectsCollection[$section->grade_level_id])) {
                 foreach ($days as $dayIndex => $day) {
-                    // Schedule 2 subjects per day for testing
                     for($i=0; $i<2; $i++) {
                         $subject = $faker->randomElement($subjectsCollection[$section->grade_level_id]);
                         $teacherId = !empty($teacherIds) ? $faker->randomElement($teacherIds) : null;
@@ -449,19 +449,18 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // ---------------------------------------------------------
-        // 10. Student Attendance (NEW)
+        // 10. Student Attendance
         // ---------------------------------------------------------
         $this->command->info('✅ Seeding Student Attendance...');
         foreach ($students as $student) {
             $enrollment = StudentEnrollment::where('student_id', $student->id)->first();
             if ($enrollment) {
-                // Generate 5 days of attendance
                 for ($d = 0; $d < 5; $d++) {
                     $date = now()->subDays($d)->format('Y-m-d');
                     if (now()->subDays($d)->isWeekend()) continue;
 
                     StudentAttendance::firstOrCreate(
-                        ['student_id' => $student->id, 'attendance_date' => $date], // FIXED: Changed 'date' to 'attendance_date'
+                        ['student_id' => $student->id, 'attendance_date' => $date],
                         [
                             'institution_id' => $institution->id,
                             'academic_session_id' => $session->id,
@@ -477,9 +476,8 @@ class BulkDummyDataSeeder extends Seeder
         // ---------------------------------------------------------
         // 11. Finance (Fees, Payroll, Budget)
         // ---------------------------------------------------------
-        $this->command->info('💰 Seeding Finance Modules (Fees, Payroll, Budget)...');
+        $this->command->info('💰 Seeding Finance Modules...');
         
-        // A. Fees
         $tuitionType = FeeType::firstOrCreate(['institution_id' => $institution->id, 'name' => 'Frais Scolaires']);
         $primaryGrade = $gradeModels['1P'];
         
@@ -506,23 +504,22 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // B. Budget
+        // Budget Category
         $catOps = BudgetCategory::firstOrCreate(
             ['institution_id' => $institution->id, 'name' => 'Operations'],
-            ['type' => 'expense', 'description' => 'Daily operational costs']
+            ['description' => 'Daily operational costs']
         );
 
-        Budget::firstOrCreate(
+        $budget = Budget::firstOrCreate(
             ['institution_id' => $institution->id, 'budget_category_id' => $catOps->id, 'academic_session_id' => $session->id],
-            ['allocated_amount' => 50000.00, 'notes' => 'Annual Operations Budget']
+            ['allocated_amount' => 50000.00, 'spent_amount' => 0, 'notes' => 'Annual Operations Budget']
         );
 
         if ($adminUserId) {
             FundRequest::firstOrCreate(
                 ['institution_id' => $institution->id, 'title' => 'Purchase of Whiteboards'],
                 [
-                    'budget_category_id' => $catOps->id,
-                    'academic_session_id' => $session->id,
+                    'budget_id' => $budget->id, 
                     'requested_by' => $adminUserId,
                     'amount' => 500.00,
                     'status' => 'pending',
@@ -531,10 +528,10 @@ class BulkDummyDataSeeder extends Seeder
             );
         }
 
-        // C. Payroll (Salary Structure)
         if (!empty($teacherIds)) {
             $staffMember = Staff::find($teacherIds[0]);
             if ($staffMember) {
+                // Remove keys that don't match database columns
                 SalaryStructure::firstOrCreate(
                     ['staff_id' => $staffMember->id],
                     [
@@ -542,29 +539,30 @@ class BulkDummyDataSeeder extends Seeder
                         'base_salary' => 800.00,
                         'allowances' => json_encode([['name' => 'Transport', 'amount' => 50]]),
                         'deductions' => json_encode([['name' => 'Tax', 'amount' => 40]]),
-                        'net_salary' => 810.00,
-                        'effective_date' => now()->subMonth()
                     ]
                 );
 
+                // Corrected keys to match Payroll Model
                 Payroll::firstOrCreate(
-                    ['staff_id' => $staffMember->id, 'month' => now()->format('Y-m')],
+                    [
+                        'staff_id' => $staffMember->id,
+                        'month_year' => now()->startOfMonth() 
+                    ],
                     [
                         'institution_id' => $institution->id,
-                        'basic_salary' => 800.00,
+                        'basic_pay' => 800.00, // Corrected from basic_salary
                         'total_allowance' => 50.00,
                         'total_deduction' => 40.00,
                         'net_salary' => 810.00,
                         'status' => 'paid',
-                        'payment_date' => now(),
-                        'payment_method' => 'bank_transfer'
+                        'paid_at' => now() // Use paid_at instead of payment_method
                     ]
                 );
             }
         }
 
         // ---------------------------------------------------------
-        // 12. Exams & Schedules (NEW)
+        // 12. Exams & Schedules
         // ---------------------------------------------------------
         $this->command->info('📝 Seeding Exams and Schedules...');
         
@@ -573,11 +571,9 @@ class BulkDummyDataSeeder extends Seeder
             ['category' => 'p1', 'start_date' => now(), 'end_date' => now()->addDays(7), 'status' => 'ongoing']
         );
 
-        // Create Exam Schedule
         $subjects = Subject::where('institution_id', $institution->id)->get();
         if ($subjects->count() > 0) {
             $sub = $subjects->first();
-            // Find a section for this subject's grade
             $sec = ClassSection::where('grade_level_id', $sub->grade_level_id)->first();
             
             if ($sec) {
@@ -596,13 +592,11 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
 
-        // Marks
         if(count($students) > 0) {
             $student = $students[0];
             $enrollment = StudentEnrollment::where('student_id', $student->id)->first();
             
             if($enrollment) {
-                // Find subjects for this student's grade
                 $gradeSubjects = Subject::where('grade_level_id', $enrollment->grade_level_id)->get();
                 
                 foreach($gradeSubjects as $sub) {
@@ -619,7 +613,33 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // ---------------------------------------------------------
-        // 13. Communication & Voting
+        // 13. Assignments
+        // ---------------------------------------------------------
+        $this->command->info('📚 Seeding Assignments...');
+        if (!empty($teacherIds) && isset($sections['1P'])) {
+            $teacherId = $teacherIds[0]; // Get first teacher
+            $staffMember = Staff::find($teacherId);
+            $section = $sections['1P'];
+            $subject = Subject::where('grade_level_id', $section->grade_level_id)->first();
+
+            if ($staffMember && $section && $subject) {
+                Assignment::firstOrCreate(
+                    ['title' => 'Math Homework 1', 'institution_id' => $institution->id],
+                    [
+                        'academic_session_id' => $session->id,
+                        'class_section_id' => $section->id,
+                        'subject_id' => $subject->id,
+                        'teacher_id' => $staffMember->id,
+                        'description' => 'Complete exercises 1-10 on page 20.',
+                        'deadline' => now()->addDays(3),
+                        'file_path' => null // Optional attachment
+                    ]
+                );
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 14. Communication & Voting
         // ---------------------------------------------------------
         Notice::firstOrCreate(
             ['title' => 'Rentrée Scolaire 2024', 'institution_id' => $institution->id],
@@ -633,7 +653,6 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // Election
         $election = Election::firstOrCreate(
             ['title' => 'Élections du Comité', 'institution_id' => $institution->id],
             [
