@@ -33,6 +33,7 @@
                                         <th>#</th>
                                         <th>{{ __('invoice.invoice_number') }}</th>
                                         <th>{{ __('invoice.student') }}</th>
+                                        <th>{{ __('invoice.description') }}</th> {{-- Added Fee Name/Description Column --}}
                                         <th>{{ __('invoice.issue_date') }}</th>
                                         <th>{{ __('invoice.due_date') }}</th>
                                         <th>{{ __('invoice.total') }}</th>
@@ -68,6 +69,7 @@
                 { data: 'DT_RowIndex', name: 'id' },
                 { data: 'invoice_number', name: 'invoice_number' },
                 { data: 'student_name', name: 'student.first_name' },
+                { data: 'fee_name', name: 'fee_name', orderable: false, searchable: false }, // Added Fee Name Data
                 { data: 'issue_date', name: 'issue_date' },
                 { data: 'due_date', name: 'due_date' },
                 { data: 'total_amount', name: 'total_amount' },

@@ -6,15 +6,14 @@ use App\Http\Controllers\BaseController;
 use App\Models\FeeStructure;
 use App\Models\FeeType;
 use App\Models\GradeLevel;
-use App\Models\ClassSection; // Added Model
+use App\Models\ClassSection;
 use App\Models\AcademicSession;
-use App\Models\Institution;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Middleware\PermissionMiddleware;
-use Illuminate\Support\Facades\DB; // Added DB
+use Illuminate\Support\Facades\DB;
 
 class FeeStructureController extends BaseController
 {
@@ -30,7 +29,6 @@ class FeeStructureController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            // Eager load classSection as well
             $data = FeeStructure::with(['feeType', 'gradeLevel', 'classSection'])
                 ->select('fee_structures.*');
 
@@ -43,9 +41,22 @@ class FeeStructureController extends BaseController
                 ->addColumn('fee_type', function($row){
                     return $row->feeType->name ?? 'N/A';
                 })
+                ->addColumn('parent_fee_name', function($row) use ($institutionId) {
+                    if ($row->payment_mode === 'installment') {
+                        // Attempt to find the parent Global fee
+                        // Logic: Same Institution, Grade, Session, FeeType, but mode is Global
+                        $global = FeeStructure::where('institution_id', $row->institution_id)
+                            ->where('grade_level_id', $row->grade_level_id)
+                            ->where('academic_session_id', $row->academic_session_id)
+                            ->where('fee_type_id', $row->fee_type_id)
+                            ->where('payment_mode', 'global')
+                            ->first();
+                        return $global ? $global->name : '-';
+                    }
+                    return '-'; 
+                })
                 ->addColumn('grade', function($row){
                     $grade = $row->gradeLevel->name ?? 'All Grades';
-                    // Append Section Name if exists
                     if($row->classSection) {
                         $grade .= ' (' . $row->classSection->name . ')';
                     } elseif($row->grade_level_id && is_null($row->class_section_id)) {
@@ -106,9 +117,6 @@ class FeeStructureController extends BaseController
         return view('finance.fees.create', compact('feeTypes', 'gradeLevels', 'session'));
     }
 
-    /**
-     * AJAX Method to get Sections based on Grade
-     */
     public function getClassSections(Request $request)
     {
         $institutionId = $this->getInstitutionId();
@@ -119,7 +127,6 @@ class FeeStructureController extends BaseController
         }
 
         $sections = ClassSection::where('grade_level_id', $gradeId);
-        
         if ($institutionId) {
             $sections->where('institution_id', $institutionId);
         }
@@ -133,20 +140,11 @@ class FeeStructureController extends BaseController
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'fee_type_id' => [
-                'required', 
-                'exists:fee_types,id',
-                function($attribute, $value, $fail) use ($institutionId) {
-                    if($institutionId) {
-                        $exists = FeeType::where('id', $value)->where('institution_id', $institutionId)->exists();
-                        if(!$exists) $fail('Selected fee type is invalid for this institution.');
-                    }
-                }
-            ],
+            'fee_type_id' => 'required|exists:fee_types,id',
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:one_time,monthly,termly,yearly',
             'grade_level_id' => 'nullable|exists:grade_levels,id',
-            'class_section_id' => 'nullable|exists:class_sections,id', // Added validation
+            'class_section_id' => 'nullable|exists:class_sections,id',
             'payment_mode' => 'required|in:global,installment',
             'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
         ]);
@@ -166,14 +164,12 @@ class FeeStructureController extends BaseController
         if ($request->payment_mode === 'installment' && $request->grade_level_id) {
             
             // 1. Check for Existing Global Fee for this Grade/Session
-            // Note: Global fee is typically at Grade level, so we check grade_level_id generally
             $globalFee = FeeStructure::where('institution_id', $institutionId)
                 ->where('grade_level_id', $request->grade_level_id)
                 ->where('payment_mode', 'global')
                 ->where('academic_session_id', $session->id)
                 ->sum('amount'); 
 
-            // Rule 1: Must have a Global Fee first
             if ($globalFee <= 0) {
                 return response()->json([
                     'message' => __('finance.global_fee_missing_error')
@@ -181,17 +177,11 @@ class FeeStructureController extends BaseController
             }
 
             // Rule 2: Installments Sum check
-            $existingInstallmentsQuery = FeeStructure::where('institution_id', $institutionId)
+            $existingInstallments = FeeStructure::where('institution_id', $institutionId)
                 ->where('grade_level_id', $request->grade_level_id)
                 ->where('payment_mode', 'installment')
-                ->where('academic_session_id', $session->id);
-            
-            // If this is a section-specific fee, we should still check against the Grade's global limit
-            // But we only sum installments that apply to this student scope. 
-            // For simplicity in this logic: Sum ALL installments for this Grade to prevent over-billing configuration.
-            // A more complex check would be: Sum(GradeWideInstallments) + Sum(ThisSectionInstallments)
-            
-            $existingInstallments = $existingInstallmentsQuery->sum('amount');
+                ->where('academic_session_id', $session->id)
+                ->sum('amount');
 
             $newTotal = $existingInstallments + $request->amount;
 
@@ -204,7 +194,6 @@ class FeeStructureController extends BaseController
                 ], 422);
             }
         }
-        // ------------------------------------------------
 
         FeeStructure::create([
             'institution_id' => $institutionId,
@@ -214,7 +203,7 @@ class FeeStructureController extends BaseController
             'amount' => $request->amount,
             'frequency' => $request->frequency,
             'grade_level_id' => $request->grade_level_id,
-            'class_section_id' => $request->class_section_id, // Save Section
+            'class_section_id' => $request->class_section_id,
             'payment_mode' => $request->payment_mode,
             'installment_order' => $request->installment_order,
         ]);
@@ -236,7 +225,6 @@ class FeeStructureController extends BaseController
         $feeTypes = FeeType::where('institution_id', $targetId)->where('is_active', true)->pluck('name', 'id');
         $gradeLevels = GradeLevel::where('institution_id', $targetId)->pluck('name', 'id');
         
-        // Load sections if grade is selected
         $classSections = [];
         if($feeStructure->grade_level_id) {
             $classSections = ClassSection::where('grade_level_id', $feeStructure->grade_level_id)
@@ -267,46 +255,61 @@ class FeeStructureController extends BaseController
             'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
         ]);
 
-        // --- VALIDATION: STRICT DEPENDENCY ON GLOBAL FEE ---
+        $session = AcademicSession::where('institution_id', $feeStructure->institution_id)->where('is_current', true)->first();
+
+        if (!$session) {
+            return response()->json(['message' => __('finance.no_active_session')], 422);
+        }
+
+        // --- VALIDATION 1: MODIFYING AN INSTALLMENT ---
         if ($request->payment_mode === 'installment' && $request->grade_level_id) {
-            $session = AcademicSession::where('institution_id', $feeStructure->institution_id)->where('is_current', true)->first();
-            
-            if ($session) {
-                // 1. Check for Existing Global Fee
-                $globalFee = FeeStructure::where('institution_id', $feeStructure->institution_id)
-                    ->where('grade_level_id', $request->grade_level_id)
-                    ->where('payment_mode', 'global')
-                    ->where('academic_session_id', $session->id)
-                    ->sum('amount');
+            $globalFee = FeeStructure::where('institution_id', $feeStructure->institution_id)
+                ->where('grade_level_id', $request->grade_level_id)
+                ->where('payment_mode', 'global')
+                ->where('academic_session_id', $session->id)
+                ->sum('amount');
 
-                // Rule 1: Must have a Global Fee first
-                if ($globalFee <= 0) {
-                    return response()->json([
-                        'message' => __('finance.global_fee_missing_error')
-                    ], 422);
-                }
+            if ($globalFee <= 0) {
+                return response()->json(['message' => __('finance.global_fee_missing_error')], 422);
+            }
 
-                // Rule 2: Installments Sum check (Exclude current record being updated)
-                $existingInstallments = FeeStructure::where('institution_id', $feeStructure->institution_id)
-                    ->where('grade_level_id', $request->grade_level_id)
-                    ->where('payment_mode', 'installment')
-                    ->where('academic_session_id', $session->id)
-                    ->where('id', '!=', $id)
-                    ->sum('amount');
+            // Sum other installments + new amount
+            $existingInstallments = FeeStructure::where('institution_id', $feeStructure->institution_id)
+                ->where('grade_level_id', $request->grade_level_id)
+                ->where('payment_mode', 'installment')
+                ->where('academic_session_id', $session->id)
+                ->where('id', '!=', $id) // Exclude self
+                ->sum('amount');
 
-                $newTotal = $existingInstallments + $request->amount;
+            $newTotal = $existingInstallments + $request->amount;
 
-                if ($newTotal > $globalFee) {
-                    return response()->json([
-                        'message' => __('finance.installment_cap_error', [
-                            'total' => number_format($newTotal, 2), 
-                            'limit' => number_format($globalFee, 2)
-                        ])
-                    ], 422);
-                }
+            if ($newTotal > $globalFee) {
+                return response()->json([
+                    'message' => __('finance.installment_cap_error', [
+                        'total' => number_format($newTotal, 2), 
+                        'limit' => number_format($globalFee, 2)
+                    ])
+                ], 422);
             }
         }
-        // ------------------------------------------------
+
+        // --- VALIDATION 2: MODIFYING A GLOBAL FEE (Reducing Amount) ---
+        if ($request->payment_mode === 'global' && $request->grade_level_id) {
+            $totalInstallments = FeeStructure::where('institution_id', $feeStructure->institution_id)
+                ->where('grade_level_id', $request->grade_level_id)
+                ->where('payment_mode', 'installment')
+                ->where('academic_session_id', $session->id)
+                ->where('id', '!=', $id)
+                ->sum('amount');
+
+            if ($request->amount < $totalInstallments) {
+                return response()->json([
+                    'message' => __('finance.global_amount_too_low', [
+                        'total' => number_format($totalInstallments, 2)
+                    ])
+                ], 422);
+            }
+        }
 
         $feeStructure->update([
             'name' => $request->name,
@@ -329,6 +332,21 @@ class FeeStructureController extends BaseController
 
         if($institutionId && $feeStructure->institution_id != $institutionId) {
             abort(403);
+        }
+
+        // --- VALIDATION: PREVENT DELETING GLOBAL IF INSTALLMENTS EXIST ---
+        if ($feeStructure->payment_mode === 'global') {
+            $hasInstallments = FeeStructure::where('institution_id', $feeStructure->institution_id)
+                ->where('grade_level_id', $feeStructure->grade_level_id)
+                ->where('academic_session_id', $feeStructure->academic_session_id)
+                ->where('payment_mode', 'installment')
+                ->exists();
+
+            if ($hasInstallments) {
+                return response()->json([
+                    'message' => __('finance.cannot_delete_global_with_installments')
+                ], 422);
+            }
         }
 
         $feeStructure->delete();

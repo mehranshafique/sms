@@ -18,7 +18,7 @@ class Subject extends Model
         'credit_hours',
         'total_marks',
         'passing_marks',
-        'is_active',
+        'is_active',    
     ];
 
     /*

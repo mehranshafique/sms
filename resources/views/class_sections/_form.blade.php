@@ -56,6 +56,7 @@
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('class_section.section_code') }}</label>
                                 <input type="text" name="code" class="form-control" value="{{ old('code', $class_section->code ?? '') }}" placeholder="{{ __('class_section.enter_code') }}">
+                                <small class="form-text text-muted">{{ __('class_section.auto_code_help') }}</small>
                             </div>
 
                             <div class="mb-3 col-md-6">

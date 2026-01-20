@@ -66,7 +66,32 @@ class ExamMarkController extends BaseController
 
         $exams = $examsQuery->pluck('name', 'id');
 
-        return view('marks.create', compact('exams'));
+        // 3. Fetch Classes ($classes) for the View
+        $classesQuery = ClassSection::with('gradeLevel')
+            ->where('is_active', true);
+
+        if ($institutionId) {
+            $classesQuery->where('institution_id', $institutionId);
+        }
+
+        // Filter for Teachers: Only show classes they teach or are assigned to
+        if ($isTeacher && !$isAdmin && $user->staff) {
+            $staffId = $user->staff->id;
+            $classesQuery->where(function($q) use ($staffId) {
+                $q->where('staff_id', $staffId) // Class Teacher
+                  ->orWhereHas('timetables', function($t) use ($staffId) {
+                      $t->where('teacher_id', $staffId); // Subject Teacher
+                  });
+            });
+        }
+
+        $classes = $classesQuery->get()->mapWithKeys(function ($item) {
+            $name = ($item->gradeLevel->name ?? '') . ' ' . $item->name;
+            return [$item->id => $name];
+        });
+
+        // Pass $classes to the view
+        return view('marks.create', compact('exams', 'classes'));
     }
 
     // =========================================================================
@@ -91,7 +116,8 @@ class ExamMarkController extends BaseController
     {
         if(!$request->grade_level_id) return response()->json([]);
         
-        $query = ClassSection::where('grade_level_id', $request->grade_level_id)
+        $query = ClassSection::with('gradeLevel')
+                             ->where('grade_level_id', $request->grade_level_id)
                              ->where('is_active', true);
 
         $user = Auth::user();
@@ -106,17 +132,33 @@ class ExamMarkController extends BaseController
             });
         }
         
-        return response()->json($query->pluck('name', 'id'));
+        // Return "Grade Name Section Name"
+        $sections = $query->get()->mapWithKeys(function($item) {
+            $name = ($item->gradeLevel->name ?? '') . ' ' . $item->name;
+            return [$item->id => $name];
+        });
+
+        return response()->json($sections);
     }
 
     public function getSubjects(Request $request)
     {
-        if(!$request->grade_level_id) return response()->json([]);
+        // 1. Resolve Grade Level ID
+        $gradeLevelId = $request->grade_level_id;
+        
+        // If class_section_id is provided but grade_level_id isn't, fetch grade from section
+        if (!$gradeLevelId && $request->class_section_id) {
+            $section = ClassSection::find($request->class_section_id);
+            if ($section) {
+                $gradeLevelId = $section->grade_level_id;
+            }
+        }
+
+        if (!$gradeLevelId) return response()->json([]);
         
         $user = Auth::user();
         
-        // 1. Teacher Logic: Trust the Timetable
-        // If the teacher has a timetable for this Grade (and optionally Section), they see the subject.
+        // 2. Teacher Logic: Trust the Timetable
         if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
             $staffId = $user->staff->id;
             
@@ -127,8 +169,8 @@ class ExamMarkController extends BaseController
             if ($request->class_section_id) {
                 $timetableQuery->where('class_section_id', $request->class_section_id);
             } else {
-                $timetableQuery->whereHas('classSection', function($q) use ($request) {
-                    $q->where('grade_level_id', $request->grade_level_id);
+                $timetableQuery->whereHas('classSection', function($q) use ($gradeLevelId) {
+                    $q->where('grade_level_id', $gradeLevelId);
                 });
             }
 
@@ -136,12 +178,12 @@ class ExamMarkController extends BaseController
 
             if (empty($subjectIds)) return response()->json([]);
 
-            // Fetch Subjects by ID (Ignore grade_level_id of subject to trust timetable)
+            // Fetch Subjects by ID
             $query = Subject::whereIn('id', $subjectIds)->where('is_active', true);
         
         } else {
-            // 2. Admin Logic: Show all subjects defined for the Grade
-            $query = Subject::where('grade_level_id', $request->grade_level_id)
+            // 3. Admin Logic: Show all subjects defined for the Grade
+            $query = Subject::where('grade_level_id', $gradeLevelId)
                             ->where('is_active', true);
         }
 

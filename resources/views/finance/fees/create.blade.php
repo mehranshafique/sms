@@ -71,7 +71,7 @@
                                         <label class="form-label">{{ __('finance.class_section') }} <small>({{ __('finance.optional') }})</small></label>
                                         <select name="class_section_id" id="sectionSelect" class="form-control default-select" data-live-search="true">
                                             <option value="">{{ __('finance.all_sections') }}</option>
-                                            {{-- Populated via AJAX --}}
+                                            {{-- Populated via JS --}}
                                         </select>
                                     </div>
 
@@ -105,65 +105,108 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    $(document).ready(function(){
+    document.addEventListener('DOMContentLoaded', function() {
         
-        if(jQuery().selectpicker) {
-            $('.default-select').selectpicker('refresh');
+        // --- HELPER: Refresh UI Library (Bootstrap-Select) ---
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select')) {
+                if ($.fn.selectpicker) {
+                     $(element).selectpicker('refresh');
+                }
+            }
         }
 
-        // Toggle Installment Order
-        $('#paymentMode').change(function() {
-            if($(this).val() === 'installment') {
-                $('#installmentOrderDiv').removeClass('d-none');
-            } else {
-                $('#installmentOrderDiv').addClass('d-none');
-            }
-        });
+        // --- DOM Elements ---
+        const gradeSelect = document.getElementById('gradeSelect');
+        const sectionSelect = document.getElementById('sectionSelect');
+        const paymentMode = document.getElementById('paymentMode');
+        const installmentOrderDiv = document.getElementById('installmentOrderDiv');
+        const feeForm = document.getElementById('feeForm');
 
-        // AJAX: Fetch Sections when Grade is selected
-        $('#gradeSelect').change(function(){
-            let gradeId = $(this).val();
-            let $sectionSelect = $('#sectionSelect');
-            
-            // Clear current options
-            $sectionSelect.html('<option value="">{{ __("finance.all_sections") }}</option>');
-            $sectionSelect.selectpicker('refresh');
+        // --- 1. Grade Dropdown Logic (Native JS) ---
+        if (gradeSelect) {
+            gradeSelect.addEventListener('change', function() {
+                const gradeId = this.value;
+                
+                // Reset Section UI
+                sectionSelect.innerHTML = '<option value="">{{ __("finance.all_sections") }}</option>';
+                refreshSelect(sectionSelect);
 
-            if(gradeId) {
-                $.ajax({
-                    url: "{{ route('fees.get_sections') }}", // Ensure this route is defined in web.php
-                    type: "GET",
-                    data: { grade_id: gradeId },
-                    success: function(data) {
-                        $.each(data, function(id, name){
-                            $sectionSelect.append('<option value="'+id+'">'+name+'</option>');
+                if (gradeId) {
+                    // Using established route 'students.get_sections'
+                    fetch(`{{ route('students.get_sections') }}?grade_id=${gradeId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            // Iterate object {id: name}
+                            Object.entries(data).forEach(([key, value]) => {
+                                let option = new Option(value, key);
+                                sectionSelect.add(option);
+                            });
+                            refreshSelect(sectionSelect);
+                        })
+                        .catch(err => {
+                            console.error('Error loading sections:', err);
                         });
-                        $sectionSelect.selectpicker('refresh');
-                    },
-                    error: function() {
-                        console.error("Failed to fetch sections");
-                    }
-                });
-            }
-        });
-
-        $('#feeForm').submit(function(e){
-            e.preventDefault();
-            $.ajax({
-                url: $(this).attr('action'),
-                type: "POST",
-                data: $(this).serialize(),
-                success: function(response){
-                    Swal.fire('Success', response.message, 'success').then(() => {
-                        window.location.href = response.redirect;
-                    });
-                },
-                error: function(xhr){
-                    let msg = xhr.responseJSON.message || 'Error occurred';
-                    Swal.fire('Error', msg, 'error');
                 }
             });
-        });
+        }
+
+        // --- 2. Payment Mode Toggle ---
+        if (paymentMode) {
+            paymentMode.addEventListener('change', function() {
+                if(this.value === 'installment') {
+                    installmentOrderDiv.classList.remove('d-none');
+                } else {
+                    installmentOrderDiv.classList.add('d-none');
+                }
+            });
+        }
+
+        // --- 3. Form Submission (Native JS Fetch) ---
+        if (feeForm) {
+            feeForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const btn = this.querySelector('button[type="submit"]');
+                const originalText = btn.innerHTML;
+                const formData = new FormData(this);
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
+
+                fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                })
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(res => {
+                    if (res.status >= 200 && res.status < 300) {
+                        Swal.fire({ 
+                            icon: 'success', 
+                            title: 'Success', 
+                            text: res.body.message 
+                        }).then(() => {
+                            window.location.href = res.body.redirect;
+                        });
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                        let msg = res.body.message || 'Error occurred';
+                        Swal.fire({ icon: 'error', title: 'Error', html: msg });
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    console.error(err);
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'An unexpected error occurred.' });
+                });
+            });
+        }
     });
 </script>
 @endsection

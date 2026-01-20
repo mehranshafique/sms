@@ -24,15 +24,35 @@ return [
     'action' => 'Action',
     
     // Form Labels
+    'configuration' => 'Configuration', // Added
     'target_grade' => 'Target Grade Level', 
     'target_section' => 'Target Section',
     'select_grade' => 'Select Grade',
     'select_section' => 'Select Section',
     'select_grade_first' => 'Select Grade First',
     
+    'select_students' => 'Select Students', // Added
+    'select_all' => 'Select All', // Added
+    'search_student' => 'Search student name...', // Added
+    'select_class_first_msg' => 'Please select a class section above.', // Added
+    'students_selected_count' => ':count students selected', // Added
+    'students_selected_suffix' => 'students selected', // Added for dynamic JS update
+    
     'select_fees' => 'Select Fees',
+    'search_fees' => 'Search fees...', // Added
+    'fees_will_load' => 'Fees will load here.', // Added
+    'fee_bundle_help' => 'Check multiple items to bundle fees.', // Added
     'fee_help' => 'Invoices will be generated for all active students in the selected section.',
     
+    // Fee Reference Table
+    'class_fee_overview' => 'Class Fee Overview (Reference)', // Added
+    'fee_name' => 'Fee Name', // Added
+    'fee_type' => 'Type', // Added
+    'amount' => 'Amount',
+    'mode' => 'Mode', // Added
+    'order' => 'Order', // Added
+    'frequency' => 'Frequency', // Added
+
     // Statuses
     'status_unpaid' => 'Unpaid',
     'status_partial' => 'Partial',
@@ -42,23 +62,34 @@ return [
     // Buttons
     'generate_btn' => 'Generate Invoices',
     'processing' => 'Processing...',
+    'checking' => 'Checking...', // Added
     'pay' => 'Pay',
     'view' => 'View',
     'delete' => 'Delete',
     'print' => 'Print',
     'download_pdf' => 'Download PDF',
     'pay_now' => 'Pay Now',
+    'yes_generate' => 'Yes, generate anyway', // Added
     
-    // Messages
+    // Messages & Alerts
     'no_fees_found' => 'No fee structures available. Please create fees first.',
+    'no_sections_found' => 'No sections found', // Added
+    'no_active_students' => 'No active students found in this class.', // Added
     'success_deleted' => 'Invoice deleted successfully.',
     'error_delete_paid' => 'Cannot delete an invoice that has payments attached. Please delete payments first.',
     'success' => 'Success',
     'error' => 'Error',
+    'warning' => 'Warning', // Added
     'error_occurred' => 'An error occurred.',
+    'unexpected_error' => 'An unexpected error occurred.', // Added
     'loading' => 'Loading...',
     'error_loading' => 'Error loading data',
+    'error_loading_students' => 'Error loading students', // Added
+    'error_loading_fees' => 'Error loading fees', // Added
+    'select_student_warning' => 'Please select at least one student.', // Added
+    'select_fee_warning' => 'Please select at least one fee structure.', // Added
     'duplicate_warning' => 'Warning: :count duplicate invoices detected.',
+    'duplicate_warning_title' => 'Duplicate Warning', // Added
     'no_invoices_generated_error' => 'No invoices were generated. :count students were skipped.',
     'skipped_count_msg' => '(:count skipped)',
     
@@ -74,7 +105,6 @@ return [
     'date' => 'Date',
     'status_label' => 'Status',
     'description' => 'Description',
-    'amount' => 'Amount',
     'subtotal' => 'Subtotal',
     'paid_to_date' => 'Paid to Date',
     'balance_due' => 'Balance Due',

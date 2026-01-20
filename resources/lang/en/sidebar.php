@@ -33,8 +33,8 @@ return [
     'audit_log' => 'Audit Log',
     
     'finance' => 'Finance',
-    'fees_collection' => 'Fees & Collection', // Added for split menu
-    'budget_payroll' => 'Budget & Payroll',   // Added for split menu
+    'fees_collection' => 'Fees & Collection',
+    'budget_payroll' => 'Budget & Payroll',
     'billing' => 'Billing',
     'billing_requests' => 'Billing Requests',
     'status_billing' => 'Status Billing',
@@ -45,7 +45,6 @@ return [
     'fund_requests' => 'Fund Requests', 
     'budget_categories' => 'Budget Categories', 
     
-    // NEW ADDITIONS
     'communication' => 'Communication',
     'notices' => [
         'title' => 'Notices Board',
@@ -78,6 +77,7 @@ return [
     'timetables' => [
         'title' => 'Timetables'
     ],
+    
     'examinations' => 'Examinations',
     'exams' => [
         'title' => 'Exams'
@@ -87,6 +87,27 @@ return [
     ],
     'results' => 'Result Cards',
     'academic_reports' => 'Reports (PDF)',
+    
+    // NEW KEYS FOR STUDENT/TEACHER VIEWS
+    'exam_schedules' => [
+        'title' => 'Date Sheets',
+        'manage' => 'Manage Date Sheet',
+        'my_admit_card' => 'My Admit Card',
+        'view_schedule' => 'View Schedule',
+    ],
+    
+    'assignments' => [
+        'title' => 'Assignments',
+        'my_assignments' => 'My Assignments',
+        'class_assignments' => 'Class Assignments',
+    ],
+
+    'library' => [
+        'title' => 'Library',
+    ],
+    'transport' => [
+        'title' => 'Transport',
+    ],
     
     'people' => 'People',
     'students' => [
@@ -137,7 +158,6 @@ return [
     'subscriptions' => [
         'title' => 'Subscriptions'
     ],
-    // New Payroll Keys
     'salary_structures' => 'Salary Structure',
     'generate_payroll' => 'Generate Payroll',
 ];

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str; // Added for string manipulation
 
 class ClassSectionController extends BaseController
 {
@@ -149,6 +150,11 @@ class ClassSectionController extends BaseController
         
         $validated['institution_id'] = $institutionId;
 
+        // Auto-generate code if empty
+        if (empty($validated['code'])) {
+            $validated['code'] = Str::upper($validated['name']); 
+        }
+
         ClassSection::create($validated);
 
         return response()->json(['message' => __('class_section.messages.success_create'), 'redirect' => route('class-sections.index')]);
@@ -211,6 +217,11 @@ class ClassSectionController extends BaseController
 
         if ($institutionId) {
             $validated['institution_id'] = $institutionId;
+        }
+
+        // Auto-generate code if empty
+        if (empty($validated['code'])) {
+            $validated['code'] = Str::upper($validated['name']); 
         }
 
         $class_section->update($validated);

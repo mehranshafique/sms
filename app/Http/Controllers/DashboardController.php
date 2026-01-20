@@ -39,7 +39,7 @@ class DashboardController extends BaseController
         $activeInstId = session('active_institution_id');
 
         // 1. MAIN ADMIN (PLATFORM OWNER) CHECK
-        if ($user->hasRole('Super Admin') || $user->hasRole('School Admin')) {
+        if ($user->hasRole('Super Admin')) {
             // If Super Admin switched to a specific school
             if ($activeInstId && $activeInstId !== 'global') {
                 return $this->schoolAdminDashboard($activeInstId);
@@ -49,7 +49,7 @@ class DashboardController extends BaseController
         }
 
         // 2. School Admin (Head Officer)
-        if ($user->hasRole('Head Officer')) {
+        if ($user->hasRole('Head Officer') || $user->hasRole('School Admin')) {
             $myInstitutes = $user->institutes; // Assuming relationship exists
             
             // Check if Head Officer has multiple institutions AND is in Global Mode

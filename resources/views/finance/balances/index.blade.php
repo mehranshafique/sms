@@ -28,7 +28,7 @@
                                         <th>#</th>
                                         <th>{{ __('finance.class_name') }}</th>
                                         <th>{{ __('finance.students_count') }}</th>
-                                        <th>{{ __('finance.paid_students') ?? 'Paid Students' }}</th> {{-- New Column --}}
+                                        <th>{{ __('finance.paid_students') ?? 'Paid Students' }}</th>
                                         <th>{{ __('finance.total_invoiced') }}</th>
                                         <th>{{ __('finance.total_collected') }}</th>
                                         <th>{{ __('finance.total_outstanding') }}</th>
@@ -98,9 +98,6 @@
                     data: 'class_name', 
                     name: 'name',
                     render: function(data, type, row) {
-                        // Format is already "Grade Section" from controller if available,
-                        // or "Section (Grade)" depending on logic.
-                        // Controller now sets 'class_name' as "Grade Section" directly or "Section"
                         return data;
                     }
                 },
@@ -122,20 +119,16 @@
         // 2. Handle "View Details" Click
         $(document).on('click', '.view-class-btn', function() {
             let classId = $(this).data('id');
-            let className = $(this).data('name'); // Now contains "Grade Section"
+            let className = $(this).data('name');
             
-            // UI Updates: Set Title to "Class Details: Grade Section"
             $('#selectedClassName').text("{{ __('finance.class_details') }}: " + className);
-            
             $('#detailsSection').removeClass('d-none');
-            $('#studentSearchInput').val(''); // Clear search on open
+            $('#studentSearchInput').val('');
             
-            // Scroll to details
             $('html, body').animate({
                 scrollTop: $("#detailsSection").offset().top - 100
             }, 500);
 
-            // Fetch Data
             loadClassDetails(classId);
         });
 
@@ -181,43 +174,141 @@
                     response.tabs.forEach((tab, index) => {
                         let isActive = index === 0 ? 'show active' : '';
                         
+                        // --- CALCULATE TAB STATISTICS ---
+                        let statTotalStudents = 0;
+                        let statTotalPaid = 0;
+                        let statTotalDue = 0;
+                        let currencySymbol = '';
+
                         // Build Student Rows for this Tab
                         let rowsHtml = '';
+                        
                         response.students.forEach(item => {
                             let student = item.student;
                             let status = item.statuses[tab.id]; // {label, style, paid, due}
-                            let photoUrl = student.photo ? '/storage/'+student.photo : null;
-                            let avatar = photoUrl 
-                                ? `<img src="${photoUrl}" class="rounded-circle me-2" width="35" height="35">`
-                                : `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width:35px;height:35px">${student.name.charAt(0)}</div>`;
+                            
+                            // Ensure data exists for this specific installment
+                            if (status) {
+                                statTotalStudents++;
+                                
+                                // Parse money values safely
+                                let pVal = parseFloat(String(status.paid).replace(/[^0-9.-]+/g,"")) || 0;
+                                let dVal = parseFloat(String(status.due).replace(/[^0-9.-]+/g,"")) || 0;
+                                
+                                statTotalPaid += pVal;
+                                statTotalDue += dVal;
 
-                            // Action Link (Go to Student Finance Dashboard)
-                            let actionUrl = "/finance/student/" + student.id + "/dashboard";
+                                // Capture symbol if not set
+                                if(!currencySymbol && (String(status.paid).match(/[^0-9.-]+/))) {
+                                    currencySymbol = String(status.paid).replace(/[0-9.,-]+/g, '').trim();
+                                }
 
-                            rowsHtml += `
-                                <tr class="student-row">
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            ${avatar}
-                                            <div>
-                                                <h6 class="mb-0 fs-14 student-name">${student.name}</h6>
-                                                <small class="text-muted student-id">${student.admission_no}</small>
+                                let photoUrl = student.photo ? '/storage/'+student.photo : null;
+                                let avatar = photoUrl 
+                                    ? `<img src="${photoUrl}" class="rounded-circle me-2" width="35" height="35">`
+                                    : `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width:35px;height:35px">${student.name.charAt(0)}</div>`;
+
+                                let actionUrl = "/finance/student/" + student.id + "/dashboard";
+
+                                rowsHtml += `
+                                    <tr class="student-row">
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                ${avatar}
+                                                <div>
+                                                    <h6 class="mb-0 fs-14 student-name">${student.name}</h6>
+                                                    <small class="text-muted student-id">${student.admission_no}</small>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td><span class="badge badge-${status.style} light">${status.label}</span></td>
-                                    <td class="text-success fw-bold">${status.paid}</td>
-                                    <td class="text-danger fw-bold">${status.due}</td>
-                                    <td>
-                                        <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow" target="_blank" title="{{ __('finance.view_dashboard') }}">
-                                            <i class="fa fa-arrow-right"></i>
-                                        </a>
-                                    </td>
-                                </tr>`;
+                                        </td>
+                                        <td><span class="badge badge-${status.style} light">${status.label}</span></td>
+                                        <td class="text-success fw-bold">${status.paid}</td>
+                                        <td class="text-danger fw-bold">${status.due}</td>
+                                        <td>
+                                            <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow" target="_blank" title="{{ __('finance.view_dashboard') }}">
+                                                <i class="fa fa-arrow-right"></i>
+                                            </a>
+                                        </td>
+                                    </tr>`;
+                            }
                         });
+
+                        // Calculate Invoice Total (Paid + Due)
+                        let statTotalInvoiced = statTotalPaid + statTotalDue;
+
+                        // Formatting Helper
+                        const fmt = (num) => (currencySymbol ? currencySymbol + ' ' : '') + num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
                         let contentHtml = `
                             <div class="tab-pane fade ${isActive}" id="content-${tab.id}" role="tabpanel">
+                                
+                                {{-- Compact Summary Stats Row --}}
+                                <div class="row mb-4">
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="card widget-flat border-0 shadow-sm mb-3">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="icon-box bg-light-primary text-primary rounded-circle me-3 p-3">
+                                                        <i class="fa fa-users fa-2x"></i>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-muted mb-1 fs-12 text-uppercase">{{ __('finance.students_count') }}</p>
+                                                        <h4 class="mb-0 fw-bold text-dark">${statTotalStudents}</h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="card widget-flat border-0 shadow-sm mb-3">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="icon-box bg-light-success text-success rounded-circle me-3 p-3">
+                                                        <i class="fa fa-check-circle fa-2x"></i>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-muted mb-1 fs-12 text-uppercase">{{ __('finance.paid_amount') }}</p>
+                                                        <h4 class="mb-0 fw-bold text-dark">${fmt(statTotalPaid)}</h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="card widget-flat border-0 shadow-sm mb-3">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="icon-box bg-light-danger text-danger rounded-circle me-3 p-3">
+                                                        <i class="fa fa-exclamation-circle fa-2x"></i>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-muted mb-1 fs-12 text-uppercase">{{ __('finance.due_amount') }}</p>
+                                                        <h4 class="mb-0 fw-bold text-dark">${fmt(statTotalDue)}</h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="card widget-flat border-0 shadow-sm mb-3">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="icon-box bg-light-info text-info rounded-circle me-3 p-3">
+                                                        <i class="fa fa-file-invoice-dollar fa-2x"></i>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-muted mb-1 fs-12 text-uppercase">{{ __('finance.total_invoiced') }}</p>
+                                                        <h4 class="mb-0 fw-bold text-dark">${fmt(statTotalInvoiced)}</h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="table-responsive">
                                     <table class="table table-striped table-hover verticle-middle student-table">
                                         <thead class="bg-light">
@@ -249,7 +340,6 @@
         $('#studentSearchInput').on('keyup', function() {
             var value = $(this).val().toLowerCase();
             
-            // Search in all tables within the active tab content
             $('.student-table tbody tr').filter(function() {
                 var name = $(this).find('.student-name').text().toLowerCase();
                 var id = $(this).find('.student-id').text().toLowerCase();

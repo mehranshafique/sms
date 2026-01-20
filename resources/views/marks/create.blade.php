@@ -21,7 +21,7 @@
                     <div class="card-body pt-3">
                         <div class="row">
                             {{-- 1. Exam --}}
-                            <div class="col-md-3 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">{{ __('marks.select_exam') }} <span class="text-danger">*</span></label>
                                 @php $examCount = count($exams ?? []); @endphp
                                 @if($examCount > 1)
@@ -40,24 +40,19 @@
                                 @endif
                             </div>
 
-                            {{-- 2. Grade (Year Level) --}}
-                            <div class="col-md-3 mb-3">
-                                <label class="form-label fw-bold">{{ __('marks.grade') }} <span class="text-danger">*</span></label>
-                                <select id="grade_select" class="form-control default-select" disabled>
-                                    <option value="">-- {{ __('marks.select_grade') }} --</option>
-                                </select>
-                            </div>
-
-                            {{-- 3. Section / Option --}}
-                            <div class="col-md-3 mb-3">
-                                <label class="form-label fw-bold">{{ __('marks.section_option') }} <span class="text-danger">*</span></label>
-                                <select id="section_select" class="form-control default-select" disabled>
+                            {{-- 2. Class Section (Combined Grade & Section) --}}
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">{{ __('marks.select_section') }} <span class="text-danger">*</span></label>
+                                <select id="section_select" class="form-control default-select">
                                     <option value="">-- {{ __('marks.select_section') }} --</option>
+                                    @foreach($classes as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
                                 </select>
                             </div>
 
-                            {{-- 4. Subject --}}
-                            <div class="col-md-3 mb-3">
+                            {{-- 3. Subject --}}
+                            <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">{{ __('marks.subject') }} <span class="text-danger">*</span></label>
                                 <select id="subject_select" class="form-control default-select" disabled>
                                     <option value="">-- {{ __('marks.select_subject') }} --</option>
@@ -85,10 +80,6 @@
                         <div class="row align-items-center w-100 g-3">
                             <div class="col-md-6">
                                 <div class="d-flex flex-wrap gap-4 mb-2">
-                                    <div class="d-flex align-items-center">
-                                        <span class="text-uppercase fw-bold text-muted small me-2">{{ __('marks.grade') }}:</span>
-                                        <span class="fw-bold text-dark" id="header_grade">-</span>
-                                    </div>
                                     <div class="d-flex align-items-center">
                                         <span class="text-uppercase fw-bold text-muted small me-2">{{ __('marks.section') }}:</span>
                                         <span class="fw-bold text-dark" id="header_section">-</span>
@@ -162,232 +153,270 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    $(document).ready(function() {
-        const examSel = $('#exam_select');
-        const gradeSel = $('#grade_select');
-        const sectionSel = $('#section_select');
-        const subjectSel = $('#subject_select');
+    document.addEventListener('DOMContentLoaded', function() {
         
-        function updateUI(el) { 
-            if($.fn.select2 && !el.hasClass("select2-hidden-accessible")) {
-                el.select2();
-            } else if ($.fn.select2) {
-                el.trigger('change.select2'); 
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select')) {
+                if ($.fn.selectpicker) $(element).selectpicker('refresh');
             }
-            if($.fn.selectpicker) el.selectpicker('refresh');
         }
 
-        // --- Step 1: Load Grades ---
-        function loadGrades() {
-            let id = examSel.val();
-            gradeSel.prop('disabled', true).html('<option value="">Loading...</option>');
-            sectionSel.prop('disabled', true).html('<option value="">-- {{ __("marks.select_section") }} --</option>');
-            subjectSel.prop('disabled', true).html('<option value="">-- {{ __("marks.select_subject") }} --</option>');
-            $('#marks_container, #empty_state').addClass('d-none');
-            updateUI(gradeSel); updateUI(sectionSel); updateUI(subjectSel);
-
-            if(!id) return;
-
-            $.get("{{ route('marks.get_grades') }}", {exam_id: id}, function(data) {
-                gradeSel.html('<option value="">-- {{ __("marks.select_grade") }} --</option>');
-                Object.entries(data).forEach(([id, name]) => gradeSel.append(new Option(name, id)));
-                gradeSel.prop('disabled', false); updateUI(gradeSel);
-            });
-        }
+        const examSelect = document.getElementById('exam_select');
+        const sectionSelect = document.getElementById('section_select');
+        const subjectSelect = document.getElementById('subject_select');
         
-        examSel.on('change', loadGrades);
-        if(examSel.val()) loadGrades();
+        // Helper to clear and disable dropdowns
+        function resetSelect(select, defaultText) {
+            select.innerHTML = `<option value="">${defaultText}</option>`;
+            select.disabled = true;
+            refreshSelect(select);
+        }
 
         // --- Helper: Fetch Subjects ---
-        function fetchSubjects(gradeId, sectionId = null) {
-            subjectSel.prop('disabled', true).html('<option value="">Loading...</option>');
-            updateUI(subjectSel);
+        function fetchSubjects(sectionId) {
+            resetSelect(subjectSelect, 'Loading...');
             
-            let params = { grade_level_id: gradeId };
-            if(sectionId) params.class_section_id = sectionId;
+            // Pass class_section_id to backend, which will derive grade level and filter
+            let url = "{{ route('marks.get_subjects') }}?class_section_id=" + sectionId;
 
-            $.get("{{ route('marks.get_subjects') }}", params, function(data) {
-                subjectSel.html('<option value="">-- {{ __("marks.select_subject") }} --</option>');
-                data.forEach(s => {
-                    let opt = new Option(s.name, s.id);
-                    $(opt).data('total', s.total_marks).data('teacher', s.teacher_name);
-                    subjectSel.append(opt);
-                });
-                subjectSel.prop('disabled', false); 
-                updateUI(subjectSel);
-            });
-        }
-
-        // --- Step 2: Grade Change ---
-        gradeSel.on('change', function() {
-            let id = $(this).val();
-            sectionSel.prop('disabled', true).html('<option value="">Loading...</option>');
-            // Reset subjects
-            subjectSel.prop('disabled', true).html('<option value="">-- {{ __("marks.select_subject") }} --</option>');
-            updateUI(sectionSel); updateUI(subjectSel);
-            
-            if(!id) return;
-
-            // Load Sections
-            $.get("{{ route('marks.get_sections') }}", {grade_level_id: id}, function(data) {
-                sectionSel.html('<option value="">-- {{ __("marks.select_section") }} --</option>');
-                Object.entries(data).forEach(([id, name]) => sectionSel.append(new Option(name, id)));
-                sectionSel.prop('disabled', false); updateUI(sectionSel);
-            });
-
-            // Load Subjects (General/Initial)
-            fetchSubjects(id, null);
-        });
-
-        // --- Step 2.5: Section Change ---
-        sectionSel.on('change', function() {
-            let secId = $(this).val();
-            let gradeId = gradeSel.val();
-            
-            // Reload subjects specifically for this section
-            if(gradeId && secId) {
-                fetchSubjects(gradeId, secId);
-            }
-            
-            // If user had already selected a subject and section, try load table
-            tryLoadStudents(); 
-        });
-
-        // --- Step 3: Load Students ---
-        function tryLoadStudents() {
-            let subId = subjectSel.val();
-            let secId = sectionSel.val();
-            let exId = examSel.val();
-            
-            if(!subId || !secId || !exId) { $('#marks_container').addClass('d-none'); return; }
-
-            let subjOpt = subjectSel.find(':selected');
-            $('#total_marks_value').text(subjOpt.data('total'));
-            $('#total_marks_display').removeClass('d-none');
-            $('#table_max_label').text('(Max: ' + subjOpt.data('total') + ')');
-            
-            $('#header_grade').text(gradeSel.find(':selected').text());
-            $('#header_section').text(sectionSel.find(':selected').text());
-            $('#header_teacher').text(subjOpt.data('teacher'));
-
-            $('#form_exam_id').val(exId); $('#form_section_id').val(secId); $('#form_subject_id').val(subId);
-
-            $('#loading_spinner').removeClass('d-none'); $('#marks_container').addClass('d-none'); $('#empty_state').addClass('d-none');
-
-            $.get("{{ route('marks.get_students') }}", {exam_id: exId, class_section_id: secId, subject_id: subId}, function(res) {
-                $('#loading_spinner').addClass('d-none');
-                if (res.students && res.students.length > 0) {
-                    let rows = '';
-                    let maxMarks = subjOpt.data('total') || 100;
-                    $('#total_students_count').text(res.students.length);
-
-                    res.students.forEach((s, i) => {
-                        let m = res.marks[s.id] || {marks_obtained: '', is_absent: 0};
-                        rows += `<tr class="s-row"><td class="ps-4 fw-bold">${i+1}</td><td><span class="s-name fw-bold text-dark">${s.name}</span></td><td><span class="s-adm badge badge-light badge-sm text-dark">${s.admission_number}</span></td><td><input type="number" name="marks[${s.id}]" class="form-control mark-input w-50 border-secondary" value="${m.is_absent ? '' : m.marks_obtained}" ${m.is_absent ? 'disabled' : ''} max="${maxMarks}" step="0.01" placeholder="0-${maxMarks}"></td><td class="text-center"><div class="form-check d-inline-block"><input type="checkbox" name="absent[${s.id}]" class="form-check-input abs-check" ${m.is_absent ? 'checked' : ''}></div></td></tr>`;
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    subjectSelect.innerHTML = '<option value="">-- {{ __("marks.select_subject") }} --</option>';
+                    data.forEach(s => {
+                        let opt = new Option(s.name, s.id);
+                        opt.dataset.total = s.total_marks;
+                        opt.dataset.teacher = s.teacher_name;
+                        subjectSelect.add(opt);
                     });
-                    $('#student_table_body').html(rows); $('#marks_container').removeClass('d-none');
-                } else {
-                    $('#empty_state').removeClass('d-none');
-                }
-            }).fail(function() {
-                $('#loading_spinner').addClass('d-none');
-                Swal.fire({icon: 'error', title: 'Error', text: 'Failed to load data.'});
+                    subjectSelect.disabled = false;
+                    refreshSelect(subjectSelect);
+                })
+                .catch(err => {
+                    console.error(err);
+                    resetSelect(subjectSelect, '-- {{ __("marks.select_subject") }} --');
+                });
+        }
+
+        // --- Step 1: Section Change (Now includes Grade info) ---
+        if(sectionSelect) {
+            sectionSelect.addEventListener('change', function() {
+                let id = this.value;
+                resetSelect(subjectSelect, '-- {{ __("marks.select_subject") }} --');
+                
+                document.getElementById('marks_container').classList.add('d-none');
+                document.getElementById('empty_state').classList.add('d-none');
+
+                if(!id) return;
+
+                // Load Subjects based on Section
+                fetchSubjects(id);
             });
         }
 
-        subjectSel.on('change', tryLoadStudents);
+        // --- Step 2: Load Students ---
+        if(subjectSelect) {
+            subjectSelect.addEventListener('change', tryLoadStudents);
+        }
 
-        // --- Logic: Print Award List ---
-        $('#print_award_list').click(function() {
-            let examId = examSel.val();
-            let classId = sectionSel.val();
-            let subjectId = subjectSel.val();
-
-            if (!examId || !classId || !subjectId) {
-                Swal.fire({icon: 'warning', title: 'Incomplete Selection', text: 'Please select Exam, Grade, Section, and Subject first.'});
-                return;
-            }
-
-            let url = "{{ route('exams.print_award_list') }}?exam_id=" + examId + "&class_section_id=" + classId + "&subject_id=" + subjectId;
-            window.open(url, '_blank');
-        });
-
-        // --- Logic: Absent Toggle ---
-        $(document).on('change', '.abs-check', function() {
-            let input = $(this).closest('tr').find('.mark-input');
-            if($(this).is(':checked')) { input.prop('disabled', true).val('').removeClass('is-invalid'); } 
-            else { input.prop('disabled', false).focus(); }
-        });
-
-        // --- Logic: Validation ---
-        $(document).on('input', '.mark-input', function() {
-            let max = parseFloat($('#total_marks_value').text()) || 100;
-            if(parseFloat($(this).val()) > max) $(this).addClass('is-invalid'); else $(this).removeClass('is-invalid');
-        });
-
-        // --- Logic: Search ---
-        $('#table_search').on('keyup', function() {
-            let v = this.value.toLowerCase();
-            $('.s-row').each(function() {
-                let t = $(this).find('.s-name').text().toLowerCase() + " " + $(this).find('.s-adm').text().toLowerCase();
-                $(this).toggle(t.includes(v));
-            });
-        });
-
-        // --- Logic: Save (UPDATED: Empty Mark Validation) ---
-        $('#marksForm').on('submit', function(e) {
-            e.preventDefault();
-            let max = parseFloat($('#total_marks_value').text()) || 100;
-            let err = false;
-            let emptyErr = false;
-
-            $('.mark-input').each(function() { 
-                let val = $(this).val();
-                let isAbsent = $(this).closest('tr').find('.abs-check').is(':checked');
-
-                // Check Max
-                if(parseFloat(val) > max) { $(this).addClass('is-invalid'); err = true; } 
-                
-                // Check Empty (unless absent)
-                // Use strict check for empty string to avoid false positives on 0
-                if(!isAbsent && (val === '' || val === null)) {
-                    $(this).addClass('is-invalid');
-                    emptyErr = true;
-                } else if(!err) { // Only remove if no max error
-                    $(this).removeClass('is-invalid');
-                }
-            });
-
-            if(err) { Swal.fire({icon: 'warning', title: 'Invalid Marks', text: `Marks cannot exceed ${max}`}); return; }
+        function tryLoadStudents() {
+            let subId = subjectSelect.value;
+            let secId = sectionSelect.value;
+            let exId = examSelect.value;
             
-            // New Validation Alert
-            if(emptyErr) { 
-                Swal.fire({
-                    icon: 'warning', 
-                    title: 'Missing Values', 
-                    text: 'Marks cannot be empty unless the student is marked as Absent.'
-                }); 
+            if(!subId || !secId || !exId) { 
+                document.getElementById('marks_container').classList.add('d-none'); 
                 return; 
             }
 
-            let btn = $(this).find('button[type="submit"]'); 
-            let txt = btn.text();
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+            let subjOpt = subjectSelect.options[subjectSelect.selectedIndex];
+            let totalMarks = subjOpt.dataset.total || 100;
+            let teacherName = subjOpt.dataset.teacher || 'N/A';
+
+            document.getElementById('total_marks_value').innerText = totalMarks;
+            document.getElementById('total_marks_display').classList.remove('d-none');
+            document.getElementById('table_max_label').innerText = '(Max: ' + totalMarks + ')';
             
-            $.post(this.action, $(this).serialize(), function(r) {
-                btn.prop('disabled', false).text(txt);
-                Swal.fire({
-                    icon: 'success', 
-                    title: 'Success!', 
-                    text: r.message, 
-                    showConfirmButton: true,
-                    confirmButtonText: 'OK'
+            document.getElementById('header_section').innerText = sectionSelect.options[sectionSelect.selectedIndex].text;
+            document.getElementById('header_teacher').innerText = teacherName;
+
+            document.getElementById('form_exam_id').value = exId; 
+            document.getElementById('form_section_id').value = secId; 
+            document.getElementById('form_subject_id').value = subId;
+
+            document.getElementById('loading_spinner').classList.remove('d-none'); 
+            document.getElementById('marks_container').classList.add('d-none'); 
+            document.getElementById('empty_state').classList.add('d-none');
+
+            let url = "{{ route('marks.get_students') }}?exam_id=" + exId + "&class_section_id=" + secId + "&subject_id=" + subId;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(res => {
+                    document.getElementById('loading_spinner').classList.add('d-none');
+                    if (res.students && res.students.length > 0) {
+                        let rows = '';
+                        document.getElementById('total_students_count').innerText = res.students.length;
+
+                        res.students.forEach((s, i) => {
+                            let m = res.marks[s.id] || {marks_obtained: '', is_absent: 0};
+                            let absentChecked = m.is_absent ? 'checked' : '';
+                            let inputDisabled = m.is_absent ? 'disabled' : '';
+                            let markValue = m.is_absent ? '' : m.marks_obtained;
+
+                            rows += `<tr class="s-row">
+                                <td class="ps-4 fw-bold">${i+1}</td>
+                                <td><span class="s-name fw-bold text-dark">${s.name}</span></td>
+                                <td><span class="s-adm badge badge-light badge-sm text-dark">${s.admission_number}</span></td>
+                                <td><input type="number" name="marks[${s.id}]" class="form-control mark-input w-50 border-secondary" value="${markValue}" ${inputDisabled} max="${totalMarks}" step="0.01" placeholder="0-${totalMarks}"></td>
+                                <td class="text-center"><div class="form-check d-inline-block"><input type="checkbox" name="absent[${s.id}]" class="form-check-input abs-check" ${absentChecked}></div></td>
+                            </tr>`;
+                        });
+                        document.getElementById('student_table_body').innerHTML = rows; 
+                        document.getElementById('marks_container').classList.remove('d-none');
+                    } else {
+                        document.getElementById('empty_state').classList.remove('d-none');
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('loading_spinner').classList.add('d-none');
+                    Swal.fire({icon: 'error', title: 'Error', text: 'Failed to load data.'});
                 });
-            }).fail(x => { 
-                btn.prop('disabled', false).text(txt); 
-                Swal.fire('Error', x.responseJSON.message || 'Save failed', 'error'); 
+        }
+
+        // --- Logic: Print Award List ---
+        const printBtn = document.getElementById('print_award_list');
+        if(printBtn) {
+            printBtn.addEventListener('click', function() {
+                let examId = examSelect.value;
+                let classId = sectionSelect.value;
+                let subjectId = subjectSelect.value;
+
+                if (!examId || !classId || !subjectId) {
+                    Swal.fire({icon: 'warning', title: 'Incomplete Selection', text: 'Please select Exam, Section, and Subject first.'});
+                    return;
+                }
+
+                let url = "{{ route('exams.print_award_list') }}?exam_id=" + examId + "&class_section_id=" + classId + "&subject_id=" + subjectId;
+                window.open(url, '_blank');
             });
+        }
+
+        // --- Logic: Event Delegation for Table Inputs ---
+        const tableBody = document.getElementById('student_table_body');
+        
+        // Absent Toggle
+        tableBody.addEventListener('change', function(e) {
+            if(e.target.classList.contains('abs-check')) {
+                let input = e.target.closest('tr').querySelector('.mark-input');
+                if(e.target.checked) { 
+                    input.disabled = true; 
+                    input.value = ''; 
+                    input.classList.remove('is-invalid'); 
+                } else { 
+                    input.disabled = false; 
+                    input.focus(); 
+                }
+            }
         });
+
+        // Validation on Input
+        tableBody.addEventListener('input', function(e) {
+            if(e.target.classList.contains('mark-input')) {
+                let max = parseFloat(document.getElementById('total_marks_value').innerText) || 100;
+                if(parseFloat(e.target.value) > max) {
+                    e.target.classList.add('is-invalid');
+                } else {
+                    e.target.classList.remove('is-invalid');
+                }
+            }
+        });
+
+        // --- Logic: Search ---
+        const searchInput = document.getElementById('table_search');
+        if(searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                let v = this.value.toLowerCase();
+                document.querySelectorAll('.s-row').forEach(row => {
+                    let name = row.querySelector('.s-name').innerText.toLowerCase();
+                    let adm = row.querySelector('.s-adm').innerText.toLowerCase();
+                    row.style.display = (name.includes(v) || adm.includes(v)) ? '' : 'none';
+                });
+            });
+        }
+
+        // --- Logic: Save (Updated: Empty Mark Validation) ---
+        const marksForm = document.getElementById('marksForm');
+        if(marksForm) {
+            marksForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                let max = parseFloat(document.getElementById('total_marks_value').innerText) || 100;
+                let err = false;
+                let emptyErr = false;
+
+                document.querySelectorAll('.mark-input').forEach(input => { 
+                    let val = input.value;
+                    let isAbsent = input.closest('tr').querySelector('.abs-check').checked;
+
+                    // Check Max
+                    if(parseFloat(val) > max) { 
+                        input.classList.add('is-invalid'); 
+                        err = true; 
+                    } 
+                    
+                    // Check Empty (unless absent)
+                    if(!isAbsent && (val === '' || val === null)) {
+                        input.classList.add('is-invalid');
+                        emptyErr = true;
+                    } else if(!err) { // Only remove if no max error
+                        input.classList.remove('is-invalid');
+                    }
+                });
+
+                if(err) { Swal.fire({icon: 'warning', title: 'Invalid Marks', text: `Marks cannot exceed ${max}`}); return; }
+                
+                // New Validation Alert
+                if(emptyErr) { 
+                    Swal.fire({
+                        icon: 'warning', 
+                        title: 'Missing Values', 
+                        text: 'Marks cannot be empty unless the student is marked as Absent.'
+                    }); 
+                    return; 
+                }
+
+                let btn = this.querySelector('button[type="submit"]'); 
+                let txt = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    body: new FormData(this),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    btn.disabled = false; 
+                    btn.innerHTML = txt;
+                    Swal.fire({
+                        icon: 'success', 
+                        title: 'Success!', 
+                        text: data.message, 
+                        showConfirmButton: true,
+                        confirmButtonText: 'OK'
+                    });
+                })
+                .catch(err => { 
+                    btn.disabled = false; 
+                    btn.innerHTML = txt; 
+                    Swal.fire('Error', 'An error occurred while saving marks.', 'error'); 
+                });
+            });
+        }
     });
 </script>
 @endsection

@@ -62,6 +62,8 @@ return [
     'gender' => 'Gender',
     'dob' => 'Date of Birth',
     'age' => 'Age',
+    'male' => 'Male',
+    'female' => 'Female',
     'years' => 'Years',
     'place_of_birth' => 'Place of Birth',
     'blood_group' => 'Blood Group',

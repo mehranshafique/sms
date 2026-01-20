@@ -55,6 +55,7 @@
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('grade_level.code') }}</label>
                                 <input type="text" name="code" class="form-control" value="{{ old('code', $grade_level->code ?? '') }}" placeholder="{{ __('grade_level.enter_code') }}">
+                                <small class="form-text text-muted">{{ __('grade_level.auto_code_help') }}</small>
                             </div>
 
                             <div class="mb-3 col-md-6">

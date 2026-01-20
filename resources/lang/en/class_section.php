@@ -28,7 +28,7 @@ return [
     'not_assigned' => 'Not Assigned',
     'no_records_found' => 'No classes found',
     'search_placeholder' => 'Search Classes...',
-
+    'optional' => 'Optional',
     // Forms
     'create_new' => 'Create New',
     'add_class' => 'Add Class Section',
@@ -46,6 +46,7 @@ return [
     // Placeholders
     'enter_name' => 'e.g. Section A',
     'enter_code' => 'e.g. 1-A',
+    'auto_code_help' => 'Leave empty to auto-generate from Section Name.', // Added
     'enter_room' => 'e.g. Room 101',
     'enter_capacity' => 'e.g. 40',
 

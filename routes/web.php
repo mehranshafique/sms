@@ -27,6 +27,7 @@ use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\TimetableController;
+use App\Http\Controllers\AssignmentController; // Added
 
 // --- Controllers: People ---
 use App\Http\Controllers\StudentController;
@@ -42,6 +43,7 @@ use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
 use App\Http\Controllers\ResultCardController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ExamScheduleController;
 
 // --- Controllers: Communication & Voting ---
 use App\Http\Controllers\NoticeController;
@@ -59,6 +61,7 @@ use App\Http\Controllers\Finance\FinancialReportController;
 use App\Http\Controllers\Finance\StudentFinanceController; 
 use App\Http\Controllers\SalaryStructureController; 
 use App\Http\Controllers\Finance\BudgetController; 
+
 // --- Middleware ---
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -218,7 +221,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('payroll/generate', [App\Http\Controllers\PayrollController::class, 'generate'])->name('payroll.generate');
         Route::get('payroll/{payroll}/payslip', [App\Http\Controllers\PayrollController::class, 'payslip'])->name('payroll.payslip');
         
-        // NEW: Salary Structure Management
+        // Salary Structure Management
         Route::get('salary-structures', [SalaryStructureController::class, 'index'])->name('salary-structures.index');
         Route::get('salary-structures/{staff}/edit', [SalaryStructureController::class, 'edit'])->name('salary-structures.edit');
         Route::put('salary-structures/{staff}', [SalaryStructureController::class, 'update'])->name('salary-structures.update');
@@ -236,11 +239,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
         Route::post('exams/{exam}/finalize', [ExamController::class, 'finalize'])->name('exams.finalize');
         
-        // --- PRINT ROUTES ---
-        // General Exam Result (Whole Class/All Subjects)
+        // Print Routes
         Route::get('exams/{exam}/print-result', [ExamController::class, 'printClassResult'])->name('exams.print_result');
-        // Specific Award List (Single Subject)
-        Route::get('exams/print-award-list', [ExamMarkController::class, 'printAwardList'])->name('exams.print_award_list'); // Added This Line
+        Route::get('exams/print-award-list', [ExamMarkController::class, 'printAwardList'])->name('exams.print_award_list');
 
         Route::resource('exams', ExamController::class);
         
@@ -253,13 +254,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/get-students', [ResultCardController::class, 'getStudents'])->name('get_students');
         });
     });
+
+    // Exam Schedules & Admit Cards
+    Route::middleware([CheckModuleAccess::class . ':exam_schedules'])->group(function () {
+        Route::get('exam-dates', [ExamScheduleController::class, 'index'])->name('exam-schedules.index'); // View for Students/Teachers
+        Route::get('exam-schedules', [ExamScheduleController::class, 'manage'])->name('exam-schedules.manage'); // Manage for Admins
+        Route::get('exam-schedules/get-subjects', [ExamScheduleController::class, 'getSubjects'])->name('exam-schedules.get-subjects');
+        Route::get('exam-schedules/get-students', [ExamScheduleController::class, 'getStudents'])->name('exam-schedules.get-students');
+        Route::get('exam-schedules/auto-generate', [ExamScheduleController::class, 'autoGenerate'])->name('exam-schedules.auto-generate'); 
+        Route::post('exam-schedules', [ExamScheduleController::class, 'store'])->name('exam-schedules.store');
+        Route::post('exam-schedules/download-admit-cards', [ExamScheduleController::class, 'downloadAdmitCards'])->name('exam-schedules.download-admit-cards');
+    });
     
     // Exam Marks
     Route::middleware([CheckModuleAccess::class . ':exam_marks'])->group(function () {
         Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
         Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
         
-        // AJAX Helpers (NEW: Split Grade & Section)
+        // AJAX Helpers
         Route::get('marks/get-grades', [ExamMarkController::class, 'getGrades'])->name('marks.get_grades'); 
         Route::get('marks/get-sections', [ExamMarkController::class, 'getSections'])->name('marks.get_sections'); 
         Route::get('marks/get-subjects', [ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
@@ -267,6 +279,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Student View
         Route::get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
+    });
+
+    // Assignments Module
+    Route::middleware([CheckModuleAccess::class . ':assignments'])->group(function () {
+        Route::get('assignments/get-subjects', [AssignmentController::class, 'getSubjects'])->name('assignments.get-subjects');
+        Route::resource('assignments', AssignmentController::class);
     });
 
     // Academic Reports (Bulletins, Transcripts)
@@ -282,31 +300,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::prefix('finance')->group(function () {
         
-         // NEW: Student Finance Dashboard (Tabbed View)
+         // Student Finance Dashboard
         Route::get('student/{student}/dashboard', [StudentFinanceController::class, 'index'])
             ->name('finance.student.dashboard');
         
-            // NEW: Student Balances Overview
+        // Student Balances Overview
         Route::get('balances', [App\Http\Controllers\Finance\StudentBalanceController::class, 'index'])->name('finance.balances.index');
         Route::get('balances/class/{id}', [App\Http\Controllers\Finance\StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); 
 
-
         // BUDGET MODULE
-        // Categories
         Route::get('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'categories'])->name('budgets.categories');
         Route::post('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
         
-        // Allocations & Index
         Route::get('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'index'])->name('budgets.index');
         Route::post('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'store'])->name('budgets.store');
         
-        // Requests
         Route::get('budgets/requests', [App\Http\Controllers\Finance\BudgetController::class, 'fundRequests'])->name('budgets.requests');
         Route::post('budgets/requests/store', [App\Http\Controllers\Finance\BudgetController::class, 'storeFundRequest'])->name('budgets.requests.store');
         
-        // Approvals (Using 'update' naming convention for clarity, maps to approveFundRequest)
         Route::post('budgets/requests/{id}/update', [App\Http\Controllers\Finance\BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
-
 
         // Invoices - AJAX Routes
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');

@@ -39,30 +39,32 @@ class RolePermissionSeeder extends Seeder
             'Class Sections' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Assignments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Added Assignments
             
             // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
             'Student Promotion' => ['view', 'create'],
-            'Student Transfers' => ['view', 'create', 'print'], // Added Transfer
+            'Student Transfers' => ['view', 'create', 'print'],
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Staff Attendance' => ['view', 'create', 'update', 'delete'], // Added Staff Attendance
+            'Staff Attendance' => ['view', 'create', 'update', 'delete'],
             
             // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Exam Schedules' => ['view', 'create', 'update', 'delete', 'download_admit_card'],
             'Exam Marks' => ['create', 'update', 'view'],
             'Result Cards' => ['view'], 
-            'Academic Reports' => ['view'], // Added Bulletin/Transcript
+            'Academic Reports' => ['view'],
             
             // Finance
             'Fee Structures' => ['view', 'create', 'update', 'delete'],
             'Fee Types' => ['view', 'create', 'update', 'delete'],
             'Invoices' => ['view', 'create', 'update', 'delete'],
             'Payments' => ['view', 'create'],
-            'Payrolls' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added Payrolls
-            'Salary Structures' => ['view', 'create', 'update', 'delete'], // Added Salary Structures
-            'Budgets' => ['view', 'create', 'update', 'delete', 'approve_funds', 'viewAny'], // Added Budgets
+            'Payrolls' => ['view', 'create', 'update', 'delete', 'viewAny'],
+            'Salary Structures' => ['view', 'create', 'update', 'delete'],
+            'Budgets' => ['view', 'create', 'update', 'delete', 'approve_funds', 'viewAny'],
             
             // Security & Config
             'Audit Logs' => ['view'],
@@ -76,6 +78,10 @@ class RolePermissionSeeder extends Seeder
             'Notices' => ['view', 'create', 'update', 'delete','viewAny'],
             'Voting' => ['view', 'create', 'update', 'delete'],
             'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
+
+            // Additional Modules (mentioned in premium plan)
+            'Library' => ['view', 'create', 'update', 'delete'],
+            'Transport' => ['view', 'create', 'update', 'delete'],
         ];
 
         // 3. Create Modules and Permissions dynamically

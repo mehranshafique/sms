@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Str; // Added for auto-generation
 
 class GradeLevelController extends BaseController
 {
@@ -44,7 +46,6 @@ class GradeLevelController extends BaseController
                     return $row->institution->name ?? 'N/A';
                 })
                 ->editColumn('education_cycle', function($row){
-                    // Ensure we get the string value even if cast to Enum
                     $val = is_object($row->education_cycle) ? $row->education_cycle->value : $row->education_cycle;
                     return __('grade_level.cycle_' . $val);
                 })
@@ -63,13 +64,11 @@ class GradeLevelController extends BaseController
                 ->make(true);
         }
 
-        // --- FETCH STATISTICS FOR CARDS ---
         $query = GradeLevel::query();
         if ($institutionId) {
             $query->where('institution_id', $institutionId);
         }
 
-        // FIX: Match these values to your Database Enum ('primary','secondary','university')
         $stats = $query->selectRaw("
             count(*) as total,
             sum(case when education_cycle = 'primary' then 1 else 0 end) as primary_count,
@@ -100,23 +99,43 @@ class GradeLevelController extends BaseController
     public function store(Request $request)
     {
         $institutionId = $this->getInstitutionId();
+        $targetInstituteId = $institutionId ?? $request->institution_id;
 
-        $validated = $request->validate([
+        $request->validate([
             'institution_id'  => $institutionId ? 'nullable' : 'required|exists:institutions,id',
-            'name'            => 'required|string|max:100',
             'code'            => 'nullable|string|max:30',
             'order_index'     => 'required|integer|min:0',
-            // FIX: Validate against DB expected values
             'education_cycle' => 'required|in:primary,secondary,university,vocational',
+            'name'            => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('grade_levels')->where(function ($query) use ($targetInstituteId, $request) {
+                    return $query->where('institution_id', $targetInstituteId)
+                                 ->where('education_cycle', $request->education_cycle);
+                }),
+            ],
         ]);
 
-        if ($institutionId) {
-            $validated['institution_id'] = $institutionId;
+        try {
+            $data = $request->only(['name', 'code', 'order_index', 'education_cycle']);
+            $data['institution_id'] = $targetInstituteId;
+
+            // Auto-generate code if empty
+            if (empty($data['code'])) {
+                $data['code'] = Str::upper($data['name']); 
+            }
+
+            GradeLevel::create($data);
+
+            return response()->json(['message' => __('grade_level.messages.success_create'), 'redirect' => route('grade-levels.index')]);
+        } catch (QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? 0;
+            if ($errorCode == 1062) {
+                return response()->json(['message' => __('grade_level.messages.duplicate_entry') ?? 'A grade level with this name already exists in this education cycle.'], 422);
+            }
+            return response()->json(['message' => __('grade_level.messages.error_occurred') . ': ' . $e->getMessage()], 500);
         }
-
-        GradeLevel::create($validated);
-
-        return response()->json(['message' => __('grade_level.messages.success_create'), 'redirect' => route('grade-levels.index')]);
     }
 
     public function edit(GradeLevel $grade_level)
@@ -140,21 +159,47 @@ class GradeLevelController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $grade_level->institution_id != $institutionId) abort(403);
 
-        $validated = $request->validate([
+        $targetInstituteId = $institutionId ?? $request->input('institution_id', $grade_level->institution_id);
+
+        $request->validate([
             'institution_id'  => $institutionId ? 'nullable' : 'required|exists:institutions,id',
-            'name'            => 'required|string|max:100',
             'code'            => 'nullable|string|max:30',
             'order_index'     => 'required|integer|min:0',
             'education_cycle' => 'required|in:primary,secondary,university,vocational',
+            'name'            => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('grade_levels')->where(function ($query) use ($targetInstituteId, $request) {
+                    return $query->where('institution_id', $targetInstituteId)
+                                 ->where('education_cycle', $request->education_cycle);
+                })->ignore($grade_level->id),
+            ],
         ]);
 
-        if ($institutionId) {
-            $validated['institution_id'] = $institutionId;
+        try {
+            $data = $request->only(['name', 'code', 'order_index', 'education_cycle']);
+            if ($institutionId) {
+                $data['institution_id'] = $institutionId;
+            } elseif ($request->has('institution_id')) {
+                $data['institution_id'] = $request->institution_id;
+            }
+
+            // Auto-generate code if empty
+            if (empty($data['code'])) {
+                $data['code'] = Str::upper($data['name']);
+            }
+
+            $grade_level->update($data);
+
+            return response()->json(['message' => __('grade_level.messages.success_update'), 'redirect' => route('grade-levels.index')]);
+        } catch (QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? 0;
+            if ($errorCode == 1062) {
+                return response()->json(['message' => __('grade_level.messages.duplicate_entry') ?? 'A grade level with this name already exists in this education cycle.'], 422);
+            }
+            return response()->json(['message' => __('grade_level.messages.error_occurred') . ': ' . $e->getMessage()], 500);
         }
-
-        $grade_level->update($validated);
-
-        return response()->json(['message' => __('grade_level.messages.success_update'), 'redirect' => route('grade-levels.index')]);
     }
 
     public function destroy(GradeLevel $grade_level)
@@ -162,8 +207,15 @@ class GradeLevelController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $grade_level->institution_id != $institutionId) abort(403);
 
-        $grade_level->delete();
-        return response()->json(['message' => __('grade_level.messages.success_delete')]);
+        try {
+            $grade_level->delete();
+            return response()->json(['message' => __('grade_level.messages.success_delete')]);
+        } catch (QueryException $e) {
+            if (($e->errorInfo[1] ?? 0) == 1451) {
+                return response()->json(['message' => __('grade_level.messages.cannot_delete_linked_data') ?? 'Cannot delete this grade level because it is linked to other data.'], 422);
+            }
+            return response()->json(['message' => __('grade_level.messages.error_occurred') . ': ' . $e->getMessage()], 500);
+        }
     }
 
     public function bulkDelete(Request $request)
@@ -174,15 +226,22 @@ class GradeLevelController extends BaseController
         if (!empty($ids)) {
             $institutionId = $this->getInstitutionId();
             
-            $query = GradeLevel::whereIn('id', $ids);
-            
-            if ($institutionId) {
-                $query->where('institution_id', $institutionId);
+            try {
+                $query = GradeLevel::whereIn('id', $ids);
+                
+                if ($institutionId) {
+                    $query->where('institution_id', $institutionId);
+                }
+                
+                $query->delete();
+                return response()->json(['success' => __('grade_level.messages.success_delete')]);
+            } catch (QueryException $e) {
+                if (($e->errorInfo[1] ?? 0) == 1451) {
+                    return response()->json(['error' => __('grade_level.messages.cannot_delete_linked_data') ?? 'Cannot delete selected records because they are linked to other data.'], 422);
+                }
+                return response()->json(['error' => __('grade_level.messages.error_occurred') . ': ' . $e->getMessage()], 500);
             }
-            
-            $query->delete();
-            return response()->json(['success' => __('grade_level.messages.success_delete')]);
         }
-        return response()->json(['error' => __('grade_level.something_went_wrong')]);
+        return response()->json(['error' => __('grade_level.something_went_wrong')], 400);
     }
 }

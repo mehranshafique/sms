@@ -36,7 +36,7 @@ class InvoiceController extends BaseController
         if ($institutionId === 'global') $institutionId = null;
 
         if ($request->ajax()) {
-            $data = Invoice::with(['student', 'academicSession'])
+            $data = Invoice::with(['student', 'academicSession', 'items'])
                 ->select('invoices.*')
                 ->latest();
 
@@ -48,6 +48,9 @@ class InvoiceController extends BaseController
                 ->addIndexColumn()
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('invoice_number', fn($row) => '<a href="'.route('invoices.show', $row->id).'" class="text-primary fw-bold">#'.$row->invoice_number.'</a>')
+                ->addColumn('fee_name', function($row){
+                    return $row->items->pluck('description')->implode(', ');
+                })
                 ->editColumn('total_amount', fn($row) => CurrencySymbol::default() . ' ' . number_format($row->total_amount, 2))
                 ->editColumn('paid_amount', fn($row) => CurrencySymbol::default() . ' ' . number_format($row->paid_amount, 2))
                 ->editColumn('issue_date', fn($row) => $row->issue_date->format('d M, Y'))
@@ -182,21 +185,14 @@ class InvoiceController extends BaseController
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         if (!$session) return response()->json(['has_duplicates' => false]);
 
-        // Check specifically for fee structures already invoiced to selected students in the current session
         $count = InvoiceItem::whereIn('fee_structure_id', $feeIds)
             ->whereHas('invoice', fn($q) => $q->whereIn('student_id', $studentIds)->where('academic_session_id', $session->id))
             ->distinct('invoice_id')->count();
 
-        // Calculate total students selected
         $totalSelected = count($studentIds);
-        
-        // Calculate new students who will actually get an invoice (Total - Duplicates roughly, logic improved below)
-        // Actually, let's just return the info. The JS will decide whether to prompt.
         
         $message = "";
         if ($count > 0) {
-            // Find how many students already have invoices vs how many don't
-            // This is an approximation for the warning message
             $studentsWithInvoice = Invoice::whereIn('student_id', $studentIds)
                 ->where('academic_session_id', $session->id)
                 ->whereHas('items', fn($q) => $q->whereIn('fee_structure_id', $feeIds))
@@ -242,14 +238,10 @@ class InvoiceController extends BaseController
         $fees = FeeStructure::whereIn('id', $request->fee_structure_ids)->with('feeType')->get();
         $totalFeeAmount = $fees->sum('amount');
         
-        // --- 1. Mode Determination ---
-        // If ANY selected fee is 'one_time', we bypass the strict mode check.
         $isOneTimeInvoice = $fees->contains('frequency', 'one_time');
-        
-        // If NOT one-time, we respect the payment mode of the first fee (global vs installment)
         $targetMode = $fees->first()->payment_mode; 
 
-        // --- 2. Fee Cap Check Setup ---
+        // Fee Cap Setup
         $classSection = ClassSection::find($request->class_section_id);
         $globalFeeStructure = FeeStructure::where('institution_id', $institutionId)
             ->where('academic_session_id', $session->id)
@@ -259,13 +251,13 @@ class InvoiceController extends BaseController
                   ->orWhere('grade_level_id', $classSection->grade_level_id);
             })
             ->whereHas('feeType', function($q) {
-                $q->where('name', 'like', '%Tuition%'); // Only track Tuition against cap
+                $q->where('name', 'like', '%Tuition%'); 
             })
             ->first();
 
         $annualCap = $globalFeeStructure ? $globalFeeStructure->amount : 0;
 
-        // --- 3. Filter Students ---
+        // Filter Students
         $studentsQuery = StudentEnrollment::where('class_section_id', $request->class_section_id)
             ->where('academic_session_id', $session->id)
             ->whereIn('student_id', $request->student_ids)
@@ -274,7 +266,6 @@ class InvoiceController extends BaseController
 
         $students = $studentsQuery->get();
 
-        // Strict Mode Check (Skipped if One-Time fee)
         if (!$isOneTimeInvoice) {
             $students = $students->filter(function($enrollment) use ($targetMode) {
                 $studentMode = $enrollment->student->payment_mode ?? 'installment';
@@ -292,11 +283,17 @@ class InvoiceController extends BaseController
         $generatedCount = 0;
         $skippedCount = 0;
 
-        DB::transaction(function () use ($students, $fees, $totalFeeAmount, $request, $institutionId, $session, &$generatedCount, &$skippedCount, $targetMode, $annualCap, $isOneTimeInvoice) {
+        // Optimization: Pre-fetch Global Fees for description lookup
+        $globalFeesCache = FeeStructure::where('institution_id', $institutionId)
+            ->where('academic_session_id', $session->id)
+            ->where('payment_mode', 'global')
+            ->get();
+
+        DB::transaction(function () use ($students, $fees, $totalFeeAmount, $request, $institutionId, $session, &$generatedCount, &$skippedCount, $targetMode, $annualCap, $isOneTimeInvoice, $globalFeesCache) {
             foreach ($students as $enrollment) {
                 $studentId = $enrollment->student_id;
                 
-                // A. Conflict Check (Only for non-one-time invoices)
+                // A. Conflict Check
                 if (!$isOneTimeInvoice) {
                     $hasGlobal = Invoice::where('student_id', $studentId)
                         ->where('academic_session_id', $session->id)
@@ -312,8 +309,7 @@ class InvoiceController extends BaseController
                     if ($targetMode === 'global' && ($hasGlobal || $hasInstallment)) { $skippedCount++; continue; }
                 }
 
-                // B. Calculate Discount
-                // FIX: Only apply discount to standard (Global/Installment) invoices, NOT one-time extras.
+                // B. Discount
                 $discountValue = 0;
                 $discountDescription = null;
 
@@ -333,7 +329,6 @@ class InvoiceController extends BaseController
                 $finalAmount = max(0, $totalFeeAmount - $discountValue);
 
                 // C. Fee Cap Check
-                // Applies only if this invoice contains "Tuition" related fees
                 if ($annualCap > 0) {
                     $isTuitionInvoice = $fees->contains(fn($fee) => $fee->feeType && stripos($fee->feeType->name, 'Tuition') !== false);
 
@@ -344,11 +339,8 @@ class InvoiceController extends BaseController
                             ->get()
                             ->flatMap(fn($inv) => $inv->items)
                             ->filter(fn($item) => $item->feeStructure && $item->feeStructure->feeType && stripos($item->feeStructure->feeType->name, 'Tuition') !== false)
-                            ->sum('amount'); // Sum of previous invoices (gross or net depends on policy, usually gross for caps)
+                            ->sum('amount'); 
 
-                        // Check if adding this invoice exceeds cap
-                        // Note: We check against the GROSS fee ($totalFeeAmount), not net, because caps usually apply to sticker price.
-                        // Discounts reduce what they pay, but the cap is on the 'price'.
                         if (($existingTuitionTotal + $totalFeeAmount) > ($annualCap + 0.01)) {
                             $skippedCount++; continue;
                         }
@@ -367,11 +359,19 @@ class InvoiceController extends BaseController
                 }
 
                 // E. Create Invoice
+                // UNIQUE INVOICE NUMBER: INV-{Year}-{AdmissionNo}-{Timestamp}
+                // Example: INV-2024-ADM001-20240120143005
+                // Guaranteed unique per student per second.
+                $year = date('Y');
+                $admClean = preg_replace('/[^A-Za-z0-9]/', '', $enrollment->student->admission_number);
+                $timestamp = now()->format('YmdHis'); 
+                $invoiceNumber = "INV-{$year}-{$admClean}-{$timestamp}";
+
                 $invoice = Invoice::create([
                     'institution_id' => $institutionId,
                     'academic_session_id' => $session->id,
                     'student_id' => $studentId,
-                    'invoice_number' => 'INV-' . strtoupper(Str::random(8)),
+                    'invoice_number' => $invoiceNumber,
                     'issue_date' => $request->issue_date,
                     'due_date' => $request->due_date,
                     'total_amount' => $finalAmount,
@@ -379,15 +379,33 @@ class InvoiceController extends BaseController
                 ]);
 
                 foreach ($feesToProcess as $fee) {
+                    $description = $fee->name;
+
+                    // DESCRIPTIVE REASON: "Term 1 (Installment) of Annual Tuition"
+                    if ($fee->payment_mode === 'installment') {
+                        // Find Parent Global Fee
+                        $parentGlobal = $globalFeesCache->filter(function($gFee) use ($fee) {
+                            return $gFee->fee_type_id === $fee->fee_type_id &&
+                                   ($gFee->grade_level_id === $fee->grade_level_id || $gFee->class_section_id === $fee->class_section_id);
+                        })->first();
+
+                        $globalName = $parentGlobal ? $parentGlobal->name : 'Global Fee';
+                        $description = "{$fee->name} of {$globalName}";
+                    } 
+                    // Fallback for Global fees or others
+                    else {
+                        $description = "{$fee->name} (" . ucfirst($fee->payment_mode) . ")";
+                    }
+
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,
                         'fee_structure_id' => $fee->id,
-                        'description' => $fee->name,
+                        'description' => $description,
                         'amount' => $fee->amount,
                     ]);
                 }
 
-                // F. Add Negative Line Item for Discount
+                // F. Discount Line Item
                 if ($discountValue > 0) {
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,

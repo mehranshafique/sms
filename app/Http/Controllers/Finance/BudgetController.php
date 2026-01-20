@@ -171,7 +171,7 @@ class BudgetController extends BaseController
                     return $row->created_at->format('d M, Y');
                 })
                 ->addColumn('action', function($row){
-                    if($row->status == 'pending' && Auth::user()->can('approve_funds')) {
+                    if($row->status == 'pending' && Auth::user()->can('budget.approve_funds')) {
                         return '
                         <div class="d-flex">
                             <button class="btn btn-success btn-xs me-1 approve-btn" data-id="'.$row->id.'"><i class="fa fa-check"></i></button>

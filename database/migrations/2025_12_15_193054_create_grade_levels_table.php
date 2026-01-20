@@ -26,8 +26,9 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Unique name per institution
-            $table->unique(['institution_id', 'name']);
+            // FIXED: Unique name per institution AND education cycle
+            // This allows "Grade 1" in Primary and "Grade 1" in Secondary to exist simultaneously
+            $table->unique(['institution_id', 'name', 'education_cycle']); 
         });
     }
 

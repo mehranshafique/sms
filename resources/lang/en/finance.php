@@ -17,7 +17,8 @@ return [
     'grade_level' => 'Grade Level (Optional)',
     'select_type' => 'Select Type',
     'select_grade' => 'Select Grade',
-    
+    'mode' => 'Payment Mode', // Added
+    'parent_fee_name' => 'Parent Fee Name', // Added
     // Fee Types
     'fee_type_list' => 'Fee Type List',
     'add_type' => 'Add Fee Type',
@@ -42,14 +43,28 @@ return [
     'no_active_session' => 'No active academic session found.',
     'global_fee_missing_error' => 'A Global Annual Fee must be created for this grade before adding installments.',
     'installment_cap_error' => 'Total installments (:total) cannot exceed the Global Annual Fee (:limit).',
+    'error_occurred' => 'Error occurred',
+    'unexpected_error' => 'An unexpected error occurred.',
     
-    // Buttons
+    // NEW SAFETY MESSAGES
+    'global_amount_too_low' => 'Cannot reduce Global Fee below the sum of existing installments (:total).',
+    'cannot_delete_global_with_installments' => 'Cannot delete Global Fee because active installments exist. Please delete installments first.',
+    
+    // Buttons & Actions
     'save' => 'Save',
-    'cancel' => 'Cancel',
+    'cancel' => 'Cancel', // Added
     'action' => 'Action',
     'edit_fee' => 'Edit Fee',
     'view_details' => 'View Details',
     'close' => 'Close',
+    'yes_delete' => 'Yes, delete it!', // Added
+    
+    // Alerts & Confirmations
+    'are_you_sure' => 'Are you sure?', // Added
+    'delete_warning' => 'This action cannot be undone!', // Added
+    'error' => 'Error', // Added
+    'success' => 'Success', // Added
+    'deleted' => 'Deleted!', // Added
     
     // Class Financial Report
     'class_financial_report' => 'Class Financial Report',
@@ -73,6 +88,10 @@ return [
     'installment' => 'Installment',
     'class_section' => 'Class Section',
     'optional' => 'Optional',
+    'all_sections' => 'All Sections',
+    'installment_order' => 'Installment Order',
+    'sequence_order_hint' => 'Sequence number (1 for first installment, etc.)',
+
     // Student Finance Dashboard & General Keys
     'student_finance_dashboard' => 'Student Finance Dashboard',
     'back_to_profile' => 'Back to Profile',
@@ -114,7 +133,7 @@ return [
     'all_classes' => 'All Classes',
     'class_name' => 'Class Name',
     'students_count' => 'Students',
-    'paid_students' => 'Paid Students', // Added
+    'paid_students' => 'Paid Students',
     'total_invoiced' => 'Total Invoiced',
     'total_collected' => 'Collected',
     'total_outstanding' => 'Outstanding',
@@ -123,9 +142,9 @@ return [
     'no_fee_structures_class' => 'No fee structures or installments defined for this class yet.',
     'view_dashboard' => 'View Dashboard',
     'error_loading' => 'Error loading data. Please try again.',
-    'paid_amount' => 'Paid Amount', // Added
-    'due_amount' => 'Due Amount', // Added
-    'status_partial' => 'Partial', // Explicitly added for JS fallback
-    'status_unpaid' => 'Unpaid',   // Explicitly added for JS fallback
-    'status_overdue' => 'Overdue', // Explicitly added for JS fallback
+    'paid_amount' => 'Paid Amount',
+    'due_amount' => 'Due Amount',
+    'status_partial' => 'Partial',
+    'status_unpaid' => 'Unpaid',
+    'status_overdue' => 'Overdue',
 ];

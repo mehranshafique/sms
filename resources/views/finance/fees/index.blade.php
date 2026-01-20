@@ -38,9 +38,11 @@
                                         <th>#</th>
                                         <th>{{ __('finance.fee_name') }}</th>
                                         <th>{{ __('finance.fee_type') }}</th>
+                                        <th>{{ __('finance.parent_fee_name') }}</th> {{-- New Column --}}
                                         <th>{{ __('finance.amount') }}</th>
                                         <th>{{ __('finance.frequency') }}</th>
                                         <th>{{ __('finance.grade_level') }}</th>
+                                        <th>{{ __('finance.mode') }}</th>
                                         <th class="text-end">{{ __('finance.action') }}</th>
                                     </tr>
                                 </thead>
@@ -71,9 +73,11 @@
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
                 { data: 'name', name: 'name' },
                 { data: 'fee_type', name: 'feeType.name' },
+                { data: 'parent_fee_name', name: 'parent_fee_name', orderable: false, searchable: false }, // New Column Data
                 { data: 'amount', name: 'amount' },
                 { data: 'frequency', name: 'frequency' },
                 { data: 'grade', name: 'gradeLevel.name' },
+                { data: 'mode', name: 'mode' },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
             ],
             language: {
@@ -96,7 +100,8 @@
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
                 cancelButtonColor: '#3085d6',
-                confirmButtonText: "{{ __('finance.yes_delete') }}"
+                confirmButtonText: "{{ __('finance.yes_delete') }}",
+                cancelButtonText: "{{ __('finance.cancel') }}"
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -104,11 +109,12 @@
                         type: 'DELETE',
                         headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                         success: function(response) {
-                            Swal.fire("{{ __('finance.deleted') }}", response.message, 'success');
+                            Swal.fire("{{ __('finance.success') }}", response.message, 'success');
                             table.ajax.reload();
                         },
-                        error: function() {
-                            Swal.fire("{{ __('finance.error') }}", "{{ __('finance.error_occurred') }}", 'error');
+                        error: function(xhr) {
+                            let msg = xhr.responseJSON.message || "{{ __('finance.error_occurred') }}";
+                            Swal.fire("{{ __('finance.error') }}", msg, 'error');
                         }
                     });
                 }

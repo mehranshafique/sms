@@ -18,7 +18,7 @@
             {{-- 1. Configuration Section (Top Row) --}}
             <div class="card">
                 <div class="card-header border-0 pb-0">
-                    <h4 class="card-title">1. Configuration</h4>
+                    <h4 class="card-title">{{ __('invoice.configuration') }}</h4>
                 </div>
                 <div class="card-body pt-2">
                     <div class="row">
@@ -56,25 +56,25 @@
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header border-0 pb-0 d-flex justify-content-between align-items-center">
-                            <h4 class="card-title">2. Select Students <span class="text-danger">*</span></h4>
+                            <h4 class="card-title">{{ __('invoice.select_students') }} <span class="text-danger">*</span></h4>
                             <div class="form-check custom-checkbox">
                                 <input type="checkbox" class="form-check-input" id="selectAllStudents" disabled>
-                                <label class="form-check-label" for="selectAllStudents">Select All</label>
+                                <label class="form-check-label" for="selectAllStudents">{{ __('invoice.select_all') }}</label>
                             </div>
                         </div>
                         <div class="card-body">
                             {{-- Optional Student Search --}}
-                            <input type="text" id="studentSearch" class="form-control mb-3 input-sm" placeholder="Search student name..." disabled>
+                            <input type="text" id="studentSearch" class="form-control mb-3 input-sm" placeholder="{{ __('invoice.search_student') }}" disabled>
                             
                             <div class="border rounded p-3" style="height: 300px; overflow-y: auto; background: #f8f9fa;">
                                 <div id="studentList" class="row">
                                     <div class="col-12 text-center text-muted mt-5 pt-5">
                                         <i class="fa fa-users fa-2x mb-2"></i><br>
-                                        Please select a class section above.
+                                        {{ __('invoice.select_class_first_msg') }}
                                     </div>
                                 </div>
                             </div>
-                            <small class="text-muted mt-2 d-block" id="studentCount">0 students selected</small>
+                            <small class="text-muted mt-2 d-block" id="studentCount">{{ __('invoice.students_selected_count', ['count' => 0]) }}</small>
                         </div>
                     </div>
                 </div>
@@ -83,21 +83,21 @@
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header border-0 pb-0">
-                            <h4 class="card-title">3. Select Fees <span class="text-danger">*</span></h4>
+                            <h4 class="card-title">{{ __('invoice.select_fees') }} <span class="text-danger">*</span></h4>
                         </div>
                         <div class="card-body">
                             {{-- Fee Search --}}
-                            <input type="text" id="feeSearch" class="form-control mb-3 input-sm" placeholder="Search fees..." disabled>
+                            <input type="text" id="feeSearch" class="form-control mb-3 input-sm" placeholder="{{ __('invoice.search_fees') }}" disabled>
 
                             <div class="border rounded p-3" style="height: 300px; overflow-y: auto; background: #f8f9fa;">
                                 <div id="feeList" class="d-flex flex-column">
                                     <div class="text-center text-muted mt-5 pt-5">
                                         <i class="fa fa-money fa-2x mb-2"></i><br>
-                                        Fees will load here.
+                                        {{ __('invoice.fees_will_load') }}
                                     </div>
                                 </div>
                             </div>
-                            <small class="text-muted mt-2 d-block">Check multiple items to bundle fees.</small>
+                            <small class="text-muted mt-2 d-block">{{ __('invoice.fee_bundle_help') }}</small>
                         </div>
                     </div>
                 </div>
@@ -117,19 +117,19 @@
         {{-- 3. Fee Reference Table (Below Button) --}}
         <div class="card d-none" id="feeReferenceSection">
             <div class="card-header bg-light">
-                <h5 class="card-title mb-0"><i class="fa fa-table me-2"></i> Class Fee Overview (Reference)</h5>
+                <h5 class="card-title mb-0"><i class="fa fa-table me-2"></i> {{ __('invoice.class_fee_overview') }}</h5>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-striped table-bordered mb-0">
                         <thead class="thead-primary">
                             <tr>
-                                <th>Fee Name</th>
-                                <th>Type</th>
-                                <th>Amount</th>
-                                <th>Mode</th>
-                                <th>Order</th>
-                                <th>Frequency</th>
+                                <th>{{ __('invoice.fee_name') }}</th>
+                                <th>{{ __('invoice.fee_type') }}</th>
+                                <th>{{ __('invoice.amount') }}</th>
+                                <th>{{ __('invoice.mode') }}</th>
+                                <th>{{ __('invoice.order') }}</th>
+                                <th>{{ __('invoice.frequency') }}</th>
                             </tr>
                         </thead>
                         <tbody id="feeReferenceTableBody">
@@ -147,266 +147,340 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    $(document).ready(function(){
+    document.addEventListener('DOMContentLoaded', function() {
         
-        if($.fn.selectpicker) {
-            $('.default-select').selectpicker('refresh');
+        // --- HELPER: Refresh UI Library (Bootstrap-Select) ---
+        function refreshSelect(element) {
+            if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
+                 $(element).selectpicker('refresh');
+            }
         }
 
-        // --- 1. Load Sections ---
-        $('#gradeSelect').change(function(){
-            let gradeId = $(this).val();
-            let sectionSelect = $('#sectionSelect');
-            
-            // Reset
-            sectionSelect.empty().append('<option value="">Loading...</option>').prop('disabled', true);
-            resetLists();
-            
-            if($.fn.selectpicker) sectionSelect.selectpicker('refresh');
+        // --- DOM Elements ---
+        const gradeSelect = document.getElementById('gradeSelect');
+        const sectionSelect = document.getElementById('sectionSelect');
+        
+        const studentList = document.getElementById('studentList');
+        const feeList = document.getElementById('feeList');
+        const feeReferenceSection = document.getElementById('feeReferenceSection');
+        const feeReferenceTableBody = document.getElementById('feeReferenceTableBody');
+        
+        const studentSearch = document.getElementById('studentSearch');
+        const feeSearch = document.getElementById('feeSearch');
+        const selectAllStudents = document.getElementById('selectAllStudents');
+        
+        const generateBtn = document.getElementById('generateBtn');
+        const studentCount = document.getElementById('studentCount');
+        const invoiceForm = document.getElementById('invoiceForm');
 
-            if(gradeId) {
-                $.ajax({
-                    url: "{{ route('invoices.get_sections') }}",
-                    type: "GET",
-                    data: { grade_id: gradeId },
-                    success: function(data){
-                        sectionSelect.empty();
-                        if(Object.keys(data).length > 0){
-                            sectionSelect.append('<option value="">{{ __("invoice.select_section") }}</option>');
-                            $.each(data, function(key, value){
-                                sectionSelect.append('<option value="'+key+'">'+value+'</option>');
-                            });
-                            sectionSelect.prop('disabled', false);
-                        } else {
-                            sectionSelect.append('<option value="">No sections found</option>');
-                        }
-                        if($.fn.selectpicker) setTimeout(() => sectionSelect.selectpicker('refresh'), 100);
-                    }
-                });
-            } else {
-                sectionSelect.empty().append('<option value="">{{ __("invoice.select_grade_first") }}</option>');
-                if($.fn.selectpicker) sectionSelect.selectpicker('refresh');
-            }
-        });
-
-        // --- 2. Load Students & Fees ---
-        $('#sectionSelect').change(function(){
-            let sectionId = $(this).val();
-            resetLists();
-
-            if(sectionId) {
-                // Enable inputs
-                $('#studentSearch, #feeSearch, #selectAllStudents').prop('disabled', false);
-                $('#studentList').html('<div class="text-center p-3"><i class="fa fa-spinner fa-spin"></i> Loading...</div>');
-                $('#feeList').html('<div class="text-center p-3"><i class="fa fa-spinner fa-spin"></i> Loading...</div>');
-
-                // A. Get Students
-                $.ajax({
-                    url: "{{ route('invoices.get_students') }}", 
-                    type: "GET",
-                    data: { class_section_id: sectionId },
-                    success: function(data){
-                        let list = $('#studentList');
-                        list.empty();
-                        if(data.length > 0){
-                            $.each(data, function(index, student){
-                                let item = `
-                                    <div class="col-12 student-item">
-                                        <div class="form-check custom-checkbox mb-2">
-                                            <input type="checkbox" name="student_ids[]" value="${student.id}" class="form-check-input student-check" id="student_${student.id}" checked>
-                                            <label class="form-check-label w-100" for="student_${student.id}">
-                                                <span class="fw-bold">${student.name}</span> 
-                                                <span class="float-end text-muted small">${student.admission_number}</span>
-                                            </label>
-                                        </div>
-                                    </div>`;
-                                list.append(item);
-                            });
-                            $('#selectAllStudents').prop('checked', true);
-                            updateStudentCount();
-                            $('#generateBtn').prop('disabled', false);
-                        } else {
-                            list.html('<div class="col-12 text-warning text-center p-4">No active students found in this class.</div>');
-                        }
-                    }
-                });
-
-                // B. Get Fees
-                $.ajax({
-                    url: "/finance/invoices/get-fees",
-                    type: "GET",
-                    data: { class_section_id: sectionId },
-                    success: function(data){
-                        let list = $('#feeList');
-                        let tableBody = $('#feeReferenceTableBody');
-                        list.empty();
-                        tableBody.empty();
-
-                        if(data.length > 0){
-                            $.each(data, function(index, fee){
-                                // 1. Checkbox List
-                                let item = `
-                                    <div class="fee-item border-bottom pb-2 mb-2">
-                                        <div class="form-check custom-checkbox">
-                                            <input type="checkbox" name="fee_structure_ids[]" value="${fee.id}" class="form-check-input fee-check" id="fee_${fee.id}">
-                                            <label class="form-check-label w-100" for="fee_${fee.id}">
-                                                <div class="d-flex justify-content-between">
-                                                    <span class="fee-name fw-bold">${fee.name}</span>
-                                                    <span class="badge badge-primary badge-sm">${fee.amount}</span>
-                                                </div>
-                                                <div class="small text-muted">
-                                                    ${fee.type} | ${fee.payment_mode} ${fee.order !== '-' ? '#'+fee.order : ''}
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>`;
-                                list.append(item);
-
-                                // 2. Reference Table Row
-                                let row = `
-                                    <tr>
-                                        <td><strong>${fee.name}</strong></td>
-                                        <td>${fee.type}</td>
-                                        <td>${fee.amount}</td>
-                                        <td><span class="badge badge-light text-dark">${fee.payment_mode}</span></td>
-                                        <td>${fee.order}</td>
-                                        <td>${fee.frequency}</td>
-                                    </tr>`;
-                                tableBody.append(row);
-                            });
-                            
-                            // Only show table if we have data
-                            $('#feeReferenceSection').removeClass('d-none');
-                        } else {
-                            list.html('<div class="col-12 text-danger text-center p-4">No fee structures defined.</div>');
-                            $('#feeReferenceSection').addClass('d-none'); // Ensure hidden if empty
-                        }
-                    }
-                });
-            }
-        });
-
-        // --- Helper Functions ---
-
+        // --- Helper: Reset UI Lists ---
         function resetLists() {
-            $('#studentList').empty().html('<div class="text-center text-muted mt-5 pt-5">Select class first</div>');
-            $('#feeList').empty().html('<div class="text-center text-muted mt-5 pt-5">Select class first</div>');
-            $('#studentSearch, #feeSearch, #selectAllStudents').prop('disabled', true).val('');
-            $('#selectAllStudents').prop('checked', false);
-            $('#feeReferenceSection').addClass('d-none');
-            $('#feeReferenceTableBody').empty();
-            $('#generateBtn').prop('disabled', true);
-            $('#studentCount').text('0 students selected');
+            studentList.innerHTML = '<div class="col-12 text-center text-muted mt-5 pt-5"><i class="fa fa-users fa-2x mb-2"></i><br>{{ __("invoice.select_class_first_msg") }}</div>';
+            feeList.innerHTML = '<div class="text-center text-muted mt-5 pt-5"><i class="fa fa-money fa-2x mb-2"></i><br>{{ __("invoice.select_class_first_msg") }}</div>';
+            
+            [studentSearch, feeSearch, selectAllStudents].forEach(el => {
+                el.disabled = true;
+                if(el.type === 'checkbox') el.checked = false;
+                else el.value = '';
+            });
+
+            feeReferenceSection.classList.add('d-none');
+            feeReferenceTableBody.innerHTML = '';
+            generateBtn.disabled = true;
+            studentCount.innerText = '{{ __("invoice.students_selected_count", ["count" => 0]) }}';
         }
 
         function updateStudentCount() {
-            let count = $('.student-check:checked').length;
-            $('#studentCount').text(count + ' students selected');
+            const count = document.querySelectorAll('.student-check:checked').length;
+            studentCount.innerText = count + ' {{ __("invoice.students_selected_suffix") }}';
         }
 
-        // --- Search Logic ---
-        
-        // Student Search
-        $('#studentSearch').on('keyup', function() {
-            let value = $(this).val().toLowerCase();
-            $("#studentList .student-item").filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-            });
-        });
+        // --- 1. Logic: Grade -> Section ---
+        if (gradeSelect) {
+            gradeSelect.addEventListener('change', function() {
+                const gradeId = this.value;
+                
+                // Reset Section UI
+                sectionSelect.innerHTML = '<option value="">{{ __("invoice.loading") }}</option>';
+                sectionSelect.disabled = true;
+                refreshSelect(sectionSelect);
+                
+                // Reset lower lists
+                resetLists();
 
-        // Fee Search
-        $('#feeSearch').on('keyup', function() {
-            let value = $(this).val().toLowerCase();
-            $("#feeList .fee-item").filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-            });
-        });
+                if (gradeId) {
+                    fetch(`{{ route('invoices.get_sections') }}?grade_id=${gradeId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            sectionSelect.innerHTML = '<option value="">{{ __("invoice.select_section") }}</option>';
+                            
+                            // Iterate object {id: name}
+                            Object.entries(data).forEach(([key, value]) => {
+                                let option = new Option(value, key);
+                                sectionSelect.add(option);
+                            });
 
-        // Select All Logic
-        $('#selectAllStudents').change(function(){
-            let isChecked = $(this).prop('checked');
-            // Only affect visible items (in case search filter is active)
-            $('.student-item:visible .student-check').prop('checked', isChecked);
-            updateStudentCount();
-        });
-
-        $(document).on('change', '.student-check', function(){
-            updateStudentCount();
-            // Update "Select All" state
-            let allVisible = $('.student-item:visible .student-check');
-            let allChecked = $('.student-item:visible .student-check:checked');
-            $('#selectAllStudents').prop('checked', allVisible.length === allChecked.length);
-        });
-
-        // --- Submit Logic (Same as before) ---
-        $('#invoiceForm').submit(function(e){
-            e.preventDefault();
-            
-            if($('.student-check:checked').length === 0){
-                Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select at least one student.' });
-                return;
-            }
-            if($('.fee-check:checked').length === 0){
-                Swal.fire({ icon: 'warning', title: 'Warning', text: 'Please select at least one fee structure.' });
-                return;
-            }
-
-            let form = this;
-            let formData = $(this).serialize();
-            let btn = $('#generateBtn');
-            let originalText = btn.html();
-            
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Checking...');
-
-            $.ajax({
-                url: "/finance/invoices/check-duplicates",
-                type: "GET",
-                data: formData,
-                success: function(checkData) {
-                    if (checkData.has_duplicates) {
-                        Swal.fire({
-                            title: 'Duplicate Warning',
-                            text: checkData.message,
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#3085d6',
-                            cancelButtonColor: '#d33',
-                            confirmButtonText: 'Yes, generate anyway'
-                        }).then((result) => {
-                            if (result.isConfirmed) {
-                                submitInvoice(form, btn, originalText);
+                            if (sectionSelect.options.length > 1) {
+                                sectionSelect.disabled = false;
                             } else {
-                                btn.prop('disabled', false).html(originalText);
+                                sectionSelect.innerHTML = '<option value="">{{ __("invoice.no_sections_found") }}</option>';
                             }
+                            refreshSelect(sectionSelect);
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            sectionSelect.innerHTML = '<option value="">{{ __("invoice.error_loading") }}</option>';
+                            refreshSelect(sectionSelect);
                         });
-                    } else {
-                        submitInvoice(form, btn, originalText);
-                    }
-                },
-                error: function() {
-                    submitInvoice(form, btn, originalText);
-                }
-            });
-        });
-
-        function submitInvoice(form, btn, originalText) {
-            btn.html('<i class="fa fa-spinner fa-spin"></i> Processing...');
-            $.ajax({
-                url: $(form).attr('action'),
-                type: "POST",
-                data: $(form).serialize(),
-                success: function(response){
-                    Swal.fire({ icon: 'success', title: 'Success', text: response.message }).then(() => {
-                        window.location.href = response.redirect;
-                    });
-                },
-                error: function(xhr){
-                    btn.prop('disabled', false).html(originalText);
-                    let msg = xhr.responseJSON.message || "{{ __('invoice.error_occurred') }}";
-                    Swal.fire({ icon: 'error', title: 'Error', html: msg });
+                } else {
+                    sectionSelect.innerHTML = '<option value="">{{ __("invoice.select_grade_first") }}</option>';
+                    refreshSelect(sectionSelect);
                 }
             });
         }
+
+        // --- 2. Logic: Section -> Students & Fees ---
+        if (sectionSelect) {
+            sectionSelect.addEventListener('change', function() {
+                const sectionId = this.value;
+                resetLists();
+
+                if (sectionId) {
+                    // Enable inputs
+                    [studentSearch, feeSearch, selectAllStudents].forEach(el => el.disabled = false);
+                    
+                    // Show Loaders
+                    const loader = '<div class="text-center p-3"><i class="fa fa-spinner fa-spin"></i> {{ __("invoice.loading") }}</div>';
+                    studentList.innerHTML = loader;
+                    feeList.innerHTML = loader;
+
+                    // A. Fetch Students
+                    fetch(`{{ route('invoices.get_students') }}?class_section_id=${sectionId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            studentList.innerHTML = '';
+                            if (data.length > 0) {
+                                let html = '';
+                                data.forEach(student => {
+                                    html += `
+                                        <div class="col-12 student-item">
+                                            <div class="form-check custom-checkbox mb-2">
+                                                <input type="checkbox" name="student_ids[]" value="${student.id}" class="form-check-input student-check" id="student_${student.id}" checked>
+                                                <label class="form-check-label w-100" for="student_${student.id}">
+                                                    <span class="fw-bold">${student.name}</span> 
+                                                    <span class="float-end text-muted small">${student.admission_number}</span>
+                                                </label>
+                                            </div>
+                                        </div>`;
+                                });
+                                studentList.innerHTML = html;
+                                selectAllStudents.checked = true;
+                                updateStudentCount();
+                                generateBtn.disabled = false;
+                            } else {
+                                studentList.innerHTML = '<div class="col-12 text-warning text-center p-4">{{ __("invoice.no_active_students") }}</div>';
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            studentList.innerHTML = '<div class="text-danger text-center">{{ __("invoice.error_loading_students") }}</div>';
+                        });
+
+                    // B. Fetch Fees
+                    fetch(`/finance/invoices/get-fees?class_section_id=${sectionId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            feeList.innerHTML = '';
+                            feeReferenceTableBody.innerHTML = '';
+
+                            if (data.length > 0) {
+                                let listHtml = '';
+                                let tableHtml = '';
+
+                                data.forEach(fee => {
+                                    // List Item
+                                    listHtml += `
+                                        <div class="fee-item border-bottom pb-2 mb-2">
+                                            <div class="form-check custom-checkbox">
+                                                <input type="checkbox" name="fee_structure_ids[]" value="${fee.id}" class="form-check-input fee-check" id="fee_${fee.id}">
+                                                <label class="form-check-label w-100" for="fee_${fee.id}">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span class="fee-name fw-bold">${fee.name}</span>
+                                                        <span class="badge badge-primary badge-sm">${fee.amount}</span>
+                                                    </div>
+                                                    <div class="small text-muted">
+                                                        ${fee.type} | ${fee.payment_mode} ${fee.order !== '-' ? '#'+fee.order : ''}
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>`;
+
+                                    // Table Row
+                                    tableHtml += `
+                                        <tr>
+                                            <td><strong>${fee.name}</strong></td>
+                                            <td>${fee.type}</td>
+                                            <td>${fee.amount}</td>
+                                            <td><span class="badge badge-light text-dark">${fee.payment_mode}</span></td>
+                                            <td>${fee.order}</td>
+                                            <td>${fee.frequency}</td>
+                                        </tr>`;
+                                });
+
+                                feeList.innerHTML = listHtml;
+                                feeReferenceTableBody.innerHTML = tableHtml;
+                                feeReferenceSection.classList.remove('d-none');
+                            } else {
+                                feeList.innerHTML = '<div class="col-12 text-danger text-center p-4">{{ __("invoice.no_fees_found") }}</div>';
+                                feeReferenceSection.classList.add('d-none');
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            feeList.innerHTML = '<div class="text-danger text-center">{{ __("invoice.error_loading_fees") }}</div>';
+                        });
+                }
+            });
+        }
+
+        // --- 3. Search Logic ---
+        studentSearch.addEventListener('keyup', function() {
+            const value = this.value.toLowerCase();
+            document.querySelectorAll('#studentList .student-item').forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.indexOf(value) > -1 ? '' : 'none';
+            });
+        });
+
+        feeSearch.addEventListener('keyup', function() {
+            const value = this.value.toLowerCase();
+            document.querySelectorAll('#feeList .fee-item').forEach(item => {
+                const text = item.innerText.toLowerCase();
+                item.style.display = text.indexOf(value) > -1 ? '' : 'none';
+            });
+        });
+
+        // --- 4. Select All Logic ---
+        selectAllStudents.addEventListener('change', function() {
+            const isChecked = this.checked;
+            // Only toggle visible items (in case search is active)
+            const visibleItems = Array.from(document.querySelectorAll('#studentList .student-item')).filter(el => el.style.display !== 'none');
+            
+            visibleItems.forEach(item => {
+                const checkbox = item.querySelector('.student-check');
+                if(checkbox) checkbox.checked = isChecked;
+            });
+            updateStudentCount();
+        });
+
+        // Event Delegation for dynamic checkboxes
+        document.addEventListener('change', function(e) {
+            if(e.target && e.target.classList.contains('student-check')) {
+                updateStudentCount();
+                
+                // Update "Select All" status
+                const allVisible = Array.from(document.querySelectorAll('#studentList .student-item')).filter(el => el.style.display !== 'none');
+                const allVisibleChecks = allVisible.map(item => item.querySelector('.student-check'));
+                // Check if ALL are checked
+                if (allVisibleChecks.length > 0) {
+                    const allChecked = allVisibleChecks.every(cb => cb.checked);
+                    selectAllStudents.checked = allChecked;
+                }
+            }
+        });
+
+        // --- 5. Submit Logic (Native JS) ---
+        invoiceForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const studentChecked = document.querySelectorAll('.student-check:checked').length;
+            const feeChecked = document.querySelectorAll('.fee-check:checked').length;
+
+            if (studentChecked === 0) {
+                Swal.fire({ icon: 'warning', title: '{{ __("invoice.warning") }}', text: '{{ __("invoice.select_student_warning") }}' });
+                return;
+            }
+            if (feeChecked === 0) {
+                Swal.fire({ icon: 'warning', title: '{{ __("invoice.warning") }}', text: '{{ __("invoice.select_fee_warning") }}' });
+                return;
+            }
+
+            const btn = generateBtn;
+            const originalText = btn.innerHTML;
+            const formData = new FormData(this);
+
+            // Inner function to perform the actual submit
+            const performSubmit = () => {
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {{ __("invoice.processing") }}';
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                })
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(res => {
+                    if (res.status >= 200 && res.status < 300) {
+                        Swal.fire({ icon: 'success', title: '{{ __("invoice.success") }}', text: res.body.message })
+                            .then(() => {
+                                if(res.body.redirect) window.location.href = res.body.redirect;
+                            });
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                        let msg = res.body.message || "{{ __('invoice.error_occurred') }}";
+                        Swal.fire({ icon: 'error', title: '{{ __("invoice.error") }}', html: msg });
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    console.error(err);
+                    Swal.fire({ icon: 'error', title: '{{ __("invoice.error") }}', text: '{{ __("invoice.unexpected_error") }}' });
+                });
+            };
+
+            // 1. Check for duplicates first
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {{ __("invoice.checking") }}';
+
+            const params = new URLSearchParams(formData).toString();
+
+            fetch(`/finance/invoices/check-duplicates?${params}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.has_duplicates) {
+                    Swal.fire({
+                        title: '{{ __("invoice.duplicate_warning_title") }}',
+                        text: data.message,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: '{{ __("invoice.yes_generate") }}'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            performSubmit();
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = originalText;
+                        }
+                    });
+                } else {
+                    performSubmit();
+                }
+            })
+            .catch(err => {
+                console.error('Check Error', err);
+                // Fallback: Try submitting anyway if check fails
+                performSubmit();
+            });
+        });
     });
 </script>
 @endsection

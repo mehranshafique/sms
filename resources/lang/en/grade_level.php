@@ -6,6 +6,9 @@ return [
         'success_create' => 'Grade Level created successfully.',
         'success_update' => 'Grade Level updated successfully.',
         'success_delete' => 'Grade Level deleted successfully.',
+        'error_occurred' => 'Error Occurred',
+        'cannot_delete_linked_data' => 'Cannot delete this grade level because it is linked to other data.',
+        'duplicate_entry' => 'A grade level with this name already exists in this education cycle.',
     ],
     
     // Stats
@@ -38,6 +41,8 @@ return [
     'education_cycle' => 'Education Cycle',
     
     // Dropdown / Values (Used in _form and controller display)
+    'institution' => 'Institution',
+    'select_institution' => 'Select Institution',
     'select_cycle' => 'Select Cycle',
     'primary' => 'Primary',
     'secondary' => 'Secondary',
@@ -60,6 +65,9 @@ return [
     // Validation/Alerts
     'enter_name' => 'e.g. Grade 1',
     'enter_code' => 'e.g. G1',
+    'auto_code_help' => 'Leave empty to auto-generate from Grade Name.', // Added
+    'cycle_hint' => 'Select the education cycle for this grade.',
+    'order_hint' => 'Used for sorting grades (e.g. 1, 2, 3).',
     'are_you_sure' => 'Are you sure?',
     'delete_warning' => 'This cannot be undone.',
     'yes_delete' => 'Yes, delete!',
