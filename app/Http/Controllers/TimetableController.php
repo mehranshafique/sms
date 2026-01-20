@@ -86,7 +86,8 @@ class TimetableController extends BaseController
                 ->addColumn('class', function($row){
                     $gradeName = $row->classSection->gradeLevel->name ?? '';
                     $sectionName = $row->classSection->name ?? 'N/A';
-                    return $sectionName . ($gradeName ? ' (' . $gradeName . ')' : '');
+                    // Changed format to: "7ème EB Section A"
+                    return ($gradeName ? $gradeName . ' ' : '') . $sectionName;
                 })
                 ->addColumn('subject', function($row){
                     return $row->subject->name ?? 'N/A';
@@ -291,7 +292,8 @@ class TimetableController extends BaseController
         $headerTitle = __('timetable.class_routine');
         if ($classSection) {
             $gradeName = $classSection->gradeLevel->name ?? '';
-            $headerTitle = $classSection->name . ($gradeName ? ' (' . $gradeName . ')' : '');
+            // Changed header format to: "7ème EB Section A"
+            $headerTitle = ($gradeName ? $gradeName . ' ' : '') . $classSection->name;
         } elseif (isset($filters['teacher_id'])) {
             $t = Staff::with('user')->find($filters['teacher_id']);
             $headerTitle = $t ? __('timetable.teacher') . ": " . $t->user->name : __('timetable.teacher_schedule');

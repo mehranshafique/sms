@@ -92,7 +92,7 @@ return [
     'duplicate_warning_title' => 'Duplicate Warning', // Added
     'no_invoices_generated_error' => 'No invoices were generated. :count students were skipped.',
     'skipped_count_msg' => '(:count skipped)',
-    
+    'deselect_all' => 'Deselect All',
     // Discount
     'discount_scholarship' => 'Discount / Scholarship',
     'fixed' => 'Fixed',

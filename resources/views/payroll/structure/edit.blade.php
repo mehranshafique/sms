@@ -67,14 +67,24 @@
                         </div>
                         <div class="card-body bg-light" id="allowance_container" style="min-height: 200px;">
                             <p class="text-muted fs-12 mb-3">{{ __('payroll.allowance_help') }}</p>
-                            @php $allowances = $structure->allowances ?? []; @endphp
+                            @php 
+                                $allowances = $structure->allowances;
+                                // Safety Decode: Ensure it's an array if passed as string
+                                if(is_string($allowances)) $allowances = json_decode($allowances, true);
+                                if(!is_array($allowances)) $allowances = [];
+                            @endphp
                             @forelse($allowances as $key => $val)
+                                @php
+                                    // Handle array format [{'name'=>'Transport', 'amount'=>50}] vs associative ['Transport'=>50]
+                                    $label = is_array($val) ? ($val['name'] ?? '') : $key;
+                                    $amount = is_array($val) ? ($val['amount'] ?? 0) : $val;
+                                @endphp
                                 <div class="row mb-2 entry-row align-items-center">
                                     <div class="col-6">
-                                        <input type="text" name="allowance_keys[]" class="form-control form-control-sm" value="{{ $key }}" placeholder="{{ __('payroll.label_placeholder') }}">
+                                        <input type="text" name="allowance_keys[]" class="form-control form-control-sm" value="{{ $label }}" placeholder="{{ __('payroll.label_placeholder') }}">
                                     </div>
                                     <div class="col-4">
-                                        <input type="number" name="allowance_values[]" class="form-control form-control-sm" value="{{ $val }}" step="0.01">
+                                        <input type="number" name="allowance_values[]" class="form-control form-control-sm" value="{{ $amount }}" step="0.01">
                                     </div>
                                     <div class="col-2"><button type="button" class="btn btn-danger btn-xs sharp remove-row"><i class="fa fa-trash"></i></button></div>
                                 </div>
@@ -94,14 +104,23 @@
                         </div>
                         <div class="card-body bg-light" id="deduction_container" style="min-height: 200px;">
                              <p class="text-muted fs-12 mb-3">{{ __('payroll.deduction_help') }} <br><strong>{{ __('payroll.deduction_note') }}</strong></p>
-                            @php $deductions = $structure->deductions ?? []; @endphp
+                            @php 
+                                $deductions = $structure->deductions;
+                                // Safety Decode
+                                if(is_string($deductions)) $deductions = json_decode($deductions, true);
+                                if(!is_array($deductions)) $deductions = [];
+                            @endphp
                             @forelse($deductions as $key => $val)
+                                @php
+                                    $label = is_array($val) ? ($val['name'] ?? '') : $key;
+                                    $amount = is_array($val) ? ($val['amount'] ?? 0) : $val;
+                                @endphp
                                 <div class="row mb-2 entry-row align-items-center">
                                     <div class="col-6">
-                                        <input type="text" name="deduction_keys[]" class="form-control form-control-sm" value="{{ $key }}" placeholder="{{ __('payroll.label_placeholder') }}">
+                                        <input type="text" name="deduction_keys[]" class="form-control form-control-sm" value="{{ $label }}" placeholder="{{ __('payroll.label_placeholder') }}">
                                     </div>
                                     <div class="col-4">
-                                        <input type="number" name="deduction_values[]" class="form-control form-control-sm" value="{{ $val }}" step="0.01">
+                                        <input type="number" name="deduction_values[]" class="form-control form-control-sm" value="{{ $amount }}" step="0.01">
                                     </div>
                                     <div class="col-2"><button type="button" class="btn btn-danger btn-xs sharp remove-row"><i class="fa fa-trash"></i></button></div>
                                 </div>

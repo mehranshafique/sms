@@ -40,15 +40,39 @@ class SalaryStructureController extends BaseController
                     return '<span class="badge badge-warning text-white">Not Set</span>';
                 })
                 ->addColumn('allowances', function($row){
-                    if (!$row->salaryStructure || empty($row->salaryStructure->allowances)) return '-';
-                    return count($row->salaryStructure->allowances) . ' items';
+                    $data = $row->salaryStructure ? $row->salaryStructure->allowances : null;
+                    
+                    // Safety check: Force decode if string, fallback to empty array
+                    if (is_string($data)) {
+                        $data = json_decode($data, true);
+                    }
+                    
+                    if (!is_array($data) || empty($data)) return '-';
+                    
+                    return count($data) . ' items';
                 })
                 ->addColumn('net_estimate', function($row){
                     if (!$row->salaryStructure) return '-';
                     $s = $row->salaryStructure;
-                    $totalA = array_sum($s->allowances ?? []);
-                    $totalD = array_sum($s->deductions ?? []);
-                    // Rough estimate, doesn't account for hourly variations
+                    
+                    // Ensure we work with arrays
+                    $allowances = $s->allowances;
+                    if(is_string($allowances)) $allowances = json_decode($allowances, true);
+                    if(!is_array($allowances)) $allowances = [];
+
+                    $deductions = $s->deductions;
+                    if(is_string($deductions)) $deductions = json_decode($deductions, true);
+                    if(!is_array($deductions)) $deductions = [];
+
+                    // Safely sum up amounts. Supports both [['amount'=>50]] and ['Transport'=>50] formats
+                    $totalA = collect($allowances)->sum(function($item) {
+                        return is_array($item) ? ($item['amount'] ?? 0) : (is_numeric($item) ? $item : 0);
+                    });
+                    
+                    $totalD = collect($deductions)->sum(function($item) {
+                        return is_array($item) ? ($item['amount'] ?? 0) : (is_numeric($item) ? $item : 0);
+                    });
+
                     return number_format(($s->base_salary + $totalA) - $totalD, 2);
                 })
                 ->addColumn('action', function($row){
@@ -92,7 +116,11 @@ class SalaryStructureController extends BaseController
         if ($request->has('allowance_keys')) {
             foreach ($request->allowance_keys as $index => $key) {
                 if ($key && isset($request->allowance_values[$index])) {
-                    $allowances[$key] = $request->allowance_values[$index];
+                    // Standardize storage format: [['name' => 'Transport', 'amount' => 50]]
+                    $allowances[] = [
+                        'name' => $key,
+                        'amount' => $request->allowance_values[$index]
+                    ];
                 }
             }
         }
@@ -101,7 +129,10 @@ class SalaryStructureController extends BaseController
         if ($request->has('deduction_keys')) {
             foreach ($request->deduction_keys as $index => $key) {
                 if ($key && isset($request->deduction_values[$index])) {
-                    $deductions[$key] = $request->deduction_values[$index];
+                    $deductions[] = [
+                        'name' => $key,
+                        'amount' => $request->deduction_values[$index]
+                    ];
                 }
             }
         }

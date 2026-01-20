@@ -181,7 +181,7 @@
                         </div>
                     </div>
                     
-                    {{-- 3. School Year & Timings (UPDATED) --}}
+                    {{-- 3. School Year & Timings --}}
                     <div id="school_year" class="tab-pane fade">
                         <div class="card">
                              <div class="card-header">
@@ -226,12 +226,21 @@
                         </div>
                     </div>
 
-                    {{-- 4. Modules --}}
+                    {{-- 4. Modules (UPDATED WITH BUTTONS) --}}
                     @if(auth()->user()->hasRole('Super Admin'))
                     <div id="modules" class="tab-pane fade">
                         <div class="card">
-                            <div class="card-header">
+                            <div class="card-header d-flex justify-content-between align-items-center">
                                 <h4 class="card-title">{{ __('configuration.module_management') }}</h4>
+                                {{-- Select/Deselect All Buttons --}}
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-2" id="selectAllModules">
+                                        <i class="fa fa-check-square-o me-1"></i> {{ __('invoice.select_all') ?? 'Select All' }}
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllModules">
+                                        <i class="fa fa-square-o me-1"></i> {{ __('invoice.deselect_all') ?? 'Deselect All' }}
+                                    </button>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('configuration.modules.update') }}" method="POST" id="modulesForm">
@@ -250,7 +259,7 @@
                                                     <td class="align-middle fw-bold">{{ $mod->name }}</td>
                                                     <td class="text-end">
                                                         <div class="form-check form-switch d-inline-block">
-                                                            <input class="form-check-input" type="checkbox" 
+                                                            <input class="form-check-input module-switch" type="checkbox" 
                                                                    name="modules[]" 
                                                                    value="{{ $mod->slug }}" 
                                                                    {{ in_array($mod->slug, $enabledModules) ? 'checked' : '' }}>
@@ -364,7 +373,7 @@
         z-index: 100000 !important;
     }
     .swal2-popup {
-        font-size: 14px !important; /* Ensure readable text size */
+        font-size: 14px !important;
     }
     .swal2-actions {
         z-index: 1 !important;
@@ -372,7 +381,6 @@
     .swal2-actions button {
         margin: 0 5px !important;
     }
-    /* Force standard button look if theme overrides */
     .swal2-confirm {
         background-color: #3085d6 !important;
         color: #fff !important;
@@ -402,7 +410,6 @@
             });
         }
 
-        // Initialize ClockPicker
         if ($.fn.clockpicker) {
             $('.clockpicker').clockpicker({
                 donetext: 'Done',
@@ -412,7 +419,16 @@
             });
         }
 
-        // --- NEW: Dynamic Balance Display Logic ---
+        // --- NEW: Module Select/Deselect All ---
+        $('#selectAllModules').click(function() {
+            $('.module-switch').prop('checked', true);
+        });
+
+        $('#deselectAllModules').click(function() {
+            $('.module-switch').prop('checked', false);
+        });
+
+        // --- Dynamic Balance Display Logic ---
         function updateRechargeBalance() {
             let type = $('#rechargeType').val();
             let balance = 0;
@@ -426,10 +442,7 @@
             $('#currentBalanceDisplay').text(balance);
         }
 
-        // Bind change event
         $('#rechargeType').change(updateRechargeBalance);
-        
-        // Initial call to set correct balance on load
         updateRechargeBalance();
 
 
@@ -451,22 +464,17 @@
                     success: function(response) {
                         btn.prop('disabled', false).html(originalText);
                         
-                        // Show Success Alert
                         Swal.fire({
                             icon: 'success',
                             title: '{{ __('configuration.success') }}',
                             text: response.message,
-                            // timer: 2000, // Removed timer to ensure user sees the modal
-                            showConfirmButton: true, // Enabled button
+                            showConfirmButton: true,
                             confirmButtonText: 'OK',
                             confirmButtonColor: '#3085d6'
                         }).then((result) => {
-                            // --- NEW: Reload Page After Success ---
-                            // Reload regardless of how the modal is closed
                             location.reload(); 
                         });
 
-                        // (Optional fallback if reload isn't immediate or wanted for specific forms)
                         if(formSelector === '#rechargeForm' && response.new_balance !== undefined) {
                              if(response.type === 'sms') {
                                 $('#smsBalance').text(new Intl.NumberFormat().format(response.new_balance));
@@ -485,7 +493,6 @@
                         if(xhr.responseJSON) {
                             if(xhr.responseJSON.message) msg = xhr.responseJSON.message;
                             else if (xhr.responseJSON.errors) {
-                                // Extract first validation error
                                 msg = Object.values(xhr.responseJSON.errors)[0][0];
                             }
                         }
@@ -502,14 +509,13 @@
             });
         }
 
-        // Attach handlers to all forms
         handleAjaxForm('#smtpForm');
         handleAjaxForm('#smsForm');
         handleAjaxForm('#yearForm');
         handleAjaxForm('#modulesForm');
         handleAjaxForm('#rechargeForm');
 
-        // --- Specific Handler for Test Email (keeps existing logic) ---
+        // --- Specific Handler for Test Email ---
         $('#testEmailForm').submit(function(e) {
             e.preventDefault(); 
             let btn = $('#testEmailBtn');

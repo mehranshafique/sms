@@ -331,13 +331,33 @@ class InstituteController extends BaseController
 
     /**
      * Check if email exists in Users or Institutions table.
+     * UPDATED: Accepts an optional 'id' to exclude current institution and its admin from checks.
      */
     public function checkEmail(Request $request)
     {
         $email = $request->input('email');
+        $ignoreId = $request->input('id'); // The institution ID being edited
         
-        $existsUser = User::where('email', $email)->exists();
-        $existsInst = Institution::where('email', $email)->exists();
+        // 1. Prepare Institution Check
+        $instQuery = Institution::where('email', $email);
+        if ($ignoreId) {
+            $instQuery->where('id', '!=', $ignoreId);
+        }
+        $existsInst = $instQuery->exists();
+
+        // 2. Prepare User Check
+        $userQuery = User::where('email', $email);
+        if ($ignoreId) {
+            // Find the admin user associated with this institution to exclude them
+            $adminUser = User::where('institute_id', $ignoreId)
+                             ->whereIn('user_type', [UserType::SCHOOL_ADMIN->value, UserType::HEAD_OFFICER->value])
+                             ->first();
+            
+            if ($adminUser) {
+                $userQuery->where('id', '!=', $adminUser->id);
+            }
+        }
+        $existsUser = $userQuery->exists();
 
         if ($existsUser || $existsInst) {
             return response()->json(['exists' => true, 'message' => __('institute.validation_email_unique')]);

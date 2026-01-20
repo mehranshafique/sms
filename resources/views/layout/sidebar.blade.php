@@ -153,7 +153,7 @@
                 @endif
 
                 {{-- LIBRARY & TRANSPORT (Added based on request) --}}
-                @if($hasModule('library'))
+                <!-- @if($hasModule('library'))
                 <li class="nav-label">{{ __('sidebar.library.title') }}</li>
                     {{-- Placeholder routes until implemented --}}
                     <li><a class="ai-icon" href="javascript:void(0)"><i class="la la-book"></i><span class="nav-text">{{ __('sidebar.library.title') }}</span></a></li>
@@ -162,7 +162,7 @@
                 @if($hasModule('transport'))
                 <li class="nav-label">{{ __('sidebar.transport.title') }}</li>
                     <li><a class="ai-icon" href="javascript:void(0)"><i class="la la-bus"></i><span class="nav-text">{{ __('sidebar.transport.title') }}</span></a></li>
-                @endif
+                @endif -->
 
                 {{-- PEOPLE --}}
                 <li class="nav-label">{{ __('sidebar.people') }}</li>

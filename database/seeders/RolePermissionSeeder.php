@@ -51,10 +51,10 @@ class RolePermissionSeeder extends Seeder
             'Staff Attendance' => ['view', 'create', 'update', 'delete'],
             
             // Assessment
-            'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Examinations' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Schedules' => ['view', 'create', 'update', 'delete', 'download_admit_card'],
             'Exam Marks' => ['create', 'update', 'view'],
-            'Result Cards' => ['view'], 
+            'Results' => ['view'], 
             'Academic Reports' => ['view'],
             
             // Finance
@@ -80,8 +80,8 @@ class RolePermissionSeeder extends Seeder
             'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
 
             // Additional Modules (mentioned in premium plan)
-            'Library' => ['view', 'create', 'update', 'delete'],
-            'Transport' => ['view', 'create', 'update', 'delete'],
+            // 'Library' => ['view', 'create', 'update', 'delete'],
+            // 'Transport' => ['view', 'create', 'update', 'delete'],
         ];
 
         // 3. Create Modules and Permissions dynamically
