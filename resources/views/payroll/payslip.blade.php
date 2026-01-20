@@ -68,6 +68,15 @@
         $workUnitLabel = $isHourly ? __('payroll.hourly_short') : __('payroll.total_days');
         $rateLabel = $isHourly ? __('payroll.hourly_rate') : __('payroll.base_salary');
         $rateValue = $structure ? $structure->base_salary : 0;
+        
+        // --- FIX: Safely Decode Allowances & Deductions ---
+        $allowances = $structure->allowances ?? [];
+        if(is_string($allowances)) $allowances = json_decode($allowances, true);
+        if(!is_array($allowances)) $allowances = [];
+
+        $deductions = $structure->deductions ?? [];
+        if(is_string($deductions)) $deductions = json_decode($deductions, true);
+        if(!is_array($deductions)) $deductions = [];
     @endphp
 
     {{-- Employee Info --}}
@@ -132,14 +141,17 @@
                         <td class="amount">{{ number_format($payroll->basic_pay, 2) }}</td>
                     </tr>
                     
-                    @if($structure && !empty($structure->allowances))
-                        @foreach($structure->allowances as $key => $amount)
-                        <tr>
-                            <td>{{ ucfirst(str_replace('_', ' ', $key)) }}</td>
-                            <td class="amount">{{ number_format($amount, 2) }}</td>
-                        </tr>
-                        @endforeach
-                    @endif
+                    @foreach($allowances as $key => $val)
+                    @php
+                        // Handle array format [{'name'=>'Transport', 'amount'=>50}] vs associative ['Transport'=>50]
+                        $label = is_array($val) ? ($val['name'] ?? 'Allowance') : $key;
+                        $amount = is_array($val) ? ($val['amount'] ?? 0) : $val;
+                    @endphp
+                    <tr>
+                        <td>{{ ucfirst(str_replace('_', ' ', $label)) }}</td>
+                        <td class="amount">{{ number_format((float)$amount, 2) }}</td>
+                    </tr>
+                    @endforeach
 
                     <tr class="total-row">
                         <td>{{ __('payroll.total_earnings') }}</td>
@@ -160,18 +172,24 @@
                 </thead>
                 <tbody>
                     @if($payroll->total_deduction > 0)
-                        @if($structure && !empty($structure->deductions))
-                            @foreach($structure->deductions as $key => $amount)
-                            <tr>
-                                <td>{{ ucfirst(str_replace('_', ' ', $key)) }}</td>
-                                <td class="amount">{{ number_format($amount, 2) }}</td>
-                            </tr>
-                            @endforeach
-                        @endif
+                        
+                        @foreach($deductions as $key => $val)
+                        @php
+                            $label = is_array($val) ? ($val['name'] ?? 'Deduction') : $key;
+                            $amount = is_array($val) ? ($val['amount'] ?? 0) : $val;
+                        @endphp
+                        <tr>
+                            <td>{{ ucfirst(str_replace('_', ' ', $label)) }}</td>
+                            <td class="amount">{{ number_format((float)$amount, 2) }}</td>
+                        </tr>
+                        @endforeach
 
                         @php
-                            $calcDeductions = array_sum($structure->deductions ?? []);
-                            $lop = $payroll->total_deduction - $calcDeductions;
+                            // Calculate total from structure to see if there is extra LOP
+                            $structDedTotal = collect($deductions)->sum(function($item) {
+                                return is_array($item) ? ($item['amount'] ?? 0) : $item;
+                            });
+                            $lop = $payroll->total_deduction - $structDedTotal;
                         @endphp
                         
                         @if($lop > 0.01)

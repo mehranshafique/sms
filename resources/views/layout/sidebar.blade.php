@@ -106,7 +106,7 @@
                 @if($hasModule('subjects')) @can('subject.view') <li><a class="ai-icon" href="{{ route('subjects.index') }}"><i class="la la-book"></i><span class="nav-text">{{ __('sidebar.subjects.title') }}</span></a></li> @endcan @endif
                 @if($hasModule('timetables')) @can('timetable.view') <li><a class="ai-icon" href="{{ route('timetables.index') }}"><i class="la la-clock-o"></i><span class="nav-text">{{ __('sidebar.timetables.title') }}</span></a></li> @endcan @endif
 
-                {{-- EXAMINATIONS --}}
+                {{-- exams --}}
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
                 @if($hasModule('exams')) @can('exam.view') <li><a class="ai-icon" href="{{ route('exams.index') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.exams.title') }}</span></a></li> @endcan @endif
                 
@@ -130,13 +130,13 @@
 
                 @if($hasModule('exam_marks')) @can('exam_mark.create') <li><a class="ai-icon" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li> @endcan @endif
                 
-                @if($hasModule('results') || $hasModule('examinations')) 
+                @if($hasModule('results') || $hasModule('exams')) 
                     @if(auth()->user()->can('view result_card') || $isStudent || $isTeacher)
                     <li><a class="ai-icon" href="{{ route('results.index') }}"><i class="la la-certificate"></i><span class="nav-text">{{ __('sidebar.results') }}</span></a></li>
                     @endif
                 @endif
 
-                @if($hasModule('examinations')) <li><a class="ai-icon" href="{{ route('reports.index') }}"><i class="la la-file-pdf-o"></i><span class="nav-text">{{ __('sidebar.academic_reports') }}</span></a></li> @endif
+                @if($hasModule('exams')) <li><a class="ai-icon" href="{{ route('reports.index') }}"><i class="la la-file-pdf-o"></i><span class="nav-text">{{ __('sidebar.academic_reports') }}</span></a></li> @endif
 
                 {{-- COMMUNICATION --}}
                 @if($hasModule('communication'))

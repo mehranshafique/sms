@@ -51,10 +51,10 @@ class RolePermissionSeeder extends Seeder
             'Staff Attendance' => ['view', 'create', 'update', 'delete'],
             
             // Assessment
-            'Examinations' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Schedules' => ['view', 'create', 'update', 'delete', 'download_admit_card'],
             'Exam Marks' => ['create', 'update', 'view'],
-            'Results' => ['view'], 
+            'Result Cards' => ['view'], 
             'Academic Reports' => ['view'],
             
             // Finance
