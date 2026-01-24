@@ -10,7 +10,7 @@ use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Str; // Added for auto-generation
+use Illuminate\Support\Str; 
 
 class GradeLevelController extends BaseController
 {
@@ -89,17 +89,30 @@ class GradeLevelController extends BaseController
         $institutionId = $this->getInstitutionId();
         
         $institutes = [];
-        if (auth()->user()->hasRole('Super Admin') && !$institutionId) {
+        $institutionType = 'mixed'; // Default
+
+        if ($institutionId) {
+            $inst = Institution::find($institutionId);
+            $institutionType = $inst->type ?? 'mixed';
+        } elseif (auth()->user()->hasRole('Super Admin')) {
             $institutes = Institution::pluck('name', 'id');
         }
 
-        return view('grade_levels.create', compact('institutionId', 'institutes'));
+        return view('grade_levels.create', compact('institutionId', 'institutes', 'institutionType'));
     }
 
     public function store(Request $request)
     {
         $institutionId = $this->getInstitutionId();
         $targetInstituteId = $institutionId ?? $request->institution_id;
+
+        // Force Cycle based on Institution Type if not Mixed/Super Admin context
+        if ($institutionId) {
+            $inst = Institution::find($institutionId);
+            if ($inst && in_array($inst->type, ['primary', 'secondary', 'university'])) {
+                $request->merge(['education_cycle' => $inst->type]);
+            }
+        }
 
         $request->validate([
             'institution_id'  => $institutionId ? 'nullable' : 'required|exists:institutions,id',
@@ -121,7 +134,6 @@ class GradeLevelController extends BaseController
             $data = $request->only(['name', 'code', 'order_index', 'education_cycle']);
             $data['institution_id'] = $targetInstituteId;
 
-            // Auto-generate code if empty
             if (empty($data['code'])) {
                 $data['code'] = Str::upper($data['name']); 
             }
@@ -147,11 +159,16 @@ class GradeLevelController extends BaseController
         }
 
         $institutes = [];
-        if (auth()->user()->hasRole('Super Admin') && !$institutionId) {
+        $institutionType = 'mixed'; 
+
+        if ($institutionId) {
+            $inst = Institution::find($institutionId);
+            $institutionType = $inst->type ?? 'mixed';
+        } elseif (auth()->user()->hasRole('Super Admin') && !$institutionId) {
             $institutes = Institution::pluck('name', 'id');
         }
 
-        return view('grade_levels.edit', compact('grade_level', 'institutionId', 'institutes'));
+        return view('grade_levels.edit', compact('grade_level', 'institutionId', 'institutes', 'institutionType'));
     }
 
     public function update(Request $request, GradeLevel $grade_level)
@@ -160,6 +177,14 @@ class GradeLevelController extends BaseController
         if ($institutionId && $grade_level->institution_id != $institutionId) abort(403);
 
         $targetInstituteId = $institutionId ?? $request->input('institution_id', $grade_level->institution_id);
+
+        // Force Cycle Update Logic
+        if ($institutionId) {
+            $inst = Institution::find($institutionId);
+            if ($inst && in_array($inst->type, ['primary', 'secondary', 'university'])) {
+                $request->merge(['education_cycle' => $inst->type]);
+            }
+        }
 
         $request->validate([
             'institution_id'  => $institutionId ? 'nullable' : 'required|exists:institutions,id',
@@ -185,7 +210,6 @@ class GradeLevelController extends BaseController
                 $data['institution_id'] = $request->institution_id;
             }
 
-            // Auto-generate code if empty
             if (empty($data['code'])) {
                 $data['code'] = Str::upper($data['name']);
             }

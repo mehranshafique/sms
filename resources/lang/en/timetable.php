@@ -13,7 +13,7 @@ return [
     'manage_list_subtitle' => 'Manage class schedules and routines',
     'create_new' => 'Add Routine',
     'filter_by_class' => 'Filter by Class',
-    'all_grades' => 'All Grades', // Added
+    'all_grades' => 'All Grades',
     'class_routine' => 'Class Routine',
     'weekly_schedule' => 'Weekly Schedule',
     'print_routine' => 'Print Routine',
@@ -43,11 +43,11 @@ return [
     'view' => 'View Routine',
     
     'select_class' => 'Select Class',
-    'select_class_first' => 'Select Grade First', // Added for better UX
+    'select_class_first' => 'Select Grade First',
     'select_subject' => 'Select Subject',
-    'select_teacher' => 'Select Teacher',
+    'select_teacher' => 'Teacher (Read Only)', // Updated Label
     'select_day' => 'Select Day',
-    'select_room' => 'Select Room', // Added
+    'select_room' => 'Select Room',
     
     'start_time' => 'Start Time',
     'end_time' => 'End Time',
@@ -66,7 +66,10 @@ return [
     // Errors
     'no_active_session' => 'No active academic session found. Please create one first.',
     'teacher_busy' => 'The selected teacher is already booked for this time slot.',
-    'room_busy' => 'The selected room is already booked for this time slot.',
+    'class_busy' => 'This class already has a lecture scheduled during this time slot.',
+    'room_busy' => 'This room is occupied by another class at this time.',
+    'error_end_time' => 'End time must be after the start time.',
+    'assign_teacher_first' => 'No teacher assigned to this subject. Please assign a teacher in "Class Courses" first.', // New Key
 
     // Buttons
     'save_routine' => 'Save Routine',

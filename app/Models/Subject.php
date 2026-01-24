@@ -12,9 +12,12 @@ class Subject extends Model
     protected $fillable = [
         'institution_id',
         'grade_level_id',
+        'department_id', // New
+        'prerequisite_id', // New
         'name',
         'code',
         'type',
+        'semester', // New
         'credit_hours',
         'total_marks',
         'passing_marks',
@@ -36,7 +39,22 @@ class Subject extends Model
     {
         return $this->belongsTo(GradeLevel::class);
     }
+
+    // New: Department Relationship
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    // New: Prerequisite Relationship
+    public function prerequisite()
+    {
+        return $this->belongsTo(Subject::class, 'prerequisite_id');
+    }
     
-    // Future: Assign teachers to subjects
-    // public function teachers() { ... }
+    // New: Subjects that require this one (Reverse Prerequisite)
+    public function dependentSubjects()
+    {
+        return $this->hasMany(Subject::class, 'prerequisite_id');
+    }
 }

@@ -6,12 +6,12 @@
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4>Attendance Register</h4>
-                    <p class="mb-0">Monthly class attendance view</p>
+                    <h4>{{ __('attendance.register_title') }}</h4>
+                    <p class="mb-0">{{ __('attendance.register_subtitle') }}</p>
                 </div>
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
-                <a href="{{ route('attendance.index') }}" class="btn btn-secondary btn-rounded">Back to List</a>
+                <a href="{{ route('attendance.index') }}" class="btn btn-secondary btn-rounded">{{ __('attendance.back_to_list') }}</a>
             </div>
         </div>
 
@@ -23,16 +23,16 @@
                         <form method="GET" action="{{ route('attendance.report') }}" id="reportForm">
                             <div class="row align-items-end">
                                 <div class="col-md-3 mb-3">
-                                    <label class="form-label">Select Class</label>
+                                    <label class="form-label">{{ __('attendance.select_class') }}</label>
                                     <select name="class_section_id" class="form-control default-select" onchange="this.form.submit()">
-                                        <option value="">-- Select Class --</option>
+                                        <option value="">-- {{ __('attendance.select_class') }} --</option>
                                         @foreach($classSections as $id => $name)
                                             <option value="{{ $id }}" {{ request('class_section_id') == $id ? 'selected' : '' }}>{{ $name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <div class="col-md-3 mb-3">
-                                    <label class="form-label">Month</label>
+                                    <label class="form-label">{{ __('attendance.month') }}</label>
                                     <select name="month" class="form-control default-select" onchange="this.form.submit()">
                                         @for($m=1; $m<=12; $m++)
                                             <option value="{{ $m }}" {{ $month == $m ? 'selected' : '' }}>{{ date("F", mktime(0, 0, 0, $m, 1)) }}</option>
@@ -40,7 +40,7 @@
                                     </select>
                                 </div>
                                 <div class="col-md-3 mb-3">
-                                    <label class="form-label">Year</label>
+                                    <label class="form-label">{{ __('attendance.year') }}</label>
                                     <select name="year" class="form-control default-select" onchange="this.form.submit()">
                                         @for($y=date('Y'); $y>=date('Y')-5; $y--)
                                             <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option>
@@ -48,7 +48,16 @@
                                     </select>
                                 </div>
                                 <div class="col-md-3 mb-3">
-                                    <button type="button" class="btn btn-primary w-100" onclick="window.print()"><i class="fa fa-print me-2"></i> Print</button>
+                                    {{-- UPDATED PRINT BUTTON --}}
+                                    @if(request('class_section_id'))
+                                        <a href="{{ route('attendance.print_report', request()->all()) }}" target="_blank" class="btn btn-primary w-100">
+                                            <i class="fa fa-print me-2"></i> {{ __('attendance.print') }}
+                                        </a>
+                                    @else
+                                        <button type="button" class="btn btn-primary w-100" disabled>
+                                            <i class="fa fa-print me-2"></i> {{ __('attendance.print') }}
+                                        </button>
+                                    @endif
                                 </div>
                             </div>
                         </form>
@@ -67,7 +76,7 @@
                             <table class="table table-bordered table-sm mb-0 table-striped" style="font-size: 12px;">
                                 <thead class="bg-light text-center">
                                     <tr>
-                                        <th class="text-start p-3" style="min-width: 200px; position: sticky; left: 0; background: #f8f9fa; z-index: 2;">Student Name</th>
+                                        <th class="text-start p-3" style="min-width: 200px; position: sticky; left: 0; background: #f8f9fa; z-index: 2;">{{ __('attendance.student') }}</th>
                                         @for($d=1; $d<=$daysInMonth; $d++)
                                             <th style="min-width: 30px;">{{ $d }}</th>
                                         @endfor
@@ -119,7 +128,7 @@
             </div>
         </div>
         @elseif(request('class_section_id'))
-            <div class="alert alert-info text-center">No students found for this class.</div>
+            <div class="alert alert-info text-center">{{ __('attendance.no_students_found_class') }}</div>
         @endif
 
     </div>

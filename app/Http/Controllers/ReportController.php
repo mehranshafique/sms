@@ -10,6 +10,7 @@ use App\Models\ExamRecord;
 use App\Models\StudentEnrollment;
 use App\Models\ClassSection;
 use App\Models\InstitutionSetting; 
+use App\Models\Institution;
 use App\Enums\AcademicType; 
 use App\Models\Subject; 
 use Illuminate\Http\Request;
@@ -30,6 +31,8 @@ class ReportController extends BaseController
     public function index()
     {
         $institutionId = $this->getInstitutionId();
+        $institution = Institution::find($institutionId);
+        $institutionType = $institution->type ?? 'mixed'; 
 
         // Fetch Exams
         $exams = Exam::where('institution_id', $institutionId)
@@ -43,67 +46,159 @@ class ReportController extends BaseController
             ->orderBy('first_name')
             ->get();
 
-        return view('reports.index', compact('exams', 'students'));
+        // Fetch Classes for Bulk Printing
+        $classes = ClassSection::with('gradeLevel')
+            ->where('institution_id', $institutionId)
+            ->where('is_active', true)
+            ->get();
+
+        return view('reports.index', compact('exams', 'students', 'classes', 'institutionType'));
     }
 
     /**
      * Generate Student Bulletin (Term Report Card).
+     * Supports Single Student OR Whole Class (Bulk)
      */
     public function bulletin(Request $request)
     {
         $request->validate([
-            'student_id' => 'required|exists:students,id',
+            'student_id' => 'nullable|required_without:class_section_id|exists:students,id',
+            'class_section_id' => 'nullable|required_without:student_id|exists:class_sections,id',
             'trimester' => 'nullable|integer|in:1,2,3',
             'semester' => 'nullable|integer|in:1,2',
-            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6', // Added Period support
-            'type' => 'nullable|in:period,term', // New: Report Type
+            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6', 
+            'type' => 'nullable|in:period,term', 
         ]);
 
-        $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
-        
-        // Security Check
         $institutionId = $this->getInstitutionId();
-        if ($institutionId && $student->institution_id != $institutionId) {
-            abort(403, 'Unauthorized access.');
+
+        // 1. Validate Active Period
+        if (!Auth::user()->hasRole('Super Admin')) {
+            $activePeriodsJson = InstitutionSetting::get($institutionId, 'active_periods', '[]');
+            $activePeriods = json_decode($activePeriodsJson, true) ?? [];
+            
+            $requestedPeriod = null;
+            if ($request->type === 'period') $requestedPeriod = $request->period;
+            elseif ($request->trimester) $requestedPeriod = 'trimester_' . $request->trimester;
+            elseif ($request->semester) $requestedPeriod = 'semester_' . $request->semester;
+
+            if (!empty($activePeriods) && $requestedPeriod && !in_array($requestedPeriod, $activePeriods)) {
+                 $msg = __('reports.error_period_inactive', ['period' => strtoupper($requestedPeriod)]);
+                 if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+                 return back()->with('error', $msg);
+            }
         }
 
-        $enrollment = $student->enrollments()->latest()->first();
-        if (!$enrollment) return back()->with('error', __('reports.no_enrollment'));
+        // 2. Identify Target Students
+        $targetStudents = collect();
+        $classSection = null;
 
-        // Cycle Logic
-        $cycle = $enrollment->classSection->gradeLevel->education_cycle ?? AcademicType::PRIMARY; 
-        
-        if ($cycle instanceof AcademicType) {
-            $cycleValue = $cycle->value;
+        if ($request->class_section_id) {
+            $classSection = ClassSection::with('gradeLevel')->find($request->class_section_id);
+            if ($classSection->institution_id != $institutionId) abort(403);
+
+            $enrollments = StudentEnrollment::with(['student', 'classSection.gradeLevel'])
+                ->where('class_section_id', $request->class_section_id)
+                ->where('status', 'active')
+                ->get();
+            
+            if ($enrollments->isEmpty()) {
+                $msg = __('reports.no_students_in_class');
+                if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+                return back()->with('error', $msg);
+            }
+            
+            $targetStudents = $enrollments; 
         } else {
-            $cycleValue = $cycle; 
+            $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
+            if ($student->institution_id != $institutionId) abort(403);
+
+            $enrollment = $student->enrollments()->latest()->first();
+            if (!$enrollment) {
+                $msg = __('reports.no_enrollment');
+                if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+                return back()->with('error', $msg);
+            }
+            
+            $classSection = $enrollment->classSection;
+            $targetStudents = collect([$enrollment]);
         }
 
-        // Fetch Settings
-        $threshold = InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50);
-        $gradingScale = json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true);
+        // 3. Prepare Data
+        $bulkData = [];
+        $settings = [
+            'threshold' => InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50),
+            'gradingScale' => json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true)
+        ];
 
-        // Branch Logic
-        if ($cycleValue === 'university' || $cycleValue === 'lmd') {
-            return $this->generateLmdTranscript($student, $enrollment, $request->semester, $threshold, $gradingScale);
-        } elseif ($cycleValue === 'secondary') {
-            // Check if Period Only or Full Semester
-            if ($request->type === 'period' && $request->period) {
-                return $this->generatePeriodBulletin($student, $enrollment, $request->period, $gradingScale);
+        foreach ($targetStudents as $enrollment) {
+            $student = $enrollment->student;
+            $cycle = $enrollment->classSection->gradeLevel->education_cycle ?? AcademicType::PRIMARY; 
+            $cycleValue = ($cycle instanceof AcademicType) ? $cycle->value : $cycle;
+
+            $reportData = null;
+            $viewName = '';
+
+            if ($cycleValue === 'university' || $cycleValue === 'lmd') {
+                continue; 
+            } 
+            elseif ($cycleValue === 'secondary') {
+                $viewName = 'reports.bulletin_secondary';
+                if ($request->type === 'period') {
+                    $viewName = 'reports.bulletin_period';
+                    $reportData = $this->getPeriodData($student, $enrollment, $request->period);
+                } else {
+                    $reportData = $this->getSecondaryData($student, $enrollment, $request->semester);
+                }
+            } 
+            else {
+                // Primary
+                $viewName = 'reports.bulletin_primary';
+                if ($request->type === 'period') {
+                    $viewName = 'reports.bulletin_period';
+                    $reportData = $this->getPeriodData($student, $enrollment, $request->period);
+                } else {
+                    $reportData = $this->getPrimaryData($student, $enrollment, $request->trimester);
+                }
             }
-            return $this->generateSecondaryBulletin($student, $enrollment, $request->semester, $gradingScale);
+
+            if ($reportData && $this->hasMarks($reportData)) {
+                $bulkData[] = array_merge($reportData, [
+                    'student' => $student,
+                    'enrollment' => $enrollment,
+                    'settings' => $settings,
+                    'request' => $request->all()
+                ]);
+            }
+        }
+
+        // --- AJAX CHECK RESPONSE ---
+        if ($request->check_only) {
+            if (empty($bulkData)) {
+                return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+            }
+            return response()->json(['status' => 'success']);
+        }
+
+        if (empty($bulkData)) {
+            return back()->with('error', __('reports.no_records_found'));
+        }
+
+        // 4. Generate PDF
+        if (count($bulkData) === 1) {
+            $data = $bulkData[0];
+            $pdf = Pdf::loadView($viewName, $data); 
+            return $pdf->stream('Bulletin_'.$data['student']->admission_number.'.pdf');
         } else {
-            // Primary Logic (can be expanded for periods too)
-            if ($request->type === 'period' && $request->period) {
-                return $this->generatePeriodBulletin($student, $enrollment, $request->period, $gradingScale);
-            }
-            return $this->generatePrimaryBulletin($student, $enrollment, $request->trimester, $gradingScale);
+            $pdf = Pdf::loadView('reports.bulk_print', [
+                'reports' => $bulkData, 
+                'viewName' => $viewName,
+                'classSection' => $classSection
+            ]);
+            return $pdf->stream('Class_Bulletin_'.$classSection->name.'.pdf');
         }
     }
 
-    /**
-     * Generate Student Transcript (Cumulative History).
-     */
     public function transcript(Request $request)
     {
         $request->validate([
@@ -111,57 +206,52 @@ class ReportController extends BaseController
         ]);
 
         $student = Student::with('institution')->findOrFail($request->student_id);
-        
         $institutionId = $this->getInstitutionId();
+        
         if ($institutionId && $student->institution_id != $institutionId) {
             abort(403, 'Unauthorized access.');
         }
 
-        // Fetch Academic History
         $history = ExamRecord::with(['exam.academicSession', 'subject'])
             ->where('student_id', $student->id)
             ->get()
             ->groupBy('exam.academic_session_id');
 
+        // --- AJAX CHECK RESPONSE ---
+        if ($request->check_only) {
+            if ($history->isEmpty()) {
+                return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+            }
+            return response()->json(['status' => 'success']);
+        }
+
+        if ($history->isEmpty()) {
+            return back()->with('error', __('reports.no_records_found'));
+        }
+
         $pdf = Pdf::loadView('reports.transcript', compact('student', 'history'));
-        
         return $pdf->stream('Transcript_' . $student->admission_number . '.pdf');
     }
 
-    // --- HELPER METHODS FOR BULLETINS ---
+    // --- HELPERS ---
 
-    private function generateLmdTranscript($student, $enrollment, $semester, $threshold, $gradingScale)
-    {
-        $query = ExamRecord::with(['subject', 'exam'])
-            ->where('student_id', $student->id)
-            ->whereHas('exam', function($q) use ($enrollment) {
-                $q->where('academic_session_id', $enrollment->academic_session_id);
-            });
-
-        if ($semester) {
-            $query->whereHas('exam', function($q) use ($semester) {
-                $q->where('category', 'like', "%session_$semester%");
-            });
+    private function hasMarks($reportData) {
+        if (!isset($reportData['data'])) return false;
+        foreach($reportData['data'] as $row) {
+            if (isset($row['has_marks']) && $row['has_marks']) return true; 
+            if (isset($row['obtained']) && is_numeric($row['obtained'])) return true;
+            if (isset($row['exam_score']) && is_numeric($row['exam_score'])) return true;
         }
-
-        $records = $query->get();
-
-        $pdf = Pdf::loadView('reports.transcript_lmd', compact('student', 'enrollment', 'records', 'semester', 'threshold', 'gradingScale'));
-        return $pdf->stream('LMD_Transcript_'.$student->admission_number.'.pdf');
+        return false;
     }
 
-    /**
-     * Generates a simple bulletin for a single period (P1, P2, etc.)
-     */
-    private function generatePeriodBulletin($student, $enrollment, $period, $gradingScale)
+    private function getPeriodData($student, $enrollment, $period)
     {
-        // 1. Fetch Subjects
         $subjects = Subject::where('grade_level_id', $enrollment->classSection->grade_level_id)
             ->where('institution_id', $student->institution_id)
             ->orderBy('name')
             ->get();
 
-        // 2. Fetch Marks for this specific period
         $records = ExamRecord::with(['subject', 'exam'])
             ->where('student_id', $student->id)
             ->whereHas('exam', function($q) use ($enrollment, $period) {
@@ -170,21 +260,27 @@ class ReportController extends BaseController
             })->get()->keyBy('subject_id');
 
         $data = [];
+        $hasData = false;
+
         foreach($subjects as $subject) {
             $rec = $records->get($subject->id);
+            $obtained = $rec ? $rec->marks_obtained : '-';
+            if ($rec) $hasData = true;
+
             $data[] = [
                 'subject' => $subject,
-                'obtained' => $rec ? $rec->marks_obtained : '-',
+                'obtained' => $obtained,
                 'max' => $subject->total_marks ?? 20,
                 'percentage' => $rec ? ($rec->marks_obtained / ($subject->total_marks ?: 20)) * 100 : 0
             ];
         }
 
-        $pdf = Pdf::loadView('reports.bulletin_period', compact('student', 'enrollment', 'period', 'data', 'gradingScale'));
-        return $pdf->stream('Bulletin_Period_'.$period.'_'.$student->admission_number.'.pdf');
+        if (!$hasData) return null;
+
+        return ['period' => $period, 'data' => $data];
     }
 
-    private function generatePrimaryBulletin($student, $enrollment, $trimester, $gradingScale)
+    private function getPrimaryData($student, $enrollment, $trimester)
     {
         $trimester = $trimester ?? 1;
         $pA = "p" . (($trimester * 2) - 1); 
@@ -197,6 +293,8 @@ class ReportController extends BaseController
                 $q->where('academic_session_id', $enrollment->academic_session_id);
             })->get();
 
+        if ($records->isEmpty()) return null;
+
         $data = [];
         foreach ($records as $r) {
             $subId = $r->subject_id;
@@ -208,20 +306,17 @@ class ReportController extends BaseController
                     'exam_max' => ($r->subject->total_marks ?? 20) * 2 
                 ];
             }
-            
             if ($r->exam->category == $pA) $data[$subId]['p1_score'] = $r->marks_obtained;
             if ($r->exam->category == $pB) $data[$subId]['p2_score'] = $r->marks_obtained;
             if ($r->exam->category == $examCat) $data[$subId]['exam_score'] = $r->marks_obtained;
         }
 
-        $pdf = Pdf::loadView('reports.bulletin_primary', compact('student', 'enrollment', 'data', 'trimester', 'gradingScale'));
-        return $pdf->stream('Bulletin_Primary_'.$student->admission_number.'.pdf');
+        return ['data' => $data, 'trimester' => $trimester];
     }
 
-    private function generateSecondaryBulletin($student, $enrollment, $semester, $gradingScale)
+    private function getSecondaryData($student, $enrollment, $semester)
     {
         $semester = $semester ?? 1;
-        
         $startPeriod = ($semester * 2) - 1; 
         $pA = "p" . $startPeriod;       
         $pB = "p" . ($startPeriod + 1); 
@@ -239,7 +334,10 @@ class ReportController extends BaseController
                   ->whereIn('category', [$pA, $pB, $examCat]);
             })->get();
 
+        if ($records->isEmpty()) return null;
+
         $data = [];
+        $hasAnyMarks = false;
         
         foreach($subjects as $subject) {
             $max = $subject->total_marks ?? 20; 
@@ -260,27 +358,18 @@ class ReportController extends BaseController
             $subId = $r->subject_id;
             if (isset($data[$subId])) {
                 $cat = $r->exam->category;
-                
-                if ($cat == $pA) {
-                    $data[$subId]['p1_score'] = $r->marks_obtained;
-                    $data[$subId]['has_marks'] = true;
-                }
-                elseif ($cat == $pB) {
-                    $data[$subId]['p2_score'] = $r->marks_obtained;
-                    $data[$subId]['has_marks'] = true;
-                }
-                elseif ($cat == $examCat) {
-                    $data[$subId]['exam_score'] = $r->marks_obtained;
-                    $data[$subId]['has_marks'] = true;
-                }
+                if ($cat == $pA) { $data[$subId]['p1_score'] = $r->marks_obtained; $data[$subId]['has_marks'] = true; $hasAnyMarks = true; }
+                elseif ($cat == $pB) { $data[$subId]['p2_score'] = $r->marks_obtained; $data[$subId]['has_marks'] = true; $hasAnyMarks = true; }
+                elseif ($cat == $examCat) { $data[$subId]['exam_score'] = $r->marks_obtained; $data[$subId]['has_marks'] = true; $hasAnyMarks = true; }
             }
         }
+
+        if (!$hasAnyMarks) return null;
 
         foreach($data as $id => &$row) {
             $s1 = is_numeric($row['p1_score']) ? $row['p1_score'] : 0;
             $s2 = is_numeric($row['p2_score']) ? $row['p2_score'] : 0;
             $ex = is_numeric($row['exam_score']) ? $row['exam_score'] : 0;
-            
             if($row['has_marks']) {
                 $row['total_score'] = $s1 + $s2 + $ex;
             } else {
@@ -288,7 +377,6 @@ class ReportController extends BaseController
             }
         }
 
-        $pdf = Pdf::loadView('reports.bulletin_secondary', compact('student', 'enrollment', 'semester', 'data', 'gradingScale'));
-        return $pdf->stream('Bulletin_Secondary_'.$student->admission_number.'.pdf');
+        return ['data' => $data, 'semester' => $semester];
     }
 }

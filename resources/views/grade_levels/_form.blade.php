@@ -19,16 +19,23 @@
                                 $hasContext = isset($institutionId) && $institutionId;
                                 $isSuperAdmin = auth()->user()->hasRole('Super Admin');
                                 
-                                // FIX: Correctly extract cycle value for auto-select
+                                // Cycle Value Extraction
                                 $currentCycle = '';
                                 if(isset($grade_level) && $grade_level->education_cycle) {
-                                    // If cast to Enum, get value; otherwise use string
                                     $currentCycle = is_object($grade_level->education_cycle) 
                                         ? $grade_level->education_cycle->value 
                                         : $grade_level->education_cycle;
                                 }
-                                // Fallback to old input on validation error
                                 $currentCycle = old('education_cycle', $currentCycle);
+
+                                // Determine Visibility based on Institution Type
+                                // Default to 'mixed' if not passed from controller
+                                $instType = isset($institutionType) ? $institutionType : 'mixed';
+                                $isFixedType = in_array($instType, ['primary', 'secondary', 'university']);
+                                
+                                if($isFixedType) {
+                                    $currentCycle = $instType; // Force value
+                                }
                             @endphp
 
                             @if($hasContext && !$isSuperAdmin)
@@ -65,18 +72,31 @@
                             </div>
 
                             {{-- Academic Cycle Selection --}}
-                            <div class="mb-3 col-md-6">
-                                <label class="form-label">{{ __('grade_level.education_cycle') }} <span class="text-danger">*</span></label>
-                                <select name="education_cycle" class="form-control default-select" required>
-                                    <option value="">-- {{ __('grade_level.select_cycle') }} --</option>
-                                    <option value="primary" {{ ($currentCycle == 'primary') ? 'selected' : '' }}>{{ __('grade_level.cycle_primary') }}</option>
-                                    <option value="secondary" {{ ($currentCycle == 'secondary') ? 'selected' : '' }}>{{ __('grade_level.cycle_secondary') }}</option>
-                                    {{-- FIX: Value is 'university' to match Database Enum --}}
-                                    <option value="university" {{ ($currentCycle == 'university') ? 'selected' : '' }}>{{ __('grade_level.cycle_university') }}</option>
-                                    <option value="vocational" {{ ($currentCycle == 'vocational') ? 'selected' : '' }}>{{ __('grade_level.cycle_vocational') }}</option>
-                                </select>
-                                <small class="text-muted">{{ __('grade_level.cycle_hint') }}</small>
-                            </div>
+                            {{-- Logic: If Fixed Type, Hide Select and Use Hidden Input --}}
+                            @if($isFixedType)
+                                <input type="hidden" name="education_cycle" value="{{ $currentCycle }}">
+                                {{-- Optional: Display Badge to inform user --}}
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label">{{ __('grade_level.education_cycle') }}</label>
+                                    <div>
+                                        <span class="badge badge-info">{{ ucfirst($currentCycle) }}</span>
+                                        <small class="d-block text-muted mt-1">Auto-selected based on institution type.</small>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label">{{ __('grade_level.education_cycle') }} <span class="text-danger">*</span></label>
+                                    <select name="education_cycle" class="form-control default-select" required>
+                                        <option value="">-- {{ __('grade_level.select_cycle') }} --</option>
+                                        <option value="primary" {{ ($currentCycle == 'primary') ? 'selected' : '' }}>{{ __('grade_level.cycle_primary') }}</option>
+                                        <option value="secondary" {{ ($currentCycle == 'secondary') ? 'selected' : '' }}>{{ __('grade_level.cycle_secondary') }}</option>
+                                        <option value="university" {{ ($currentCycle == 'university') ? 'selected' : '' }}>{{ __('grade_level.cycle_university') }}</option>
+                                        <option value="vocational" {{ ($currentCycle == 'vocational') ? 'selected' : '' }}>{{ __('grade_level.cycle_vocational') }}</option>
+                                    </select>
+                                    <small class="text-muted">{{ __('grade_level.cycle_hint') }}</small>
+                                </div>
+                            @endif
+
                         </div>
                         <button type="submit" class="btn btn-primary mt-3">{{ isset($grade_level) ? __('grade_level.update') : __('grade_level.save') }}</button>
                     </div>

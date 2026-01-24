@@ -27,7 +27,8 @@ use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\TimetableController;
-use App\Http\Controllers\AssignmentController; // Added
+use App\Http\Controllers\AssignmentController; 
+use App\Http\Controllers\ClassSubjectController; // Added Import
 
 // --- Controllers: People ---
 use App\Http\Controllers\StudentController;
@@ -37,7 +38,7 @@ use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
 use App\Http\Controllers\StudentPromotionController;
 use App\Http\Controllers\TransferController; 
-
+use App\Http\Controllers\UniversityEnrollmentController; // NEW IMPORT
 // --- Controllers: Examinations ---
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
@@ -150,6 +151,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('academic-sessions', AcademicSessionController::class);
     });
     
+    // Departments (New Dedicated Module)
+    Route::middleware([CheckModuleAccess::class . ':departments'])->group(function () {
+        Route::resource('departments', \App\Http\Controllers\DepartmentController::class);
+    });
+    
     // Grade Levels
     Route::middleware([CheckModuleAccess::class . ':grade_levels'])->group(function () {
         Route::post('grade-levels/bulk-delete', [GradeLevelController::class, 'bulkDelete'])->name('grade-levels.bulkDelete');
@@ -168,9 +174,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('subjects', SubjectController::class);
     });
 
+    // Class Subjects Allocation (NEW)
+    Route::middleware([CheckModuleAccess::class . ':class_subjects'])->group(function () {
+        Route::get('class-subjects', [ClassSubjectController::class, 'index'])->name('class-subjects.index');
+        Route::post('class-subjects', [ClassSubjectController::class, 'store'])->name('class-subjects.store');
+    });
+
     // Timetables
     Route::middleware([CheckModuleAccess::class . ':timetables'])->group(function () {
         Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
+        Route::get('timetables/get-allocated-subjects', [TimetableController::class, 'getAllocatedSubjects'])->name('timetables.get_allocated_subjects');
+        // NEW: Check Availability Route
+        Route::get('timetables/check-availability', [TimetableController::class, 'checkAvailability'])->name('timetables.check_availability');
+        
         Route::get('timetables/routine', [TimetableController::class, 'classRoutine'])->name('timetables.routine');
         Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
         Route::get('timetables/{timetable}/print', [TimetableController::class, 'print'])->name('timetables.print');
@@ -193,9 +209,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('students/{student}/transfer-certificate', [TransferController::class, 'printCertificate'])->name('transfers.print');
     });
     // Enrollments
+    Route::get('parents/check', [App\Http\Controllers\ParentController::class, 'check'])->name('parents.check');
+    Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
+    Route::resource('students', StudentController::class);
+    
+    // Primary/Secondary Enrollments
     Route::middleware([CheckModuleAccess::class . ':enrollments'])->group(function () {
         Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
         Route::resource('enrollments', StudentEnrollmentController::class);
+    });
+
+    // NEW: University Enrollments
+    // We use the same 'enrollments' module check or a new one if seeded. 
+    // Assuming we use 'university_enrollments' slug if added to package/seeder.
+    // For now, let's group it.
+    Route::middleware([CheckModuleAccess::class . ':enrollments'])->prefix('university')->name('university.')->group(function () {
+        Route::resource('enrollments', UniversityEnrollmentController::class);
     });
 
     // Student Promotions
@@ -210,6 +239,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('attendance', [StudentAttendanceController::class, 'store'])->name('attendance.store');
         Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');
         Route::get('attendance/report', [StudentAttendanceController::class, 'report'])->name('attendance.report');
+        Route::get('attendance/print-report', [StudentAttendanceController::class, 'printReport'])->name('attendance.print_report');
     });
 
     // HR / Staff Management
@@ -257,8 +287,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Exam Schedules & Admit Cards
     Route::middleware([CheckModuleAccess::class . ':exam_schedules'])->group(function () {
-        Route::get('exam-dates', [ExamScheduleController::class, 'index'])->name('exam-schedules.index'); // View for Students/Teachers
-        Route::get('exam-schedules', [ExamScheduleController::class, 'manage'])->name('exam-schedules.manage'); // Manage for Admins
+        Route::get('exam-schedules', [ExamScheduleController::class, 'manage'])->name('exam-schedules.manage');
         Route::get('exam-schedules/get-subjects', [ExamScheduleController::class, 'getSubjects'])->name('exam-schedules.get-subjects');
         Route::get('exam-schedules/get-students', [ExamScheduleController::class, 'getStudents'])->name('exam-schedules.get-students');
         Route::get('exam-schedules/auto-generate', [ExamScheduleController::class, 'autoGenerate'])->name('exam-schedules.auto-generate'); 
@@ -309,12 +338,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('balances/class/{id}', [App\Http\Controllers\Finance\StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); 
 
         // BUDGET MODULE
+        // Categories
         Route::get('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'categories'])->name('budgets.categories');
         Route::post('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
         
+        // Allocations & Index
         Route::get('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'index'])->name('budgets.index');
         Route::post('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'store'])->name('budgets.store');
         
+        // NEW: Edit/Update Routes
+        Route::get('budgets/{budget}/edit', [App\Http\Controllers\Finance\BudgetController::class, 'edit'])->name('budgets.edit');
+        Route::put('budgets/{budget}', [App\Http\Controllers\Finance\BudgetController::class, 'update'])->name('budgets.update');
+        
+        // Requests
         Route::get('budgets/requests', [App\Http\Controllers\Finance\BudgetController::class, 'fundRequests'])->name('budgets.requests');
         Route::post('budgets/requests/store', [App\Http\Controllers\Finance\BudgetController::class, 'storeFundRequest'])->name('budgets.requests.store');
         

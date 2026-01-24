@@ -65,6 +65,9 @@ return [
     'sessions' => [
         'title' => 'Sessions'
     ],
+    'departments' => [
+        'title' => 'Departments',
+    ],
     'grade_levels' => [
         'title' => 'Grades'
     ],
@@ -73,6 +76,10 @@ return [
     ],
     'subjects' => [
         'title' => 'Subjects'
+    ],
+    // NEW: Class Course Allocation
+    'class_subjects' => [
+        'title' => 'Class Courses',
     ],
     'timetables' => [
         'title' => 'Timetables'
@@ -88,7 +95,6 @@ return [
     'results' => 'Result Cards',
     'academic_reports' => 'Reports (PDF)',
     
-    // NEW KEYS FOR STUDENT/TEACHER VIEWS
     'exam_schedules' => [
         'title' => 'Date Sheets',
         'manage' => 'Manage Date Sheet',
@@ -115,6 +121,9 @@ return [
     ],
     'enrollments' => [
         'title' => 'Enrollments'
+    ],
+    'university_enrollments' => [ // NEW KEY
+        'title' => 'Univ. Enrollments'
     ],
     'attendance' => [
         'title' => 'Attendance'

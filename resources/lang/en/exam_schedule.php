@@ -10,7 +10,7 @@ return [
     'select_class' => 'Select Class',
     'load_subjects' => 'Load Subjects',
     'download_admit_card' => 'Download Admit Cards',
-    'auto_fill' => 'Auto Fill Schedule', // Added
+    'auto_fill' => 'Auto Fill Schedule',
     
     // Table Headers
     'subject' => 'Subject',
@@ -39,11 +39,14 @@ return [
     // Actions
     'save_schedule' => 'Save Date Sheet',
     'clear' => 'Clear',
+    'actions' => 'Actions', // Added
+    'preview_admit_card' => 'Preview Admit Card', // Added
+    'download_pdf_btn' => 'Download PDF', // Added
     
     // Messages
     'success_saved' => 'Exam schedule saved successfully.',
-    'auto_fill_success' => 'Schedule suggestions applied successfully. Please review before saving.', // Added
-    'auto_fill_confirm' => 'This will overwrite empty or existing dates in the form with suggested dates based on school timings. Continue?', // Added
+    'auto_fill_success' => 'Schedule suggestions applied successfully. Please review before saving.',
+    'auto_fill_confirm' => 'This will overwrite empty or existing dates in the form with suggested dates based on school timings. Continue?',
     'error_overlap_class' => 'Time conflict detected for this class on :date between :start - :end.',
     'error_overlap_room' => 'Room :room is already booked on :date between :start - :end.',
     'error_date_range' => 'Date :date is outside the exam period (:start to :end).',

@@ -10,6 +10,7 @@ use App\Models\Subject;
 use App\Models\StudentEnrollment;
 use App\Models\Timetable;
 use App\Models\InstitutionSetting; 
+use App\Models\ClassSubject; // Added
 use App\Enums\RoleEnum;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class ExamMarkController extends BaseController
 {
+    // ... (Constructor and Create method same as before) ...
     public function __construct()
     {
         $this->middleware(PermissionMiddleware::class . ':exam_mark.create')->only(['create', 'store', 'printAwardList']);
@@ -30,43 +32,32 @@ class ExamMarkController extends BaseController
         $user = Auth::user();
         $institutionId = session('active_institution_id') ?? $user->institute_id;
 
-        // 1. Get List of Authorized Periods from Settings
         $settingVal = InstitutionSetting::get($institutionId, 'active_periods', '[]');
         $activePeriods = json_decode($settingVal ?? '[]', true);
 
-        // 2. Fetch Exams filtered by: 
-        //    a) Ongoing Status 
-        //    b) Must belong to an "Active Period" (if user is Teacher AND NOT Admin)
-        
         $examsQuery = Exam::where('status', 'ongoing');
         
         if ($institutionId) {
             $examsQuery->where('institution_id', $institutionId);
         }
 
-        // Determine Role Context
         $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
         $isAdmin = $user->hasRole([
             RoleEnum::SUPER_ADMIN->value, 
             RoleEnum::HEAD_OFFICER->value, 
-            RoleEnum::SCHOOL_ADMIN->value // Ensure School Admin is included
+            RoleEnum::SCHOOL_ADMIN->value 
         ]);
 
-        // RESTRICTION LOGIC:
-        // Only restrict if user is a Teacher AND NOT an Admin.
-        // This prevents Admins (who might also have a teacher role for testing) from being blocked.
         if ($isTeacher && !$isAdmin) {
             if (!empty($activePeriods)) {
                 $examsQuery->whereIn('category', $activePeriods);
             } else {
-                // If no periods are active, show nothing to teacher
                 $examsQuery->whereRaw('1 = 0'); 
             }
         }
 
         $exams = $examsQuery->pluck('name', 'id');
 
-        // 3. Fetch Classes ($classes) for the View
         $classesQuery = ClassSection::with('gradeLevel')
             ->where('is_active', true);
 
@@ -74,13 +65,16 @@ class ExamMarkController extends BaseController
             $classesQuery->where('institution_id', $institutionId);
         }
 
-        // Filter for Teachers: Only show classes they teach or are assigned to
+        // UPDATE: Teacher visibility for Classes via Timetable AND Allocation
         if ($isTeacher && !$isAdmin && $user->staff) {
             $staffId = $user->staff->id;
             $classesQuery->where(function($q) use ($staffId) {
                 $q->where('staff_id', $staffId) // Class Teacher
                   ->orWhereHas('timetables', function($t) use ($staffId) {
-                      $t->where('teacher_id', $staffId); // Subject Teacher
+                      $t->where('teacher_id', $staffId); 
+                  })
+                  ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                      $c->where('teacher_id', $staffId);
                   });
             });
         }
@@ -90,14 +84,10 @@ class ExamMarkController extends BaseController
             return [$item->id => $name];
         });
 
-        // Pass $classes to the view
         return view('marks.create', compact('exams', 'classes'));
     }
 
-    // =========================================================================
-    // AJAX HELPER METHODS
-    // =========================================================================
-
+    // ... (getGrades, getSections methods remain same) ...
     public function getGrades(Request $request)
     {
         if(!$request->exam_id) return response()->json([]);
@@ -141,12 +131,11 @@ class ExamMarkController extends BaseController
         return response()->json($sections);
     }
 
+    // UPDATE: Respect Class Allocation
     public function getSubjects(Request $request)
     {
-        // 1. Resolve Grade Level ID
         $gradeLevelId = $request->grade_level_id;
         
-        // If class_section_id is provided but grade_level_id isn't, fetch grade from section
         if (!$gradeLevelId && $request->class_section_id) {
             $section = ClassSection::find($request->class_section_id);
             if ($section) {
@@ -158,33 +147,52 @@ class ExamMarkController extends BaseController
         
         $user = Auth::user();
         
-        // 2. Teacher Logic: Trust the Timetable
+        // Teacher Logic: Hybrid Check
         if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
             $staffId = $user->staff->id;
             
-            $timetableQuery = Timetable::where('teacher_id', $staffId);
-
-            // If a specific section is selected, filter by it. 
-            // Otherwise filter by all sections in the Grade.
+            // 1. Timetable
+            $timetableIds = Timetable::where('teacher_id', $staffId);
             if ($request->class_section_id) {
-                $timetableQuery->where('class_section_id', $request->class_section_id);
+                $timetableIds->where('class_section_id', $request->class_section_id);
             } else {
-                $timetableQuery->whereHas('classSection', function($q) use ($gradeLevelId) {
+                $timetableIds->whereHas('classSection', function($q) use ($gradeLevelId) {
                     $q->where('grade_level_id', $gradeLevelId);
                 });
             }
+            $ttIds = $timetableIds->pluck('subject_id')->toArray();
 
-            $subjectIds = $timetableQuery->pluck('subject_id')->unique()->toArray();
+            // 2. Class Allocation
+            $allocationIds = ClassSubject::where('teacher_id', $staffId);
+            if ($request->class_section_id) {
+                $allocationIds->where('class_section_id', $request->class_section_id);
+            } else {
+                $allocationIds->whereHas('classSection', function($q) use ($gradeLevelId) {
+                    $q->where('grade_level_id', $gradeLevelId);
+                });
+            }
+            $allocIds = $allocationIds->pluck('subject_id')->toArray();
+
+            $subjectIds = array_unique(array_merge($ttIds, $allocIds));
 
             if (empty($subjectIds)) return response()->json([]);
 
-            // Fetch Subjects by ID
             $query = Subject::whereIn('id', $subjectIds)->where('is_active', true);
         
         } else {
-            // 3. Admin Logic: Show all subjects defined for the Grade
-            $query = Subject::where('grade_level_id', $gradeLevelId)
-                            ->where('is_active', true);
+            // Admin Logic: Hybrid Fallback
+            if ($request->class_section_id) {
+                $allocated = ClassSubject::where('class_section_id', $request->class_section_id)
+                    ->with('subject')->get();
+                
+                if ($allocated->isNotEmpty()) {
+                    $query = Subject::whereIn('id', $allocated->pluck('subject_id'));
+                } else {
+                    $query = Subject::where('grade_level_id', $gradeLevelId)->where('is_active', true);
+                }
+            } else {
+                $query = Subject::where('grade_level_id', $gradeLevelId)->where('is_active', true);
+            }
         }
 
         $formattedSubjects = $query->get()->map(function($subject) use ($request) {
@@ -200,6 +208,65 @@ class ExamMarkController extends BaseController
         return response()->json($formattedSubjects);
     }
 
+    // UPDATE: getSubjectTeacher needs to check ClassSubject too
+    private function getSubjectTeacher($classId, $subjectId)
+    {
+        if(!$classId) return 'N/A';
+        
+        // 1. Try Allocation
+        $alloc = ClassSubject::with('teacher.user')
+            ->where('class_section_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->first();
+            
+        if ($alloc && $alloc->teacher) {
+            return $alloc->teacher->user->name;
+        }
+
+        // 2. Try Timetable
+        $tt = Timetable::with('teacher.user')
+            ->where('class_section_id', $classId)
+            ->where('subject_id', $subjectId)
+            ->first();
+            
+        return $tt->teacher->user->name ?? 'N/A';
+    }
+
+    // UPDATE: Security Check needs to respect Allocation
+    private function validateAccess($examId, $classId, $subjectId)
+    {
+        $user = Auth::user();
+        if ($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value])) {
+            return true;
+        }
+
+        if ($user->hasRole(RoleEnum::TEACHER->value)) {
+            if (!$user->staff) return false;
+            $staffId = $user->staff->id;
+
+            $isClassTeacher = ClassSection::where('id', $classId)
+                ->where('staff_id', $staffId)
+                ->exists();
+            if ($isClassTeacher) return true;
+
+            $isSubjectTeacher = Timetable::where('class_section_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->where('teacher_id', $staffId)
+                ->exists();
+            if ($isSubjectTeacher) return true;
+
+            $isAllocated = ClassSubject::where('class_section_id', $classId)
+                ->where('subject_id', $subjectId)
+                ->where('teacher_id', $staffId)
+                ->exists();
+            
+            return $isAllocated;
+        }
+        
+        return false;
+    }
+
+    // ... (Store, Print, MyMarks methods remain unchanged) ...
     public function getStudents(Request $request)
     {
         if(!$request->exam_id || !$request->class_section_id || !$request->subject_id) {
@@ -244,10 +311,6 @@ class ExamMarkController extends BaseController
             'marks' => $marks
         ]);
     }
-
-    // =========================================================================
-    // STORE MARKS
-    // =========================================================================
 
     public function store(Request $request)
     {
@@ -314,10 +377,6 @@ class ExamMarkController extends BaseController
             'redirect' => null 
         ]);
     }
-
-    // =========================================================================
-    // PRINT AWARD LIST
-    // =========================================================================
 
     public function printAwardList(Request $request)
     {
@@ -397,46 +456,5 @@ class ExamMarkController extends BaseController
             ->groupBy('exam_id');
 
         return view('marks.my_marks', compact('records', 'student'));
-    }
-
-    // =========================================================================
-    // PRIVATE HELPERS
-    // =========================================================================
-
-    private function getSubjectTeacher($classId, $subjectId)
-    {
-        if(!$classId) return 'N/A';
-        $tt = Timetable::with('teacher.user')
-            ->where('class_section_id', $classId)
-            ->where('subject_id', $subjectId)
-            ->first();
-        return $tt->teacher->user->name ?? 'N/A';
-    }
-
-    private function validateAccess($examId, $classId, $subjectId)
-    {
-        $user = Auth::user();
-        if ($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value])) {
-            return true;
-        }
-
-        if ($user->hasRole(RoleEnum::TEACHER->value)) {
-            if (!$user->staff) return false;
-            $staffId = $user->staff->id;
-
-            $isClassTeacher = ClassSection::where('id', $classId)
-                ->where('staff_id', $staffId)
-                ->exists();
-            if ($isClassTeacher) return true;
-
-            $isSubjectTeacher = Timetable::where('class_section_id', $classId)
-                ->where('subject_id', $subjectId)
-                ->where('teacher_id', $staffId)
-                ->exists();
-
-            return $isSubjectTeacher;
-        }
-        
-        return false;
     }
 }

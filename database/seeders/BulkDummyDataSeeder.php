@@ -41,8 +41,9 @@ use App\Models\Budget;
 use App\Models\FundRequest;
 use App\Models\SalaryStructure;
 use App\Models\Payroll;
-// New Modules
 use App\Models\Assignment; 
+// NEW: Department Model
+use App\Models\Department; 
 
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
@@ -113,7 +114,7 @@ class BulkDummyDataSeeder extends Seeder
                 'modules' => [
                     'academics', 'students', 'staff', 'finance', 'examinations', 
                     'communication', 'voting', 'exam_schedules', 'payrolls', 'budgets',
-                    'assignments', 'library', 'transport'
+                    'assignments', 'library', 'transport', 'departments' // Added departments
                 ],
                 'student_limit' => 2000,
                 'staff_limit' => 200,
@@ -138,7 +139,7 @@ class BulkDummyDataSeeder extends Seeder
                 'code' => $instCode,
                 'name' => 'E-Digitex International School',
                 'acronym' => 'E-DIGITEX',
-                'type' => 'mixed',
+                'type' => 'mixed', // Supports Primary + University features
                 'country' => $countryId,
                 'state' => $stateId,
                 'city' => $cityId,
@@ -219,7 +220,7 @@ class BulkDummyDataSeeder extends Seeder
         );
 
         // ---------------------------------------------------------
-        // 5. Grade Levels
+        // 5. Grade Levels & Departments
         // ---------------------------------------------------------
         $gradesList = [
             ['name' => '1ère Primaire', 'code' => '1P', 'cycle' => 'primary', 'order' => 1],
@@ -227,6 +228,8 @@ class BulkDummyDataSeeder extends Seeder
             ['name' => '6ème Primaire', 'code' => '6P', 'cycle' => 'primary', 'order' => 6],
             ['name' => '7ème EB', 'code' => '7EB', 'cycle' => 'secondary', 'order' => 7],
             ['name' => '4ème Humanités', 'code' => '4HS', 'cycle' => 'secondary', 'order' => 10],
+            // Added University Grade
+            ['name' => 'Licence 1 (L1)', 'code' => 'L1', 'cycle' => 'university', 'order' => 13], 
         ];
 
         $gradeModels = [];
@@ -242,7 +245,7 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // ---------------------------------------------------------
-        // 6. Staff (Teachers & Admin)
+        // 6. Staff (Teachers & Admin) & Departments
         // ---------------------------------------------------------
         $staffData = [
             ['role' => RoleEnum::TEACHER->value, 'dept' => 'Sciences', 'first_name' => 'John', 'last_name' => 'Doe'],
@@ -254,6 +257,7 @@ class BulkDummyDataSeeder extends Seeder
         
         $teacherIds = [];
         $adminUserId = null; 
+        $hodId = null; // Head of Dept ID
 
         foreach ($staffData as $idx => $data) {
             $roleName = $data['role'];
@@ -297,10 +301,27 @@ class BulkDummyDataSeeder extends Seeder
             
             if ($roleName == RoleEnum::TEACHER->value) {
                 $teacherIds[] = $staff->id;
+                if(!$hodId) $hodId = $staff->id; // Assign first teacher as HOD for sample
             }
         }
 
         if (!$adminUserId) $adminUserId = User::where('institute_id', $institution->id)->first()->id ?? 1;
+
+        // 6.1 Create Departments (Linked to Academics)
+        $deptsList = [
+            ['name' => 'Département des Sciences', 'code' => 'SCI', 'head' => $hodId],
+            ['name' => 'Département des Lettres', 'code' => 'LIT', 'head' => null],
+        ];
+
+        foreach ($deptsList as $d) {
+            Department::firstOrCreate(
+                ['institution_id' => $institution->id, 'code' => $d['code']],
+                [
+                    'name' => $d['name'],
+                    'head_of_department_id' => $d['head']
+                ]
+            );
+        }
 
         // ---------------------------------------------------------
         // 7. Class Sections & Subjects
@@ -309,8 +330,11 @@ class BulkDummyDataSeeder extends Seeder
         $subjectsCollection = [];
 
         foreach ($gradeModels as $code => $grade) {
+            // University uses "Program" logic usually, but fits into ClassSection structure for now
+            $secName = ($grade->education_cycle == 'university') ? 'Génie Informatique' : 'Section A';
+
             $sections[$code] = ClassSection::firstOrCreate(
-                ['institution_id' => $institution->id, 'grade_level_id' => $grade->id, 'name' => 'Section A'],
+                ['institution_id' => $institution->id, 'grade_level_id' => $grade->id, 'name' => $secName],
                 [
                     'campus_id' => $campus->id,
                     'room_number' => 'Salle ' . $grade->order_index,
@@ -320,13 +344,20 @@ class BulkDummyDataSeeder extends Seeder
                 ]
             );
 
-            $subjNames = ['Mathématiques', 'Français', 'Anglais', 'Informatique'];
+            // Determine subjects based on cycle
+            if ($grade->education_cycle == 'university') {
+                $subjNames = ['Algorithmique', 'Base de Données', 'Réseaux', 'Anglais Technique'];
+            } else {
+                $subjNames = ['Mathématiques', 'Français', 'Anglais', 'Informatique'];
+            }
+
             foreach($subjNames as $subName) {
                 $sub = Subject::firstOrCreate(
                     ['institution_id' => $institution->id, 'grade_level_id' => $grade->id, 'name' => $subName],
                     [
                         'code' => strtoupper(substr($subName, 0, 3)) . '-' . $code,
                         'type' => 'theory',
+                        'credit_hours' => 3,
                         'total_marks' => 20,
                         'passing_marks' => 10,
                         'is_active' => true
@@ -420,7 +451,7 @@ class BulkDummyDataSeeder extends Seeder
                         'first_name' => $firstName,
                         'last_name' => $lastName,
                         'gender' => $faker->randomElement(['male', 'female']),
-                        'dob' => $faker->dateTimeBetween('-15 years', '-6 years'),
+                        'dob' => $faker->dateTimeBetween('-25 years', '-6 years'), // Expanded range for Uni students
                         'admission_date' => '2024-09-04',
                         'country' => $countryName,
                         'state' => $stateName,
@@ -481,6 +512,7 @@ class BulkDummyDataSeeder extends Seeder
         $tuitionType = FeeType::firstOrCreate(['institution_id' => $institution->id, 'name' => 'Frais Scolaires']);
         $primaryGrade = $gradeModels['1P'];
         
+        // Fee Structure
         FeeStructure::firstOrCreate(
             ['institution_id' => $institution->id, 'name' => 'Minerval Annuel 1P', 'grade_level_id' => $primaryGrade->id],
             [
@@ -504,15 +536,28 @@ class BulkDummyDataSeeder extends Seeder
             ]
         );
 
-        // Budget Category
+        // Budget
         $catOps = BudgetCategory::firstOrCreate(
             ['institution_id' => $institution->id, 'name' => 'Operations'],
             ['description' => 'Daily operational costs']
         );
 
+        // Budget Allocation (Using New Fields from Budget Update)
         $budget = Budget::firstOrCreate(
-            ['institution_id' => $institution->id, 'budget_category_id' => $catOps->id, 'academic_session_id' => $session->id],
-            ['allocated_amount' => 50000.00, 'spent_amount' => 0, 'notes' => 'Annual Operations Budget']
+            [
+                'institution_id' => $institution->id, 
+                'budget_category_id' => $catOps->id, 
+                'academic_session_id' => $session->id
+            ],
+            [
+                'allocated_amount' => 50000.00, 
+                'spent_amount' => 0, 
+                // Using new period logic
+                // 'period_name' => 'Q1 2025', 
+                // 'start_date' => now()->startOfYear(),
+                // 'end_date' => now()->startOfYear()->addMonths(3),
+                'notes' => 'Annual Operations Budget'
+            ]
         );
 
         if ($adminUserId) {
@@ -531,7 +576,6 @@ class BulkDummyDataSeeder extends Seeder
         if (!empty($teacherIds)) {
             $staffMember = Staff::find($teacherIds[0]);
             if ($staffMember) {
-                // Remove keys that don't match database columns
                 SalaryStructure::firstOrCreate(
                     ['staff_id' => $staffMember->id],
                     [
@@ -542,7 +586,6 @@ class BulkDummyDataSeeder extends Seeder
                     ]
                 );
 
-                // Corrected keys to match Payroll Model
                 Payroll::firstOrCreate(
                     [
                         'staff_id' => $staffMember->id,
@@ -550,12 +593,12 @@ class BulkDummyDataSeeder extends Seeder
                     ],
                     [
                         'institution_id' => $institution->id,
-                        'basic_pay' => 800.00, // Corrected from basic_salary
+                        'basic_pay' => 800.00,
                         'total_allowance' => 50.00,
                         'total_deduction' => 40.00,
                         'net_salary' => 810.00,
                         'status' => 'paid',
-                        'paid_at' => now() // Use paid_at instead of payment_method
+                        'paid_at' => now()
                     ]
                 );
             }
@@ -617,7 +660,7 @@ class BulkDummyDataSeeder extends Seeder
         // ---------------------------------------------------------
         $this->command->info('📚 Seeding Assignments...');
         if (!empty($teacherIds) && isset($sections['1P'])) {
-            $teacherId = $teacherIds[0]; // Get first teacher
+            $teacherId = $teacherIds[0];
             $staffMember = Staff::find($teacherId);
             $section = $sections['1P'];
             $subject = Subject::where('grade_level_id', $section->grade_level_id)->first();
@@ -632,7 +675,7 @@ class BulkDummyDataSeeder extends Seeder
                         'teacher_id' => $staffMember->id,
                         'description' => 'Complete exercises 1-10 on page 20.',
                         'deadline' => now()->addDays(3),
-                        'file_path' => null // Optional attachment
+                        'file_path' => null 
                     ]
                 );
             }

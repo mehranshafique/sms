@@ -33,6 +33,8 @@ return [
     'edit_subject' => 'Edit Subject',
     'basic_information' => 'Basic Information',
     'select_grade' => 'Select Grade Level',
+    'select_institution' => 'Select Institution',
+    'institution_label' => 'Institution',
     
     'subject_name' => 'Subject Name',
     'subject_code' => 'Subject Code',
@@ -41,6 +43,14 @@ return [
     'total_marks' => 'Total Marks',
     'passing_marks' => 'Passing Marks',
     'status_label' => 'Status',
+    
+    // University Specific Keys
+    'department' => 'Department',
+    'select_department' => 'Select Department',
+    'prerequisite' => 'Prerequisite Subject',
+    'select_prerequisite' => 'Select Prerequisite',
+    'semester' => 'Semester/Term',
+    'enter_semester' => 'e.g. Fall 2025 or Semester 1',
 
     // Dropdown
     'theory' => 'Theory',
@@ -52,7 +62,7 @@ return [
     // Placeholders
     'enter_name' => 'e.g. Mathematics',
     'enter_code' => 'e.g. MATH101',
-    'enter_credits' => 'e.g. 3',
+    'enter_credits' => 'e.g. 3.0',
     'enter_total' => 'e.g. 100',
     'enter_pass' => 'e.g. 40',
 

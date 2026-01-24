@@ -11,7 +11,7 @@ return [
     // Index
     'attendance_list' => 'Attendance Log',
     'mark_attendance' => 'Mark Attendance',
-    'view_register' => 'View Register', // New
+    'view_register' => 'View Register', 
     'filter_class' => 'Filter Class',
     'filter_date' => 'Filter Date',
     'export' => 'Export',
@@ -59,8 +59,21 @@ return [
     'back_to_list' => 'Back to List',
     'month' => 'Month',
     'year' => 'Year',
-    'print' => 'Print',
+    'print' => 'Print Register', // Updated key
     'no_students_found_class' => 'No students found for this class.',
+    
+    // Print View Specific
+    'attendance_report' => 'Attendance Report',
+    'class_details' => 'Class Details',
+    'total_students' => 'Total Students',
+    'generated_on' => 'Generated On',
+    'legend' => 'Legend',
+    'legend_p' => 'P: Present',
+    'legend_a' => 'A: Absent',
+    'legend_l' => 'L: Late',
+    'legend_e' => 'E: Excused',
+    'legend_h' => 'H: Half Day',
+    'summary' => 'Summary', // Added Summary
 
     // Admin Settings Errors
     'admin_blocked' => 'Attendance marking is currently blocked by administrator.',

@@ -153,7 +153,8 @@ class InvoiceController extends BaseController
             ->where('institution_id', $institutionId)
             ->where(function($q) use ($section, $request) {
                 $q->where('grade_level_id', $section->grade_level_id)
-                  ->orWhere('class_section_id', $request->class_section_id);
+                  ->orWhere('class_section_id', $request->class_section_id)
+                  ->orWhereNull('grade_level_id'); // FIX: Include fees available to All Grades
             })
             ->get()
             ->map(fn($fee) => [

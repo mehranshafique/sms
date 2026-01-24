@@ -9,6 +9,7 @@ use App\Models\Staff;
 use App\Models\AcademicSession;
 use App\Models\Institution;
 use App\Models\GradeLevel;
+use App\Models\ClassSubject;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -65,7 +66,7 @@ class TimetableController extends BaseController
             if ($request->has('class_section_id') && $request->class_section_id) {
                 $query->where('timetables.class_section_id', $request->class_section_id);
             }
-            // Optional: Filter by Grade if Class is not selected but Grade is
+            
             if ($request->has('grade_level_id') && $request->grade_level_id && !$request->class_section_id) {
                 $query->whereHas('classSection', function($q) use ($request) {
                     $q->where('grade_level_id', $request->grade_level_id);
@@ -86,7 +87,6 @@ class TimetableController extends BaseController
                 ->addColumn('class', function($row){
                     $gradeName = $row->classSection->gradeLevel->name ?? '';
                     $sectionName = $row->classSection->name ?? 'N/A';
-                    // Changed format to: "7ème EB Section A"
                     return ($gradeName ? $gradeName . ' ' : '') . $sectionName;
                 })
                 ->addColumn('subject', function($row){
@@ -123,16 +123,12 @@ class TimetableController extends BaseController
         $gradeLevels = [];
 
         if (!$user->hasRole(['Student', 'Teacher'])) {
-            // Fetch Grades
             $gradeLevelsQuery = GradeLevel::query();
             if ($institutionId) {
                 $gradeLevelsQuery->where('institution_id', $institutionId);
             }
             $gradeLevels = $gradeLevelsQuery->orderBy('order_index')->pluck('name', 'id');
 
-            // Initial Classes (All, or empty if we strictly depend on grade)
-            // Keeping it empty initially forces user to select grade, or you can load all.
-            // Let's load all initially to match previous behavior, but Filter JS will handle it.
             $classSectionsQuery = ClassSection::with('gradeLevel');
             if ($institutionId) {
                 $classSectionsQuery->where('institution_id', $institutionId);
@@ -147,6 +143,7 @@ class TimetableController extends BaseController
 
     public function classRoutine(Request $request)
     {
+        // ... (existing code remains the same) ...
         $institutionId = $this->getInstitutionId();
         $user = Auth::user();
         
@@ -199,7 +196,6 @@ class TimetableController extends BaseController
             }
             $gradeLevels = $gradeLevelsQuery->orderBy('order_index')->pluck('name', 'id');
 
-            // UPDATED: No concatenation
             $classesQuery = ClassSection::with('gradeLevel');
             if ($institutionId) $classesQuery->where('institution_id', $institutionId);
             $classes = $classesQuery->get()->mapWithKeys(function($item) {
@@ -225,10 +221,10 @@ class TimetableController extends BaseController
     private function generateWeeklyView($classSection = null, $isViewer = false, $timetable = null, $classes = null, $teachers = null, $rooms = null, $filters = [], $gradeLevels = null)
     {
         $data = $this->getScheduleData($classSection, $filters);
-        
         $viewName = $isViewer ? 'timetables.viewer' : 'timetables.show';
         $timetable = $timetable ?? ($data['timetable'] ?? null);
-
+        
+        // Ensure collections are passed if null
         $classes = $classes ?? collect();
         $teachers = $teachers ?? collect();
         $rooms = $rooms ?? collect();
@@ -239,7 +235,7 @@ class TimetableController extends BaseController
 
     private function getScheduleData($classSection = null, $filters = [])
     {
-        // ... (No change to logic, just standard code) ...
+        // ... (Logic unchanged) ...
         $institutionId = $this->getInstitutionId();
 
         if (!$institutionId) {
@@ -292,7 +288,6 @@ class TimetableController extends BaseController
         $headerTitle = __('timetable.class_routine');
         if ($classSection) {
             $gradeName = $classSection->gradeLevel->name ?? '';
-            // Changed header format to: "7ème EB Section A"
             $headerTitle = ($gradeName ? $gradeName . ' ' : '') . $classSection->name;
         } elseif (isset($filters['teacher_id'])) {
             $t = Staff::with('user')->find($filters['teacher_id']);
@@ -306,6 +301,7 @@ class TimetableController extends BaseController
 
         return compact('weeklySchedule', 'headerTitle', 'session', 'institution', 'timetable');
     }
+
     public function create()
     {
         $institutionId = $this->getInstitutionId();
@@ -317,7 +313,6 @@ class TimetableController extends BaseController
             $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         }
 
-        // 1. Fetch Grade Levels (Dependent Dropdown Start)
         $gradeLevelsQuery = GradeLevel::query();
         if ($institutionId) {
             $gradeLevelsQuery->where('institution_id', $institutionId);
@@ -332,7 +327,6 @@ class TimetableController extends BaseController
              return [$item->id => $label];
         });
 
-        // 2. Fetch Subjects & Teachers
         $fetchData = function($model) use ($institutionId) {
             $query = $model::query();
             if ($institutionId) {
@@ -360,6 +354,106 @@ class TimetableController extends BaseController
         });
 
         return view('timetables.create', compact('gradeLevels', 'subjects', 'teachers', 'institutions', 'institutionId'));
+    }
+
+    public function getAllocatedSubjects(Request $request) 
+    {
+        $classId = $request->class_section_id;
+        $gradeId = $request->grade_level_id;
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+
+        $subjects = [];
+        $allocations = [];
+
+        if ($classId) {
+            // Updated to include Teacher relationship for Read-Only logic
+            $allocations = ClassSubject::where('class_section_id', $classId)
+                ->with(['subject', 'teacher.user'])
+                ->get();
+            
+            if ($allocations->isNotEmpty()) {
+                $subjects = $allocations->map(function($alloc) {
+                    return [
+                        'id' => $alloc->subject_id, 
+                        'name' => $alloc->subject->name,
+                        'default_teacher' => $alloc->teacher_id,
+                        'teacher_name' => $alloc->teacher->user->name ?? null // Return Teacher Name
+                    ];
+                });
+            }
+        }
+
+        if (empty($subjects) && $gradeId) {
+            $query = Subject::where('grade_level_id', $gradeId)->where('is_active', true);
+            if ($institutionId) $query->where('institution_id', $institutionId);
+            
+            $subjects = $query->get()->map(function($sub) {
+                return [
+                    'id' => $sub->id, 
+                    'name' => $sub->name,
+                    'default_teacher' => null,
+                    'teacher_name' => null
+                ];
+            });
+        }
+
+        return response()->json($subjects);
+    }
+
+    /**
+     * AJAX: Check existing slots for Class, Teacher, and Room on a specific Day
+     */
+    public function checkAvailability(Request $request)
+    {
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+        $day = strtolower($request->day);
+        
+        if (!$institutionId || !$day) {
+            return response()->json([]);
+        }
+
+        $currentSession = AcademicSession::where('institution_id', $institutionId)
+            ->where('is_current', true)
+            ->first();
+
+        if (!$currentSession) return response()->json([]);
+
+        $query = Timetable::with(['classSection', 'subject', 'teacher.user'])
+            ->where('institution_id', $institutionId)
+            ->where('academic_session_id', $currentSession->id)
+            ->where('day_of_week', $day);
+
+        // Build OR condition to find ANY conflict involving the selected entities
+        $query->where(function($q) use ($request) {
+            if ($request->class_section_id) {
+                $q->orWhere('class_section_id', $request->class_section_id);
+            }
+            if ($request->staff_id) {
+                $q->orWhere('teacher_id', $request->staff_id);
+            }
+            if ($request->room_number) {
+                $q->orWhere('room_number', $request->room_number);
+            }
+        });
+
+        $slots = $query->orderBy('start_time')->get()->map(function($slot) use ($request) {
+            $conflicts = [];
+            if ($request->class_section_id && $slot->class_section_id == $request->class_section_id) $conflicts[] = 'Class';
+            if ($request->staff_id && $slot->teacher_id == $request->staff_id) $conflicts[] = 'Teacher';
+            if ($request->room_number && $slot->room_number == $request->room_number) $conflicts[] = 'Room';
+
+            return [
+                'start_time' => $slot->start_time->format('H:i'),
+                'end_time' => $slot->end_time->format('H:i'),
+                'subject' => $slot->subject->name ?? '-',
+                'teacher' => $slot->teacher->user->name ?? '-',
+                'class' => $slot->classSection->name ?? '-',
+                'room' => $slot->room_number ?? '-',
+                'conflicts' => $conflicts
+            ];
+        });
+
+        return response()->json($slots);
     }
 
     public function store(Request $request)
@@ -392,18 +486,28 @@ class TimetableController extends BaseController
 
         $institutions = Institution::where('id', $timetable->institution_id)->pluck('name', 'id');
         
-        // 1. Fetch Grade Levels
         $gradeLevels = GradeLevel::where('institution_id', $timetable->institution_id)
             ->orderBy('order_index')
             ->pluck('name', 'id');
 
-        // 2. Fetch Classes for current Grade (to allow editing within same grade)
         $currentClass = $timetable->classSection;
         $classes = ClassSection::where('grade_level_id', $currentClass->grade_level_id)
             ->where('institution_id', $timetable->institution_id)
             ->pluck('name', 'id');
 
-        $subjects = Subject::where('institution_id', $timetable->institution_id)->pluck('name', 'id');
+        $allocations = ClassSubject::where('class_section_id', $currentClass->id)->exists();
+        
+        if ($allocations) {
+            $subjects = ClassSubject::where('class_section_id', $currentClass->id)
+                ->with('subject')
+                ->get()
+                ->mapWithKeys(fn($a) => [$a->subject_id => $a->subject->name]);
+        } else {
+            $subjects = Subject::where('institution_id', $timetable->institution_id)
+                ->where('grade_level_id', $currentClass->grade_level_id)
+                ->pluck('name', 'id');
+        }
+
         $teachers = Staff::with('user')->where('institution_id', $timetable->institution_id)->get()->mapWithKeys(fn($t)=>[$t->id => $t->user->name]);
 
         return view('timetables.edit', compact('timetable', 'gradeLevels', 'classes', 'subjects', 'teachers', 'institutions', 'institutionId'));
@@ -474,21 +578,60 @@ class TimetableController extends BaseController
         $end = Carbon::parse($request->end_time)->format('H:i:s');
 
         if($end <= $start) {
-            throw ValidationException::withMessages(['end_time' => 'End time must be after start time.']);
+            throw ValidationException::withMessages(['end_time' => __('timetable.error_end_time')]);
         }
 
-        // Conflict Checks
+        // Overlap Logic: (start1 < end2) AND (end1 > start2)
+        
+        // 1. CLASS CHECK
+        $classConflict = Timetable::where('institution_id', $targetInstituteId)
+            ->where('class_section_id', $request->class_section_id)
+            ->where('academic_session_id', $currentSession->id)
+            ->where('day_of_week', $day)
+            ->where('id', '!=', $ignoreId)
+            ->where(function($q) use ($start, $end) {
+                $q->where('start_time', '<', $end)
+                  ->where('end_time', '>', $start);
+            })
+            ->exists();
+
+        if ($classConflict) {
+            throw ValidationException::withMessages(['class_section_id' => __('timetable.class_busy')]);
+        }
+
+        // 2. TEACHER CHECK
         if ($request->staff_id) {
-            $conflicts = Timetable::where('teacher_id', $request->staff_id)
-                ->where('day_of_week', $day)
+            $teacherConflict = Timetable::where('institution_id', $targetInstituteId)
+                ->where('teacher_id', $request->staff_id)
                 ->where('academic_session_id', $currentSession->id)
+                ->where('day_of_week', $day)
                 ->where('id', '!=', $ignoreId)
-                ->get();
-                
-            foreach($conflicts as $conflict) {
-                if ($conflict->start_time->format('H:i:s') < $end && $conflict->end_time->format('H:i:s') > $start) {
-                     throw ValidationException::withMessages(['staff_id' => __('timetable.teacher_busy')]);
-                }
+                ->where(function($q) use ($start, $end) {
+                    $q->where('start_time', '<', $end)
+                      ->where('end_time', '>', $start);
+                })
+                ->exists();
+
+            if ($teacherConflict) {
+                throw ValidationException::withMessages(['staff_id' => __('timetable.teacher_busy')]);
+            }
+        }
+
+        // 3. ROOM CHECK
+        if ($request->filled('room_number')) {
+            $roomConflict = Timetable::where('institution_id', $targetInstituteId)
+                ->where('room_number', $request->room_number)
+                ->where('academic_session_id', $currentSession->id)
+                ->where('day_of_week', $day)
+                ->where('id', '!=', $ignoreId)
+                ->where(function($q) use ($start, $end) {
+                    $q->where('start_time', '<', $end)
+                      ->where('end_time', '>', $start);
+                })
+                ->exists();
+
+            if ($roomConflict) {
+                throw ValidationException::withMessages(['room_number' => __('timetable.room_busy')]);
             }
         }
     }

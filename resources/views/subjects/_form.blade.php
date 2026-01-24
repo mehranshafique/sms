@@ -21,14 +21,12 @@
                             @endphp
 
                             @if($hasContext && !$isSuperAdmin)
-                                {{-- Standard User / Head Officer with Context: Auto-Fill --}}
                                 <input type="hidden" name="institution_id" value="{{ $institutionId }}">
                             @else
-                                {{-- Super Admin / No Context: Show Dropdown --}}
                                 <div class="mb-3 col-md-6">
-                                    <label class="form-label">Institution <span class="text-danger">*</span></label>
+                                    <label class="form-label">{{ __('subject.institution_label') }} <span class="text-danger">*</span></label>
                                     <select name="institution_id" class="form-control default-select" required>
-                                        <option value="">Select Institution</option>
+                                        <option value="">{{ __('subject.select_institution') }}</option>
                                         @foreach($institutions as $id => $name)
                                             <option value="{{ $id }}" {{ (old('institution_id', $subject->institution_id ?? ($hasContext ? $institutionId : '')) == $id) ? 'selected' : '' }}>
                                                 {{ $name }}
@@ -38,14 +36,18 @@
                                 </div>
                             @endif
 
-                            {{-- Grade Level Selection --}}
+                            {{-- Grade Level Selection (Enhanced with Data Attributes for JS) --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('subject.select_grade') }} <span class="text-danger">*</span></label>
-                                <select name="grade_level_id" class="form-control default-select" required>
+                                <select name="grade_level_id" id="gradeSelect" class="form-control default-select" required>
                                     <option value="">{{ __('subject.select_grade') }}</option>
-                                    @if(isset($gradeLevels) && count($gradeLevels) > 0)
-                                        @foreach($gradeLevels as $id => $name)
-                                            <option value="{{ $id }}" {{ (old('grade_level_id', $subject->grade_level_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                    @if(isset($grades))
+                                        @foreach($grades as $grade)
+                                            <option value="{{ $grade['id'] }}" 
+                                                    data-cycle="{{ $grade['cycle'] ?? 'primary' }}"
+                                                    {{ (old('grade_level_id', $subject->grade_level_id ?? '') == $grade['id']) ? 'selected' : '' }}>
+                                                {{ $grade['name'] }}
+                                            </option>
                                         @endforeach
                                     @endif
                                 </select>
@@ -70,10 +72,53 @@
                                 </select>
                             </div>
 
-                            <div class="mb-3 col-md-4">
-                                <label class="form-label">{{ __('subject.credit_hours') }}</label>
-                                <input type="number" name="credit_hours" class="form-control" value="{{ old('credit_hours', $subject->credit_hours ?? 0) }}" placeholder="{{ __('subject.enter_credits') }}">
+                            {{-- UNIVERSITY FIELDS CONTAINER --}}
+                            <div id="universityFields" style="display: none;" class="col-12 p-0">
+                                <div class="row m-0">
+                                    {{-- Department --}}
+                                    <div class="mb-3 col-md-6">
+                                        <label class="form-label">{{ __('subject.department') }}</label>
+                                        <select name="department_id" class="form-control default-select">
+                                            <option value="">-- {{ __('subject.select_department') }} --</option>
+                                            @if(isset($departments))
+                                                @foreach($departments as $id => $name)
+                                                    <option value="{{ $id }}" {{ (old('department_id', $subject->department_id ?? '') == $id) ? 'selected' : '' }}>
+                                                        {{ $name }}
+                                                    </option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
+
+                                    {{-- Prerequisite --}}
+                                    <div class="mb-3 col-md-6">
+                                        <label class="form-label">{{ __('subject.prerequisite') }}</label>
+                                        <select name="prerequisite_id" class="form-control default-select" data-live-search="true">
+                                            <option value="">-- {{ __('subject.select_prerequisite') }} --</option>
+                                            @if(isset($prerequisites))
+                                                @foreach($prerequisites as $id => $name)
+                                                    <option value="{{ $id }}" {{ (old('prerequisite_id', $subject->prerequisite_id ?? '') == $id) ? 'selected' : '' }}>
+                                                        {{ $name }}
+                                                    </option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
+
+                                    {{-- Semester --}}
+                                    <div class="mb-3 col-md-4">
+                                        <label class="form-label">{{ __('subject.semester') }}</label>
+                                        <input type="text" name="semester" class="form-control" value="{{ old('semester', $subject->semester ?? '') }}" placeholder="{{ __('subject.enter_semester') }}">
+                                    </div>
+
+                                    {{-- Credit Hours (Moved inside University fields) --}}
+                                    <div class="mb-3 col-md-4">
+                                        <label class="form-label">{{ __('subject.credit_hours') }}</label>
+                                        <input type="number" name="credit_hours" class="form-control" value="{{ old('credit_hours', $subject->credit_hours ?? 0) }}" placeholder="{{ __('subject.enter_credits') }}" step="0.5">
+                                    </div>
+                                </div>
                             </div>
+                            {{-- END UNIVERSITY FIELDS --}}
 
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('subject.total_marks') }} <span class="text-danger">*</span></label>
@@ -100,3 +145,31 @@
         </div>
     </div>
 </form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const gradeSelect = document.getElementById('gradeSelect');
+        const uniFields = document.getElementById('universityFields');
+
+        function toggleUniFields() {
+            if (!gradeSelect) return;
+            
+            // Get selected option
+            const selectedOption = gradeSelect.options[gradeSelect.selectedIndex];
+            const cycle = selectedOption.getAttribute('data-cycle');
+            
+            // Show if University, hide otherwise
+            // Note: 'university' here must match the enum value in GradeLevel migration
+            if (cycle === 'university' || cycle === 'cycle_lmd') { 
+                uniFields.style.display = 'block';
+            } else {
+                uniFields.style.display = 'none';
+            }
+        }
+
+        if (gradeSelect) {
+            gradeSelect.addEventListener('change', toggleUniFields);
+            toggleUniFields();
+        }
+    });
+</script>

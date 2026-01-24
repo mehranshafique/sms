@@ -54,7 +54,7 @@
                 </div>
             </div>
             <div class="col-sm-6 p-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
-                @can('student_enrollment.create')
+                @if(auth()->user()->can('student_enrollment.create'))
                 <a href="{{ route('enrollments.create') }}" class="btn btn-primary btn-rounded shadow-sm fw-bold px-4 py-2">
                     <i class="fa fa-plus me-2"></i> {{ __('enrollment.create_new') }}
                 </a>

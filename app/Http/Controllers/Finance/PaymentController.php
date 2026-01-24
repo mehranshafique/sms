@@ -11,6 +11,7 @@ use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash; // Added for password check
 use Illuminate\Support\Str;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
@@ -48,7 +49,15 @@ class PaymentController extends BaseController
             'payment_date' => 'required|date',
             'method' => 'required|in:cash,bank_transfer,card,online',
             'notes' => 'nullable|string',
+            'password' => 'required|string', // Added Password Validation
         ]);
+
+        // 1. Security Check: Validate Password
+        if (!Hash::check($request->password, Auth::user()->password)) {
+            return response()->json([
+                'message' => __('auth.password') ?? 'Incorrect password. Please try again.'
+            ], 422);
+        }
 
         $invoice = Invoice::with(['items.feeStructure', 'student'])->findOrFail($request->invoice_id);
         
@@ -60,7 +69,7 @@ class PaymentController extends BaseController
         $studentId = $invoice->student_id;
         $academicSessionId = $invoice->academic_session_id;
 
-        // --- 1. GLOBAL FEE CAP LOGIC ---
+        // --- 2. GLOBAL FEE CAP LOGIC ---
         $enrollment = StudentEnrollment::where('student_id', $studentId)
             ->where('academic_session_id', $academicSessionId)
             ->first();
@@ -98,7 +107,7 @@ class PaymentController extends BaseController
             }
         }
 
-        // --- 2. INSTALLMENT LOGIC ENFORCEMENT ---
+        // --- 3. INSTALLMENT LOGIC ENFORCEMENT ---
         foreach ($invoice->items as $item) {
             if ($item->feeStructure && $item->feeStructure->payment_mode === 'installment') {
                 $currentOrder = $item->feeStructure->installment_order;
@@ -125,7 +134,7 @@ class PaymentController extends BaseController
 
         $remaining = $invoice->total_amount - $invoice->paid_amount;
         
-        if($request->amount > ($remaining + 0.01)){ // Add small buffer for float comparison
+        if($request->amount > ($remaining + 0.01)){ 
             return response()->json(['message' => __('payment.exceeds_balance') . ' (' . number_format($remaining, 2) . ')'], 422);
         }
 
@@ -148,7 +157,6 @@ class PaymentController extends BaseController
             $total = (float)$invoice->total_amount;
             $paid = (float)$newPaid;
             
-            // Allow small float tolerance for 'paid' status
             $status = ($paid >= $total - 0.01) ? 'paid' : 'partial';
 
             $invoice->update([

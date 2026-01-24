@@ -8,7 +8,7 @@ use App\Models\ClassSection;
 use App\Models\Subject;
 use App\Models\StudentEnrollment;
 use App\Models\InstitutionSetting;
-use App\Enums\RoleEnum; // Ensure Enums are used
+use App\Enums\RoleEnum; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -160,6 +160,7 @@ class ExamScheduleController extends BaseController
 
     /**
      * Helper to auto-generate a schedule proposal
+     * UPDATED: Better looping logic to ensure maximum coverage
      */
     public function autoGenerate(Request $request)
     {
@@ -180,42 +181,76 @@ class ExamScheduleController extends BaseController
         $schoolStart = $settings['school_start_time'] ?? '08:00';
         $schoolEnd = $settings['school_end_time'] ?? '14:00';
 
-        // 2. Logic: Default Duration 2 Hours
-        $defaultDurationMinutes = 120; 
+        $defaultDurationMinutes = 120; // 2 hours duration
+        $gapMinutes = 30; // Gap between exams on the same day
         
-        $examStart = Carbon::parse($schoolStart);
-        $examEnd = $examStart->copy()->addMinutes($defaultDurationMinutes);
-
-        if ($examEnd->format('H:i') > $schoolEnd) {
-            $examEnd = Carbon::parse($schoolEnd);
-        }
-
-        // 3. Get Subjects (Only related to Class Grade Level)
+        // 2. Get Subjects
         $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
             ->where('is_active', true)
             ->get();
 
         $scheduleProposal = [];
-        $currentDate = Carbon::parse($exam->start_date);
-        $maxDate = Carbon::parse($exam->end_date);
+        
+        // 3. Smart Date Logic
+        $examStartDate = Carbon::parse($exam->start_date)->startOfDay();
+        $examEndDate = Carbon::parse($exam->end_date)->startOfDay();
+        $today = Carbon::now()->startOfDay();
+
+        // Start scheduling from Tomorrow if exam started in past, else from Start Date
+        if ($examStartDate->lte($today)) {
+            $currentDate = $today->copy()->addDay();
+        } else {
+            $currentDate = $examStartDate;
+        }
+
+        // Ensure we don't start AFTER the end date (edge case)
+        if ($currentDate->gt($examEndDate)) {
+            $currentDate = $examEndDate; 
+        }
+
+        // Initialize time slot tracking
+        $currentStartTime = Carbon::parse($schoolStart);
+        $maxEndTime = Carbon::parse($schoolEnd);
 
         foreach ($subjects as $subject) {
-            // Skip Sundays
+            // Check if current date is valid (not Sunday)
             while ($currentDate->isSunday()) {
                 $currentDate->addDay();
+                // Reset time for new day
+                $currentStartTime = Carbon::parse($schoolStart);
             }
 
-            if ($currentDate->gt($maxDate)) {
-                break;
+            // Calculate potential end time for this slot
+            $proposedEndTime = $currentStartTime->copy()->addMinutes($defaultDurationMinutes);
+
+            // If the exam goes beyond school hours, move to next day
+            if ($proposedEndTime->format('H:i') > $maxEndTime->format('H:i')) {
+                $currentDate->addDay();
+                // Re-check Sunday for the new day
+                while ($currentDate->isSunday()) {
+                    $currentDate->addDay();
+                }
+                // Reset time to start of day
+                $currentStartTime = Carbon::parse($schoolStart);
+                $proposedEndTime = $currentStartTime->copy()->addMinutes($defaultDurationMinutes);
             }
+
+            // If we've run past the exam end date, just use the end date (cram them in)
+            // Note: If we are cramming on the last day, time logic might still push beyond school hours
+            // but we will allow it for now to ensure all subjects get a slot.
+            $dateToUse = $currentDate->gt($examEndDate) ? $examEndDate : $currentDate;
 
             $scheduleProposal[$subject->id] = [
-                'date' => $currentDate->format('Y-m-d'),
-                'start_time' => $examStart->format('H:i'),
-                'end_time' => $examEnd->format('H:i'),
+                'date' => $dateToUse->format('Y-m-d'),
+                'start_time' => $currentStartTime->format('H:i'),
+                'end_time' => $proposedEndTime->format('H:i'),
             ];
 
-            $currentDate->addDay();
+            // Prepare start time for the *next* subject on the SAME day
+            $currentStartTime = $proposedEndTime->copy()->addMinutes($gapMinutes);
+            
+            // Note: We do NOT increment the day here. The loop's next iteration will check 
+            // if the updated $currentStartTime fits within school hours. If not, it increments the day then.
         }
 
         return response()->json([
@@ -404,6 +439,11 @@ class ExamScheduleController extends BaseController
         $fileName = 'Admit_Cards_' . $classSection->name . '_' . $exam->name . '.pdf';
         if ($request->student_id && $students->count() == 1) {
             $fileName = 'Admit_Card_' . $students->first()->full_name . '.pdf';
+        }
+        
+        // --- NEW: Support for Preview Action ---
+        if ($request->has('preview') && $request->preview == '1') {
+            return $pdf->stream($fileName);
         }
         
         return $pdf->download($fileName);

@@ -35,15 +35,18 @@ class RolePermissionSeeder extends Seeder
             
             // Academic Cycle
             'Academic Sessions' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Departments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Grade Levels' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Class Sections' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Class Subjects' => ['view', 'update'],
             'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Assignments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Added Assignments
+            'Assignments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             
             // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'University Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Added for new module
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
             'Student Promotion' => ['view', 'create'],
             'Student Transfers' => ['view', 'create', 'print'],
@@ -78,10 +81,6 @@ class RolePermissionSeeder extends Seeder
             'Notices' => ['view', 'create', 'update', 'delete','viewAny'],
             'Voting' => ['view', 'create', 'update', 'delete'],
             'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
-
-            // Additional Modules (mentioned in premium plan)
-            // 'Library' => ['view', 'create', 'update', 'delete'],
-            // 'Transport' => ['view', 'create', 'update', 'delete'],
         ];
 
         // 3. Create Modules and Permissions dynamically
@@ -96,10 +95,7 @@ class RolePermissionSeeder extends Seeder
             );
 
             foreach ($actions as $action) {
-                // Formatting: singular_module.action (e.g. academic_session.view)
                 $singularKey = Str::singular($slug);
-                
-                // Exceptional cases
                 if ($slug === 'settings') $singularKey = 'setting';
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
                 if ($slug === 'sms_templates') $singularKey = 'sms_template';
@@ -121,7 +117,7 @@ class RolePermissionSeeder extends Seeder
             }
         }
 
-        // 4. Create Global Template Roles (institution_id = null)
+        // 4. Create Global Template Roles
         $superAdminRole = Role::firstOrCreate([
             'name' => RoleEnum::SUPER_ADMIN->value, 
             'guard_name' => 'web', 
@@ -143,8 +139,6 @@ class RolePermissionSeeder extends Seeder
         // 5. Assign Permissions
         $superAdminRole->syncPermissions($allPermissions);
 
-        // School Admin (Template)
-        // Gets all permissions except super-admin specific ones
         $schoolAdminPermissions = array_filter($allPermissions, function($perm) {
             return !Str::startsWith($perm, ['institution.', 'package.', 'subscription.', 'audit_log.', 'module.']);
         });

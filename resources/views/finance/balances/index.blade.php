@@ -174,8 +174,12 @@
                     response.tabs.forEach((tab, index) => {
                         let isActive = index === 0 ? 'show active' : '';
                         
+                        // Get students specific to this tab
+                        let studentsForTab = response.students_by_tab[tab.id] || [];
+
                         // --- CALCULATE TAB STATISTICS ---
                         let statTotalStudents = 0;
+                        let statTotalPaidStudents = 0;
                         let statTotalPaid = 0;
                         let statTotalDue = 0;
                         let currencySymbol = '';
@@ -183,54 +187,55 @@
                         // Build Student Rows for this Tab
                         let rowsHtml = '';
                         
-                        response.students.forEach(item => {
+                        studentsForTab.forEach(item => {
                             let student = item.student;
-                            let status = item.statuses[tab.id]; // {label, style, paid, due}
+                            let status = item.status; // {label, style, paid, due, has_invoice}
                             
-                            // Ensure data exists for this specific installment
-                            if (status) {
-                                statTotalStudents++;
-                                
-                                // Parse money values safely
-                                let pVal = parseFloat(String(status.paid).replace(/[^0-9.-]+/g,"")) || 0;
-                                let dVal = parseFloat(String(status.due).replace(/[^0-9.-]+/g,"")) || 0;
-                                
-                                statTotalPaid += pVal;
-                                statTotalDue += dVal;
-
-                                // Capture symbol if not set
-                                if(!currencySymbol && (String(status.paid).match(/[^0-9.-]+/))) {
-                                    currencySymbol = String(status.paid).replace(/[0-9.,-]+/g, '').trim();
-                                }
-
-                                let photoUrl = student.photo ? '/storage/'+student.photo : null;
-                                let avatar = photoUrl 
-                                    ? `<img src="${photoUrl}" class="rounded-circle me-2" width="35" height="35">`
-                                    : `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width:35px;height:35px">${student.name.charAt(0)}</div>`;
-
-                                let actionUrl = "/finance/student/" + student.id + "/dashboard";
-
-                                rowsHtml += `
-                                    <tr class="student-row">
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                ${avatar}
-                                                <div>
-                                                    <h6 class="mb-0 fs-14 student-name">${student.name}</h6>
-                                                    <small class="text-muted student-id">${student.admission_no}</small>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td><span class="badge badge-${status.style} light">${status.label}</span></td>
-                                        <td class="text-success fw-bold">${status.paid}</td>
-                                        <td class="text-danger fw-bold">${status.due}</td>
-                                        <td>
-                                            <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow" target="_blank" title="{{ __('finance.view_dashboard') }}">
-                                                <i class="fa fa-arrow-right"></i>
-                                            </a>
-                                        </td>
-                                    </tr>`;
+                            statTotalStudents++;
+                            
+                            // Parse money values safely
+                            let pVal = parseFloat(String(status.paid).replace(/[^0-9.-]+/g,"")) || 0;
+                            let dVal = parseFloat(String(status.due).replace(/[^0-9.-]+/g,"")) || 0;
+                            
+                            if(status.has_invoice && dVal <= 0.01) {
+                                statTotalPaidStudents++;
                             }
+
+                            statTotalPaid += pVal;
+                            statTotalDue += dVal;
+
+                            // Capture symbol if not set
+                            if(!currencySymbol && (String(status.paid).match(/[^0-9.-]+/))) {
+                                currencySymbol = String(status.paid).replace(/[0-9.,-]+/g, '').trim();
+                            }
+
+                            let photoUrl = student.photo ? '/storage/'+student.photo : null;
+                            let avatar = photoUrl 
+                                ? `<img src="${photoUrl}" class="rounded-circle me-2" width="35" height="35">`
+                                : `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width:35px;height:35px">${student.name.charAt(0)}</div>`;
+
+                            let actionUrl = "/finance/student/" + student.id + "/dashboard";
+
+                            rowsHtml += `
+                                <tr class="student-row">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            ${avatar}
+                                            <div>
+                                                <h6 class="mb-0 fs-14 student-name">${student.name}</h6>
+                                                <small class="text-muted student-id">${student.admission_no}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge badge-${status.style} light">${status.label}</span></td>
+                                    <td class="text-success fw-bold">${status.paid}</td>
+                                    <td class="text-danger fw-bold">${status.due}</td>
+                                    <td>
+                                        <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow" target="_blank" title="{{ __('finance.view_dashboard') }}">
+                                            <i class="fa fa-arrow-right"></i>
+                                        </a>
+                                    </td>
+                                </tr>`;
                         });
 
                         // Calculate Invoice Total (Paid + Due)
@@ -242,6 +247,11 @@
                         let contentHtml = `
                             <div class="tab-pane fade ${isActive}" id="content-${tab.id}" role="tabpanel">
                                 
+                                {{-- Tab Helper Text --}}
+                                <div class="alert alert-info border-0 bg-info-light text-info mb-4">
+                                    <i class="fa fa-info-circle me-2"></i> ${tab.description}
+                                </div>
+
                                 {{-- Compact Summary Stats Row --}}
                                 <div class="row mb-4">
                                     <div class="col-xl-3 col-sm-6">
@@ -251,9 +261,15 @@
                                                     <div class="icon-box bg-light-primary text-primary rounded-circle me-3 p-3">
                                                         <i class="fa fa-users fa-2x"></i>
                                                     </div>
-                                                    <div>
-                                                        <p class="text-muted mb-1 fs-12 text-uppercase">{{ __('finance.students_count') }}</p>
-                                                        <h4 class="mb-0 fw-bold text-dark">${statTotalStudents}</h4>
+                                                    <div class="flex-grow-1">
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted fs-12 text-uppercase">{{ __('finance.students_count') }}</span>
+                                                            <h4 class="mb-0 fw-bold text-dark">${statTotalStudents}</h4>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between border-top pt-1">
+                                                            <span class="text-success fs-12 text-uppercase">{{ __('finance.paid_students') ?? 'Paid' }}</span>
+                                                            <h5 class="mb-0 fw-bold text-success">${statTotalPaidStudents}</h5>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

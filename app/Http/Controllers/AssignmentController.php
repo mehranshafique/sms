@@ -7,6 +7,7 @@ use App\Models\ClassSection;
 use App\Models\Subject;
 use App\Models\AcademicSession;
 use App\Models\Timetable;
+use App\Models\ClassSubject; // Added
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,7 @@ use App\Enums\RoleEnum;
 
 class AssignmentController extends BaseController
 {
+    // ... (Constructor and index methods unchanged) ...
     public function __construct()
     {
         $this->setPageTitle(__('assignment.page_title'));
@@ -69,12 +71,16 @@ class AssignmentController extends BaseController
             ->where('institution_id', $institutionId)
             ->where('is_active', true);
 
+        // UPDATE: Checked both Timetable AND ClassAllocation
         if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
             $staffId = $user->staff->id;
             $classesQuery->where(function($q) use ($staffId) {
                 $q->where('staff_id', $staffId) // Class Teacher
                   ->orWhereHas('timetables', function($t) use ($staffId) {
-                      $t->where('teacher_id', $staffId); // Subject Teacher
+                      $t->where('teacher_id', $staffId); // Subject Teacher (Timetable)
+                  })
+                  ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                      $c->where('teacher_id', $staffId); // Subject Teacher (Allocation)
                   });
             });
         }
@@ -87,6 +93,56 @@ class AssignmentController extends BaseController
         return view('assignments.create', compact('classes'));
     }
 
+    // UPDATE: Fetch subjects based on hybrid logic
+    public function getSubjects(Request $request)
+    {
+        $request->validate(['class_section_id' => 'required|exists:class_sections,id']);
+        
+        $user = Auth::user();
+        $section = ClassSection::find($request->class_section_id);
+        
+        if (!$section) return response()->json([]);
+
+        if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
+            $staffId = $user->staff->id;
+            
+            // 1. Get from Timetable
+            $subjectIds = Timetable::where('teacher_id', $staffId)
+                ->where('class_section_id', $section->id)
+                ->pluck('subject_id')
+                ->toArray();
+
+            // 2. Get from Allocations
+            $allocatedIds = ClassSubject::where('teacher_id', $staffId)
+                ->where('class_section_id', $section->id)
+                ->pluck('subject_id')
+                ->toArray();
+
+            $allIds = array_unique(array_merge($subjectIds, $allocatedIds));
+
+            if (empty($allIds)) return response()->json([]);
+
+            $subjects = Subject::whereIn('id', $allIds)->where('is_active', true)->get();
+        } else {
+            // Admin logic: Prefer allocated subjects if exist, else Global
+            $allocated = ClassSubject::where('class_section_id', $section->id)->with('subject')->get();
+            if ($allocated->isNotEmpty()) {
+                $subjects = $allocated->pluck('subject');
+            } else {
+                $subjects = Subject::where('grade_level_id', $section->grade_level_id)
+                    ->where('is_active', true)
+                    ->get();
+            }
+        }
+
+        $formatted = $subjects->map(function($s) {
+            return ['id' => $s->id, 'name' => $s->name];
+        });
+
+        return response()->json($formatted);
+    }
+
+    // ... (Store and destroy methods remain unchanged) ...
     public function store(Request $request)
     {
         $request->validate([
@@ -122,40 +178,6 @@ class AssignmentController extends BaseController
         ]);
 
         return redirect()->route('assignments.index')->with('success', __('assignment.success_create'));
-    }
-
-    public function getSubjects(Request $request)
-    {
-        $request->validate(['class_section_id' => 'required|exists:class_sections,id']);
-        
-        $user = Auth::user();
-        $section = ClassSection::find($request->class_section_id);
-        
-        if (!$section) return response()->json([]);
-
-        if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
-            $staffId = $user->staff->id;
-            
-            $subjectIds = Timetable::where('teacher_id', $staffId)
-                ->where('class_section_id', $section->id)
-                ->pluck('subject_id')
-                ->unique()
-                ->toArray();
-
-            if (empty($subjectIds)) return response()->json([]);
-
-            $subjects = Subject::whereIn('id', $subjectIds)->where('is_active', true)->get();
-        } else {
-            $subjects = Subject::where('grade_level_id', $section->grade_level_id)
-                ->where('is_active', true)
-                ->get();
-        }
-
-        $formatted = $subjects->map(function($s) {
-            return ['id' => $s->id, 'name' => $s->name];
-        });
-
-        return response()->json($formatted);
     }
     
     public function destroy(Assignment $assignment)

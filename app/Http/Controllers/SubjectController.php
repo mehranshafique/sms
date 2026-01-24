@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Subject;
 use App\Models\GradeLevel;
 use App\Models\Institution;
+use App\Models\Department; 
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class SubjectController extends BaseController
 {
@@ -20,14 +22,12 @@ class SubjectController extends BaseController
 
     public function index(Request $request)
     {
-        // 1. Get Context
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $data = Subject::with(['gradeLevel', 'institution'])
+            $data = Subject::with(['gradeLevel', 'institution', 'department']) 
                 ->select('subjects.*');
 
-            // 2. Strict Scoping
             if ($institutionId) {
                 $data->where('institution_id', $institutionId);
             }
@@ -49,6 +49,12 @@ class SubjectController extends BaseController
                 })
                 ->addColumn('grade', function($row){
                     return $row->gradeLevel->name ?? 'N/A';
+                })
+                ->addColumn('department', function($row){
+                    return $row->department->name ?? '-';
+                })
+                ->addColumn('credits', function($row){
+                    return $row->credit_hours > 0 ? $row->credit_hours : '-';
                 })
                 ->editColumn('type', function($row){
                     return ucfirst($row->type);
@@ -79,7 +85,6 @@ class SubjectController extends BaseController
                 ->make(true);
         }
 
-        // Stats Logic - Scoped
         $query = Subject::query();
         if ($institutionId) {
             $query->where('institution_id', $institutionId);
@@ -109,41 +114,67 @@ class SubjectController extends BaseController
             $gradeLevelsQuery->with('institution');
         }
         
-        $gradeLevelsCollection = $gradeLevelsQuery->orderBy('order_index')->get();
-        
-        $gradeLevels = $gradeLevelsCollection->mapWithKeys(function($item) use ($institutionId) {
-            $label = $item->name;
-            if (!$institutionId && $item->institution) {
-                $label .= ' (' . $item->institution->name . ')';
-            }
-            return [$item->id => $label];
+        $grades = $gradeLevelsQuery->orderBy('order_index')->get()->map(function($item) use ($institutionId) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name . ($institutionId ? '' : ' (' . ($item->institution->name ?? '') . ')'),
+                'cycle' => $item->education_cycle 
+            ];
         });
+
+        $departments = [];
+        if ($institutionId) {
+            $departments = Department::where('institution_id', $institutionId)->pluck('name', 'id');
+        }
+
+        $prerequisites = [];
+        if ($institutionId) {
+            $prerequisites = Subject::where('institution_id', $institutionId)->where('is_active', true)->pluck('name', 'id');
+        }
             
-        return view('subjects.create', compact('gradeLevels', 'institutions', 'institutionId'));
+        return view('subjects.create', compact('grades', 'institutions', 'institutionId', 'departments', 'prerequisites'));
     }
 
     public function store(Request $request)
     {
-        // 1. Resolve ID
         $institutionId = $this->getInstitutionId() ?? $request->institution_id;
 
         $validated = $request->validate([
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
+            'department_id'  => 'nullable|exists:departments,id', 
+            'prerequisite_id'=> 'nullable|exists:subjects,id', 
             'name'           => ['required', 'string', 'max:100', 
-                // Rule: Unique name per grade level
                 Rule::unique('subjects')
                     ->where('grade_level_id', $request->grade_level_id)
             ],
             'code'           => 'nullable|string|max:30',
+            'semester'       => 'nullable|string|max:20', 
             'type'           => 'required|in:theory,practical,both',
-            'credit_hours'   => 'nullable|integer|min:0',
+            'credit_hours'   => 'nullable|numeric|min:0', 
             'total_marks'    => 'required|integer|min:0',
             'passing_marks'  => 'required|integer|min:0|lte:total_marks',
             'is_active'      => 'boolean'
         ]);
 
         $validated['institution_id'] = $institutionId;
+
+        // Auto-generate code if empty
+        if (empty($validated['code'])) {
+            $baseCode = Str::upper(Str::slug($validated['name'], ''));
+            // Take first 3-4 chars for brevity if needed, but full slug is safer for uniqueness base
+            // Let's keep full slug to avoid collision initially
+            $code = $baseCode;
+            $counter = 1;
+
+            while (Subject::where('institution_id', $institutionId)
+                          ->where('code', $code)
+                          ->exists()) {
+                $code = $baseCode . $counter;
+                $counter++;
+            }
+            $validated['code'] = $code;
+        }
 
         Subject::create($validated);
 
@@ -155,7 +186,7 @@ class SubjectController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $subject->institution_id != $institutionId) abort(403);
         
-        $subject->load('gradeLevel', 'institution');
+        $subject->load('gradeLevel', 'institution', 'department', 'prerequisite');
         return view('subjects.show', compact('subject'));
     }
 
@@ -163,7 +194,6 @@ class SubjectController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
 
-        // Strict Check
         if ($institutionId && $subject->institution_id != $institutionId) {
             abort(403, 'Unauthorized access.');
         }
@@ -177,16 +207,22 @@ class SubjectController extends BaseController
             $gradeLevelsQuery->with('institution');
         }
         
-        $gradeLevelsCollection = $gradeLevelsQuery->orderBy('order_index')->get();
-        $gradeLevels = $gradeLevelsCollection->mapWithKeys(function($item) use ($institutionId) {
-            $label = $item->name;
-            if (!$institutionId && $item->institution) {
-                $label .= ' (' . $item->institution->name . ')';
-            }
-            return [$item->id => $label];
+        $grades = $gradeLevelsQuery->orderBy('order_index')->get()->map(function($item) use ($institutionId) {
+            return [
+                'id' => $item->id,
+                'name' => $item->name . ($institutionId ? '' : ' (' . ($item->institution->name ?? '') . ')'),
+                'cycle' => $item->education_cycle
+            ];
         });
 
-        return view('subjects.edit', compact('subject', 'gradeLevels', 'institutions', 'institutionId'));
+        $departments = Department::where('institution_id', $subject->institution_id)->pluck('name', 'id');
+        
+        $prerequisites = Subject::where('institution_id', $subject->institution_id)
+            ->where('id', '!=', $subject->id) 
+            ->where('is_active', true)
+            ->pluck('name', 'id');
+
+        return view('subjects.edit', compact('subject', 'grades', 'institutions', 'institutionId', 'departments', 'prerequisites'));
     }
 
     public function update(Request $request, Subject $subject)
@@ -197,19 +233,20 @@ class SubjectController extends BaseController
             abort(403);
         }
         
-        $targetId = $institutionId ?? $subject->institution_id;
-
         $validated = $request->validate([
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
+            'department_id'  => 'nullable|exists:departments,id',
+            'prerequisite_id'=> 'nullable|exists:subjects,id|different:id', 
             'name'           => ['required', 'string', 'max:100', 
                 Rule::unique('subjects')
                     ->ignore($subject->id)
                     ->where('grade_level_id', $request->grade_level_id)
             ],
             'code'           => 'nullable|string|max:30',
+            'semester'       => 'nullable|string|max:20',
             'type'           => 'required|in:theory,practical,both',
-            'credit_hours'   => 'nullable|integer|min:0',
+            'credit_hours'   => 'nullable|numeric|min:0',
             'total_marks'    => 'required|integer|min:0',
             'passing_marks'  => 'required|integer|min:0|lte:total_marks',
             'is_active'      => 'boolean'
@@ -217,6 +254,23 @@ class SubjectController extends BaseController
 
         if ($institutionId) {
             $validated['institution_id'] = $institutionId;
+        }
+
+        // Auto-generate code if empty
+        if (empty($validated['code'])) {
+            $baseCode = Str::upper(Str::slug($validated['name'], ''));
+            $code = $baseCode;
+            $counter = 1;
+
+            // Check uniqueness against other subjects (excluding self)
+            while (Subject::where('institution_id', $institutionId ?? $subject->institution_id)
+                          ->where('code', $code)
+                          ->where('id', '!=', $subject->id)
+                          ->exists()) {
+                $code = $baseCode . $counter;
+                $counter++;
+            }
+            $validated['code'] = $code;
         }
 
         $subject->update($validated);
@@ -240,14 +294,10 @@ class SubjectController extends BaseController
         $ids = $request->ids;
         if (!empty($ids)) {
             $institutionId = $this->getInstitutionId();
-            
             $query = Subject::whereIn('id', $ids);
-            
-            // Secure Bulk Delete
             if ($institutionId) {
                 $query->where('institution_id', $institutionId);
             }
-            
             $query->delete();
             return response()->json(['success' => __('subject.messages.success_delete')]);
         }

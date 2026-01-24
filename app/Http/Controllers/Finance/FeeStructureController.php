@@ -44,7 +44,6 @@ class FeeStructureController extends BaseController
                 ->addColumn('parent_fee_name', function($row) use ($institutionId) {
                     if ($row->payment_mode === 'installment') {
                         // Attempt to find the parent Global fee
-                        // Logic: Same Institution, Grade, Session, FeeType, but mode is Global
                         $global = FeeStructure::where('institution_id', $row->institution_id)
                             ->where('grade_level_id', $row->grade_level_id)
                             ->where('academic_session_id', $row->academic_session_id)
@@ -160,7 +159,39 @@ class FeeStructureController extends BaseController
             return response()->json(['message' => __('finance.no_active_session')], 422);
         }
 
-        // --- VALIDATION: STRICT DEPENDENCY ON GLOBAL FEE ---
+        // --- VALIDATION: PREVENT DUPLICATE GLOBAL FEE CONFIGURATION ---
+        if ($request->payment_mode === 'global') {
+            $exists = FeeStructure::where('institution_id', $institutionId)
+                ->where('academic_session_id', $session->id)
+                ->where('fee_type_id', $request->fee_type_id)
+                ->where('payment_mode', 'global')
+                // Check scope overlap: Same Grade OR Same Class
+                ->where(function($q) use ($request) {
+                    if ($request->class_section_id) {
+                        $q->where('class_section_id', $request->class_section_id);
+                    } elseif ($request->grade_level_id) {
+                        $q->where('grade_level_id', $request->grade_level_id)
+                          ->whereNull('class_section_id'); // Ensure we target the grade-wide fee
+                    } else {
+                        // Global for ALL grades? (If your system supports it)
+                        // If both are null, it implies institute-wide fee.
+                        $q->whereNull('grade_level_id')->whereNull('class_section_id');
+                    }
+                })
+                ->exists();
+
+            if ($exists) {
+                // Return a specific error code or message that the frontend can use to prompt user
+                // Or simply block it. The prompt logic would require a multi-step confirmation flow
+                // which is complex for a standard store method. 
+                // Blocking with a clear message is safer and standard for API consistency.
+                return response()->json([
+                    'message' => __('finance.duplicate_global_config_error')
+                ], 422);
+            }
+        }
+
+        // --- VALIDATION: STRICT DEPENDENCY ON GLOBAL FEE (Existing Logic) ---
         if ($request->payment_mode === 'installment' && $request->grade_level_id) {
             
             // 1. Check for Existing Global Fee for this Grade/Session

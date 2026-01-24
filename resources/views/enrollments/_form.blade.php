@@ -14,18 +14,7 @@
                     <div class="basic-form">
                         <div class="row">
                             
-                            {{-- Student Selection (Disabled on Edit to prevent ID swap) --}}
-                            <div class="mb-3 col-md-6">
-                                <label class="form-label">{{ __('enrollment.select_student') }} <span class="text-danger">*</span></label>
-                                <select name="student_id" class="form-control default-select" required {{ isset($enrollment) ? 'disabled' : '' }}>
-                                    <option value="">{{ __('enrollment.select_student') }}</option>
-                                    @foreach($students as $id => $name)
-                                        <option value="{{ $id }}" {{ (old('student_id', $enrollment->student_id ?? '') == $id) ? 'selected' : '' }}>{{ $name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            {{-- Class Selection --}}
+                            {{-- Class Selection (Moved to First Position for Logic Flow) --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('enrollment.select_class') }} <span class="text-danger">*</span></label>
                                 <select name="class_section_id" class="form-control default-select" required>
@@ -36,13 +25,38 @@
                                 </select>
                             </div>
 
-                            {{-- Roll Number --}}
+                            {{-- Student Selection (Bulk / Single) --}}
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label">{{ __('enrollment.select_student') }} <span class="text-danger">*</span></label>
+                                
+                                @if(isset($enrollment))
+                                    {{-- Edit Mode: Single Student Readonly --}}
+                                    <select name="student_id" class="form-control default-select" required disabled>
+                                        @foreach($students as $id => $name)
+                                            <option value="{{ $id }}" selected>{{ $name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input type="hidden" name="student_id" value="{{ $enrollment->student_id }}">
+                                @else
+                                    {{-- Create Mode: Bulk Multi-Select --}}
+                                    <select name="student_ids[]" class="form-control default-select" multiple data-live-search="true" required>
+                                        @foreach($students as $id => $name)
+                                            <option value="{{ $id }}">{{ $name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <small class="text-muted">You can select multiple students to enroll them in this class at once.</small>
+                                @endif
+                            </div>
+
+                            {{-- Roll Number (Only visible in Edit Mode, auto-generated/ignored in bulk) --}}
+                            @if(isset($enrollment))
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('enrollment.roll_number') }}</label>
                                 <input type="text" name="roll_number" class="form-control" value="{{ old('roll_number', $enrollment->roll_number ?? '') }}" placeholder="{{ __('enrollment.enter_roll') }}">
                             </div>
+                            @endif
 
-                            {{-- Date Picker (Fixed Style using 'datepicker' class) --}}
+                            {{-- Date Picker --}}
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('enrollment.enrolled_at') }} <span class="text-danger">*</span></label>
                                 <input type="text" name="enrolled_at" class="form-control datepicker" value="{{ old('enrolled_at', isset($enrollment) && $enrollment->enrolled_at ? $enrollment->enrolled_at->format('Y-m-d') : date('Y-m-d')) }}" placeholder="YYYY-MM-DD" required>

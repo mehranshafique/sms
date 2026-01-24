@@ -64,6 +64,11 @@
                                 <textarea name="notes" class="form-control" rows="2"></textarea>
                             </div>
 
+                            <div class="mb-4">
+                                <label class="form-label text-danger font-w600"><i class="fa fa-lock me-1"></i> Admin Password Confirmation <span class="text-danger">*</span></label>
+                                <input type="password" name="password" class="form-control border-danger" required placeholder="Enter your login password to confirm">
+                            </div>
+
                             <button type="submit" class="btn btn-success w-100">{{ __('payment.confirm_payment') }}</button>
                         </form>
                     </div>
@@ -80,6 +85,12 @@
     $(document).ready(function(){
         $('#paymentForm').submit(function(e){
             e.preventDefault();
+            
+            // Disable button to prevent double submit
+            let btn = $(this).find('button[type="submit"]');
+            let originalText = btn.text();
+            btn.prop('disabled', true).text('Processing...');
+
             $.ajax({
                 url: $(this).attr('action'),
                 type: "POST",
@@ -90,7 +101,8 @@
                     });
                 },
                 error: function(xhr){
-                    let msg = xhr.responseJSON.message || '{{ __("payment.error_occurred") }}';
+                    btn.prop('disabled', false).text(originalText);
+                    let msg = xhr.responseJSON ? xhr.responseJSON.message : '{{ __("payment.error_occurred") }}';
                     Swal.fire('{{ __("payment.error") }}', msg, 'error');
                 }
             });

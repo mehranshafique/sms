@@ -49,7 +49,7 @@ return [
     // NEW SAFETY MESSAGES
     'global_amount_too_low' => 'Cannot reduce Global Fee below the sum of existing installments (:total).',
     'cannot_delete_global_with_installments' => 'Cannot delete Global Fee because active installments exist. Please delete installments first.',
-    
+    'duplicate_global_config_error' => 'This class/grade already has a Global Fee configuration for this Fee Type. Please edit the existing structure instead of creating a duplicate.', // Added
     // Buttons & Actions
     'save' => 'Save',
     'cancel' => 'Cancel', // Added
@@ -147,4 +147,10 @@ return [
     'status_partial' => 'Partial',
     'status_unpaid' => 'Unpaid',
     'status_overdue' => 'Overdue',
+     
+    // NEW KEYS FOR TAB DESCRIPTIONS
+    'tab_info_global' => 'Students with "Global" payment mode (Lump-sum payers).',
+    'tab_info_installment' => 'Students with "Installment" payment mode.',
+    'summary' => 'Total Summary',
+    'tab_info_summary' => 'Cumulative financial summary for all students in this class.',
 ];

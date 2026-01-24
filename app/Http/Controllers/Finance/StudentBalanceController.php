@@ -11,13 +11,16 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
 use App\Enums\CurrencySymbol;
+use Spatie\Permission\Middleware\PermissionMiddleware; // Added
 
 class StudentBalanceController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
-        // Permission check can be added here if needed, e.g., view_financial_reports
+        // Permission check: Reuse 'invoice.view' or add specific 'balance.view'
+        // Using 'invoice.view' as it's finance related and usually shared
+        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'getClassDetails']);
         $this->setPageTitle(__('finance.balance_overview')); 
     }
 
@@ -46,31 +49,28 @@ class StudentBalanceController extends BaseController
                     return $row->enrollments()->where('status', 'active')->count();
                 })
                 ->addColumn('paid_students_count', function($row){
-                    // FIX: Ensure we only count students who HAVE invoices and have paid them off.
-                    
-                    // 1. Get all active students in class
+                    // LOGIC: Paid Count = (Students with Invoices) - (Students with Debt)
                     $studentIds = $row->enrollments()->where('status', 'active')->pluck('student_id');
                     
                     if($studentIds->isEmpty()) return 0;
 
-                    // 2. Find students who actually HAVE invoices (Billed Students)
-                    $invoicedStudentIds = Invoice::whereIn('student_id', $studentIds)
-                        ->distinct()
-                        ->pluck('student_id');
-
-                    // If no one is billed, paid count is 0
-                    if($invoicedStudentIds->isEmpty()) return 0;
-
-                    // 3. Find students who HAVE debt (due > 0.01)
-                    $debtorIds = Invoice::whereIn('student_id', $studentIds)
-                        ->selectRaw('student_id, SUM(total_amount - paid_amount) as due')
+                    $invoicedStudents = Invoice::whereIn('student_id', $studentIds)
+                        ->select('student_id')
                         ->groupBy('student_id')
-                        ->having('due', '>', 0.01) 
+                        ->get()
                         ->pluck('student_id');
                     
-                    // 4. Paid Students = (Billed Students) - (Students with Debt)
-                    // This excludes students who have never been invoiced.
-                    return $invoicedStudentIds->diff($debtorIds)->count();
+                    if($invoicedStudents->isEmpty()) return 0;
+
+                    $debtorIds = Invoice::whereIn('student_id', $studentIds)
+                        ->select('student_id')
+                        ->groupBy('student_id')
+                        ->havingRaw('SUM(total_amount - paid_amount) > 0.01')
+                        ->pluck('student_id');
+
+                    $fullyPaidCount = $invoicedStudents->diff($debtorIds)->count();
+
+                    return $fullyPaidCount;
                 })
                 ->addColumn('total_invoiced', function($row){
                     return CurrencySymbol::default() . ' ' . number_format($this->getClassFinancials($row->id, 'total'), 2);
@@ -107,13 +107,10 @@ class StudentBalanceController extends BaseController
         $institutionId = $this->getInstitutionId();
         $classSection = ClassSection::findOrFail($id);
         
-        // --- SECURITY CHECK ---
-        // Prevent accessing class details from another institution context
         if ($institutionId && $classSection->institution_id != $institutionId) {
             abort(403, __('finance.unauthorized_access'));
         }
 
-        // 1. Identify Installments / Fee Groups
         $feeStructures = FeeStructure::where('institution_id', $institutionId)
             ->where(function($q) use ($classSection) {
                 $q->where('grade_level_id', $classSection->grade_level_id)
@@ -126,7 +123,11 @@ class StudentBalanceController extends BaseController
         
         // A. Global Tab
         if ($feeStructures->where('payment_mode', 'global')->isNotEmpty()) {
-            $tabs[] = ['id' => 'global', 'label' => __('finance.annual_fee')];
+            $tabs[] = [
+                'id' => 'global', 
+                'label' => __('finance.annual_fee'),
+                'description' => __('finance.tab_info_global')
+            ];
         }
 
         // B. Installment Tabs
@@ -139,99 +140,137 @@ class StudentBalanceController extends BaseController
             if ($fees->count() > 1) {
                 $label = __('finance.installment_label') . " $order";
             }
-            
-            $tabs[] = ['id' => 'inst_'.$order, 'label' => $label, 'order' => $order];
+            $tabs[] = [
+                'id' => 'inst_'.$order, 
+                'label' => $label, 
+                'order' => $order,
+                'description' => __('finance.tab_info_installment')
+            ];
         }
 
+        // C. Summary Tab (Added at the end)
+        $tabs[] = [
+            'id' => 'summary',
+            'label' => __('finance.summary') ?? 'Summary',
+            'description' => __('finance.tab_info_summary') ?? 'Accumulated totals for all student payments.'
+        ];
+
         // 2. Fetch Students & Their Invoices
-        $students = StudentEnrollment::with('student.invoices.items.feeStructure')
+        $allStudents = StudentEnrollment::with('student.invoices.items.feeStructure')
             ->where('class_section_id', $id)
             ->where('status', 'active')
-            ->get()
-            ->map(function($enrollment) {
-                return [
-                    'id' => $enrollment->student->id,
-                    'name' => $enrollment->student->full_name,
-                    'photo' => $enrollment->student->student_photo,
-                    'admission_no' => $enrollment->student->admission_number,
-                    'invoices' => $enrollment->student->invoices 
-                ];
-            });
+            ->get();
 
         // 3. Map Student Status per Tab
-        $studentRows = [];
-        foreach ($students as $student) {
-            $row = [
-                'student' => $student,
-                'statuses' => []
-            ];
+        $tabData = [];
 
-            foreach ($tabs as $tab) {
-                $status = 'N/A';
-                $style = 'secondary';
-                $label = 'N/A'; // Default localized label
-                $paidAmount = 0;
-                $dueAmount = 0;
-                
-                $matchingInvoice = null;
+        foreach ($tabs as $tab) {
+            $filteredStudents = [];
 
-                if ($tab['id'] === 'global') {
-                    $matchingInvoice = $student['invoices']->first(function($inv) {
-                        return $inv->items->contains(function($item) {
-                            return $item->feeStructure && $item->feeStructure->payment_mode === 'global';
-                        });
-                    });
-                } else {
-                    $order = $tab['order'];
-                    $matchingInvoice = $student['invoices']->first(function($inv) use ($order) {
-                        return $inv->items->contains(function($item) use ($order) {
-                            return $item->feeStructure && $item->feeStructure->installment_order == $order;
-                        });
-                    });
+            foreach ($allStudents as $enrollment) {
+                $student = $enrollment->student;
+                $studentMode = $student->payment_mode ?? 'installment'; 
+
+                // --- FILTER LOGIC (Except for Summary) ---
+                if ($tab['id'] !== 'summary') {
+                    if ($tab['id'] === 'global' && $studentMode !== 'global') continue; 
+                    if (str_starts_with($tab['id'], 'inst_') && $studentMode !== 'installment') continue;
                 }
 
-                if ($matchingInvoice) {
-                    $rawStatus = ucfirst($matchingInvoice->status); 
-                    
-                    // Amounts
-                    $paidAmount = $matchingInvoice->paid_amount;
-                    $dueAmount = $matchingInvoice->total_amount - $matchingInvoice->paid_amount;
+                $status = 'N/A';
+                $style = 'secondary';
+                $label = 'N/A'; 
+                $paidAmount = 0;
+                $dueAmount = 0;
+                $matchingInvoice = null;
+                $hasInvoice = false;
 
-                    // Localize Status
-                    if ($rawStatus === 'Paid') {
-                        $style = 'success';
-                        $label = __('finance.paid');
-                    } elseif ($rawStatus === 'Partial') {
-                        $style = 'warning';
-                        $label = __('finance.status_partial') ?? 'Partial';
-                    } elseif ($rawStatus === 'Unpaid') {
-                        $style = 'danger';
-                        $label = __('finance.status_unpaid') ?? 'Unpaid';
-                    } elseif ($rawStatus === 'Overdue') {
-                        $style = 'dark';
-                        $label = __('finance.status_overdue') ?? 'Overdue';
+                // --- Calculate Amounts ---
+                if ($tab['id'] === 'summary') {
+                    // For Summary: Sum of ALL invoices for this student in this session
+                    // We assume invoices are loaded eager-ly via 'student.invoices'
+                    // but we should filter by academic session if needed. 
+                    // Assuming $student->invoices contains all invoices for the student.
+                    // Ideally filter by current academic session.
+                    
+                    // Simple sum for demonstration (refine with session filter if needed)
+                    $paidAmount = $student->invoices->sum('paid_amount');
+                    $totalAmount = $student->invoices->sum('total_amount');
+                    $dueAmount = $totalAmount - $paidAmount;
+                    
+                    if ($student->invoices->isNotEmpty()) {
+                        $hasInvoice = true;
+                        // Determine Overall Status
+                        if ($dueAmount <= 0.01 && $totalAmount > 0) {
+                            $style = 'success'; $label = __('finance.paid');
+                        } elseif ($paidAmount > 0) {
+                            $style = 'warning'; $label = __('finance.status_partial');
+                        } elseif ($totalAmount > 0) {
+                            $style = 'danger'; $label = __('finance.status_unpaid');
+                        } else {
+                            $style = 'secondary'; $label = '-';
+                        }
+                    }
+
+                } else {
+                    // Standard Logic for Specific Tabs
+                    if ($tab['id'] === 'global') {
+                        $matchingInvoice = $student->invoices->first(function($inv) {
+                            return $inv->items->contains(function($item) {
+                                return $item->feeStructure && $item->feeStructure->payment_mode === 'global';
+                            });
+                        });
                     } else {
-                        $label = $rawStatus;
+                        $order = $tab['order'];
+                        $matchingInvoice = $student->invoices->first(function($inv) use ($order) {
+                            return $inv->items->contains(function($item) use ($order) {
+                                return $item->feeStructure && $item->feeStructure->installment_order == $order;
+                            });
+                        });
+                    }
+
+                    if ($matchingInvoice) {
+                        $hasInvoice = true;
+                        $rawStatus = ucfirst($matchingInvoice->status); 
+                        $paidAmount = $matchingInvoice->paid_amount;
+                        $dueAmount = $matchingInvoice->total_amount - $matchingInvoice->paid_amount;
+
+                        if ($rawStatus === 'Paid') { $style = 'success'; $label = __('finance.paid'); } 
+                        elseif ($rawStatus === 'Partial') { $style = 'warning'; $label = __('finance.status_partial') ?? 'Partial'; } 
+                        elseif ($rawStatus === 'Unpaid') { $style = 'danger'; $label = __('finance.status_unpaid') ?? 'Unpaid'; } 
+                        elseif ($rawStatus === 'Overdue') { $style = 'dark'; $label = __('finance.status_overdue') ?? 'Overdue'; } 
+                        else { $label = $rawStatus; }
                     }
                 }
 
-                $row['statuses'][$tab['id']] = [
+                $statusObj = [
                     'label' => $label, 
                     'style' => $style,
                     'paid' => CurrencySymbol::default() . ' ' . number_format($paidAmount, 2),
-                    'due' => CurrencySymbol::default() . ' ' . number_format($dueAmount, 2)
+                    'due' => CurrencySymbol::default() . ' ' . number_format($dueAmount, 2),
+                    'has_invoice' => $hasInvoice
+                ];
+
+                $filteredStudents[] = [
+                    'student' => [
+                        'id' => $student->id,
+                        'name' => $student->full_name,
+                        'photo' => $student->student_photo,
+                        'admission_no' => $student->admission_number,
+                    ],
+                    'status' => $statusObj
                 ];
             }
-            $studentRows[] = $row;
+            
+            $tabData[$tab['id']] = $filteredStudents;
         }
 
         return response()->json([
             'tabs' => $tabs,
-            'students' => $studentRows
+            'students_by_tab' => $tabData 
         ]);
     }
 
-    // --- Helper ---
     private function getClassFinancials($classId, $type)
     {
         $studentIds = StudentEnrollment::where('class_section_id', $classId)
