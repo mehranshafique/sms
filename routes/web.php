@@ -27,24 +27,25 @@ use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\TimetableController;
-use App\Http\Controllers\AssignmentController; 
-use App\Http\Controllers\ClassSubjectController; // Added Import
+use App\Http\Controllers\ClassSubjectController; // Added
+use App\Http\Controllers\DepartmentController;   // Added
 
 // --- Controllers: People ---
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentEnrollmentController; 
+use App\Http\Controllers\UniversityEnrollmentController; // Added
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
 use App\Http\Controllers\StudentPromotionController;
 use App\Http\Controllers\TransferController; 
-use App\Http\Controllers\UniversityEnrollmentController; // NEW IMPORT
+
 // --- Controllers: Examinations ---
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
 use App\Http\Controllers\ResultCardController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\ExamScheduleController;
+use App\Http\Controllers\ExamScheduleController; 
 
 // --- Controllers: Communication & Voting ---
 use App\Http\Controllers\NoticeController;
@@ -62,6 +63,7 @@ use App\Http\Controllers\Finance\FinancialReportController;
 use App\Http\Controllers\Finance\StudentFinanceController; 
 use App\Http\Controllers\SalaryStructureController; 
 use App\Http\Controllers\Finance\BudgetController; 
+use App\Http\Controllers\Finance\StudentBalanceController; // Added
 
 // --- Middleware ---
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -151,11 +153,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('academic-sessions', AcademicSessionController::class);
     });
     
-    // Departments (New Dedicated Module)
+    // Departments (University)
     Route::middleware([CheckModuleAccess::class . ':departments'])->group(function () {
-        Route::resource('departments', \App\Http\Controllers\DepartmentController::class);
+        Route::resource('departments', DepartmentController::class);
     });
-    
+
     // Grade Levels
     Route::middleware([CheckModuleAccess::class . ':grade_levels'])->group(function () {
         Route::post('grade-levels/bulk-delete', [GradeLevelController::class, 'bulkDelete'])->name('grade-levels.bulkDelete');
@@ -174,7 +176,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('subjects', SubjectController::class);
     });
 
-    // Class Subjects Allocation (NEW)
+    // Class Course Allocation (Hybrid)
     Route::middleware([CheckModuleAccess::class . ':class_subjects'])->group(function () {
         Route::get('class-subjects', [ClassSubjectController::class, 'index'])->name('class-subjects.index');
         Route::post('class-subjects', [ClassSubjectController::class, 'store'])->name('class-subjects.store');
@@ -182,16 +184,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Timetables
     Route::middleware([CheckModuleAccess::class . ':timetables'])->group(function () {
-        Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
-        Route::get('timetables/get-allocated-subjects', [TimetableController::class, 'getAllocatedSubjects'])->name('timetables.get_allocated_subjects');
-        // NEW: Check Availability Route
+        // Helper Routes
         Route::get('timetables/check-availability', [TimetableController::class, 'checkAvailability'])->name('timetables.check_availability');
+        Route::get('timetables/get-allocated-subjects', [TimetableController::class, 'getAllocatedSubjects'])->name('timetables.get_allocated_subjects');
         
+        Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
         Route::get('timetables/routine', [TimetableController::class, 'classRoutine'])->name('timetables.routine');
         Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
         Route::get('timetables/{timetable}/print', [TimetableController::class, 'print'])->name('timetables.print');
         Route::get('timetables/{timetable}/download', [TimetableController::class, 'downloadPdf'])->name('timetables.download');
         Route::resource('timetables', TimetableController::class);
+    });
+    
+    // Assignments
+    Route::middleware([CheckModuleAccess::class . ':assignments'])->group(function () {
+        Route::get('assignments/get-subjects', [App\Http\Controllers\AssignmentController::class, 'getSubjects'])->name('assignments.get-subjects');
+        Route::resource('assignments', App\Http\Controllers\AssignmentController::class);
     });
 
     // =========================================================================
@@ -199,30 +207,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
     // Parent / Guardian Management
     Route::get('parents/check', [App\Http\Controllers\ParentController::class, 'check'])->name('parents.check');
+    
     // Students
     Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
     Route::resource('students', StudentController::class);
+    
     // Student Transfer Routes
     Route::middleware([CheckModuleAccess::class . ':student_transfers'])->group(function () {
         Route::get('students/{student}/transfer', [TransferController::class, 'create'])->name('transfers.create');
         Route::post('students/{student}/transfer', [TransferController::class, 'store'])->name('transfers.store');
         Route::get('students/{student}/transfer-certificate', [TransferController::class, 'printCertificate'])->name('transfers.print');
     });
-    // Enrollments
-    Route::get('parents/check', [App\Http\Controllers\ParentController::class, 'check'])->name('parents.check');
-    Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
-    Route::resource('students', StudentController::class);
     
-    // Primary/Secondary Enrollments
+    // Enrollments
     Route::middleware([CheckModuleAccess::class . ':enrollments'])->group(function () {
         Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
         Route::resource('enrollments', StudentEnrollmentController::class);
     });
 
     // NEW: University Enrollments
-    // We use the same 'enrollments' module check or a new one if seeded. 
-    // Assuming we use 'university_enrollments' slug if added to package/seeder.
-    // For now, let's group it.
     Route::middleware([CheckModuleAccess::class . ':enrollments'])->prefix('university')->name('university.')->group(function () {
         Route::resource('enrollments', UniversityEnrollmentController::class);
     });
@@ -269,8 +272,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('exams/bulk-delete', [ExamController::class, 'bulkDelete'])->name('exams.bulkDelete');
         Route::post('exams/{exam}/finalize', [ExamController::class, 'finalize'])->name('exams.finalize');
         
-        // Print Routes
+        // --- PRINT ROUTES ---
+        // General Exam Result (Whole Class/All Subjects)
         Route::get('exams/{exam}/print-result', [ExamController::class, 'printClassResult'])->name('exams.print_result');
+        // Specific Award List (Single Subject)
         Route::get('exams/print-award-list', [ExamMarkController::class, 'printAwardList'])->name('exams.print_award_list');
 
         Route::resource('exams', ExamController::class);
@@ -288,9 +293,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Exam Schedules & Admit Cards
     Route::middleware([CheckModuleAccess::class . ':exam_schedules'])->group(function () {
         Route::get('exam-schedules', [ExamScheduleController::class, 'manage'])->name('exam-schedules.manage');
+        Route::get('exam-schedules/view', [ExamScheduleController::class, 'index'])->name('exam-schedules.index'); // ADDED THIS LINE
         Route::get('exam-schedules/get-subjects', [ExamScheduleController::class, 'getSubjects'])->name('exam-schedules.get-subjects');
-        Route::get('exam-schedules/get-students', [ExamScheduleController::class, 'getStudents'])->name('exam-schedules.get-students');
-        Route::get('exam-schedules/auto-generate', [ExamScheduleController::class, 'autoGenerate'])->name('exam-schedules.auto-generate'); 
+        Route::get('exam-schedules/get-students', [ExamScheduleController::class, 'getStudents'])->name('exam-schedules.get-students'); // Added missing route
+        Route::get('exam-schedules/auto-generate', [ExamScheduleController::class, 'autoGenerate'])->name('exam-schedules.auto-generate'); // Added missing route
         Route::post('exam-schedules', [ExamScheduleController::class, 'store'])->name('exam-schedules.store');
         Route::post('exam-schedules/download-admit-cards', [ExamScheduleController::class, 'downloadAdmitCards'])->name('exam-schedules.download-admit-cards');
     });
@@ -300,7 +306,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('marks/create', [ExamMarkController::class, 'create'])->name('marks.create');
         Route::post('marks', [ExamMarkController::class, 'store'])->name('marks.store');
         
-        // AJAX Helpers
+        // AJAX Helpers (NEW: Split Grade & Section)
         Route::get('marks/get-grades', [ExamMarkController::class, 'getGrades'])->name('marks.get_grades'); 
         Route::get('marks/get-sections', [ExamMarkController::class, 'getSections'])->name('marks.get_sections'); 
         Route::get('marks/get-subjects', [ExamMarkController::class, 'getSubjects'])->name('marks.get_subjects');
@@ -308,12 +314,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Student View
         Route::get('my-marks', [ExamMarkController::class, 'myMarks'])->name('marks.my_marks');
-    });
-
-    // Assignments Module
-    Route::middleware([CheckModuleAccess::class . ':assignments'])->group(function () {
-        Route::get('assignments/get-subjects', [AssignmentController::class, 'getSubjects'])->name('assignments.get-subjects');
-        Route::resource('assignments', AssignmentController::class);
     });
 
     // Academic Reports (Bulletins, Transcripts)
@@ -329,32 +329,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::prefix('finance')->group(function () {
         
-         // Student Finance Dashboard
+         // NEW: Student Finance Dashboard (Tabbed View)
         Route::get('student/{student}/dashboard', [StudentFinanceController::class, 'index'])
             ->name('finance.student.dashboard');
         
-        // Student Balances Overview
-        Route::get('balances', [App\Http\Controllers\Finance\StudentBalanceController::class, 'index'])->name('finance.balances.index');
-        Route::get('balances/class/{id}', [App\Http\Controllers\Finance\StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); 
+        // NEW: Student Balances Overview
+        Route::get('balances', [StudentBalanceController::class, 'index'])->name('finance.balances.index');
+        Route::get('balances/class/{id}', [StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); 
+
 
         // BUDGET MODULE
         // Categories
-        Route::get('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'categories'])->name('budgets.categories');
-        Route::post('budgets/categories', [App\Http\Controllers\Finance\BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
+        Route::get('budgets/categories', [BudgetController::class, 'categories'])->name('budgets.categories');
+        Route::post('budgets/categories', [BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
         
         // Allocations & Index
-        Route::get('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'index'])->name('budgets.index');
-        Route::post('budgets', [App\Http\Controllers\Finance\BudgetController::class, 'store'])->name('budgets.store');
-        
-        // NEW: Edit/Update Routes
-        Route::get('budgets/{budget}/edit', [App\Http\Controllers\Finance\BudgetController::class, 'edit'])->name('budgets.edit');
-        Route::put('budgets/{budget}', [App\Http\Controllers\Finance\BudgetController::class, 'update'])->name('budgets.update');
+        Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
+        Route::post('budgets', [BudgetController::class, 'store'])->name('budgets.store');
+        Route::get('budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit'); // Added Edit
+        Route::put('budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update'); // Added Update
         
         // Requests
-        Route::get('budgets/requests', [App\Http\Controllers\Finance\BudgetController::class, 'fundRequests'])->name('budgets.requests');
-        Route::post('budgets/requests/store', [App\Http\Controllers\Finance\BudgetController::class, 'storeFundRequest'])->name('budgets.requests.store');
+        Route::get('budgets/requests', [BudgetController::class, 'fundRequests'])->name('budgets.requests');
+        Route::post('budgets/requests/store', [BudgetController::class, 'storeFundRequest'])->name('budgets.requests.store');
         
-        Route::post('budgets/requests/{id}/update', [App\Http\Controllers\Finance\BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
+        // Approvals (Using 'update' naming convention for clarity, maps to approveFundRequest)
+        Route::post('budgets/requests/{id}/update', [BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
+
 
         // Invoices - AJAX Routes
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
