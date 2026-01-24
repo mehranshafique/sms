@@ -42,8 +42,9 @@ use App\Models\FundRequest;
 use App\Models\SalaryStructure;
 use App\Models\Payroll;
 use App\Models\Assignment; 
-// NEW: Department Model
+// NEW: Department & ClassSubject Models
 use App\Models\Department; 
+use App\Models\ClassSubject;
 
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
@@ -114,7 +115,7 @@ class BulkDummyDataSeeder extends Seeder
                 'modules' => [
                     'academics', 'students', 'staff', 'finance', 'examinations', 
                     'communication', 'voting', 'exam_schedules', 'payrolls', 'budgets',
-                    'assignments', 'library', 'transport', 'departments' // Added departments
+                    'assignments', 'library', 'transport', 'departments', 'class_subjects' // Added new modules
                 ],
                 'student_limit' => 2000,
                 'staff_limit' => 200,
@@ -324,7 +325,7 @@ class BulkDummyDataSeeder extends Seeder
         }
 
         // ---------------------------------------------------------
-        // 7. Class Sections & Subjects
+        // 7. Class Sections, Subjects & Class Allocations
         // ---------------------------------------------------------
         $sections = [];
         $subjectsCollection = [];
@@ -357,12 +358,31 @@ class BulkDummyDataSeeder extends Seeder
                     [
                         'code' => strtoupper(substr($subName, 0, 3)) . '-' . $code,
                         'type' => 'theory',
-                        'credit_hours' => 3,
                         'total_marks' => 20,
+                        'credit_hours' => 3,
                         'passing_marks' => 10,
                         'is_active' => true
                     ]
                 );
+                
+                // NEW: Seed Class Subject Allocation (The Hybrid Model)
+                // Assigns specific teacher to this subject for this class section
+                if (!empty($teacherIds)) {
+                    ClassSubject::firstOrCreate(
+                        [
+                            'institution_id' => $institution->id,
+                            'academic_session_id' => $session->id,
+                            'class_section_id' => $sections[$code]->id,
+                            'subject_id' => $sub->id,
+                        ],
+                        [
+                            'teacher_id' => $faker->randomElement($teacherIds),
+                            'weekly_periods' => rand(4, 6),
+                            'exam_weight' => 100
+                        ]
+                    );
+                }
+                
                 $subjectsCollection[$grade->id][] = $sub;
             }
         }
@@ -379,7 +399,13 @@ class BulkDummyDataSeeder extends Seeder
                 foreach ($days as $dayIndex => $day) {
                     for($i=0; $i<2; $i++) {
                         $subject = $faker->randomElement($subjectsCollection[$section->grade_level_id]);
-                        $teacherId = !empty($teacherIds) ? $faker->randomElement($teacherIds) : null;
+                        
+                        // Try to get allocated teacher first
+                        $allocation = ClassSubject::where('class_section_id', $section->id)
+                            ->where('subject_id', $subject->id)
+                            ->first();
+                            
+                        $teacherId = $allocation ? $allocation->teacher_id : (!empty($teacherIds) ? $faker->randomElement($teacherIds) : null);
                         
                         if($teacherId) {
                             Timetable::firstOrCreate(
@@ -446,12 +472,13 @@ class BulkDummyDataSeeder extends Seeder
                     [
                         'parent_id' => $parent->id,
                         'institution_id' => $institution->id,
+                        'email' => $sUser->email,
                         'campus_id' => $campus->id,
                         'admission_number' => $admissionNumber,
                         'first_name' => $firstName,
                         'last_name' => $lastName,
                         'gender' => $faker->randomElement(['male', 'female']),
-                        'dob' => $faker->dateTimeBetween('-25 years', '-6 years'), // Expanded range for Uni students
+                        'dob' => $faker->dateTimeBetween('-25 years', '-6 years'), 
                         'admission_date' => '2024-09-04',
                         'country' => $countryName,
                         'state' => $stateName,
@@ -512,7 +539,6 @@ class BulkDummyDataSeeder extends Seeder
         $tuitionType = FeeType::firstOrCreate(['institution_id' => $institution->id, 'name' => 'Frais Scolaires']);
         $primaryGrade = $gradeModels['1P'];
         
-        // Fee Structure
         FeeStructure::firstOrCreate(
             ['institution_id' => $institution->id, 'name' => 'Minerval Annuel 1P', 'grade_level_id' => $primaryGrade->id],
             [
@@ -542,7 +568,6 @@ class BulkDummyDataSeeder extends Seeder
             ['description' => 'Daily operational costs']
         );
 
-        // Budget Allocation (Using New Fields from Budget Update)
         $budget = Budget::firstOrCreate(
             [
                 'institution_id' => $institution->id, 
@@ -552,7 +577,6 @@ class BulkDummyDataSeeder extends Seeder
             [
                 'allocated_amount' => 50000.00, 
                 'spent_amount' => 0, 
-                // Using new period logic
                 // 'period_name' => 'Q1 2025', 
                 // 'start_date' => now()->startOfYear(),
                 // 'end_date' => now()->startOfYear()->addMonths(3),
@@ -723,6 +747,6 @@ class BulkDummyDataSeeder extends Seeder
 
         Model::reguard();
 
-        $this->command->info('✅ Bulk Dummy Data Seeded Successfully with ALL Modules!');
+        $this->command->info('✅ Bulk Dummy Data Seeded Successfully with Class Course Allocations!');
     }
 }
