@@ -10,7 +10,8 @@ use App\Models\Subject;
 use App\Models\StudentEnrollment;
 use App\Models\Timetable;
 use App\Models\InstitutionSetting; 
-use App\Models\ClassSubject; // Added
+use App\Models\ClassSubject; 
+use App\Models\ExamSchedule; // Added
 use App\Enums\RoleEnum;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +21,6 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class ExamMarkController extends BaseController
 {
-    // ... (Constructor and Create method same as before) ...
     public function __construct()
     {
         $this->middleware(PermissionMiddleware::class . ':exam_mark.create')->only(['create', 'store', 'printAwardList']);
@@ -65,7 +65,7 @@ class ExamMarkController extends BaseController
             $classesQuery->where('institution_id', $institutionId);
         }
 
-        // UPDATE: Teacher visibility for Classes via Timetable AND Allocation
+        // Teacher visibility for Classes via Timetable AND Allocation
         if ($isTeacher && !$isAdmin && $user->staff) {
             $staffId = $user->staff->id;
             $classesQuery->where(function($q) use ($staffId) {
@@ -87,7 +87,6 @@ class ExamMarkController extends BaseController
         return view('marks.create', compact('exams', 'classes'));
     }
 
-    // ... (getGrades, getSections methods remain same) ...
     public function getGrades(Request $request)
     {
         if(!$request->exam_id) return response()->json([]);
@@ -131,13 +130,14 @@ class ExamMarkController extends BaseController
         return response()->json($sections);
     }
 
-    // UPDATE: Respect Class Allocation
     public function getSubjects(Request $request)
     {
         $gradeLevelId = $request->grade_level_id;
+        $classSectionId = $request->class_section_id;
+        $examId = $request->exam_id;
         
-        if (!$gradeLevelId && $request->class_section_id) {
-            $section = ClassSection::find($request->class_section_id);
+        if (!$gradeLevelId && $classSectionId) {
+            $section = ClassSection::find($classSectionId);
             if ($section) {
                 $gradeLevelId = $section->grade_level_id;
             }
@@ -146,6 +146,14 @@ class ExamMarkController extends BaseController
         if (!$gradeLevelId) return response()->json([]);
         
         $user = Auth::user();
+        $query = null;
+
+        // Get Exam Session to filter Allocations correctly
+        $examSessionId = null;
+        if ($examId) {
+            $exam = Exam::find($examId);
+            if ($exam) $examSessionId = $exam->academic_session_id;
+        }
         
         // Teacher Logic: Hybrid Check
         if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
@@ -153,8 +161,8 @@ class ExamMarkController extends BaseController
             
             // 1. Timetable
             $timetableIds = Timetable::where('teacher_id', $staffId);
-            if ($request->class_section_id) {
-                $timetableIds->where('class_section_id', $request->class_section_id);
+            if ($classSectionId) {
+                $timetableIds->where('class_section_id', $classSectionId);
             } else {
                 $timetableIds->whereHas('classSection', function($q) use ($gradeLevelId) {
                     $q->where('grade_level_id', $gradeLevelId);
@@ -164,13 +172,18 @@ class ExamMarkController extends BaseController
 
             // 2. Class Allocation
             $allocationIds = ClassSubject::where('teacher_id', $staffId);
-            if ($request->class_section_id) {
-                $allocationIds->where('class_section_id', $request->class_section_id);
+            if ($classSectionId) {
+                $allocationIds->where('class_section_id', $classSectionId);
             } else {
                 $allocationIds->whereHas('classSection', function($q) use ($gradeLevelId) {
                     $q->where('grade_level_id', $gradeLevelId);
                 });
             }
+            // Filter by session if known
+            if ($examSessionId) {
+                $allocationIds->where('academic_session_id', $examSessionId);
+            }
+
             $allocIds = $allocationIds->pluck('subject_id')->toArray();
 
             $subjectIds = array_unique(array_merge($ttIds, $allocIds));
@@ -180,14 +193,21 @@ class ExamMarkController extends BaseController
             $query = Subject::whereIn('id', $subjectIds)->where('is_active', true);
         
         } else {
-            // Admin Logic: Hybrid Fallback
-            if ($request->class_section_id) {
-                $allocated = ClassSubject::where('class_section_id', $request->class_section_id)
-                    ->with('subject')->get();
+            // Admin Logic: Hybrid Fallback (Allocation -> Grade)
+            if ($classSectionId) {
+                $allocationQuery = ClassSubject::where('class_section_id', $classSectionId);
                 
-                if ($allocated->isNotEmpty()) {
-                    $query = Subject::whereIn('id', $allocated->pluck('subject_id'));
+                if ($examSessionId) {
+                    $allocationQuery->where('academic_session_id', $examSessionId);
+                }
+
+                $allocatedIds = $allocationQuery->pluck('subject_id');
+                
+                if ($allocatedIds->isNotEmpty()) {
+                    // Respect Class Allocation (e.g. Latin vs Science)
+                    $query = Subject::whereIn('id', $allocatedIds)->where('is_active', true);
                 } else {
+                    // Fallback to Grade Level
                     $query = Subject::where('grade_level_id', $gradeLevelId)->where('is_active', true);
                 }
             } else {
@@ -195,12 +215,32 @@ class ExamMarkController extends BaseController
             }
         }
 
-        $formattedSubjects = $query->get()->map(function($subject) use ($request) {
-            $teacherName = $this->getSubjectTeacher($request->class_section_id, $subject->id);
+        // Fetch Schedule Configs for this Exam+Class to override Max Marks
+        $scheduleConfigs = collect();
+        if ($examId && $classSectionId) {
+            $scheduleConfigs = ExamSchedule::where('exam_id', $examId)
+                ->where('class_section_id', $classSectionId)
+                ->get()
+                ->keyBy('subject_id');
+        }
+
+        $formattedSubjects = $query->get()->map(function($subject) use ($classSectionId, $scheduleConfigs) {
+            $teacherName = $this->getSubjectTeacher($classSectionId, $subject->id);
+            
+            // Determine Max Marks: Schedule Config > Subject Default > 100
+            $maxMarks = $subject->total_marks ?? 100;
+            if (isset($scheduleConfigs[$subject->id])) {
+                // FIX: Check if max_marks is specifically set (not null) and use it
+                $configMark = $scheduleConfigs[$subject->id]->max_marks;
+                if (!is_null($configMark) && $configMark > 0) {
+                    $maxMarks = $configMark;
+                }
+            }
+
             return [
                 'id' => $subject->id,
                 'name' => $subject->name,
-                'total_marks' => $subject->total_marks ?? 100, 
+                'total_marks' => (float)$maxMarks, // Ensure float for consistency
                 'teacher_name' => $teacherName
             ];
         });
@@ -208,7 +248,6 @@ class ExamMarkController extends BaseController
         return response()->json($formattedSubjects);
     }
 
-    // UPDATE: getSubjectTeacher needs to check ClassSubject too
     private function getSubjectTeacher($classId, $subjectId)
     {
         if(!$classId) return 'N/A';
@@ -232,7 +271,6 @@ class ExamMarkController extends BaseController
         return $tt->teacher->user->name ?? 'N/A';
     }
 
-    // UPDATE: Security Check needs to respect Allocation
     private function validateAccess($examId, $classId, $subjectId)
     {
         $user = Auth::user();
@@ -266,7 +304,6 @@ class ExamMarkController extends BaseController
         return false;
     }
 
-    // ... (Store, Print, MyMarks methods remain unchanged) ...
     public function getStudents(Request $request)
     {
         if(!$request->exam_id || !$request->class_section_id || !$request->subject_id) {
@@ -333,8 +370,19 @@ class ExamMarkController extends BaseController
              return response()->json(['message' => __('exam.messages.exam_finalized_error')], 403);
         }
 
+        // Determine Max Marks: Check Schedule First, then Subject
         $subject = Subject::findOrFail($request->subject_id);
         $maxMarks = $subject->total_marks ?? 100;
+
+        $schedule = ExamSchedule::where('exam_id', $request->exam_id)
+            ->where('class_section_id', $request->class_section_id)
+            ->where('subject_id', $request->subject_id)
+            ->first();
+
+        // FIX: Prioritize schedule max_marks if available
+        if ($schedule && !is_null($schedule->max_marks) && $schedule->max_marks > 0) {
+            $maxMarks = $schedule->max_marks;
+        }
 
         DB::transaction(function () use ($request, $maxMarks) {
             $marksInput = $request->input('marks', []);
@@ -394,6 +442,24 @@ class ExamMarkController extends BaseController
         $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
         $subject = Subject::findOrFail($request->subject_id);
         
+        // Fetch Max Marks AND Pass Marks correctly for the award list
+        $maxMarks = $subject->total_marks ?? 100;
+        $passMarks = $subject->passing_marks ?? 40; // Default passing marks
+
+        $schedule = ExamSchedule::where('exam_id', $exam->id)
+            ->where('class_section_id', $classSection->id)
+            ->where('subject_id', $subject->id)
+            ->first();
+            
+        if ($schedule) {
+            if (!is_null($schedule->max_marks) && $schedule->max_marks > 0) {
+                $maxMarks = $schedule->max_marks;
+            }
+            if (!is_null($schedule->pass_marks) && $schedule->pass_marks > 0) {
+                $passMarks = $schedule->pass_marks;
+            }
+        }
+        
         $students = StudentEnrollment::with('student')
             ->where('class_section_id', $classSection->id)
             ->where('academic_session_id', $exam->academic_session_id)
@@ -425,7 +491,7 @@ class ExamMarkController extends BaseController
         $pdf = Pdf::loadView('marks.print_award_list', compact(
             'exam', 'classSection', 'subject', 'students', 'marks', 
             'totalStudents', 'absentCount', 'presentCount', 'teacherName',
-            'gradingScale' 
+            'gradingScale', 'maxMarks', 'passMarks'
         ));
 
         return $pdf->stream('Award_List_'.$classSection->name.'_'.$subject->name.'.pdf');

@@ -52,6 +52,14 @@
                     <strong>{{ __('student.academic_year') }}:</strong> {{ $enrollment->academicSession->name }}
                 </td>
             </tr>
+            @if(isset($ranks))
+            <tr>
+                <td colspan="2" style="border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px;">
+                    <strong>Section Rank:</strong> {{ $ranks['section_rank'] }} / {{ $ranks['section_total'] }} &nbsp;&nbsp;|&nbsp;&nbsp;
+                    <strong>Grade Rank:</strong> {{ $ranks['grade_rank'] }} / {{ $ranks['grade_total'] }}
+                </td>
+            </tr>
+            @endif
         </table>
     </div>
 

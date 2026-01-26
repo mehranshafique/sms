@@ -176,8 +176,10 @@
         function fetchSubjects(sectionId) {
             resetSelect(subjectSelect, 'Loading...');
             
-            // Pass class_section_id to backend, which will derive grade level and filter
-            let url = "{{ route('marks.get_subjects') }}?class_section_id=" + sectionId;
+            // FIX: Pass exam_id to backend so it can load the specific Exam Schedule Max Marks
+            const exId = examSelect.value;
+            
+            let url = "{{ route('marks.get_subjects') }}?class_section_id=" + sectionId + "&exam_id=" + exId;
 
             fetch(url)
                 .then(res => res.json())
@@ -198,7 +200,22 @@
                 });
         }
 
-        // --- Step 1: Section Change (Now includes Grade info) ---
+        // --- Step 1: Exam Change (Reload subjects if class is already selected) ---
+        if(examSelect) {
+            examSelect.addEventListener('change', function() {
+                let sectionId = sectionSelect.value;
+                if(sectionId) {
+                    // Re-fetch subjects to update max marks based on new exam
+                    fetchSubjects(sectionId);
+                    // Also clear previous table container as exam changed
+                    document.getElementById('marks_container').classList.add('d-none');
+                    document.getElementById('empty_state').classList.add('d-none');
+                    document.getElementById('total_marks_display').classList.add('d-none');
+                }
+            });
+        }
+
+        // --- Step 2: Section Change (Now includes Grade info) ---
         if(sectionSelect) {
             sectionSelect.addEventListener('change', function() {
                 let id = this.value;
@@ -206,15 +223,16 @@
                 
                 document.getElementById('marks_container').classList.add('d-none');
                 document.getElementById('empty_state').classList.add('d-none');
+                document.getElementById('total_marks_display').classList.add('d-none');
 
                 if(!id) return;
 
-                // Load Subjects based on Section
+                // Load Subjects based on Section (and Exam)
                 fetchSubjects(id);
             });
         }
 
-        // --- Step 2: Load Students ---
+        // --- Step 3: Load Students ---
         if(subjectSelect) {
             subjectSelect.addEventListener('change', tryLoadStudents);
         }

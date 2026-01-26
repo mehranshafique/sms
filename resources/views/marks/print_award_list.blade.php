@@ -1,125 +1,173 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>{{ __('marks.award_list') }} - {{ $subject->name }}</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <style>
+        body { font-family: 'Helvetica', sans-serif; font-size: 12px; color: #333; }
+        .container { width: 100%; margin: 0 auto; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h2 { margin: 0; text-transform: uppercase; font-size: 18px; }
+        .header p { margin: 2px 0; font-size: 11px; }
+        
+        .info-table { width: 100%; margin-bottom: 20px; font-size: 13px; }
+        .info-table td { padding: 5px; }
+        .info-label { font-weight: bold; width: 120px; }
+
+        .marks-table { width: 100%; border-collapse: collapse; }
+        .marks-table th, .marks-table td { border: 1px solid #000; padding: 6px; text-align: center; }
+        .marks-table th { background-color: #f0f0f0; font-weight: bold; }
+        .marks-table td.name { text-align: left; padding-left: 8px; }
+        
+        .summary-box { margin-top: 20px; border: 1px solid #000; padding: 10px; width: 40%; float: right; }
+        
+        /* Fixed Signature Layout for DomPDF */
+        .signature-table { width: 100%; margin-top: 50px; border: none; }
+        .signature-table td { border: none; text-align: center; vertical-align: bottom; padding: 0 10px; }
+        .sig-line { border-top: 1px solid #000; margin: 0 auto; width: 80%; display: block; margin-bottom: 5px; }
+        
+        .fail { color: red; font-weight: bold; }
+        .pass { color: green; font-weight: bold; }
+        
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; border-top: 1px dashed #ccc; padding-top: 5px; }
         @page { margin: 20px; }
-        body { font-family: 'Helvetica', sans-serif; font-size: 11px; color: #333; }
-        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
-        .school-name { font-size: 18px; font-weight: bold; text-transform: uppercase; }
-        .doc-title { font-size: 14px; font-weight: bold; margin-top: 5px; text-decoration: underline; text-transform: uppercase; }
-        
-        .meta-table { width: 100%; margin-bottom: 15px; }
-        .meta-table td { padding: 3px; }
-        .label { font-weight: bold; width: 120px; }
-        
-        .marks-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .marks-table th, .marks-table td { border: 1px solid #444; padding: 6px; text-align: center; }
-        .marks-table th { background-color: #f0f0f0; text-transform: uppercase; font-size: 10px; }
-        .text-left { text-align: left !important; padding-left: 10px !important; }
-        
-        .summary-box { border: 1px solid #333; padding: 10px; margin-top: 20px; width: 40%; display: inline-block; vertical-align: top; }
-        .signatures { margin-top: 50px; width: 100%; }
-        .sig-box { float: left; width: 33%; text-align: center; border-top: 1px solid #333; padding-top: 5px; margin-top: 40px; }
-        
-        .absent-text { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
+    <div class="container">
+        {{-- Header --}}
+        <div class="header">
+            <h2>{{ $exam->institution->name }}</h2>
+            <p>{{ $exam->institution->address }}</p>
+            <h3 style="margin-top: 10px; text-decoration: underline;">{{ __('marks.award_list') }}</h3>
+            <p>{{ $exam->name }} ({{ $exam->academicSession->name }})</p>
+        </div>
 
-    <div class="header">
-        <div class="school-name">{{ $exam->institution->name }}</div>
-        <div>{{ $exam->institution->address }}</div>
-        <div class="doc-title">{{ __('marks.award_list') }}</div>
-    </div>
-
-    <table class="meta-table">
-        <tr>
-            <td class="label">{{ __('marks.exam') }}:</td>
-            <td><strong>{{ $exam->name }}</strong> ({{ $exam->academicSession->name }})</td>
-            <td class="label">{{ __('marks.date') }}:</td>
-            <td>{{ now()->format('d M, Y') }}</td>
-        </tr>
-        <tr>
-            <td class="label">{{ __('marks.class') }}:</td>
-            <td>{{ $classSection->gradeLevel->name }} - {{ $classSection->name }}</td>
-            <td class="label">{{ __('marks.subject') }}:</td>
-            <td><strong>{{ $subject->name }}</strong> (Max: {{ $subject->total_marks }})</td>
-        </tr>
-        <tr>
-            <td class="label">{{ __('marks.teacher') }}:</td>
-            <td colspan="3">{{ $teacherName }}</td>
-        </tr>
-    </table>
-
-    <table class="marks-table">
-        <thead>
+        {{-- Exam Info --}}
+        <table class="info-table">
             <tr>
-                <th width="5%">#</th>
-                <th width="15%">{{ __('marks.admission_no') }}</th>
-                <th class="text-left">{{ __('marks.student_name') }}</th>
-                <th width="15%">{{ __('marks.marks_obtained') }}</th>
-                <th width="15%">{{ __('reports.grade') ?? 'Grade' }}</th>
-                <th width="15%">{{ __('marks.status') ?? 'Status' }}</th>
+                <td class="info-label">{{ __('marks.grade') }}:</td>
+                <td>{{ $classSection->gradeLevel->name }}</td>
+                <td class="info-label">{{ __('marks.section') }}:</td>
+                <td>{{ $classSection->name }}</td>
             </tr>
-        </thead>
-        <tbody>
-            @foreach($students as $index => $student)
-                @php
-                    $record = $marks[$student->student_id] ?? null;
-                    
-                    // Strict Check: Ensure 1 is treated as True
-                    $isAbsent = $record && (bool)$record->is_absent;
-                    
-                    $mark = '-';
-                    $grade = '-';
-                    $status = '-';
-                    
-                    if ($record && !$isAbsent) {
-                        $mark = $record->marks_obtained;
-                        $max = $subject->total_marks ?: 100;
-                        $pct = ($mark / $max) * 100;
+            <tr>
+                <td class="info-label">{{ __('marks.subject') }}:</td>
+                <td>{{ $subject->name }} ({{ $subject->code }})</td>
+                <td class="info-label">{{ __('marks.teacher') }}:</td>
+                <td>{{ $teacherName }}</td>
+            </tr>
+            <tr>
+                <td class="info-label">{{ __('marks.total_marks') }}:</td>
+                <td><strong>{{ $maxMarks }}</strong></td>
+                <td class="info-label">{{ __('marks.pass_marks') }}:</td>
+                <td><strong>{{ $passMarks }}</strong></td>
+            </tr>
+        </table>
+
+        {{-- Marks Table --}}
+        <table class="marks-table">
+            <thead>
+                <tr>
+                    <th width="5%">#</th>
+                    <th width="15%">{{ __('marks.admission_no') }}</th>
+                    <th class="name">{{ __('marks.student_name') }}</th>
+                    <th width="15%">{{ __('marks.marks_obtained') }}</th>
+                    <th width="10%">%</th>
+                    <th width="10%">{{ __('marks.grade') }}</th>
+                    <th width="10%">{{ __('marks.status') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($students as $index => $enrollment)
+                    @php
+                        $student = $enrollment->student;
+                        $record = $marks[$student->id] ?? null;
+                        $mark = $record ? $record->marks_obtained : 0;
+                        $isAbsent = $record ? $record->is_absent : false;
                         
-                        // Dynamic Grading from DB
-                        $grade = 'F'; // Default
+                        $percentage = ($maxMarks > 0) ? ($mark / $maxMarks) * 100 : 0;
+                        
+                        // Calculate Grade based on percentage
+                        $gradeLetter = '-';
                         foreach($gradingScale as $scale) {
-                            if($pct >= $scale['min']) {
-                                $grade = $scale['grade'];
+                            if ($percentage >= $scale['min']) {
+                                $gradeLetter = $scale['grade'];
                                 break;
                             }
                         }
+
+                        // Determine Pass/Fail based on configured pass marks
+                        $isPass = ($mark >= $passMarks);
+                        $statusLabel = $isPass ? __('marks.pass') : __('marks.fail');
+                        $statusClass = $isPass ? 'pass' : 'fail';
                         
-                        $status = $pct >= 50 ? 'Pass' : 'Fail';
-                    } elseif ($isAbsent) {
-                        $mark = 'ABS';
-                        $status = __('marks.absent');
-                        $grade = '-';
-                    }
-                @endphp
+                        if($isAbsent) {
+                            $markDisplay = 'ABS';
+                            $percentageDisplay = '-';
+                            $statusLabel = __('marks.absent');
+                            $statusClass = 'fail';
+                            $gradeLetter = 'F';
+                        } else {
+                            $markDisplay = $mark;
+                            $percentageDisplay = round($percentage, 1) . '%';
+                        }
+                    @endphp
+                    <tr>
+                        <td>{{ $index + 1 }}</td>
+                        <td>{{ $student->admission_number }}</td>
+                        <td class="name">{{ $student->full_name }}</td>
+                        <td>{{ $markDisplay }}</td>
+                        <td>{{ $percentageDisplay }}</td>
+                        <td>{{ $gradeLetter }}</td>
+                        <td class="{{ $statusClass }}">{{ $statusLabel }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        {{-- Summary --}}
+        <div class="summary-box">
+            <strong>{{ __('marks.summary') }}</strong><br>
+            <table width="100%">
                 <tr>
-                    <td>{{ $index + 1 }}</td>
-                    <td>{{ $student->student->admission_number }}</td>
-                    <td class="text-left">{{ $student->student->full_name }}</td>
-                    <td style="font-weight: bold;" class="{{ $isAbsent ? 'absent-text' : '' }}">{{ $mark }}</td>
-                    <td>{{ $grade }}</td>
-                    <td class="{{ $isAbsent ? 'absent-text' : '' }}">{{ $status }}</td>
+                    <td>{{ __('marks.total_students') }}:</td>
+                    <td align="right">{{ $totalStudents }}</td>
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
+                <tr>
+                    <td>{{ __('marks.present') }}:</td>
+                    <td align="right">{{ $presentCount }}</td>
+                </tr>
+                <tr>
+                    <td>{{ __('marks.absent') }}:</td>
+                    <td align="right">{{ $absentCount }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="clear: both;"></div>
 
-    <div class="summary-box">
-        <strong>{{ __('marks.summary') ?? 'Summary' }}</strong><br>
-        {{ __('marks.total_students') }}: {{ $totalStudents }}<br>
-        {{ __('marks.present') ?? 'Present' }}: {{ $presentCount }}<br>
-        {{ __('marks.absent') ?? 'Absent' }}: {{ $absentCount }}
+        {{-- Signatures (Refactored to Table for DomPDF Stability) --}}
+        <table class="signature-table">
+            <tr>
+                <td width="33%">
+                    <div class="sig-line"></div>
+                    {{ __('marks.teacher_sign') }}
+                </td>
+                <td width="33%">
+                    <div class="sig-line"></div>
+                    {{ __('exam_schedule.controller_sign') }}
+                </td>
+                <td width="33%">
+                    <div class="sig-line"></div>
+                    {{ __('exam_schedule.principal_sign') }}
+                </td>
+            </tr>
+        </table>
+
+        <div class="footer">
+            Generated on {{ now()->format('d M, Y h:i A') }}
+        </div>
     </div>
-
-    <div class="signatures">
-        <div class="sig-box">{{ __('marks.teacher_sign') ?? 'Subject Teacher' }}</div>
-        <div class="sig-box" style="margin: 40px 0 0 33%;">{{ __('reports.principal') }}</div>
-    </div>
-
 </body>
 </html>

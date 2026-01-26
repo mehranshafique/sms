@@ -29,6 +29,7 @@ return [
     'exam' => 'Exam',
     'date' => 'Date',
     'total_marks' => 'Total Marks',
+    'pass_marks' => 'Pass Marks', // Added
     'total_students' => 'Total Students',
     'award_list' => 'Award List',
     'summary' => 'Summary',
@@ -49,4 +50,8 @@ return [
     'save_marks' => 'Save Marks',
     'load_students' => 'Loading Students...',
     'validation_error' => 'Validation Error',
+    
+    // Statuses (Added for Award List)
+    'pass' => 'Pass',
+    'fail' => 'Fail',
 ];

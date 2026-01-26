@@ -51,6 +51,15 @@
             <td class="label">{{ __('student.gender') }}:</td>
             <td>{{ ucfirst($student->gender) }}</td>
         </tr>
+        {{-- Ranking Info --}}
+        @if(isset($ranks))
+        <tr>
+            <td class="label">Section Rank:</td>
+            <td><strong>{{ $ranks['section_rank'] }}</strong> / {{ $ranks['section_total'] }}</td>
+            <td class="label">Grade Rank:</td>
+            <td><strong>{{ $ranks['grade_rank'] }}</strong> / {{ $ranks['grade_total'] }}</td>
+        </tr>
+        @endif
     </table>
 
     <table class="marks-table">
@@ -73,8 +82,19 @@
             @endphp
             @foreach($data as $row)
                 @php 
-                    $subTotalObt = $row['p1_score'] + $row['p2_score'] + $row['exam_score'];
-                    $subTotalMax = ($row['p_max'] * 2) + $row['exam_max'];
+                    // FIX: Force numeric conversion to avoid "Unsupported operand types: string + string"
+                    $p1 = is_numeric($row['p1_score']) ? (float)$row['p1_score'] : 0;
+                    $p2 = is_numeric($row['p2_score']) ? (float)$row['p2_score'] : 0;
+                    $ex = is_numeric($row['exam_score']) ? (float)$row['exam_score'] : 0;
+                    
+                    $subTotalObt = $p1 + $p2 + $ex;
+                    
+                    // Max Values
+                    $pMax = is_numeric($row['p_max']) ? (float)$row['p_max'] : 20;
+                    $exMax = is_numeric($row['exam_max']) ? (float)$row['exam_max'] : 40;
+                    
+                    $subTotalMax = ($pMax * 2) + $exMax;
+                    
                     $grandTotalObt += $subTotalObt;
                     $grandTotalMax += $subTotalMax;
                 @endphp

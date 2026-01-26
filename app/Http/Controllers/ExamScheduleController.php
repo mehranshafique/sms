@@ -8,6 +8,7 @@ use App\Models\ClassSection;
 use App\Models\Subject;
 use App\Models\StudentEnrollment;
 use App\Models\InstitutionSetting;
+use App\Models\ClassSubject; // Added
 use App\Enums\RoleEnum; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -96,7 +97,7 @@ class ExamScheduleController extends BaseController
             ->latest()
             ->pluck('name', 'id');
 
-        // Fetch Classes with Grade Level for Display: "Grade 1 Section A" (No Hyphen)
+        // Fetch Classes with Grade Level for Display
         $classes = ClassSection::with('gradeLevel')
             ->where('institution_id', $institutionId)
             ->get()
@@ -118,10 +119,22 @@ class ExamScheduleController extends BaseController
         $exam = Exam::findOrFail($request->exam_id);
         $classSection = ClassSection::findOrFail($request->class_section_id);
 
-        // 1. Fetch Subjects linked to the Grade Level of the selected Section
-        $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
-            ->where('is_active', true)
-            ->get();
+        // --- 1. Filter Subjects: Check Class Course Allocation First ---
+        $allocatedSubjectIds = ClassSubject::where('class_section_id', $classSection->id)
+            ->where('academic_session_id', $exam->academic_session_id)
+            ->pluck('subject_id');
+
+        if ($allocatedSubjectIds->isNotEmpty()) {
+            // Specific Allocation Found
+            $subjects = Subject::whereIn('id', $allocatedSubjectIds)
+                ->where('is_active', true)
+                ->get();
+        } else {
+            // Fallback: General Grade Level Subjects
+            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
+                ->where('is_active', true)
+                ->get();
+        }
 
         if ($subjects->isEmpty()) {
             return response()->json(['message' => __('exam_schedule.no_subjects_found')], 404);
@@ -137,6 +150,9 @@ class ExamScheduleController extends BaseController
         $rows = $subjects->map(function ($subject) use ($existingSchedules, $exam) {
             $schedule = $existingSchedules->get($subject->id);
             
+            $maxMarks = $schedule->max_marks ?? $subject->total_marks ?? 20;
+            $passMarks = $schedule->pass_marks ?? $subject->passing_marks ?? ($maxMarks * 0.4);
+
             return [
                 'subject_id' => $subject->id,
                 'subject_name' => $subject->name,
@@ -145,8 +161,8 @@ class ExamScheduleController extends BaseController
                 'start_time' => $schedule ? $schedule->start_time->format('H:i') : '',
                 'end_time' => $schedule ? $schedule->end_time->format('H:i') : '',
                 'room_number' => $schedule->room_number ?? '',
-                'max_marks' => $schedule->max_marks ?? $subject->total_marks ?? 100,
-                'pass_marks' => $schedule->pass_marks ?? $subject->passing_marks ?? 33,
+                'max_marks' => $maxMarks,
+                'pass_marks' => $passMarks,
                 'is_scheduled' => $schedule ? true : false,
             ];
         });
@@ -158,10 +174,6 @@ class ExamScheduleController extends BaseController
         ]);
     }
 
-    /**
-     * Helper to auto-generate a schedule proposal
-     * UPDATED: Better looping logic to ensure maximum coverage
-     */
     public function autoGenerate(Request $request)
     {
         $request->validate([
@@ -173,71 +185,61 @@ class ExamScheduleController extends BaseController
         $exam = Exam::findOrFail($request->exam_id);
         $classSection = ClassSection::findOrFail($request->class_section_id);
 
-        // 1. Get School Timings
         $settings = InstitutionSetting::where('institution_id', $institutionId)
             ->whereIn('key', ['school_start_time', 'school_end_time'])
             ->pluck('value', 'key');
 
         $schoolStart = $settings['school_start_time'] ?? '08:00';
         $schoolEnd = $settings['school_end_time'] ?? '14:00';
-
-        $defaultDurationMinutes = 120; // 2 hours duration
-        $gapMinutes = 30; // Gap between exams on the same day
+        $defaultDurationMinutes = 120;
+        $gapMinutes = 30;
         
-        // 2. Get Subjects
-        $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
-            ->where('is_active', true)
-            ->get();
+        // --- 1. Filter Subjects: Respect Class Course Allocation ---
+        $allocatedSubjectIds = ClassSubject::where('class_section_id', $classSection->id)
+            ->where('academic_session_id', $exam->academic_session_id)
+            ->pluck('subject_id');
+
+        if ($allocatedSubjectIds->isNotEmpty()) {
+            $subjects = Subject::whereIn('id', $allocatedSubjectIds)->where('is_active', true)->get();
+        } else {
+            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)->where('is_active', true)->get();
+        }
 
         $scheduleProposal = [];
-        
-        // 3. Smart Date Logic
         $examStartDate = Carbon::parse($exam->start_date)->startOfDay();
         $examEndDate = Carbon::parse($exam->end_date)->startOfDay();
         $today = Carbon::now()->startOfDay();
 
-        // Start scheduling from Tomorrow if exam started in past, else from Start Date
         if ($examStartDate->lte($today)) {
             $currentDate = $today->copy()->addDay();
         } else {
             $currentDate = $examStartDate;
         }
 
-        // Ensure we don't start AFTER the end date (edge case)
         if ($currentDate->gt($examEndDate)) {
             $currentDate = $examEndDate; 
         }
 
-        // Initialize time slot tracking
         $currentStartTime = Carbon::parse($schoolStart);
         $maxEndTime = Carbon::parse($schoolEnd);
 
         foreach ($subjects as $subject) {
-            // Check if current date is valid (not Sunday)
             while ($currentDate->isSunday()) {
                 $currentDate->addDay();
-                // Reset time for new day
                 $currentStartTime = Carbon::parse($schoolStart);
             }
 
-            // Calculate potential end time for this slot
             $proposedEndTime = $currentStartTime->copy()->addMinutes($defaultDurationMinutes);
 
-            // If the exam goes beyond school hours, move to next day
             if ($proposedEndTime->format('H:i') > $maxEndTime->format('H:i')) {
                 $currentDate->addDay();
-                // Re-check Sunday for the new day
                 while ($currentDate->isSunday()) {
                     $currentDate->addDay();
                 }
-                // Reset time to start of day
                 $currentStartTime = Carbon::parse($schoolStart);
                 $proposedEndTime = $currentStartTime->copy()->addMinutes($defaultDurationMinutes);
             }
 
-            // If we've run past the exam end date, just use the end date (cram them in)
-            // Note: If we are cramming on the last day, time logic might still push beyond school hours
-            // but we will allow it for now to ensure all subjects get a slot.
             $dateToUse = $currentDate->gt($examEndDate) ? $examEndDate : $currentDate;
 
             $scheduleProposal[$subject->id] = [
@@ -246,11 +248,7 @@ class ExamScheduleController extends BaseController
                 'end_time' => $proposedEndTime->format('H:i'),
             ];
 
-            // Prepare start time for the *next* subject on the SAME day
             $currentStartTime = $proposedEndTime->copy()->addMinutes($gapMinutes);
-            
-            // Note: We do NOT increment the day here. The loop's next iteration will check 
-            // if the updated $currentStartTime fits within school hours. If not, it increments the day then.
         }
 
         return response()->json([
@@ -285,6 +283,7 @@ class ExamScheduleController extends BaseController
             'exam_id' => 'required|exists:exams,id',
             'class_section_id' => 'required|exists:class_sections,id',
             'schedules' => 'required|array',
+            'schedules.*.max_marks' => 'required|numeric|min:1',
         ]);
 
         $exam = Exam::findOrFail($request->exam_id);
@@ -310,8 +309,8 @@ class ExamScheduleController extends BaseController
                 $start = $data['start_time'];
                 $end = $data['end_time'];
                 $room = $data['room_number'] ?? null;
-                $maxMarks = $data['max_marks'] ?? null;
-                $passMarks = $data['pass_marks'] ?? null;
+                $maxMarks = $data['max_marks']; 
+                $passMarks = $data['pass_marks'] ?? ($maxMarks * 0.4); 
 
                 if ($date < $exam->start_date->format('Y-m-d') || $date > $exam->end_date->format('Y-m-d')) {
                     throw new \Exception(__('exam_schedule.error_date_range', [
@@ -401,12 +400,25 @@ class ExamScheduleController extends BaseController
         $exam = Exam::with('institution')->findOrFail($request->exam_id);
         $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
 
-        $schedules = ExamSchedule::with('subject')
+        // --- FILTER LOGIC APPLIED TO ADMIT CARD ---
+        
+        // 1. Get allocated subjects for this class/session
+        $allocatedSubjectIds = ClassSubject::where('class_section_id', $classSection->id)
+            ->where('academic_session_id', $exam->academic_session_id)
+            ->pluck('subject_id');
+
+        $schedulesQuery = ExamSchedule::with('subject')
             ->where('exam_id', $exam->id)
             ->where('class_section_id', $classSection->id)
             ->orderBy('exam_date')
-            ->orderBy('start_time')
-            ->get();
+            ->orderBy('start_time');
+
+        // 2. If allocations exist, only show schedules for those subjects
+        if ($allocatedSubjectIds->isNotEmpty()) {
+            $schedulesQuery->whereIn('subject_id', $allocatedSubjectIds);
+        }
+
+        $schedules = $schedulesQuery->get();
 
         if ($schedules->isEmpty()) {
             return back()->with('error', __('exam_schedule.no_schedules_found'));
@@ -441,7 +453,6 @@ class ExamScheduleController extends BaseController
             $fileName = 'Admit_Card_' . $students->first()->full_name . '.pdf';
         }
         
-        // --- NEW: Support for Preview Action ---
         if ($request->has('preview') && $request->preview == '1') {
             return $pdf->stream($fileName);
         }
