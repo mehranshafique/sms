@@ -47,7 +47,23 @@ class InvoiceController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
+                // FIXED: Grouped OR conditions inside a nested closure to preserve relationship constraints
+                // ADDED: post_name to search criteria
+                ->filterColumn('student_name', function($query, $keyword) {
+                    $query->whereHas('student', function($q) use ($keyword) {
+                        $q->where(function($subQ) use ($keyword) {
+                            $subQ->where('first_name', 'like', "%{$keyword}%")
+                                 ->orWhere('last_name', 'like', "%{$keyword}%")
+                                 ->orWhere('post_name', 'like', "%{$keyword}%")
+                                 ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', "%{$keyword}%")
+                                 ->orWhere('admission_number', 'like', "%{$keyword}%");
+                        });
+                    });
+                })
                 ->addColumn('invoice_number', fn($row) => '<a href="'.route('invoices.show', $row->id).'" class="text-primary fw-bold">#'.$row->invoice_number.'</a>')
+                ->filterColumn('invoice_number', function($query, $keyword) {
+                    $query->where('invoice_number', 'like', "%{$keyword}%");
+                })
                 ->addColumn('fee_name', function($row){
                     return $row->items->pluck('description')->implode(', ');
                 })
@@ -154,7 +170,7 @@ class InvoiceController extends BaseController
             ->where(function($q) use ($section, $request) {
                 $q->where('grade_level_id', $section->grade_level_id)
                   ->orWhere('class_section_id', $request->class_section_id)
-                  ->orWhereNull('grade_level_id'); // FIX: Include fees available to All Grades
+                  ->orWhereNull('grade_level_id'); 
             })
             ->get()
             ->map(fn($fee) => [
@@ -360,9 +376,6 @@ class InvoiceController extends BaseController
                 }
 
                 // E. Create Invoice
-                // UNIQUE INVOICE NUMBER: INV-{Year}-{AdmissionNo}-{Timestamp}
-                // Example: INV-2024-ADM001-20240120143005
-                // Guaranteed unique per student per second.
                 $year = date('Y');
                 $admClean = preg_replace('/[^A-Za-z0-9]/', '', $enrollment->student->admission_number);
                 $timestamp = now()->format('YmdHis'); 

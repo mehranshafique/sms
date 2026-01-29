@@ -11,7 +11,7 @@ use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash; // Added for password check
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
@@ -49,7 +49,7 @@ class PaymentController extends BaseController
             'payment_date' => 'required|date',
             'method' => 'required|in:cash,bank_transfer,card,online',
             'notes' => 'nullable|string',
-            'password' => 'required|string', // Added Password Validation
+            'password' => 'required|string', // Validated via popup
         ]);
 
         // 1. Security Check: Validate Password
@@ -170,7 +170,7 @@ class PaymentController extends BaseController
         }
 
         return response()->json([
-            'message' => __('payment.success_recorded'), 
+            'message' => "Payment successfully completed for {$invoice->student->full_name}. Thank you.",
             'redirect' => route('invoices.show', $invoice->id)
         ]);
     }

@@ -120,15 +120,13 @@ class StudentBalanceController extends BaseController
 
         // Organize Tabs
         $tabs = [];
-        
-        // A. Global Tab
-        if ($feeStructures->where('payment_mode', 'global')->isNotEmpty()) {
-            $tabs[] = [
-                'id' => 'global', 
-                'label' => __('finance.annual_fee'),
-                'description' => __('finance.tab_info_global')
-            ];
-        }
+
+        // A. Summary Tab (Moved to FIRST Position)
+        $tabs[] = [
+            'id' => 'summary',
+            'label' => __('finance.summary') ?? 'Summary',
+            'description' => __('finance.tab_info_summary') ?? 'Accumulated totals for all student payments.'
+        ];
 
         // B. Installment Tabs
         $installments = $feeStructures->where('payment_mode', 'installment')
@@ -148,13 +146,15 @@ class StudentBalanceController extends BaseController
             ];
         }
 
-        // C. Summary Tab (Added at the end)
-        $tabs[] = [
-            'id' => 'summary',
-            'label' => __('finance.summary') ?? 'Summary',
-            'description' => __('finance.tab_info_summary') ?? 'Accumulated totals for all student payments.'
-        ];
-
+        // C. Global Tab (Moved to LAST Position)
+        if ($feeStructures->where('payment_mode', 'global')->isNotEmpty()) {
+            $tabs[] = [
+                'id' => 'global', 
+                'label' => __('finance.annual_fee'),
+                'description' => __('finance.tab_info_global')
+            ];
+        }
+        
         // 2. Fetch Students & Their Invoices
         $allStudents = StudentEnrollment::with('student.invoices.items.feeStructure')
             ->where('class_section_id', $id)
