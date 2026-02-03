@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class LoginRequest extends FormRequest
 {
@@ -22,12 +24,13 @@ class LoginRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, \Illuminate\Contracts\Validation\Rule|array|string>
      */
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            // We use 'login' as the input field name on the form now, instead of 'email'
+            'login' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
@@ -41,13 +44,36 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $input = $this->input('login');
+        $password = $this->input('password');
+
+        // 1. Determine if input is Email, otherwise treat as Username/Shortcode
+        $field = filter_var($input, FILTER_VALIDATE_EMAIL) ? 'email' : null;
+
+        $user = null;
+
+        if ($field === 'email') {
+            // Standard Email Lookup
+            $user = User::where('email', $input)->first();
+        } else {
+            // Flexible Lookup: Username OR Shortcode
+            $user = User::where(function ($query) use ($input) {
+                $query->where('username', $input)
+                      ->orWhere('shortcode', $input);
+            })->first();
+        }
+
+        // 2. Validate User & Password
+        if (! $user || ! Hash::check($password, $user->password)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'login' => trans('auth.failed'),
             ]);
         }
+
+        // 3. Log the user in
+        Auth::login($user, $this->boolean('remember'));
 
         RateLimiter::clear($this->throttleKey());
     }
@@ -68,7 +94,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'login' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -80,6 +106,6 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->input('login')).'|'.$this->ip());
     }
 }

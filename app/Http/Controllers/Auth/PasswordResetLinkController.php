@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
+use App\Models\User;
 
 class PasswordResetLinkController extends Controller
 {
@@ -26,19 +27,37 @@ class PasswordResetLinkController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'email' => ['required', 'email'],
+            'login' => ['required', 'string'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
+        // 1. Resolve Login Input to Email
+        $input = $request->input('login');
+        $field = filter_var($input, FILTER_VALIDATE_EMAIL) ? 'email' : null;
+
+        $user = null;
+
+        if ($field === 'email') {
+            $user = User::where('email', $input)->first();
+        } else {
+            // Check Username or Shortcode
+            $user = User::where('username', $input)
+                  ->orWhere('shortcode', $input)
+                  ->first();
+        }
+
+        // If user not found, throw generic error to avoid enumeration (or specific if preferred)
+        if (! $user) {
+            return back()->withInput()->withErrors(['email' => trans('passwords.user')]);
+        }
+
+        // 2. Send Password Reset Link using the resolved email
+        // We manually merge the 'email' into the request so the broker can use it
         $status = Password::sendResetLink(
-            $request->only('email')
+            ['email' => $user->email]
         );
 
         return $status == Password::RESET_LINK_SENT
                     ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+                    : back()->withInput()->withErrors(['email' => __($status)]);
     }
 }

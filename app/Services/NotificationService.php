@@ -8,15 +8,12 @@ use App\Models\User;
 use App\Models\Institution;
 use App\Mail\PaymentReceived;
 use App\Mail\UserCredentialsMail; 
-use App\Interfaces\SmsGatewayInterface;
 use App\Enums\RoleEnum; 
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
-    protected $smsGateway;
-    
     // Define event keys that should ignore credit limits
     protected $unlimitedGlobalEvents = [
         'institution_created',
@@ -26,9 +23,9 @@ class NotificationService
         'system_alert'
     ];
 
-    public function __construct(SmsGatewayInterface $smsGateway)
+    public function __construct()
     {
-        $this->smsGateway = $smsGateway;
+        // We resolve SMS services dynamically to prevent autoloader errors during boot
     }
 
     public function sendPaymentNotification(Payment $payment)
@@ -37,6 +34,7 @@ class NotificationService
         $student = $invoice->student;
         $institution = $invoice->institution;
         
+        // 1. Email
         if ($student->email) {
             try {
                 Mail::to($student->email)->queue(new PaymentReceived($payment));
@@ -47,6 +45,7 @@ class NotificationService
 
         $phone = $student->mobile_number ?? $student->father_phone;
 
+        // 2. SMS & WhatsApp
         if ($phone) {
             $data = [
                 'StudentName' => $student->first_name,
@@ -55,48 +54,42 @@ class NotificationService
                 'Balance' => number_format($invoice->total_amount - $invoice->paid_amount, 2),
                 'Currency' => config('app.currency_symbol', '$'),
                 'Date' => $payment->payment_date->format('d/m/Y'),
-                'TransactionID' => $payment->transaction_id ?? 'N/A'
+                'TransactionID' => $payment->transaction_id ?? 'N/A',
+                // snake_case aliases
+                'student_name' => $student->first_name,
+                'school_name' => $institution->name,
+                'transaction_id' => $payment->transaction_id ?? 'N/A'
             ];
 
-            // Provide snake_case keys for legacy compatibility
-            $data['student_name'] = $data['StudentName'];
-            $data['school_name'] = $data['SchoolName'];
-            $data['transaction_id'] = $data['TransactionID'];
-
-            $sent = $this->sendSmsEvent('payment_received', $phone, $data, $institution->id);
-
-            if (!$sent) {
-                $message = __('notifications.payment_received_sms', [
-                    'name' => $data['StudentName'],
-                    'amount' => $data['Amount'],
-                    'school' => $data['SchoolName'],
-                    'balance' => $data['Balance']
-                ]);
-                
-                $this->performSmsSend($phone, $message, $institution->id, false); 
-            }
+            // Send via SMS (Mobishastra)
+            $this->sendNotificationEvent('payment_received', $phone, $data, $institution->id, 'sms');
+            
+            // Send via WhatsApp (Infobip)
+            $this->sendNotificationEvent('payment_received', $phone, $data, $institution->id, 'whatsapp');
         }
     }
 
     public function sendUserCredentials(User $user, $plainPassword, $roleEnumVal)
     {
         $schoolName = $user->institute ? $user->institute->name : config('app.name');
-        
         $roleLabel = __('roles.' . strtolower($roleEnumVal));
 
-        // Data array now includes BOTH PascalCase (for SMS templates) and snake_case (for views)
         $data = [
             'Name' => $user->name,
             'Email' => $user->email,
+            'Shortcode' => $user->shortcode ?? 'N/A',
+            'Username' => $user->username ?? $user->shortcode ?? 'N/A',
             'Password' => $plainPassword ?? __('auth.unchanged'),
             'Role' => $roleLabel, 
             'SchoolName' => $schoolName,
             'Url' => route('login'),
             'LoginLink' => route('login'),
 
-            // Add snake_case keys to fix "Undefined array key" in views
+            // snake_case aliases
             'name' => $user->name,
             'email' => $user->email,
+            'shortcode' => $user->shortcode ?? 'N/A',
+            'username' => $user->username ?? $user->shortcode ?? 'N/A',
             'password' => $plainPassword ?? __('auth.unchanged'),
             'role' => $roleLabel,
             'school_name' => $schoolName,
@@ -104,33 +97,29 @@ class NotificationService
             'login_link' => route('login'),
         ];
 
-        // 2. Send SMS
-        if ($user->phone) {
-            $templateKey = strtolower(str_replace(' ', '_', $roleEnumVal)) . '_welcome'; 
-            
-            $sent = $this->sendSmsEvent($templateKey, $user->phone, $data, $user->institute_id);
-            
-            if (!$sent) {
-                $sent = $this->sendSmsEvent('user_welcome', $user->phone, $data, $user->institute_id);
-            }
-
-            if (!$sent) {
-                $msg = __('notifications.credential_sms_fallback', [
-                    'name' => $data['Name'],
-                    'school' => $data['SchoolName'],
-                    'email' => $data['Email'],
-                    'password' => $data['Password']
-                ]);
-                $this->performSmsSend($user->phone, $msg, $user->institute_id, false);
-            }
-        }
-
-        // 3. Send Email
+        // 1. Send Email
         if ($user->email) {
             try {
                 Mail::to($user->email)->send(new UserCredentialsMail($data));
             } catch (\Exception $e) {
                 Log::error("Failed to send credential email: " . $e->getMessage());
+            }
+        }
+
+        // 2. Send SMS & WhatsApp
+        if ($user->phone) {
+            $templateKey = strtolower(str_replace(' ', '_', $roleEnumVal)) . '_welcome'; 
+            
+            // Try specific template first, then fallback to generic
+            $smsSent = $this->sendNotificationEvent($templateKey, $user->phone, $data, $user->institute_id, 'sms');
+            if (!$smsSent) {
+                $this->sendNotificationEvent('user_welcome', $user->phone, $data, $user->institute_id, 'sms');
+            }
+
+            // Send WhatsApp
+            $waSent = $this->sendNotificationEvent($templateKey, $user->phone, $data, $user->institute_id, 'whatsapp');
+            if (!$waSent) {
+                $this->sendNotificationEvent('user_welcome', $user->phone, $data, $user->institute_id, 'whatsapp');
             }
         }
     }
@@ -143,15 +132,16 @@ class NotificationService
         $data = [
             'Name' => $adminUser->name,
             'Email' => $adminUser->email,
+            'Shortcode' => $adminUser->shortcode ?? 'N/A',
             'Password' => $plainPassword,
             'Role' => $roleLabel, 
             'SchoolName' => $schoolName,
             'Url' => route('login'),
             'LoginLink' => route('login'),
-
-            // Add snake_case keys
+            // Aliases
             'name' => $adminUser->name,
             'email' => $adminUser->email,
+            'shortcode' => $adminUser->shortcode ?? 'N/A',
             'password' => $plainPassword,
             'role' => $roleLabel,
             'school_name' => $schoolName,
@@ -159,16 +149,19 @@ class NotificationService
             'login_link' => route('login'),
         ];
 
-        if ($adminUser->phone) {
-            $this->sendSmsEvent('institution_created', $adminUser->phone, $data, $institution->id);
-        }
-
-         if ($adminUser->email) {
+        // Email
+        if ($adminUser->email) {
             try {
                 Mail::to($adminUser->email)->send(new UserCredentialsMail($data));
             } catch (\Exception $e) {
                 Log::error("Failed to send creation email: " . $e->getMessage());
             }
+        }
+
+        // SMS & WhatsApp
+        if ($adminUser->phone) {
+            $this->sendNotificationEvent('institution_created', $adminUser->phone, $data, $institution->id, 'sms');
+            $this->sendNotificationEvent('institution_created', $adminUser->phone, $data, $institution->id, 'whatsapp');
         }
     }
 
@@ -182,14 +175,19 @@ class NotificationService
         $this->sendUserCredentials($user, $plainPassword, RoleEnum::HEAD_OFFICER->value);
     }
 
-    public function sendSmsEvent($eventKey, $to, $data = [], $institutionId = null)
+    /**
+     * Unified method to fetch template and send via specific channel
+     */
+    public function sendNotificationEvent($eventKey, $to, $data = [], $institutionId = null, $channel = 'sms')
     {
+        // Fetch Template from Database
         $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
 
         if (!$template || !$template->is_active) {
             return false;
         }
 
+        // Replace Placeholders
         $message = $template->body;
         foreach ($data as $key => $value) {
             $message = str_replace('$' . $key, $value, $message);
@@ -198,10 +196,10 @@ class NotificationService
         
         $isUnlimited = in_array($eventKey, $this->unlimitedGlobalEvents);
 
-        return $this->performSmsSend($to, $message, $institutionId, $isUnlimited);
+        return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel);
     }
 
-    protected function performSmsSend($to, $message, $institutionId, $isUnlimited = false) 
+    protected function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms') 
     {
         $institution = Institution::find($institutionId);
         
@@ -209,15 +207,34 @@ class NotificationService
              return false;
         }
 
-        if (!$isUnlimited && $institution->sms_credits <= 0) {
-            Log::warning("SMS Failed: Insufficient credits for Institution ID " . ($institutionId ?? 'Unknown'));
+        // Credit Check
+        $creditColumn = ($channel === 'whatsapp') ? 'whatsapp_credits' : 'sms_credits';
+        
+        if (!$isUnlimited && $institution->$creditColumn <= 0) {
+            Log::warning(strtoupper($channel) . " Failed: Insufficient credits for Institution ID " . ($institutionId ?? 'Unknown'));
             return false;
         }
         
-        $sent = $this->smsGateway->send($to, $message);
+        // Select Provider & Send
+        $sent = false;
+        try {
+            if ($channel === 'whatsapp') {
+                // Resolve Infobip Service Dynamically
+                $infobip = app(\App\Services\Sms\InfobipService::class);
+                $sent = $infobip->sendWhatsApp($to, $message);
+            } else {
+                // Resolve Mobishastra Service Dynamically
+                $mobishastra = app(\App\Services\Sms\MobishastraService::class);
+                $sent = $mobishastra->send($to, $message);
+            }
+        } catch (\Exception $e) {
+            Log::error("Notification Service Error ($channel): " . $e->getMessage());
+            return false;
+        }
         
+        // Deduct Credit
         if ($sent && !$isUnlimited) {
-            $institution->decrement('sms_credits');
+            $institution->decrement($creditColumn);
         }
         
         return $sent;

@@ -29,7 +29,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'infobip' => [
-        'base_url' => env('INFOBIP_BASE_URL'),
+        'base_url' => env('INFOBIP_BASE_URL', 'https://xkglel.api.infobip.com'),
         'api_key' => env('INFOBIP_API_KEY'),
+        'whatsapp_from' => env('INFOBIP_WHATSAPP_FROM', '447860099299'), // Default test number
     ],
 ];

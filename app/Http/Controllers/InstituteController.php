@@ -175,8 +175,12 @@ class InstituteController extends BaseController
                     'email'         => $request->email,
                     'password'      => Hash::make($request->password),
                     'institute_id'  => $institute->id,
-                    'user_type'     => UserType::SCHOOL_ADMIN->value, // Changed from HEAD_OFFICER
+                    'shortcode'     => $institute->code, // Institute Code is the Admin's Shortcode
+                    'username'      => $institute->code,
+                    'user_type'     => UserType::SCHOOL_ADMIN->value, 
+                    'phone'         => $request->full_phone,
                     'mobile_number' => $request->full_phone,
+                    'is_active'     => true,
                 ]);
 
                 // Assign SCHOOL_ADMIN Role
@@ -188,6 +192,7 @@ class InstituteController extends BaseController
                     $adminUser->assignRole($role);
                 }
 
+                // Send Credentials via all channels
                 $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
             }
         });
@@ -273,7 +278,10 @@ class InstituteController extends BaseController
                     if ($request->filled('password')) {
                         $updateData['password'] = Hash::make($request->password);
                     }
-                    
+                    // Update shortcode/username if code changed (unlikely but safe)
+                    $updateData['shortcode'] = $institute->code;
+                    $updateData['username'] = $institute->code;
+
                     $adminUser->update($updateData);
 
                     // Ensure School Admin Role
@@ -286,7 +294,10 @@ class InstituteController extends BaseController
                     }
 
                     if ($request->filled('password')) {
-                        $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
+                        // Send updated credentials
+                        // Notification Service handles sms/whatsapp automatically via sendInstitutionCreation
+                        // NOTE: If updating password only, sendInstitutionCreation is fine as it sends creds.
+                        app(NotificationService::class)->sendInstitutionCreation($institute, $adminUser, $request->password);
                     }
                 }
             }
@@ -368,8 +379,6 @@ class InstituteController extends BaseController
 
     private function createInstituteRoles($institute)
     {
-        // Added RoleEnum::SCHOOL_ADMIN to the list as per request
-        // Kept RoleEnum::HEAD_OFFICER as per previous instruction to keep both
         $roles = [
             RoleEnum::SCHOOL_ADMIN->value, 
             RoleEnum::HEAD_OFFICER->value, 

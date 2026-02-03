@@ -3,7 +3,7 @@
 return [
     'page_title' => 'Login | E-Digitex System',
     'welcome_back' => 'Sign in your account',
-    'email_label' => 'Email Address',
+    'email_label' => 'Email, Username or ID',
     'password_label' => 'Password',
     'email_placeholder' => 'hello@example.com',
     'password_placeholder' => 'Enter your password',

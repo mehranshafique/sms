@@ -14,6 +14,8 @@ use App\Models\StudentEnrollment;
 use App\Services\IdGeneratorService;
 use App\Services\NotificationService;
 use App\Enums\UserType;
+use App\Enums\RoleEnum; 
+use Spatie\Permission\Models\Role; 
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class StudentController extends BaseController
 {
@@ -71,14 +74,11 @@ class StudentController extends BaseController
             return DataTables::of($query)
                 ->addIndexColumn()
                 // --- FIX MALFORMED UTF-8 CHARACTERS ---
-                // Force UTF-8 encoding on sensitive text fields to handle French accents
                 ->editColumn('first_name', fn($row) => mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8'))
                 ->editColumn('last_name', fn($row) => mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8'))
-                // Use the aliased parent columns here
                 ->editColumn('parent_father_name', fn($row) => mb_convert_encoding($row->parent_father_name ?? '', 'UTF-8', 'UTF-8'))
                 ->editColumn('parent_mother_name', fn($row) => mb_convert_encoding($row->parent_mother_name ?? '', 'UTF-8', 'UTF-8'))
                 ->editColumn('parent_guardian_name', fn($row) => mb_convert_encoding($row->parent_guardian_name ?? '', 'UTF-8', 'UTF-8'))
-                // --------------------------------------
                 
                 ->addColumn('checkbox', function($row){
                     return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3"><input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'"><label class="form-check-label"></label></div>';
@@ -86,7 +86,6 @@ class StudentController extends BaseController
                 ->addColumn('details', function($row){
                     $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
                     
-                    // FIX: Use multibyte safe string functions for the initial
                     $nameForInitial = trim($row->first_name) ?: 'S';
                     $initial = mb_strtoupper(mb_substr($nameForInitial, 0, 1, 'UTF-8'));
                     
@@ -94,7 +93,6 @@ class StudentController extends BaseController
                         ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' 
                         : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold; font-size: 18px;">'.$initial.'</div>';
                     
-                    // Force UTF-8 on concatenated name
                     $fName = mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8');
                     $lName = mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8');
                     $fullName = $fName . ' ' . $lName;
@@ -102,7 +100,6 @@ class StudentController extends BaseController
                     return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$fullName.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.($row->admission_number ?? '-').'</span></div></div>';
                 })
                 ->addColumn('parent_info', function($row){
-                    // Use the ALIASED column names to get data from the Join, not the Accessor
                     $name = $row->parent_father_name ?? $row->parent_mother_name ?? $row->parent_guardian_name ?? 'N/A';
                     $phone = $row->parent_father_phone ?? $row->parent_mother_phone ?? $row->parent_guardian_phone ?? 'N/A';
                     
@@ -165,7 +162,6 @@ class StudentController extends BaseController
             $sectionsQuery->where('institution_id', $institutionId);
         }
         
-        // UPDATED: Return ONLY the section name. The grade context is provided by the parent dropdown.
         $data = $sectionsQuery->get()->mapWithKeys(function($item) {
             return [$item->id => mb_convert_encoding($item->name, 'UTF-8', 'UTF-8')];
         });
@@ -176,7 +172,6 @@ class StudentController extends BaseController
     public function checkParent(Request $request)
     {
         $value = $request->query('value'); 
-        $type = $request->query('type'); 
         $institutionId = $this->getInstitutionId();
 
         if (!$value) return response()->json(['exists' => false]);
@@ -224,6 +219,7 @@ class StudentController extends BaseController
             'grade_level_id' => 'required|exists:grade_levels,id',
             'primary_guardian' => 'required|in:father,mother,guardian',
             'guardian_email' => 'nullable|email',
+            'email' => 'nullable|email|unique:users,email', // Check student email uniqueness
         ]);
 
         $parentFields = [
@@ -267,32 +263,44 @@ class StudentController extends BaseController
                     }
                 })->first();
 
-            // 2. Parent User Account
+            // 2. Parent User Account & Shortcode Generation
             $parentUserId = $parent ? $parent->user_id : null;
+            $parentPlainPassword = null;
+            $parentUserObj = null;
 
             if ($email) {
                 $existingUser = User::where('email', $email)->first();
                 if ($existingUser) {
                     $parentUserId = $existingUser->id;
+                    $parentUserObj = $existingUser;
                     if(!$existingUser->hasRole('Guardian')) {
                         $existingUser->assignRole('Guardian');
                     }
                 } else {
-                    $plainPassword = 'Parent' . rand(1000, 9999) . '!';
+                    $parentPlainPassword = 'Parent' . rand(1000, 9999) . '!';
                     $phone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
                     $name = $request->guardian_name ?? $request->father_name ?? $request->mother_name ?? 'Parent';
+                    
+                    // Generate Unique Shortcode for Parent: PAR-{InstID}-{Random}
+                    $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
+                    while(User::where('shortcode', $parentShortcode)->exists()) {
+                         $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
+                    }
 
                     $newUser = User::create([
                         'name' => $name,
                         'email' => $email,
-                        'password' => Hash::make($plainPassword),
+                        'password' => Hash::make($parentPlainPassword),
                         'phone' => $phone,
                         'user_type' => UserType::GUARDIAN->value,
                         'institute_id' => $institutionId,
+                        'shortcode' => $parentShortcode, // Added Shortcode
+                        'username' => $parentShortcode,  // Added Username match
                         'is_active' => true,
                     ]);
                     $newUser->assignRole('Guardian'); 
                     $parentUserId = $newUser->id;
+                    $parentUserObj = $newUser;
                 }
             }
 
@@ -319,19 +327,52 @@ class StudentController extends BaseController
                 }
             }
 
-            // 4. Create Student
+            // 4. Generate Admission Number
+            $admissionNumber = IdGeneratorService::generateStudentId($institution, $currentSession);
             $data['institution_id'] = $institutionId;
             $data['parent_id'] = $parent->id; 
-            $data['admission_number'] = IdGeneratorService::generateStudentId($institution, $currentSession);
+            $data['admission_number'] = $admissionNumber;
             $data['primary_guardian'] = $request->primary_guardian; 
 
             if ($request->hasFile('student_photo')) {
                 $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
             }
 
+            // 5. Create Student USER Account (Updated Logic)
+            $studentEmail = $request->email;
+            $studentPlainPassword = 'Student123!';
+            
+            // If email is not provided, generate a unique dummy email: ID@acronym.school
+            if (empty($studentEmail)) {
+                $cleanAcronym = Str::slug($institution->acronym ?? 'school');
+                $studentEmail = str_replace(['/', ' ', '-'], '', $admissionNumber) . '@' . $cleanAcronym . '.com';
+            }
+
+            $studentUser = User::create([
+                'name' => $request->first_name . ' ' . $request->last_name,
+                'email' => $studentEmail,
+                'password' => Hash::make($studentPlainPassword), // Default password
+                'user_type' => UserType::STUDENT->value,
+                'institute_id' => $institutionId,
+                'shortcode' => $admissionNumber, // Set Shortcode = Admission Number
+                'username' => $admissionNumber,  // Set Username = Admission Number
+                'is_active' => true,
+            ]);
+
+            // Assign Student Role
+            $studentRole = Role::where('name', RoleEnum::STUDENT->value)
+                               ->where('institution_id', $institutionId)
+                               ->first();
+            if ($studentRole) {
+                $studentUser->assignRole($studentRole);
+            }
+
+            $data['user_id'] = $studentUser->id;
+            
+            // 6. Create Student Profile
             $student = Student::create($data);
 
-            // 5. Enroll
+            // 7. Enroll
             $sectionId = $request->class_section_id;
             if (!$sectionId) {
                 $section = ClassSection::where('grade_level_id', $request->grade_level_id)
@@ -353,6 +394,15 @@ class StudentController extends BaseController
                     'discount_type' => $request->discount_type ?? 'fixed',
                     'scholarship_reason' => $request->scholarship_reason,
                 ]);
+            }
+
+            // 8. SEND NOTIFICATIONS
+            // Send to Student
+            $this->notificationService->sendUserCredentials($studentUser, $studentPlainPassword, RoleEnum::STUDENT->value);
+            
+            // Send to Parent (if new user created)
+            if ($parentUserObj && $parentPlainPassword) {
+                $this->notificationService->sendUserCredentials($parentUserObj, $parentPlainPassword, RoleEnum::GUARDIAN->value);
             }
         });
 
@@ -376,7 +426,7 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) abort(403);
         
-        $student->load(['institution', 'campus', 'gradeLevel', 'parent', 'enrollments.academicSession', 'enrollments.classSection']);
+        $student->load(['institution', 'campus', 'gradeLevel', 'parent', 'enrollments.academicSession', 'enrollments.classSection', 'user']);
         return view('students.show', compact('student'));
     }
 
@@ -392,8 +442,10 @@ class StudentController extends BaseController
         
         $studentData = $request->except(array_merge(
             $parentFields, 
-            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'admission_number', 'institution_id']
+            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'admission_number', 'institution_id', 'email']
         ));
+
+        // Note: We avoid updating admission_number as it's the unique ID (shortcode)
 
         DB::transaction(function () use ($student, $studentData, $parentData, $request) {
             if ($request->hasFile('student_photo')) {
@@ -401,8 +453,28 @@ class StudentController extends BaseController
                 $studentData['student_photo'] = $request->file('student_photo')->store('students', 'public');
             }
             
+            // 1. Update Student Profile
             $student->update($studentData);
 
+            // 2. Sync Student User (Name & Email if changed in request)
+            if ($student->user_id && ($request->filled('email') || $request->filled('first_name'))) {
+                $userUpdate = [];
+                $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
+                
+                // Only update email if provided and different
+                if ($request->filled('email') && $request->email !== $student->user->email) {
+                    // Check uniqueness
+                    if (!User::where('email', $request->email)->where('id', '!=', $student->user_id)->exists()) {
+                        $userUpdate['email'] = $request->email;
+                        // Also update profile email field for consistency
+                        $student->update(['email' => $request->email]);
+                    }
+                }
+                
+                User::where('id', $student->user_id)->update($userUpdate);
+            }
+
+            // 3. Update Parent Info
             if ($student->parent) {
                 $student->parent->update($parentData);
                 
@@ -412,16 +484,28 @@ class StudentController extends BaseController
                         $student->parent->update(['user_id' => $existingUser->id]);
                     } else {
                         $plainPassword = 'Parent' . rand(1000, 9999) . '!';
+                        
+                        // Generate Parent Shortcode
+                        $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
+                        while(User::where('shortcode', $parentShortcode)->exists()) {
+                             $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
+                        }
+
                         $newUser = User::create([
                             'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
                             'email' => $parentData['guardian_email'],
                             'password' => Hash::make($plainPassword),
                             'user_type' => UserType::GUARDIAN->value,
                             'institute_id' => $student->institution_id,
+                            'shortcode' => $parentShortcode, // Added
+                            'username' => $parentShortcode,  // Added
                             'is_active' => true,
                         ]);
                         $newUser->assignRole('Guardian');
                         $student->parent->update(['user_id' => $newUser->id]);
+                        
+                        // NOTIFY NEW PARENT
+                        $this->notificationService->sendUserCredentials($newUser, $plainPassword, RoleEnum::GUARDIAN->value);
                     }
                 }
             }

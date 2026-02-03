@@ -121,9 +121,6 @@ class StaffController extends BaseController
         $rolesQuery = Role::where('name', '!=', RoleEnum::SUPER_ADMIN->value);
 
         // Apply filtering logic: Always check institution_id not null unless handled specifically
-        // But per request: apply $rolesQuery->whereNotNull('institution_id') for ALL users including Head/SuperAdmin when selecting staff roles
-        // This effectively hides global platform roles from being assigned to staff via this form.
-        
         $rolesQuery->whereNotNull('institution_id');
 
         // Additionally filter by current institution context if set
@@ -146,10 +143,9 @@ class StaffController extends BaseController
             'password' => 'required|min:6',
             'role' => [
                 'required',
-                // Validate role exists AND belongs to the correct institution context (NOT NULL)
                 Rule::exists('roles', 'name')->where(function ($query) use ($institutionId) {
                     $query->where('name', '!=', RoleEnum::SUPER_ADMIN->value)
-                          ->whereNotNull('institution_id'); // Enforce Not Null check
+                          ->whereNotNull('institution_id'); 
 
                     if ($institutionId) {
                         $query->where('institution_id', $institutionId);
@@ -172,6 +168,7 @@ class StaffController extends BaseController
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
+                'mobile_number' => $request->phone, // Ensure mobile_number is also set for notifications
                 'user_type' => 4, // Staff
                 'is_active' => true,
                 'institute_id' => $institutionId,
@@ -181,11 +178,22 @@ class StaffController extends BaseController
                 $userData['profile_picture'] = $request->file('profile_picture')->store('profile-photos', 'public');
             }
 
+            // Create User First (without shortcode initially if we use ID-based EMP)
             $user = User::create($userData);
+            
+            // Assign Role
             $user->assignRole($request->role);
 
+            // Generate Employee ID (EMP-0001)
             $empId = $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
+            
+            // UPDATE: Set Shortcode & Username to Employee ID
+            $user->update([
+                'shortcode' => $empId,
+                'username'  => $empId
+            ]);
 
+            // Create Staff Profile
             Staff::create([
                 'user_id' => $user->id,
                 'institution_id' => $institutionId,
@@ -199,7 +207,8 @@ class StaffController extends BaseController
                 'status' => 'active',
             ]);
 
-            // SEND CREDENTIALS
+            // SEND CREDENTIALS (Email + SMS + WhatsApp)
+            // Notification Service handles checking for phone availability
             $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
         });
 
@@ -227,10 +236,8 @@ class StaffController extends BaseController
         
         $rolesQuery = Role::where('name', '!=', RoleEnum::SUPER_ADMIN->value);
 
-        // Apply Not Null check for all users
         $rolesQuery->whereNotNull('institution_id');
 
-        // Apply Institution Context Filter
         $instId = $staff->institution_id;
         if ($instId) {
             $rolesQuery->where('institution_id', $instId);
@@ -247,8 +254,6 @@ class StaffController extends BaseController
         if ($institutionId && $staff->institution_id != $institutionId) abort(403);
 
         $user = $staff->user;
-        
-        // Determine the relevant institution ID for validation (current staff's institution)
         $targetInstitutionId = $staff->institution_id;
 
         $request->validate([
@@ -258,7 +263,7 @@ class StaffController extends BaseController
                 'required',
                 Rule::exists('roles', 'name')->where(function ($query) use ($targetInstitutionId) {
                     $query->where('name', '!=', RoleEnum::SUPER_ADMIN->value)
-                          ->whereNotNull('institution_id'); // Enforce Not Null check
+                          ->whereNotNull('institution_id'); 
 
                     if ($targetInstitutionId) {
                         $query->where('institution_id', $targetInstitutionId);
@@ -275,6 +280,7 @@ class StaffController extends BaseController
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
+                'mobile_number' => $request->phone, // Ensure updated
             ];
 
             if ($request->password) {
@@ -286,6 +292,12 @@ class StaffController extends BaseController
                     Storage::disk('public')->delete($user->profile_picture);
                 }
                 $userData['profile_picture'] = $request->file('profile_picture')->store('profile-photos', 'public');
+            }
+
+            // Sync shortcode if manually updating employee ID (though usually generated)
+            if ($request->employee_id && $request->employee_id !== $user->shortcode) {
+                $userData['shortcode'] = $request->employee_id;
+                $userData['username'] = $request->employee_id;
             }
 
             $user->update($userData);

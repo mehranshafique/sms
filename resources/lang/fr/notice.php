@@ -1,0 +1,43 @@
+<?php
+
+return [
+    'page_title' => 'Tableau d\'affichage',
+    'notice_list' => 'Liste des annonces',
+    'add_notice' => 'Ajouter une annonce',
+    'edit_notice' => 'Modifier l\'annonce',
+    'manage_subtitle' => 'Gérer les annonces du système et de l\'école',
+    
+    'title' => 'Titre',
+    'content' => 'Contenu',
+    'type' => 'Type',
+    'audience' => 'Public cible',
+    'published_at' => 'Date de publication',
+    'status' => 'Statut',
+    'created_by' => 'Créé par',
+    
+    'info' => 'Information',
+    'warning' => 'Avertissement',
+    'urgent' => 'Urgent',
+    'all' => 'Tout le monde',
+    'staff' => 'Personnel uniquement',
+    'student' => 'Élèves uniquement',
+    'parent' => 'Parents uniquement',
+    'published' => 'Publié',
+    'draft' => 'Brouillon',
+
+    'success_create' => 'Annonce créée avec succès.',
+    'success_update' => 'Annonce mise à jour avec succès.',
+    'success_delete' => 'Annonce supprimée avec succès.',
+    'delete_warning' => 'Êtes-vous sûr de vouloir supprimer cette annonce ?',
+    'yes_delete' => 'Oui, supprimer',
+    'cancel' => 'Annuler',
+    'notice_board' => 'Tableau d\'affichage',
+    'latest_announcements' => 'Dernières annonces et mises à jour',
+    'read_more' => 'Lire la suite',
+    'no_notices' => 'Aucune annonce disponible pour le moment.',
+    'details' => 'Détails',
+    'back' => 'Retour',
+    'posted_by' => 'Publié par',
+    'student_profile_not_found' => 'Profil élève non trouvé lié à votre compte.',
+    'unauthorized' => 'Vous n\'êtes pas autorisé à voir cette annonce.',
+];

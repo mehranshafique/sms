@@ -6,24 +6,31 @@
     <h4 class="text-center mb-4">{{ __('login.reset_password_header') ?? 'Reset Password' }}</h4>
     
     <p class="text-center mb-4">
-        {{ __('login.forgot_password_desc') ?? 'Enter your email address and we will send you a link to reset your password.' }}
+        {{ __('login.forgot_password_desc') ?? 'Enter your email, username, or ID and we will send you a link to reset your password.' }}
     </p>
 
+    {{-- We point to a custom route or the standard one, but we must handle the 'login' input in the backend --}}
     <form method="POST" action="{{ route('password.email') }}" >
         @csrf
         
-        {{-- Email Input --}}
+        {{-- Login Input (Email/Username/Shortcode) --}}
         <div class="form-group">
-            <label class="form-label" for="email">{{ __('login.email_label') ?? 'Email Address' }}</label>
+            <label class="form-label" for="login">{{ __('login.email_username_label') ?? 'Email, Username or ID' }}</label>
             <input 
-                type="email" 
+                type="text" 
                 class="form-control @error('email') is-invalid @enderror" 
-                placeholder="{{ __('login.email_placeholder') ?? 'hello@example.com' }}" 
-                name="email" 
-                id="email"
-                value="{{ old('email') }}" 
+                placeholder="{{ __('login.login_placeholder') ?? 'Enter Email, Username or ID' }}" 
+                name="login" 
+                id="login"
+                value="{{ old('login') }}" 
                 required 
                 autofocus>
+                
+            @error('email')
+                <span class="invalid-feedback" role="alert">
+                    <strong>{{ $message }}</strong>
+                </span>
+            @enderror
         </div>
 
         {{-- Submit Button --}}

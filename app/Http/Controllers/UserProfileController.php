@@ -38,9 +38,13 @@ class UserProfileController extends BaseController
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'username' => 'required|string|max:50|unique:users,username,' . $user->id,
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
+        ], [
+            'profile_picture.max' => 'The profile picture must not be greater than 2MB.',
+            'username.unique' => 'This username is already taken.',
         ]);
 
         // Handle Profile Picture Upload
@@ -57,20 +61,20 @@ class UserProfileController extends BaseController
 
         $user->name = $request->name;
         $user->email = $request->email;
-        $user->phone = $request->phone; // Assuming 'phone' column exists on users table
-        $user->address = $request->address; // Assuming 'address' column exists
+        $user->username = $request->username;
+        $user->phone = $request->phone; 
+        $user->address = $request->address; 
         
         // If user is also a Student or Staff, sync data optionally
         if($user->student) {
             $user->student->update([
-                'first_name' => explode(' ', $request->name)[0],
+                'first_name' => explode(' ', $request->name)[0], // Simple split, might want refinement
                 'email' => $request->email,
                 'mobile_number' => $request->phone
             ]);
         }
         if($user->staff) {
             $user->staff->update([
-                'first_name' => explode(' ', $request->name)[0],
                 'email' => $request->email,
                 'phone' => $request->phone
             ]);

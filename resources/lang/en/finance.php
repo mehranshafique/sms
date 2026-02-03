@@ -17,8 +17,9 @@ return [
     'grade_level' => 'Grade Level (Optional)',
     'select_type' => 'Select Type',
     'select_grade' => 'Select Grade',
-    'mode' => 'Payment Mode', // Added
-    'parent_fee_name' => 'Parent Fee Name', // Added
+    'mode' => 'Payment Mode',
+    'parent_fee_name' => 'Parent Fee Name',
+    
     // Fee Types
     'fee_type_list' => 'Fee Type List',
     'add_type' => 'Add Fee Type',
@@ -49,22 +50,23 @@ return [
     // NEW SAFETY MESSAGES
     'global_amount_too_low' => 'Cannot reduce Global Fee below the sum of existing installments (:total).',
     'cannot_delete_global_with_installments' => 'Cannot delete Global Fee because active installments exist. Please delete installments first.',
-    'duplicate_global_config_error' => 'This class/grade already has a Global Fee configuration for this Fee Type. Please edit the existing structure instead of creating a duplicate.', // Added
+    'duplicate_global_config_error' => 'This class/grade already has a Global Fee configuration for this Fee Type. Please edit the existing structure instead of creating a duplicate.',
+
     // Buttons & Actions
     'save' => 'Save',
-    'cancel' => 'Cancel', // Added
+    'cancel' => 'Cancel',
     'action' => 'Action',
     'edit_fee' => 'Edit Fee',
     'view_details' => 'View Details',
     'close' => 'Close',
-    'yes_delete' => 'Yes, delete it!', // Added
+    'yes_delete' => 'Yes, delete it!',
     
     // Alerts & Confirmations
-    'are_you_sure' => 'Are you sure?', // Added
-    'delete_warning' => 'This action cannot be undone!', // Added
-    'error' => 'Error', // Added
-    'success' => 'Success', // Added
-    'deleted' => 'Deleted!', // Added
+    'are_you_sure' => 'Are you sure?',
+    'delete_warning' => 'This action cannot be undone!',
+    'error' => 'Error',
+    'success' => 'Success',
+    'deleted' => 'Deleted!',
     
     // Class Financial Report
     'class_financial_report' => 'Class Financial Report',
@@ -91,6 +93,7 @@ return [
     'all_sections' => 'All Sections',
     'installment_order' => 'Installment Order',
     'sequence_order_hint' => 'Sequence number (1 for first installment, etc.)',
+    'no_financial_records_found' => 'No financial records found for the selected class.',
 
     // Student Finance Dashboard & General Keys
     'student_finance_dashboard' => 'Student Finance Dashboard',
@@ -116,7 +119,7 @@ return [
     'reduce_global_msg' => 'Paying this will reduce your Global Balance to:',
     'student_not_enrolled' => 'Student not enrolled in any class.',
     'installment_prefix' => 'Installment',
-    
+
     // Payment History Table
     'payment_history' => 'Payment History',
     'date' => 'Date',
@@ -148,9 +151,13 @@ return [
     'status_unpaid' => 'Unpaid',
     'status_overdue' => 'Overdue',
      
-    // NEW KEYS FOR TAB DESCRIPTIONS
+    // TAB DESCRIPTIONS
     'tab_info_global' => 'Students with "Global" payment mode (Lump-sum payers).',
     'tab_info_installment' => 'Students with "Installment" payment mode.',
     'summary' => 'Total Summary',
     'tab_info_summary' => 'Cumulative financial summary for all students in this class.',
+
+    // REPORT VISUALIZATION (Added)
+    'fee_collection_analysis' => 'Fee Collection Analysis',
+    'pending_vs_collected' => 'Pending vs Collected',
 ];

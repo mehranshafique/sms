@@ -140,7 +140,7 @@
                         @endcan @endif
                         
                         @if($hasModule('class_subjects')) @can('class_subject.view') 
-                            <li><a href="{{ route('class-subjects.index') }}">{{ __('sidebar.class_subjects.title') }} (Config)</a></li> 
+                            <li><a href="{{ route('class-subjects.index') }}">{{ __('sidebar.class_subjects.title') }}</a></li> 
                         @endcan @endif
 
                         @if($hasModule('timetables')) @can('timetable.view') 

@@ -11,14 +11,14 @@
         
         {{-- Email Input --}}
         <div class="form-group">
-            <label class="form-label" for="email">{{ __('login.email_label') }}</label>
+            <label class="form-label" for="login">{{ __('login.email_label') }}</label>
             <input 
-                type="email" 
+                type="text" 
                 class="form-control" 
                 placeholder="{{ __('login.email_placeholder') }}" 
-                name="email" 
-                id="email"
-                value="{{ old('email') }}" 
+                name="login" 
+                id="login"
+                value="{{ old('login') }}" 
                 required 
                 autofocus>
         </div>
@@ -45,8 +45,8 @@
         <div class="form-row d-flex flex-wrap justify-content-between mt-4 mb-2">
             <div class="form-group">
                 <div class="form-check custom-checkbox ms-1">
-                    <input type="checkbox" class="form-check-input" id="remember_me" name="remember">
-                    <label class="form-check-label" for="remember_me">{{ __('login.remember_me') }}</label>
+                    <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                    <label class="form-check-label" for="remember">{{ __('login.remember_me') }}</label>
                 </div>
             </div>
             <div class="form-group ms-2">

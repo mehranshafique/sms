@@ -21,6 +21,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'username',   // <--- Add this
+        'shortcode',
         'password',
         'institute_id', // Useful for non-head officer users
         'user_type',

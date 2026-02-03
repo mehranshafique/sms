@@ -29,12 +29,11 @@ class MobishastraService implements SmsGatewayInterface
         try {
             // 1. Sanitize Phone Number
             $cleanNumber = preg_replace('/[^0-9]/', '', $to);
-            
-            // 2. Extract Country Code (assuming logic from your snippet: first 3 chars)
+            //Extract Country Code (assuming logic from your snippet: first 3 chars)
             // Adjust this logic if country codes vary (e.g. +92 vs +1)
             $countryCode = substr($cleanNumber, 0, 3); 
 
-            // 3. Prepare Parameters
+            // 2. Prepare Parameters
             $queryParams = [
                 'user'        => $this->creds['user'],
                 'pwd'         => $this->creds['password'],
@@ -45,7 +44,7 @@ class MobishastraService implements SmsGatewayInterface
                 'smstype'     => '0/4/3' // As per your provided file
             ];
 
-            // 4. Send Request
+            // 3. Send Request
             // withoutVerifying() is used because your snippet had 'verify' => false
             // In production, fixing SSL on the server is recommended instead.
             $response = Http::withHeaders($this->headers)
@@ -69,7 +68,6 @@ class MobishastraService implements SmsGatewayInterface
 
         } catch (\Exception $e) {
             Log::error('Mobishastra Exception: ' . $e->getMessage());
-            // We return false so the app doesn't crash, just logs the failure
             return false;
         }
     }
