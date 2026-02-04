@@ -16,6 +16,7 @@ class AuditLog extends Model
         'module',
         'description',
         'ip_address',
+        'location_details', // Added
         'user_agent',
         'old_values',
         'new_values',
@@ -24,6 +25,7 @@ class AuditLog extends Model
     protected $casts = [
         'old_values' => 'array',
         'new_values' => 'array',
+        'location_details' => 'array', // Added cast for JSON
     ];
 
     public function user()

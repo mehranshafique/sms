@@ -74,8 +74,20 @@
 @endsection
 
 @section('js')
+<!-- Datepicker & Select Picker JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
 <script>
     $(document).ready(function() {
+        
+        // Init Datepicker
+        if ($.fn.datepicker) {
+            $('.datepicker').datepicker({
+                autoclose: true,
+                format: 'yyyy-mm-dd',
+                todayHighlight: true
+            });
+        }
+
         var table = $('#auditTable').DataTable({
             processing: true,
             serverSide: true,
@@ -94,7 +106,8 @@
                 { data: 'module', name: 'module' },
                 { data: 'action', name: 'action' },
                 { data: 'details', name: 'description' },
-                { data: 'ip_address', name: 'ip_address' },
+                // Allow HTML for IP column to show location details
+                { data: 'ip_address', name: 'ip_address', render: function(data, type, row) { return data; } },
             ],
             order: [[0, 'desc']], // Latest first
             language: {

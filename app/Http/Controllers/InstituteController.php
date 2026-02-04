@@ -153,7 +153,7 @@ class InstituteController extends BaseController
 
             $institute->save();
 
-            // Fix Audit Log Context
+            // Fix Audit Log Context (Update to actual institute ID if needed)
             try {
                 \App\Models\AuditLog::where('user_id', Auth::id())
                     ->where('created_at', '>=', now()->subSeconds(10))
@@ -295,8 +295,6 @@ class InstituteController extends BaseController
 
                     if ($request->filled('password')) {
                         // Send updated credentials
-                        // Notification Service handles sms/whatsapp automatically via sendInstitutionCreation
-                        // NOTE: If updating password only, sendInstitutionCreation is fine as it sends creds.
                         app(NotificationService::class)->sendInstitutionCreation($institute, $adminUser, $request->password);
                     }
                 }
@@ -342,12 +340,11 @@ class InstituteController extends BaseController
 
     /**
      * Check if email exists in Users or Institutions table.
-     * UPDATED: Accepts an optional 'id' to exclude current institution and its admin from checks.
      */
     public function checkEmail(Request $request)
     {
         $email = $request->input('email');
-        $ignoreId = $request->input('id'); // The institution ID being edited
+        $ignoreId = $request->input('id'); 
         
         // 1. Prepare Institution Check
         $instQuery = Institution::where('email', $email);
@@ -359,7 +356,6 @@ class InstituteController extends BaseController
         // 2. Prepare User Check
         $userQuery = User::where('email', $email);
         if ($ignoreId) {
-            // Find the admin user associated with this institution to exclude them
             $adminUser = User::where('institute_id', $ignoreId)
                              ->whereIn('user_type', [UserType::SCHOOL_ADMIN->value, UserType::HEAD_OFFICER->value])
                              ->first();

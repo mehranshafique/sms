@@ -54,6 +54,23 @@ class AuditLogController extends BaseController
                 ->addColumn('institution_name', function($row){
                     return $row->institution ? $row->institution->code : 'Global';
                 })
+                // ENRICHED IP COLUMN with Location
+                ->editColumn('ip_address', function($row){
+                    $ip = $row->ip_address;
+                    if (!empty($row->location_details)) {
+                        $loc = $row->location_details;
+                        $details = collect([
+                            $loc['city'] ?? null,
+                            $loc['region'] ?? null,
+                            $loc['country'] ?? null
+                        ])->filter()->join(', ');
+
+                        if ($details) {
+                            return '<div>' . $ip . '</div><small class="text-muted"><i class="fa fa-map-marker me-1"></i>' . $details . '</small>';
+                        }
+                    }
+                    return $ip;
+                })
                 ->editColumn('action', function($row){
                     $colors = [
                         'Login' => 'success',
@@ -73,7 +90,7 @@ class AuditLogController extends BaseController
                     // Truncate description for table view
                     return '<span title="'.$row->description.'">'.\Illuminate\Support\Str::limit($row->description, 50).'</span>';
                 })
-                ->rawColumns(['action', 'details'])
+                ->rawColumns(['action', 'details', 'ip_address']) // added ip_address to raw
                 ->make(true);
         }
 
