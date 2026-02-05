@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Services\NotificationService; // Added
 use Illuminate\Support\Str;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use PDF;
@@ -21,12 +22,15 @@ use App\Enums\CurrencySymbol;
 
 class InvoiceController extends BaseController
 {
-    public function __construct()
+    protected $notificationService; // Added
+
+    public function __construct(NotificationService $notificationService) // Injected
     {
         $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'show', 'print', 'downloadPdf']);
         $this->middleware(PermissionMiddleware::class . ':invoice.create')->only(['create', 'store']);
         $this->middleware(PermissionMiddleware::class . ':invoice.delete')->only(['destroy']);
         $this->setPageTitle(__('invoice.page_title'));
+        $this->notificationService = $notificationService;
     }
 
     public function index(Request $request)
@@ -305,8 +309,10 @@ class InvoiceController extends BaseController
             ->where('academic_session_id', $session->id)
             ->where('payment_mode', 'global')
             ->get();
+            
+        $invoicesToNotify = []; // Collect invoices to notify after commit
 
-        DB::transaction(function () use ($students, $fees, $totalFeeAmount, $request, $institutionId, $session, &$generatedCount, &$skippedCount, $targetMode, $annualCap, $isOneTimeInvoice, $globalFeesCache) {
+        DB::transaction(function () use ($students, $fees, $totalFeeAmount, $request, $institutionId, $session, &$generatedCount, &$skippedCount, $targetMode, $annualCap, $isOneTimeInvoice, $globalFeesCache, &$invoicesToNotify) {
             foreach ($students as $enrollment) {
                 $studentId = $enrollment->student_id;
                 
@@ -395,9 +401,8 @@ class InvoiceController extends BaseController
                 foreach ($feesToProcess as $fee) {
                     $description = $fee->name;
 
-                    // DESCRIPTIVE REASON: "Term 1 (Installment) of Annual Tuition"
+                    // DESCRIPTIVE REASON
                     if ($fee->payment_mode === 'installment') {
-                        // Find Parent Global Fee
                         $parentGlobal = $globalFeesCache->filter(function($gFee) use ($fee) {
                             return $gFee->fee_type_id === $fee->fee_type_id &&
                                    ($gFee->grade_level_id === $fee->grade_level_id || $gFee->class_section_id === $fee->class_section_id);
@@ -406,7 +411,6 @@ class InvoiceController extends BaseController
                         $globalName = $parentGlobal ? $parentGlobal->name : 'Global Fee';
                         $description = "{$fee->name} of {$globalName}";
                     } 
-                    // Fallback for Global fees or others
                     else {
                         $description = "{$fee->name} (" . ucfirst($fee->payment_mode) . ")";
                     }
@@ -428,10 +432,16 @@ class InvoiceController extends BaseController
                         'amount' => -$discountValue,
                     ]);
                 }
-
+                
                 $generatedCount++;
+                $invoicesToNotify[] = $invoice;
             }
         });
+        
+        // Send Notifications (Outside Transaction to prevent locking issues)
+        foreach ($invoicesToNotify as $inv) {
+            $this->notificationService->sendInvoiceNotification($inv);
+        }
 
         if ($generatedCount === 0) {
             return response()->json([

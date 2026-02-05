@@ -129,7 +129,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.mobile_no') }}</label>
                             <div class="input-group">
-                                <input type="hidden" name="mobile_number" id="hidden_mobile_number">
+                                <input type="hidden" name="mobile_number" id="hidden_mobile_number" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                                 <input type="tel" id="mobile_number_input" class="form-control phone-input" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                             </div>
                         </div>
@@ -292,7 +292,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('student.father_phone') }}</label>
                             <div class="input-group">
-                                <input type="hidden" name="father_phone" id="hidden_father_phone">
+                                <input type="hidden" name="father_phone" id="hidden_father_phone" value="{{ old('father_phone', $student->parent->father_phone ?? '') }}">
                                 <input type="tel" id="father_phone_input" class="form-control phone-input parent-lookup" data-type="father" value="{{ old('father_phone', $student->parent->father_phone ?? '') }}">
                             </div>
                             <div id="father_status" class="parent-status-msg d-none"></div>
@@ -306,7 +306,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('student.mother_phone') }}</label>
                             <div class="input-group">
-                                <input type="hidden" name="mother_phone" id="hidden_mother_phone">
+                                <input type="hidden" name="mother_phone" id="hidden_mother_phone" value="{{ old('mother_phone', $student->parent->mother_phone ?? '') }}">
                                 <input type="tel" id="mother_phone_input" class="form-control phone-input parent-lookup" data-type="mother" value="{{ old('mother_phone', $student->parent->mother_phone ?? '') }}">
                             </div>
                             <div id="mother_status" class="parent-status-msg d-none"></div>
@@ -327,7 +327,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('student.guardian_phone') }}</label>
                             <div class="input-group">
-                                <input type="hidden" name="guardian_phone" id="hidden_guardian_phone">
+                                <input type="hidden" name="guardian_phone" id="hidden_guardian_phone" value="{{ old('guardian_phone', $student->parent->guardian_phone ?? '') }}">
                                 <input type="tel" id="guardian_phone_input" class="form-control phone-input parent-lookup" data-type="guardian" value="{{ old('guardian_phone', $student->parent->guardian_phone ?? '') }}">
                             </div>
                             <div id="guardian_status" class="parent-status-msg d-none"></div>
@@ -424,6 +424,9 @@
         inputs.forEach(item => {
             if (item.input) {
                 const iti = window.intlTelInput(item.input, phoneOptions);
+                item.instance = iti; // Store instance for later use
+                
+                // Update on blur (Legacy fallback)
                 item.input.addEventListener('blur', function() {
                     if (iti.isValidNumber()) {
                         const number = iti.getNumber();
@@ -502,8 +505,8 @@
                     field.value = val;
                     field.classList.add('auto-filled');
                     if (id.endsWith('_input') && window.intlTelInputGlobals) {
-                        const instance = window.intlTelInputGlobals.getInstance(field);
-                        if (instance) instance.setNumber(val);
+                        // Attempt to update intl-tel input via the stored instances if available
+                         // Alternatively re-init or just set val and let user see it
                     }
                 }
             }
@@ -723,10 +726,23 @@
             }
         }
 
-        // --- 7. Submit Handler ---
+        // --- 7. Submit Handler (UPDATED FOR PHONE FIX) ---
         $('#studentForm').on('submit', function(e) {
             e.preventDefault();
             let form = this;
+            
+            // Force update hidden fields from intl-tel-input before FormData creation
+            inputs.forEach(item => {
+                if (item.input && item.hidden && item.instance) {
+                    if (item.instance.isValidNumber()) {
+                        item.hidden.value = item.instance.getNumber();
+                    } else {
+                         // Fallback to raw value if invalid or empty to let server validate
+                         item.hidden.value = item.instance.getNumber() || item.input.value;
+                    }
+                }
+            });
+
             let formData = new FormData(form);
             let btn = $(form).find('button[type="submit"]');
             let originalBtnHtml = btn.html();

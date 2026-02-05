@@ -49,7 +49,7 @@ class AuditLogger
             'new_values' => $newValues,
         ]);
         
-        // Log::info("created ".$res->id);
+        Log::info("created ".$res->id);
     }
 
     /**

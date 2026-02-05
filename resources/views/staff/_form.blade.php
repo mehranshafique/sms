@@ -50,7 +50,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.phone') }} <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="hidden" name="full_phone" id="fullPhoneInput">
+                                <input type="hidden" name="phone" id="fullPhoneInput">
                                 <input type="tel" id="phoneInput" class="form-control" value="{{ old('phone', $staff->user->phone ?? '') }}" required>
                             </div>
                             @error('phone')

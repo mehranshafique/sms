@@ -5,35 +5,24 @@ namespace App\Services\Sms;
 use App\Interfaces\SmsGatewayInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MobishastraService implements SmsGatewayInterface
 {
     protected $creds;
-    protected $headers;
     protected $baseUrl = 'https://mshastra.com/sendurlcomma.aspx';
 
     public function __construct()
     {
-        // Load credentials from config
         $this->creds = config('sms.mobishastra');
-        
-        $this->headers = [
-            'AppID'     => $this->creds['app_id'] ?? 'huidu_liang',
-            'AppSecret' => $this->creds['app_secret'] ?? '',
-            'Cookie'    => 'ASP.NET_SessionId=x41ydxkwjfy3kfk3kfm0sa1a',
-        ];
     }
 
-    public function send(string $to, string $message): bool
+    public function send(string $to, string $message): array
     {
         try {
-            // 1. Sanitize Phone Number
             $cleanNumber = preg_replace('/[^0-9]/', '', $to);
-            //Extract Country Code (assuming logic from your snippet: first 3 chars)
-            // Adjust this logic if country codes vary (e.g. +92 vs +1)
             $countryCode = substr($cleanNumber, 0, 3); 
 
-            // 2. Prepare Parameters
             $queryParams = [
                 'user'        => $this->creds['user'],
                 'pwd'         => $this->creds['password'],
@@ -41,34 +30,45 @@ class MobishastraService implements SmsGatewayInterface
                 'CountryCode' => '+' . $countryCode,
                 'mobileno'    => '+' . $cleanNumber,
                 'msgtext'     => $message,
-                'smstype'     => '0/4/3' // As per your provided file
+                'smstype'     => '0/4/3'
             ];
 
-            // 3. Send Request
-            // withoutVerifying() is used because your snippet had 'verify' => false
-            // In production, fixing SSL on the server is recommended instead.
-            $response = Http::withHeaders($this->headers)
-                ->withoutVerifying() 
-                ->timeout(50)
+            // Use HTTP Client
+            $response = Http::withoutVerifying()
+                ->timeout(30)
                 ->get($this->baseUrl, $queryParams);
 
+            $body = $response->body();
+
+            // 1. Check HTTP Status
             if ($response->successful()) {
-                Log::info('Mobishastra SMS Sent', [
-                    'to' => $cleanNumber, 
-                    'response' => $response->body()
-                ]);
-                return true;
+                // 2. Check Provider Response Text
+                // Mobishastra returns "Send Successful" or similar positive string on 200 OK
+                if (stripos($body, 'Successful') !== false || stripos($body, 'Active') !== false) {
+                    Log::info('Mobishastra Sent', ['to' => $cleanNumber]);
+                    return ['success' => true, 'message' => __('configuration.sms_sent_success')];
+                }
+                
+                // If 200 OK but text indicates error (e.g. "Invalid Login")
+                Log::error('Mobishastra API Error', ['body' => $body]);
+                return ['success' => false, 'message' => __('configuration.gateway_response_error') . ': ' . Str::limit($body, 50)];
             }
 
-            Log::error('Mobishastra SMS Failed', [
-                'status' => $response->status(), 
-                'body' => $response->body()
-            ]);
-            return false;
+            // HTTP Error (4xx, 5xx)
+            Log::error('Mobishastra HTTP Error', ['status' => $response->status()]);
+            return ['success' => false, 'message' => __('configuration.gateway_response_error')];
 
         } catch (\Exception $e) {
-            Log::error('Mobishastra Exception: ' . $e->getMessage());
-            return false;
+            // SECURITY CRITICAL: Never return $e->getMessage() directly as it contains URL parameters with password
+            Log::error('Mobishastra Connection Exception', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return [
+                'success' => false, 
+                'message' => __('configuration.gateway_connection_error')
+            ];
         }
     }
 }

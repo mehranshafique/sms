@@ -11,5 +11,5 @@ interface SmsGatewayInterface
      * @param string $message The message content
      * @return bool True if sent successfully
      */
-    public function send(string $to, string $message): bool;
+    public function send(string $to, string $message): array;
 }

@@ -40,7 +40,6 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            // OPTIMIZED QUERY: Join 'parents' to allow sorting/searching by parent name
             $query = Student::leftJoin('parents', 'students.parent_id', '=', 'parents.id')
                 ->select([
                     'students.id',
@@ -52,7 +51,6 @@ class StudentController extends BaseController
                     'students.status',
                     'students.created_at',
                     'students.grade_level_id', 
-                    // Select Parent fields with aliases to avoid Accessor collision (getFatherNameAttribute)
                     'parents.father_name as parent_father_name',
                     'parents.mother_name as parent_mother_name',
                     'parents.guardian_name as parent_guardian_name',
@@ -73,7 +71,6 @@ class StudentController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
-                // --- FIX MALFORMED UTF-8 CHARACTERS ---
                 ->editColumn('first_name', fn($row) => mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8'))
                 ->editColumn('last_name', fn($row) => mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8'))
                 ->editColumn('parent_father_name', fn($row) => mb_convert_encoding($row->parent_father_name ?? '', 'UTF-8', 'UTF-8'))
@@ -219,7 +216,7 @@ class StudentController extends BaseController
             'grade_level_id' => 'required|exists:grade_levels,id',
             'primary_guardian' => 'required|in:father,mother,guardian',
             'guardian_email' => 'nullable|email',
-            'email' => 'nullable|email|unique:users,email', // Check student email uniqueness
+            'email' => 'nullable|email|unique:users,email', 
         ]);
 
         $parentFields = [
@@ -239,6 +236,11 @@ class StudentController extends BaseController
             if (!empty($data[$field])) {
                 $data[$field] = mb_convert_case($data[$field], MB_CASE_TITLE, "UTF-8");
             }
+        }
+        
+        // --- FIX: Ensure mobile_number is mapped correctly from request ---
+        if($request->filled('mobile_number')) {
+            $data['mobile_number'] = $request->mobile_number;
         }
 
         DB::transaction(function () use ($request, $data, $institutionId) {
@@ -276,12 +278,18 @@ class StudentController extends BaseController
                     if(!$existingUser->hasRole('Guardian')) {
                         $existingUser->assignRole('Guardian');
                     }
+                    
+                    // Update parent phone if provided in current request
+                    $primaryPhone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
+                    if($primaryPhone && $primaryPhone !== $existingUser->phone) {
+                        $existingUser->update(['phone' => $primaryPhone]);
+                    }
+
                 } else {
                     $parentPlainPassword = 'Parent' . rand(1000, 9999) . '!';
                     $phone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
                     $name = $request->guardian_name ?? $request->father_name ?? $request->mother_name ?? 'Parent';
                     
-                    // Generate Unique Shortcode for Parent: PAR-{InstID}-{Random}
                     $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
                     while(User::where('shortcode', $parentShortcode)->exists()) {
                          $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
@@ -291,11 +299,11 @@ class StudentController extends BaseController
                         'name' => $name,
                         'email' => $email,
                         'password' => Hash::make($parentPlainPassword),
-                        'phone' => $phone,
+                        'phone' => $phone, // Save Phone to User table
                         'user_type' => UserType::GUARDIAN->value,
                         'institute_id' => $institutionId,
-                        'shortcode' => $parentShortcode, // Added Shortcode
-                        'username' => $parentShortcode,  // Added Username match
+                        'shortcode' => $parentShortcode, 
+                        'username' => $parentShortcode,  
                         'is_active' => true,
                     ]);
                     $newUser->assignRole('Guardian'); 
@@ -325,6 +333,12 @@ class StudentController extends BaseController
                 if (!$parent->user_id && $parentUserId) {
                     $parent->update(['user_id' => $parentUserId]);
                 }
+                // Update parent record details if changed
+                $parent->update([
+                    'father_phone' => $request->father_phone,
+                    'mother_phone' => $request->mother_phone,
+                    'guardian_phone' => $request->guardian_phone,
+                ]);
             }
 
             // 4. Generate Admission Number
@@ -342,7 +356,6 @@ class StudentController extends BaseController
             $studentEmail = $request->email;
             $studentPlainPassword = 'Student123!';
             
-            // If email is not provided, generate a unique dummy email: ID@acronym.school
             if (empty($studentEmail)) {
                 $cleanAcronym = Str::slug($institution->acronym ?? 'school');
                 $studentEmail = str_replace(['/', ' ', '-'], '', $admissionNumber) . '@' . $cleanAcronym . '.com';
@@ -351,11 +364,12 @@ class StudentController extends BaseController
             $studentUser = User::create([
                 'name' => $request->first_name . ' ' . $request->last_name,
                 'email' => $studentEmail,
-                'password' => Hash::make($studentPlainPassword), // Default password
+                'password' => Hash::make($studentPlainPassword),
+                'phone' => $request->mobile_number, // Save Phone to User table (FIX)
                 'user_type' => UserType::STUDENT->value,
                 'institute_id' => $institutionId,
-                'shortcode' => $admissionNumber, // Set Shortcode = Admission Number
-                'username' => $admissionNumber,  // Set Username = Admission Number
+                'shortcode' => $admissionNumber, 
+                'username' => $admissionNumber,  
                 'is_active' => true,
             ]);
 
@@ -370,6 +384,7 @@ class StudentController extends BaseController
             $data['user_id'] = $studentUser->id;
             
             // 6. Create Student Profile
+            // $data already contains mobile_number from line 118
             $student = Student::create($data);
 
             // 7. Enroll
@@ -397,10 +412,10 @@ class StudentController extends BaseController
             }
 
             // 8. SEND NOTIFICATIONS
-            // Send to Student
+            // Send to Student (will use updated User object with phone)
             $this->notificationService->sendUserCredentials($studentUser, $studentPlainPassword, RoleEnum::STUDENT->value);
             
-            // Send to Parent (if new user created)
+            // Send to Parent (if new user created or updated)
             if ($parentUserObj && $parentPlainPassword) {
                 $this->notificationService->sendUserCredentials($parentUserObj, $parentPlainPassword, RoleEnum::GUARDIAN->value);
             }
@@ -444,8 +459,10 @@ class StudentController extends BaseController
             $parentFields, 
             ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'admission_number', 'institution_id', 'email']
         ));
-
-        // Note: We avoid updating admission_number as it's the unique ID (shortcode)
+        
+        if($request->filled('mobile_number')) {
+            $studentData['mobile_number'] = $request->mobile_number;
+        }
 
         DB::transaction(function () use ($student, $studentData, $parentData, $request) {
             if ($request->hasFile('student_photo')) {
@@ -456,17 +473,21 @@ class StudentController extends BaseController
             // 1. Update Student Profile
             $student->update($studentData);
 
-            // 2. Sync Student User (Name & Email if changed in request)
-            if ($student->user_id && ($request->filled('email') || $request->filled('first_name'))) {
+            // 2. Sync Student User (Name, Email, Phone)
+            if ($student->user_id) {
                 $userUpdate = [];
-                $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
+                if($request->filled('first_name')) $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
                 
+                // Update Phone
+                if ($request->filled('mobile_number')) {
+                    $userUpdate['phone'] = $request->mobile_number;
+                }
+
                 // Only update email if provided and different
                 if ($request->filled('email') && $request->email !== $student->user->email) {
                     // Check uniqueness
                     if (!User::where('email', $request->email)->where('id', '!=', $student->user_id)->exists()) {
                         $userUpdate['email'] = $request->email;
-                        // Also update profile email field for consistency
                         $student->update(['email' => $request->email]);
                     }
                 }
@@ -478,35 +499,52 @@ class StudentController extends BaseController
             if ($student->parent) {
                 $student->parent->update($parentData);
                 
+                $parentUser = null;
+                $plainPassword = null;
+                $isNewParent = false;
+
                 if (!empty($parentData['guardian_email']) && !$student->parent->user_id) {
                     $existingUser = User::where('email', $parentData['guardian_email'])->first();
                     if ($existingUser) {
                         $student->parent->update(['user_id' => $existingUser->id]);
+                        $parentUser = $existingUser;
                     } else {
                         $plainPassword = 'Parent' . rand(1000, 9999) . '!';
+                        $isNewParent = true;
                         
-                        // Generate Parent Shortcode
                         $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
                         while(User::where('shortcode', $parentShortcode)->exists()) {
                              $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
                         }
 
+                        $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
+
                         $newUser = User::create([
                             'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
                             'email' => $parentData['guardian_email'],
                             'password' => Hash::make($plainPassword),
+                            'phone' => $phone, // Save Phone
                             'user_type' => UserType::GUARDIAN->value,
                             'institute_id' => $student->institution_id,
-                            'shortcode' => $parentShortcode, // Added
-                            'username' => $parentShortcode,  // Added
+                            'shortcode' => $parentShortcode,
+                            'username' => $parentShortcode,
                             'is_active' => true,
                         ]);
                         $newUser->assignRole('Guardian');
                         $student->parent->update(['user_id' => $newUser->id]);
-                        
-                        // NOTIFY NEW PARENT
-                        $this->notificationService->sendUserCredentials($newUser, $plainPassword, RoleEnum::GUARDIAN->value);
+                        $parentUser = $newUser;
                     }
+                } elseif ($student->parent->user_id) {
+                     // Sync Parent Phone update
+                     $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
+                     if($phone) {
+                         User::where('id', $student->parent->user_id)->update(['phone' => $phone]);
+                     }
+                }
+                
+                // NOTIFY NEW PARENT
+                if ($isNewParent && $parentUser && $plainPassword) {
+                    $this->notificationService->sendUserCredentials($parentUser, $plainPassword, RoleEnum::GUARDIAN->value);
                 }
             }
 

@@ -161,7 +161,7 @@ class StaffController extends BaseController
             'joining_date' => 'nullable|date',
             'gender' => 'required|in:male,female,other',
         ]);
-
+       
         DB::transaction(function () use ($request, $institutionId) {
             $userData = [
                 'name' => $request->name,
