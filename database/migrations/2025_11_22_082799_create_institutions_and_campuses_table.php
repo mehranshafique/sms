@@ -14,7 +14,7 @@ return new class extends Migration
                 $table->id(); 
                 $table->string('name', 150);
                 $table->string('code', 30)->unique();
-                $table->enum('type', ['primary', 'secondary', 'university', 'mixed']);
+                $table->enum('type', ['primary', 'secondary', 'university', 'vocational']);
                 
                 $table->string('country')->nullable();
                 $table->string('city')->nullable();

@@ -155,67 +155,45 @@ class ExamMarkController extends BaseController
             if ($exam) $examSessionId = $exam->academic_session_id;
         }
         
-        // Teacher Logic: Hybrid Check
+        // ... (Teacher Access Logic remains the same - kept for brevity) ...
+        // Note: Re-implementing logic here for completeness as per instructions
         if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
             $staffId = $user->staff->id;
-            
-            // 1. Timetable
             $timetableIds = Timetable::where('teacher_id', $staffId);
-            if ($classSectionId) {
-                $timetableIds->where('class_section_id', $classSectionId);
-            } else {
-                $timetableIds->whereHas('classSection', function($q) use ($gradeLevelId) {
-                    $q->where('grade_level_id', $gradeLevelId);
-                });
-            }
+            if ($classSectionId) $timetableIds->where('class_section_id', $classSectionId);
+            else $timetableIds->whereHas('classSection', fn($q) => $q->where('grade_level_id', $gradeLevelId));
             $ttIds = $timetableIds->pluck('subject_id')->toArray();
 
-            // 2. Class Allocation
             $allocationIds = ClassSubject::where('teacher_id', $staffId);
-            if ($classSectionId) {
-                $allocationIds->where('class_section_id', $classSectionId);
-            } else {
-                $allocationIds->whereHas('classSection', function($q) use ($gradeLevelId) {
-                    $q->where('grade_level_id', $gradeLevelId);
-                });
-            }
-            // Filter by session if known
-            if ($examSessionId) {
-                $allocationIds->where('academic_session_id', $examSessionId);
-            }
-
+            if ($classSectionId) $allocationIds->where('class_section_id', $classSectionId);
+            else $allocationIds->whereHas('classSection', fn($q) => $q->where('grade_level_id', $gradeLevelId));
+            if ($examSessionId) $allocationIds->where('academic_session_id', $examSessionId);
             $allocIds = $allocationIds->pluck('subject_id')->toArray();
 
             $subjectIds = array_unique(array_merge($ttIds, $allocIds));
-
             if (empty($subjectIds)) return response()->json([]);
 
-            $query = Subject::whereIn('id', $subjectIds)->where('is_active', true);
+            // UPDATED: Eager load AcademicUnit
+            $query = Subject::with('academicUnit')->whereIn('id', $subjectIds)->where('is_active', true);
         
         } else {
-            // Admin Logic: Hybrid Fallback (Allocation -> Grade)
+            // Admin Logic
             if ($classSectionId) {
                 $allocationQuery = ClassSubject::where('class_section_id', $classSectionId);
-                
-                if ($examSessionId) {
-                    $allocationQuery->where('academic_session_id', $examSessionId);
-                }
-
+                if ($examSessionId) $allocationQuery->where('academic_session_id', $examSessionId);
                 $allocatedIds = $allocationQuery->pluck('subject_id');
                 
                 if ($allocatedIds->isNotEmpty()) {
-                    // Respect Class Allocation (e.g. Latin vs Science)
-                    $query = Subject::whereIn('id', $allocatedIds)->where('is_active', true);
+                    $query = Subject::with('academicUnit')->whereIn('id', $allocatedIds)->where('is_active', true);
                 } else {
-                    // Fallback to Grade Level
-                    $query = Subject::where('grade_level_id', $gradeLevelId)->where('is_active', true);
+                    $query = Subject::with('academicUnit')->where('grade_level_id', $gradeLevelId)->where('is_active', true);
                 }
             } else {
-                $query = Subject::where('grade_level_id', $gradeLevelId)->where('is_active', true);
+                $query = Subject::with('academicUnit')->where('grade_level_id', $gradeLevelId)->where('is_active', true);
             }
         }
 
-        // Fetch Schedule Configs for this Exam+Class to override Max Marks
+        // Fetch Schedule Configs
         $scheduleConfigs = collect();
         if ($examId && $classSectionId) {
             $scheduleConfigs = ExamSchedule::where('exam_id', $examId)
@@ -227,21 +205,34 @@ class ExamMarkController extends BaseController
         $formattedSubjects = $query->get()->map(function($subject) use ($classSectionId, $scheduleConfigs) {
             $teacherName = $this->getSubjectTeacher($classSectionId, $subject->id);
             
-            // Determine Max Marks: Schedule Config > Subject Default > 100
+            // Determine Max Marks
             $maxMarks = $subject->total_marks ?? 100;
             if (isset($scheduleConfigs[$subject->id])) {
-                // FIX: Check if max_marks is specifically set (not null) and use it
                 $configMark = $scheduleConfigs[$subject->id]->max_marks;
                 if (!is_null($configMark) && $configMark > 0) {
                     $maxMarks = $configMark;
                 }
             }
+            
+            // Format name with UE info if available
+            $displayName = $subject->name;
+            $ueInfo = '';
+            if($subject->academicUnit) {
+                $ueInfo = " (" . $subject->academicUnit->code . ")";
+                // Optional: Append coefficient info
+                if($subject->coefficient > 0) {
+                    $ueInfo .= " [Coeff: " . $subject->coefficient . "]";
+                }
+            }
 
             return [
                 'id' => $subject->id,
-                'name' => $subject->name,
-                'total_marks' => (float)$maxMarks, // Ensure float for consistency
-                'teacher_name' => $teacherName
+                'name' => $displayName . $ueInfo, // Updated Name Display
+                'raw_name' => $subject->name,
+                'total_marks' => (float)$maxMarks,
+                'teacher_name' => $teacherName,
+                'coefficient' => $subject->coefficient ?? 1,
+                'ue_code' => $subject->academicUnit->code ?? null
             ];
         });
 

@@ -118,17 +118,16 @@ class StudentBalanceController extends BaseController
             })
             ->get();
 
-        // Organize Tabs
         $tabs = [];
 
-        // A. Summary Tab (Moved to FIRST Position)
+        // 1. Summary
         $tabs[] = [
             'id' => 'summary',
-            'label' => __('finance.summary') ?? 'Summary',
-            'description' => __('finance.tab_info_summary') ?? 'Accumulated totals for all student payments.'
+            'label' => __('finance.summary'),
+            'description' => __('finance.tab_info_summary')
         ];
 
-        // B. Installment Tabs
+        // 2. Installments
         $installments = $feeStructures->where('payment_mode', 'installment')
             ->groupBy('installment_order')
             ->sortKeys();
@@ -146,7 +145,7 @@ class StudentBalanceController extends BaseController
             ];
         }
 
-        // C. Global Tab (Moved to LAST Position)
+        // 3. Global Fee
         if ($feeStructures->where('payment_mode', 'global')->isNotEmpty()) {
             $tabs[] = [
                 'id' => 'global', 
@@ -154,14 +153,22 @@ class StudentBalanceController extends BaseController
                 'description' => __('finance.tab_info_global')
             ];
         }
+
+        // 4. Miscellaneous Fees (Frais Connexes) - NEW
+        $miscFees = $feeStructures->where('frequency', 'one_time');
+        if ($miscFees->isNotEmpty()) {
+            $tabs[] = [
+                'id' => 'misc',
+                'label' => __('finance.misc_fees') ?? 'Misc. Fees',
+                'description' => __('finance.tab_info_misc') ?? 'Non-recurring fees like Uniforms, ID Cards, etc.'
+            ];
+        }
         
-        // 2. Fetch Students & Their Invoices
         $allStudents = StudentEnrollment::with('student.invoices.items.feeStructure')
             ->where('class_section_id', $id)
             ->where('status', 'active')
             ->get();
 
-        // 3. Map Student Status per Tab
         $tabData = [];
 
         foreach ($tabs as $tab) {
@@ -171,8 +178,8 @@ class StudentBalanceController extends BaseController
                 $student = $enrollment->student;
                 $studentMode = $student->payment_mode ?? 'installment'; 
 
-                // --- FILTER LOGIC (Except for Summary) ---
-                if ($tab['id'] !== 'summary') {
+                // Filter logic
+                if ($tab['id'] !== 'summary' && $tab['id'] !== 'misc') {
                     if ($tab['id'] === 'global' && $studentMode !== 'global') continue; 
                     if (str_starts_with($tab['id'], 'inst_') && $studentMode !== 'installment') continue;
                 }
@@ -182,51 +189,61 @@ class StudentBalanceController extends BaseController
                 $label = 'N/A'; 
                 $paidAmount = 0;
                 $dueAmount = 0;
-                $matchingInvoice = null;
                 $hasInvoice = false;
 
-                // --- Calculate Amounts ---
                 if ($tab['id'] === 'summary') {
-                    // For Summary: Sum of ALL invoices for this student in this session
-                    // We assume invoices are loaded eager-ly via 'student.invoices'
-                    // but we should filter by academic session if needed. 
-                    // Assuming $student->invoices contains all invoices for the student.
-                    // Ideally filter by current academic session.
-                    
-                    // Simple sum for demonstration (refine with session filter if needed)
+                    // Summary logic (unchanged)
                     $paidAmount = $student->invoices->sum('paid_amount');
                     $totalAmount = $student->invoices->sum('total_amount');
                     $dueAmount = $totalAmount - $paidAmount;
                     
                     if ($student->invoices->isNotEmpty()) {
                         $hasInvoice = true;
-                        // Determine Overall Status
-                        if ($dueAmount <= 0.01 && $totalAmount > 0) {
-                            $style = 'success'; $label = __('finance.paid');
-                        } elseif ($paidAmount > 0) {
-                            $style = 'warning'; $label = __('finance.status_partial');
-                        } elseif ($totalAmount > 0) {
-                            $style = 'danger'; $label = __('finance.status_unpaid');
-                        } else {
-                            $style = 'secondary'; $label = '-';
-                        }
+                        if ($dueAmount <= 0.01 && $totalAmount > 0) { $style = 'success'; $label = __('finance.paid'); } 
+                        elseif ($paidAmount > 0) { $style = 'warning'; $label = __('finance.status_partial'); } 
+                        elseif ($totalAmount > 0) { $style = 'danger'; $label = __('finance.status_unpaid'); } 
+                        else { $style = 'secondary'; $label = '-'; }
                     }
+                } 
+                elseif ($tab['id'] === 'misc') {
+                    // --- NEW MISC LOGIC ---
+                    // Sum up all invoice items that link to 'one_time' fee structures
+                    $miscInvoices = $student->invoices->filter(function($inv) {
+                        return $inv->items->contains(fn($item) => $item->feeStructure && $item->feeStructure->frequency === 'one_time');
+                    });
 
-                } else {
-                    // Standard Logic for Specific Tabs
+                    if ($miscInvoices->isNotEmpty()) {
+                        $hasInvoice = true;
+                        // Approximate logic: If total invoice is paid, then misc item is paid. 
+                        // Real item-level tracking requires 'invoice_item_payments' table which might be overkill now.
+                        // We assume standard allocation.
+                        foreach($miscInvoices as $inv) {
+                            $total = $inv->total_amount;
+                            $paid = $inv->paid_amount;
+                            
+                            // Find the specific item amount
+                            $itemAmount = $inv->items->where('feeStructure.frequency', 'one_time')->sum('amount');
+                            
+                            // Calculate proportion if partial? Or simple logic:
+                            // If invoice is fully paid, item is paid.
+                            // If invoice is partial, we can't be 100% sure which item was paid without line-item payment.
+                            // Fallback: Show Invoice status.
+                            
+                            $dueAmount += ($inv->status === 'paid') ? 0 : $itemAmount; 
+                            $paidAmount += ($inv->status === 'paid') ? $itemAmount : 0; // Simple binary logic for now
+                        }
+                        
+                        if ($dueAmount <= 0) { $style = 'success'; $label = __('finance.paid'); }
+                        else { $style = 'warning'; $label = __('finance.outstanding'); }
+                    }
+                } 
+                else {
+                    // Standard Installment/Global logic (unchanged)
                     if ($tab['id'] === 'global') {
-                        $matchingInvoice = $student->invoices->first(function($inv) {
-                            return $inv->items->contains(function($item) {
-                                return $item->feeStructure && $item->feeStructure->payment_mode === 'global';
-                            });
-                        });
+                        $matchingInvoice = $student->invoices->first(fn($inv) => $inv->items->contains(fn($item) => $item->feeStructure && $item->feeStructure->payment_mode === 'global'));
                     } else {
                         $order = $tab['order'];
-                        $matchingInvoice = $student->invoices->first(function($inv) use ($order) {
-                            return $inv->items->contains(function($item) use ($order) {
-                                return $item->feeStructure && $item->feeStructure->installment_order == $order;
-                            });
-                        });
+                        $matchingInvoice = $student->invoices->first(fn($inv) => $inv->items->contains(fn($item) => $item->feeStructure && $item->feeStructure->installment_order == $order));
                     }
 
                     if ($matchingInvoice) {
@@ -236,9 +253,9 @@ class StudentBalanceController extends BaseController
                         $dueAmount = $matchingInvoice->total_amount - $matchingInvoice->paid_amount;
 
                         if ($rawStatus === 'Paid') { $style = 'success'; $label = __('finance.paid'); } 
-                        elseif ($rawStatus === 'Partial') { $style = 'warning'; $label = __('finance.status_partial') ?? 'Partial'; } 
-                        elseif ($rawStatus === 'Unpaid') { $style = 'danger'; $label = __('finance.status_unpaid') ?? 'Unpaid'; } 
-                        elseif ($rawStatus === 'Overdue') { $style = 'dark'; $label = __('finance.status_overdue') ?? 'Overdue'; } 
+                        elseif ($rawStatus === 'Partial') { $style = 'warning'; $label = __('finance.status_partial'); } 
+                        elseif ($rawStatus === 'Unpaid') { $style = 'danger'; $label = __('finance.status_unpaid'); } 
+                        elseif ($rawStatus === 'Overdue') { $style = 'dark'; $label = __('finance.status_overdue'); } 
                         else { $label = $rawStatus; }
                     }
                 }

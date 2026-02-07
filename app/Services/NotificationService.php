@@ -7,10 +7,10 @@ use App\Models\Student;
 use App\Models\User;
 use App\Models\Institution;
 use App\Models\InstitutionSetting;
-use App\Models\Invoice; // Added
-use App\Mail\PaymentReceived;
-use App\Mail\InvoiceCreatedMail; // Will create this
-use App\Mail\UserCredentialsMail; 
+use App\Models\Invoice;
+use App\Mail\PaymentReceived; // Ensure this Mailable exists
+use App\Mail\InvoiceCreatedMail;
+use App\Mail\UserCredentialsMail; // Ensure this Mailable exists
 use App\Services\Sms\GatewayFactory;
 use App\Services\Sms\InfobipService; 
 use Illuminate\Support\Facades\Mail;
@@ -23,25 +23,26 @@ class NotificationService
         'low_balance',
         'subscription_expiry',
         'subscription_expired',
-        'system_alert'
+        'system_alert',
+        'user_welcome'
     ];
 
     /**
      * Check if a specific channel is enabled for an event in the institution settings.
-     * Default to true if settings are not found (for backward compatibility).
+     * Default to true if settings are not found.
      */
     protected function isChannelEnabled($institutionId, $eventKey, $channel)
     {
-        // For unlimited global events (system level), usually always enabled or handled separately.
-        // But if you want granular control even for these, remove this check.
         if (in_array($eventKey, $this->unlimitedGlobalEvents)) {
             return true;
         }
 
-        $settings = InstitutionSetting::get($institutionId, 'notification_preferences');
+        // Fetch settings from DB (using helper or model directly)
+        $settings = InstitutionSetting::where('institution_id', $institutionId)
+            ->where('key', 'notification_preferences')
+            ->value('value');
         
         if (!$settings) {
-            // Default: All enabled if no config exists yet
             return true; 
         }
 
@@ -52,11 +53,11 @@ class NotificationService
             return (bool) $preferences[$eventKey][$channel];
         }
 
-        return true; // Default to enabled
+        return true;
     }
 
     /**
-     * Send Invoice Notification (New Method)
+     * Send Invoice Notification
      */
     public function sendInvoiceNotification(Invoice $invoice)
     {
@@ -67,30 +68,26 @@ class NotificationService
         // 1. Email
         if ($this->isChannelEnabled($institution->id, $eventKey, 'email') && $student->email) {
             try {
-                // Check if Mailable exists before sending to avoid errors if file missing
                 if (class_exists(InvoiceCreatedMail::class)) {
                     Mail::to($student->email)->queue(new InvoiceCreatedMail($invoice));
-                    Log::info("Invoice Email queued for {$student->email}");
-                } else {
-                     Log::warning("InvoiceCreatedMail class not found. Email skipped.");
                 }
             } catch (\Exception $e) {
                 Log::error("Invoice Email Error: " . $e->getMessage());
             }
         }
 
-        $phone = $student->mobile_number ?? $student->father_phone;
+        // Get parent phone or student mobile
+        $phone = $student->mobile_number ?? $student->parent->father_phone ?? $student->parent->guardian_phone ?? null;
 
         if ($phone) {
             $data = [
-                'StudentName' => $student->first_name,
+                'StudentName' => $student->full_name,
                 'Amount' => number_format($invoice->total_amount, 2),
                 'InvoiceNumber' => $invoice->invoice_number,
                 'DueDate' => $invoice->due_date->format('d/m/Y'),
                 'SchoolName' => $institution->name,
                 'Currency' => config('app.currency_symbol', '$'),
-                // Snake Case Aliases
-                'student_name' => $student->first_name,
+                'student_name' => $student->full_name,
                 'school_name' => $institution->name,
                 'invoice_number' => $invoice->invoice_number,
                 'due_date' => $invoice->due_date->format('d/m/Y'),
@@ -108,69 +105,73 @@ class NotificationService
         }
     }
 
+    /**
+     * Send Payment Received Notification
+     */
     public function sendPaymentNotification(Payment $payment)
     {
         $invoice = $payment->invoice;
         $student = $invoice->student;
-        $institution = $invoice->institution;
+        $institution = $payment->institution ?? $invoice->institution;
         $eventKey = 'payment_received';
         
         // 1. Email
         if ($this->isChannelEnabled($institution->id, $eventKey, 'email') && $student->email) {
             try {
-                Mail::to($student->email)->queue(new PaymentReceived($payment));
+                if (class_exists(PaymentReceived::class)) {
+                    Mail::to($student->email)->queue(new PaymentReceived($payment));
+                }
             } catch (\Exception $e) {
-                Log::error("Email Error: " . $e->getMessage());
+                Log::error("Payment Email Error: " . $e->getMessage());
             }
         }
 
-        $phone = $student->mobile_number ?? $student->father_phone;
+        $phone = $student->mobile_number ?? $student->parent->father_phone ?? $student->parent->guardian_phone ?? null;
 
         if ($phone) {
             $data = [
-                'StudentName' => $student->first_name,
+                'StudentName' => $student->full_name,
                 'Amount' => number_format($payment->amount, 2),
                 'SchoolName' => $institution->name,
                 'Balance' => number_format($invoice->total_amount - $invoice->paid_amount, 2),
                 'Currency' => config('app.currency_symbol', '$'),
                 'Date' => $payment->payment_date->format('d/m/Y'),
                 'TransactionID' => $payment->transaction_id ?? 'N/A',
-                // snake_case aliases
-                'student_name' => $student->first_name,
+                'student_name' => $student->full_name,
                 'school_name' => $institution->name,
                 'transaction_id' => $payment->transaction_id ?? 'N/A'
             ];
 
-            // 2. SMS
             if ($this->isChannelEnabled($institution->id, $eventKey, 'sms')) {
                 $this->sendNotificationEvent($eventKey, $phone, $data, $institution->id, 'sms');
             }
             
-            // 3. WhatsApp
             if ($this->isChannelEnabled($institution->id, $eventKey, 'whatsapp')) {
                 $this->sendNotificationEvent($eventKey, $phone, $data, $institution->id, 'whatsapp');
             }
         }
     }
 
+    /**
+     * Send User Credentials (Welcome Email/SMS)
+     */
     public function sendUserCredentials(User $user, $plainPassword, $roleEnumVal)
     {
         $schoolName = $user->institute ? $user->institute->name : config('app.name');
-        $roleLabel = __('roles.' . strtolower($roleEnumVal));
+        $roleLabel = $roleEnumVal; // Could map to lang file if needed
         $institutionId = $user->institute_id;
         
         // Determine event key based on role
-        $eventKey = 'user_welcome'; // Default
+        $eventKey = 'user_welcome';
         if (stripos($roleEnumVal, 'Student') !== false) $eventKey = 'student_created';
         elseif (stripos($roleEnumVal, 'Staff') !== false || stripos($roleEnumVal, 'Teacher') !== false) $eventKey = 'staff_created';
-        elseif (stripos($roleEnumVal, 'Guardian') !== false) $eventKey = 'user_welcome'; // Or parent_created if added
 
         $data = [
             'Name' => $user->name,
             'Email' => $user->email,
             'Shortcode' => $user->shortcode ?? 'N/A',
             'Username' => $user->username ?? $user->shortcode ?? 'N/A',
-            'Password' => $plainPassword ?? __('auth.unchanged'),
+            'Password' => $plainPassword ?? 'Unchanged',
             'Role' => $roleLabel, 
             'SchoolName' => $schoolName,
             'Url' => route('login'),
@@ -178,19 +179,17 @@ class NotificationService
             // Aliases
             'name' => $user->name,
             'email' => $user->email,
-            'shortcode' => $user->shortcode ?? 'N/A',
-            'username' => $user->username ?? $user->shortcode ?? 'N/A',
-            'password' => $plainPassword ?? __('auth.unchanged'),
+            'password' => $plainPassword ?? 'Unchanged',
             'role' => $roleLabel,
-            'school_name' => $schoolName,
-            'url' => route('login'),
-            'login_link' => route('login'),
+            'school_name' => $schoolName
         ];
 
         // 1. Email
         if ($this->isChannelEnabled($institutionId, $eventKey, 'email') && $user->email) {
             try {
-                Mail::to($user->email)->send(new UserCredentialsMail($data));
+                if (class_exists(UserCredentialsMail::class)) {
+                    Mail::to($user->email)->send(new UserCredentialsMail($data));
+                }
             } catch (\Exception $e) {
                 Log::error("Email Error: " . $e->getMessage());
             }
@@ -200,25 +199,26 @@ class NotificationService
         if ($user->phone) {
             $templateKey = strtolower(str_replace(' ', '_', $roleEnumVal)) . '_welcome'; 
             
-            // --- SMS ---
             if ($this->isChannelEnabled($institutionId, $eventKey, 'sms')) {
-                // Try specific then generic
-                $smsRes = $this->sendNotificationEvent($templateKey, $user->phone, $data, $institutionId, 'sms');
-                if (!$smsRes['success']) {
+                // Try specific template, fallback to generic
+                $res = $this->sendNotificationEvent($templateKey, $user->phone, $data, $institutionId, 'sms');
+                if (!$res['success']) {
                     $this->sendNotificationEvent('user_welcome', $user->phone, $data, $institutionId, 'sms');
                 }
             }
 
-            // --- WhatsApp ---
             if ($this->isChannelEnabled($institutionId, $eventKey, 'whatsapp')) {
-                $waRes = $this->sendNotificationEvent($templateKey, $user->phone, $data, $institutionId, 'whatsapp');
-                if (!$waRes['success']) {
+                $res = $this->sendNotificationEvent($templateKey, $user->phone, $data, $institutionId, 'whatsapp');
+                if (!$res['success']) {
                     $this->sendNotificationEvent('user_welcome', $user->phone, $data, $institutionId, 'whatsapp');
                 }
             }
         }
     }
 
+    /**
+     * Send Institution Creation Credentials
+     */
     public function sendInstitutionCreation($institution, $adminUser, $plainPassword)
     {
         $eventKey = 'institution_created';
@@ -228,25 +228,22 @@ class NotificationService
             'Email' => $adminUser->email,
             'Shortcode' => $adminUser->shortcode ?? 'N/A',
             'Password' => $plainPassword,
-            'Role' => __('roles.head_officer'), 
+            'Role' => 'Head Officer', 
             'SchoolName' => $institution->name,
             'Url' => route('login'),
             'LoginLink' => route('login'),
-            // Aliases
             'name' => $adminUser->name,
             'email' => $adminUser->email,
-            'shortcode' => $adminUser->shortcode ?? 'N/A',
             'password' => $plainPassword,
-            'role' => __('roles.head_officer'),
-            'school_name' => $institution->name,
-            'url' => route('login'),
-            'login_link' => route('login'),
+            'school_name' => $institution->name
         ];
 
         // Email
         if ($this->isChannelEnabled($institution->id, $eventKey, 'email') && $adminUser->email) {
             try {
-                Mail::to($adminUser->email)->send(new UserCredentialsMail($data));
+                if (class_exists(UserCredentialsMail::class)) {
+                    Mail::to($adminUser->email)->send(new UserCredentialsMail($data));
+                }
             } catch (\Exception $e) {
                 Log::error("Email Error: " . $e->getMessage());
             }
@@ -264,16 +261,24 @@ class NotificationService
     }
 
     /**
-     * Unified method to dispatch notifications.
+     * Unified method to fetch template and dispatch.
      */
     public function sendNotificationEvent($eventKey, $to, $data = [], $institutionId = null, $channel = 'sms')
     {
-        // Fetch Template from Database
-        $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
+        // Fetch Template (Using model helper if available, or direct query)
+        // Assuming SmsTemplate model exists and has scopeForEvent
+        $template = null;
+        if (class_exists(\App\Models\SmsTemplate::class)) {
+            $template = \App\Models\SmsTemplate::where('event_key', $eventKey)
+                ->where(function($q) use ($institutionId) {
+                    $q->where('institution_id', $institutionId)
+                      ->orWhereNull('institution_id');
+                })
+                ->orderByDesc('institution_id') // Prioritize specific ID
+                ->first();
+        }
 
         if (!$template || !$template->is_active) {
-            // Only log if not a test event or expected missing template scenario
-            // Log::warning("Template '$eventKey' missing or inactive for Institution ID $institutionId");
             return ['success' => false, 'message' => "Template '$eventKey' missing or inactive."];
         }
 
@@ -295,42 +300,67 @@ class NotificationService
     {
         $institution = Institution::find($institutionId);
         
-        if (!$institution) {
-             return ['success' => false, 'message' => __('configuration.institution_not_found')];
+        // 1. Determine Selected Provider
+        $providerKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
+        
+        // Check school preference. Default to 'system'.
+        $selectedProvider = InstitutionSetting::where('institution_id', $institutionId)
+            ->where('key', $providerKey)
+            ->value('value') ?? 'system';
+
+        $finalProviderName = $selectedProvider;
+        $credentialsContextId = $institutionId; // Context for looking up API keys
+        $shouldDeductCredits = false;
+
+        if ($selectedProvider === 'system') {
+            // --- SYSTEM MODE ---
+            // Use Super Admin's configured provider.
+            $globalKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
+            $finalProviderName = InstitutionSetting::whereNull('institution_id')
+                ->where('key', $globalKey)
+                ->value('value') ?? 'mobishastra';
+            
+            $credentialsContextId = null; // Look in Global settings
+            $shouldDeductCredits = true;
+        } else {
+            // --- CUSTOM MODE ---
+            // Use Institution's own credentials.
+            $finalProviderName = $selectedProvider;
+            $credentialsContextId = $institutionId;
+            $shouldDeductCredits = false;
         }
 
-        // Credit Check
-        $creditColumn = ($channel === 'whatsapp') ? 'whatsapp_credits' : 'sms_credits';
+        // 2. Pre-flight Credit Check (Only for System Mode)
+        $creditCol = ($channel === 'whatsapp') ? 'whatsapp_credits' : 'sms_credits';
         
-        if (!$isUnlimited && $institution->$creditColumn <= 0) {
-            $msg = strtoupper($channel) . " " . __('configuration.insufficient_credits');
-            Log::warning($msg . " Inst ID: $institutionId");
-            return ['success' => false, 'message' => $msg];
+        if ($shouldDeductCredits && !$isUnlimited && $institution) {
+            if ($institution->$creditCol <= 0) {
+                return ['success' => false, 'message' => __('configuration.insufficient_credits')];
+            }
         }
-        
-        // Resolve Provider using Factory
-        $result = ['success' => false, 'message' => __('configuration.unknown_error')];
-        
+
+        // 3. Instantiate & Send
         try {
+            $gateway = GatewayFactory::create($finalProviderName, $credentialsContextId);
+
             if ($channel === 'whatsapp') {
-                $provider = app(InfobipService::class);
-                $result = $provider->sendWhatsApp($to, $message);
+                $result = $gateway->sendWhatsApp($to, $message);
             } else {
-                $providerName = \App\Models\InstitutionSetting::get($institutionId, 'sms_provider', 'mobishastra');
-                $gateway = GatewayFactory::create($providerName);
-                $result = $gateway->send($to, $message);
+                $result = $gateway->sendSms($to, $message);
             }
 
-            // Deduct Credit on Success
-            if ($result['success'] && !$isUnlimited) {
-                $institution->decrement($creditColumn);
+            // 4. Deduct Credits (Only on Success & System Mode)
+            if ($result['success'] && $shouldDeductCredits && !$isUnlimited && $institution) {
+                if($institution->$creditCol > 0) {
+                    $institution->decrement($creditCol);
+                }
             }
+
+            return $result;
 
         } catch (\Exception $e) {
-            Log::error("Notification Service General Error", ['error' => $e->getMessage()]);
-            $result = ['success' => false, 'message' => __('configuration.gateway_connection_error')];
+            Log::error("Notification Error [Inst: $institutionId]: " . $e->getMessage());
+            return ['success' => false, 'message' => __('configuration.gateway_connection_error') . ': ' . $e->getMessage()];
         }
-        
-        return $result;
     }
 }

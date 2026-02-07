@@ -215,6 +215,7 @@
                                 : `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width:35px;height:35px">${student.name.charAt(0)}</div>`;
 
                             let actionUrl = "/finance/student/" + student.id + "/dashboard";
+                            let statementUrl = "/finance/student/" + student.id + "/statement"; // Statement URL
 
                             rowsHtml += `
                                 <tr class="student-row">
@@ -231,9 +232,14 @@
                                     <td class="text-success fw-bold">${status.paid}</td>
                                     <td class="text-danger fw-bold">${status.due}</td>
                                     <td>
-                                        <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow" target="_blank" title="{{ __('finance.view_dashboard') }}">
-                                            <i class="fa fa-arrow-right"></i>
-                                        </a>
+                                        <div class="d-flex">
+                                            <a href="${actionUrl}" class="btn btn-primary btn-xs sharp shadow me-1" target="_blank" title="{{ __('finance.view_dashboard') }}">
+                                                <i class="fa fa-tachometer-alt"></i>
+                                            </a>
+                                            <a href="${statementUrl}" class="btn btn-secondary btn-xs sharp shadow" target="_blank" title="{{ __('finance.student_statement') }}">
+                                                <i class="fa fa-file-text-o"></i>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>`;
                         });

@@ -68,11 +68,13 @@
                     @foreach($records as $record)
                     <tr>
                         <td class="text-left">{{ $record->subject->name }}</td>
-                        <td>{{ $record->subject->total_marks ?? 100 }}</td>
+                        {{-- UPDATED: Use the dynamically calculated max marks from the controller logic --}}
+                        <td>{{ $record->calculated_max_marks ?? $record->subject->total_marks ?? 100 }}</td>
                         <td>{{ $record->marks_obtained }}</td>
-                        <td>{{-- Logic for grade calculation or stored grade --}}
+                        <td>
                             @php
-                                $percent = ($record->subject->total_marks > 0) ? ($record->marks_obtained / $record->subject->total_marks * 100) : 0;
+                                $max = $record->calculated_max_marks ?? $record->subject->total_marks ?? 100;
+                                $percent = ($max > 0) ? ($record->marks_obtained / $max * 100) : 0;
                                 $grade = 'F';
                                 if ($percent >= 90) $grade = 'A+';
                                 elseif ($percent >= 80) $grade = 'A';

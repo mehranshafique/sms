@@ -13,12 +13,14 @@ class Subject extends Model
         'institution_id',
         'grade_level_id',
         'department_id', // New
+        'academic_unit_id', // NEW
         'prerequisite_id', // New
         'name',
         'code',
         'type',
         'semester', // New
         'credit_hours',
+        'coefficient', // NEW
         'total_marks',
         'passing_marks',
         'is_active',    
@@ -45,7 +47,11 @@ class Subject extends Model
     {
         return $this->belongsTo(Department::class);
     }
-
+    // NEW: Link to UE
+    public function academicUnit()
+    {
+        return $this->belongsTo(AcademicUnit::class);
+    }
     // New: Prerequisite Relationship
     public function prerequisite()
     {

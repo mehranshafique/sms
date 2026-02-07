@@ -40,7 +40,7 @@
                                 @endif
                             </div>
 
-                            {{-- 2. Class Section (Combined Grade & Section) --}}
+                            {{-- 2. Class Section --}}
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold">{{ __('marks.select_section') }} <span class="text-danger">*</span></label>
                                 <select id="section_select" class="form-control default-select">
@@ -57,8 +57,10 @@
                                 <select id="subject_select" class="form-control default-select" disabled>
                                     <option value="">-- {{ __('marks.select_subject') }} --</option>
                                 </select>
-                                <div id="total_marks_display" class="mt-2 text-info fw-bold d-none" style="font-size: 0.85rem;">
-                                    {{ __('marks.total_marks') }}: <span id="total_marks_value" class="text-dark"></span>
+                                <div id="total_marks_display" class="mt-2 d-none d-flex justify-content-between align-items-center" style="font-size: 0.85rem;">
+                                    <span class="text-info fw-bold">{{ __('marks.total_marks') }}: <span id="total_marks_value" class="text-dark"></span></span>
+                                    {{-- Coefficient Badge --}}
+                                    <span id="coeff_display" class="badge badge-secondary shadow-sm"></span>
                                 </div>
                             </div>
                         </div>
@@ -89,7 +91,6 @@
                                         <span class="fw-bold text-primary" id="header_teacher">-</span>
                                     </div>
                                 </div>
-                                {{-- Total Students Badge --}}
                                 <span class="badge badge-light border text-dark">
                                     <i class="fa fa-users me-1"></i> {{ __('marks.total_students') }}: <span id="total_students_count" class="fw-bold">0</span>
                                 </span>
@@ -99,7 +100,6 @@
                                     <span class="input-group-text bg-light border-end-0 ps-3"><i class="fa fa-search text-muted"></i></span>
                                     <input type="text" id="table_search" class="form-control border-start-0 bg-light" placeholder="{{ __('marks.search_student') }}">
                                 </div>
-                                {{-- Print Award List Button --}}
                                 <button type="button" id="print_award_list" class="btn btn-secondary btn-sm shadow">
                                     <i class="fa fa-print me-1"></i> {{ __('marks.award_list') }}
                                 </button>
@@ -165,7 +165,6 @@
         const sectionSelect = document.getElementById('section_select');
         const subjectSelect = document.getElementById('subject_select');
         
-        // Helper to clear and disable dropdowns
         function resetSelect(select, defaultText) {
             select.innerHTML = `<option value="">${defaultText}</option>`;
             select.disabled = true;
@@ -175,8 +174,6 @@
         // --- Helper: Fetch Subjects ---
         function fetchSubjects(sectionId) {
             resetSelect(subjectSelect, 'Loading...');
-            
-            // FIX: Pass exam_id to backend so it can load the specific Exam Schedule Max Marks
             const exId = examSelect.value;
             
             let url = "{{ route('marks.get_subjects') }}?class_section_id=" + sectionId + "&exam_id=" + exId;
@@ -189,6 +186,8 @@
                         let opt = new Option(s.name, s.id);
                         opt.dataset.total = s.total_marks;
                         opt.dataset.teacher = s.teacher_name;
+                        // ADDED: Store coefficient
+                        opt.dataset.coefficient = s.coefficient; 
                         subjectSelect.add(opt);
                     });
                     subjectSelect.disabled = false;
@@ -200,22 +199,14 @@
                 });
         }
 
-        // --- Step 1: Exam Change (Reload subjects if class is already selected) ---
+        // --- Event Listeners ---
         if(examSelect) {
             examSelect.addEventListener('change', function() {
                 let sectionId = sectionSelect.value;
-                if(sectionId) {
-                    // Re-fetch subjects to update max marks based on new exam
-                    fetchSubjects(sectionId);
-                    // Also clear previous table container as exam changed
-                    document.getElementById('marks_container').classList.add('d-none');
-                    document.getElementById('empty_state').classList.add('d-none');
-                    document.getElementById('total_marks_display').classList.add('d-none');
-                }
+                if(sectionId) fetchSubjects(sectionId);
             });
         }
 
-        // --- Step 2: Section Change (Now includes Grade info) ---
         if(sectionSelect) {
             sectionSelect.addEventListener('change', function() {
                 let id = this.value;
@@ -225,16 +216,15 @@
                 document.getElementById('empty_state').classList.add('d-none');
                 document.getElementById('total_marks_display').classList.add('d-none');
 
-                if(!id) return;
-
-                // Load Subjects based on Section (and Exam)
-                fetchSubjects(id);
+                if(id) fetchSubjects(id);
             });
         }
 
-        // --- Step 3: Load Students ---
+        // --- Load Students Logic ---
         if(subjectSelect) {
-            subjectSelect.addEventListener('change', tryLoadStudents);
+            subjectSelect.addEventListener('change', function() {
+                tryLoadStudents();
+            });
         }
 
         function tryLoadStudents() {
@@ -250,11 +240,22 @@
             let subjOpt = subjectSelect.options[subjectSelect.selectedIndex];
             let totalMarks = subjOpt.dataset.total || 100;
             let teacherName = subjOpt.dataset.teacher || 'N/A';
+            let coefficient = subjOpt.dataset.coefficient || '-'; // GET Coefficient
 
+            // UI Updates
             document.getElementById('total_marks_value').innerText = totalMarks;
             document.getElementById('total_marks_display').classList.remove('d-none');
             document.getElementById('table_max_label').innerText = '(Max: ' + totalMarks + ')';
             
+            // Show Coefficient Badge
+            let coeffBadge = document.getElementById('coeff_display');
+            if(coefficient && coefficient != 1 && coefficient != '-') {
+                coeffBadge.innerText = '{{ __("lmd.coefficient") }}: ' + coefficient;
+                coeffBadge.classList.remove('d-none');
+            } else {
+                coeffBadge.classList.add('d-none');
+            }
+
             document.getElementById('header_section').innerText = sectionSelect.options[sectionSelect.selectedIndex].text;
             document.getElementById('header_teacher').innerText = teacherName;
 

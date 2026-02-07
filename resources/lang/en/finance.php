@@ -150,7 +150,20 @@ return [
     'status_partial' => 'Partial',
     'status_unpaid' => 'Unpaid',
     'status_overdue' => 'Overdue',
-     
+    'outstanding' => 'Outstanding',
+    // NEW KEYS FOR STATEMENT & MISC
+    'student_statement' => 'Student Financial Statement',
+    'transaction_history' => 'Transaction History',
+    'misc_fees' => 'Miscellaneous Fees',
+    'tab_info_misc' => 'One-time fees such as Uniforms, ID Cards, Books, etc.',
+    'total_paid' => 'Total Paid',
+    'outstanding_balance' => 'Outstanding Balance',
+    'debit' => 'Debit',
+    'credit' => 'Credit',
+    'reference' => 'Reference',
+    'export_pdf' => 'Export PDF',
+    'type' => 'Type',
+    'description' => 'Description',
     // TAB DESCRIPTIONS
     'tab_info_global' => 'Students with "Global" payment mode (Lump-sum payers).',
     'tab_info_installment' => 'Students with "Installment" payment mode.',

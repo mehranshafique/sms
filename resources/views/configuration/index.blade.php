@@ -61,7 +61,6 @@
                     
                     {{-- 1. SMTP --}}
                     <div id="smtp" class="tab-pane fade active show">
-                        {{-- (Content same as previous) --}}
                          <div class="card">
                             <div class="card-header"><h4 class="card-title">{{ __('configuration.smtp') }}</h4></div>
                             <div class="card-body">
@@ -100,31 +99,9 @@
                         </div>
                     </div>
 
-                    {{-- 2. SMS --}}
+                    {{-- 2. SMS (Updated to include partial) --}}
                     <div id="sms" class="tab-pane fade">
-                        {{-- (Content same as previous) --}}
-                         <div class="card">
-                            <div class="card-header"><h4 class="card-title">{{ __('configuration.sms_sender') }}</h4></div>
-                            <div class="card-body">
-                                <form action="{{ route('configuration.sms.update') }}" method="POST" id="smsForm">
-                                    @csrf
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label">{{ __('configuration.provider') }}</label>
-                                            <select name="sms_provider" class="form-control default-select">
-                                                <option value="mobishastra" {{ $sms['provider'] == 'mobishastra' ? 'selected' : '' }}>Mobishastra</option>
-                                                <option value="infobip" {{ $sms['provider'] == 'infobip' ? 'selected' : '' }}>Infobip</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label">{{ __('configuration.sender_id') }}</label>
-                                            <input type="text" name="sms_sender_id" class="form-control" value="{{ $sms['sender_id'] }}" placeholder="{{ __('configuration.sender_id_placeholder') }}" required maxlength="11">
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
-                                </form>
-                            </div>
-                        </div>
+                        @include('configuration.partials.sms_settings')
                     </div>
 
                     {{-- NEW: Notification Settings --}}
@@ -160,7 +137,6 @@
                                                     <td><strong>{{ $label }}</strong></td>
                                                     <td class="text-center">
                                                         <div class="form-check form-switch d-inline-block">
-                                                            {{-- Hidden input sends '0' if checkbox is unchecked --}}
                                                             <input type="hidden" name="preferences[{{ $key }}][email]" value="0">
                                                             <input class="form-check-input" type="checkbox" name="preferences[{{ $key }}][email]" value="1" 
                                                                 {{ ($notificationPrefs[$key]['email'] ?? false) ? 'checked' : '' }}>
@@ -256,7 +232,6 @@
                     {{-- 4. Modules --}}
                     @if(auth()->user()->hasRole('Super Admin'))
                     <div id="modules" class="tab-pane fade">
-                        {{-- (Content same as previous) --}}
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h4 class="card-title">{{ __('configuration.module_management') }}</h4>
@@ -286,7 +261,6 @@
                     
                     {{-- 5. Recharging --}}
                     <div id="recharge" class="tab-pane fade">
-                        {{-- (Content same as previous) --}}
                         <div class="card">
                             <div class="card-header"><h4 class="card-title">{{ __('configuration.sms_recharge') }} / WhatsApp</h4></div>
                             <div class="card-body">
@@ -382,8 +356,9 @@
         }
 
         handleAjaxForm('#smtpForm');
-        handleAjaxForm('#smsForm');
-        handleAjaxForm('#notificationsForm'); // New handler
+        // SMS form logic is now handled inside the partial's JS block, but keeping this for safety
+        handleAjaxForm('#smsSettingsForm'); 
+        handleAjaxForm('#notificationsForm'); 
         handleAjaxForm('#yearForm');
         handleAjaxForm('#modulesForm');
         handleAjaxForm('#rechargeForm');

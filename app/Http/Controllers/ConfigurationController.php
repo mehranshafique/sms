@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Institution;
 use App\Models\InstitutionSetting;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use App\Models\Module;
-use App\Services\NotificationService;
-use Exception;
+use App\Services\Sms\GatewayFactory;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use App\Enums\RoleEnum;
 
 class ConfigurationController extends BaseController
 {
@@ -18,110 +20,70 @@ class ConfigurationController extends BaseController
         $this->setPageTitle(__('configuration.page_title'));
     }
 
-    /**
-     * Main Configuration Dashboard for Platform Admin
-     * Maps to the "Configuration" menu section.
-     */
-    public function index(Request $request)
+    public function index()
     {
-        $user = Auth::user();
+        // ... (Keep existing index logic) ...
         $institutionId = $this->getInstitutionId(); 
-        
-        if (!$institutionId && $user->hasRole('Super Admin')) {
-             $firstInstitution = Institution::first();
-             if ($firstInstitution) {
-                 $institutionId = $firstInstitution->id;
-                 session(['active_institution_id' => $institutionId]);
-             } else {
-                 return redirect()->route('institutes.create')->with('info', 'Please create your first institution.');
-             }
+        $user = Auth::user();
+        $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value) && is_null($institutionId);
+
+        $settings = InstitutionSetting::where('institution_id', $institutionId)->pluck('value', 'key')->toArray();
+
+        $globalSettings = [];
+        if (!$isSuperAdmin) {
+            $globalSettings = InstitutionSetting::whereNull('institution_id')->pluck('value', 'key')->toArray();
+        } else {
+            $globalSettings = $settings; 
         }
 
-        if (!$institutionId) {
-             return redirect()->route('dashboard')->with('error', __('configuration.select_institution_context'));
-        }
-
-        $institution = Institution::findOrFail($institutionId);
-        $settings = InstitutionSetting::where('institution_id', $institutionId)->pluck('value', 'key');
-
-        // ... (SMTP, SMS, School Year configs remain the same) ...
-        $smtp = [
-            'driver' => $settings['mail_driver'] ?? 'smtp',
-            'host' => $settings['mail_host'] ?? '',
-            'port' => $settings['mail_port'] ?? '587',
-            'username' => $settings['mail_username'] ?? '',
-            'password' => $settings['mail_password'] ?? '',
-            'encryption' => $settings['mail_encryption'] ?? 'tls',
-            'from_address' => $settings['mail_from_address'] ?? '',
-            'from_name' => $settings['mail_from_name'] ?? $institution->name,
-        ];
+        $defaultSms = '["mobishastra","infobip","twilio","signalwire"]';
+        $defaultWa = '["meta","infobip","twilio"]';
+        $allowedSms = json_decode($globalSettings['allowed_sms_providers'] ?? $defaultSms, true);
+        $allowedWa = json_decode($globalSettings['allowed_whatsapp_providers'] ?? $defaultWa, true);
 
         $sms = [
+            'provider' => $settings['sms_provider'] ?? 'system',
             'sender_id' => $settings['sms_sender_id'] ?? '',
-            'provider' => $settings['sms_provider'] ?? 'mobishastra',
         ];
         
+        $notificationPrefs = isset($settings['notification_preferences']) ? json_decode($settings['notification_preferences'], true) : [];
         $schoolYear = [
             'start_date' => $settings['academic_start_date'] ?? date('Y-09-01'),
-            'end_date'   => $settings['academic_end_date'] ?? date('Y-06-30'),
+            'end_date' => $settings['academic_end_date'] ?? date('Y-07-01'),
             'start_time' => $settings['school_start_time'] ?? '08:00',
-            'end_time'   => $settings['school_end_time'] ?? '15:00',
+            'end_time' => $settings['school_end_time'] ?? '15:00',
         ];
-
-        // --- NEW: Notification Preferences ---
-        $rawPrefs = $settings['notification_preferences'] ?? '[]';
-        $notificationPrefs = json_decode($rawPrefs, true);
         
-        $defaultEvents = [
-            'student_created' => ['email' => true, 'sms' => true, 'whatsapp' => true],
-            'staff_created' => ['email' => true, 'sms' => true, 'whatsapp' => true],
-            'payment_received' => ['email' => true, 'sms' => true, 'whatsapp' => true],
-            'institution_created' => ['email' => true, 'sms' => true, 'whatsapp' => true], // Usually hidden or forced true
-        ];
+        $institution = $institutionId ? Institution::find($institutionId) : Auth::user(); 
+        $allModules = Module::all();
+        $enabledModules = isset($settings['enabled_modules']) ? json_decode($settings['enabled_modules'], true) : [];
+        $smtp = $this->getSmtpSettings($settings);
 
-        // Merge saved prefs with defaults to ensure all keys exist
-        $notificationPrefs = array_merge($defaultEvents, is_array($notificationPrefs) ? $notificationPrefs : []);
-
-        $allModules = Module::orderBy('name')->get();
-        $enabledModules = json_decode($settings['enabled_modules'] ?? '[]', true);
-        if(!is_array($enabledModules)) $enabledModules = [];
-
-        $credits = [
-            'sms' => $institution->sms_credits,
-            'whatsapp' => $institution->whatsapp_credits
-        ];
-
-        return view('configuration.index', compact('institution', 'smtp', 'sms', 'schoolYear', 'allModules', 'enabledModules', 'credits', 'notificationPrefs'));
+        return view('configuration.index', compact(
+            'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 
+            'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
+            'allowedSms', 'allowedWa', 'isSuperAdmin'
+        ));
     }
 
-    /**
-     * Update SMTP Settings (Menu: SMTP)
-     */
+    // --- 1. SMTP ---
     public function updateSmtp(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        $this->authorize('update', Institution::findOrFail($institutionId));
         
-        $data = $request->validate([
-            'mail_driver' => 'required|string',
-            'mail_host' => ['required', 'string', function($attribute, $value, $fail) {
-                if (str_contains($value, '@')) {
-                    $fail(__('configuration.mail_host_error'));
-                }
-            }],
-            'mail_port' => 'required|numeric',
-            'mail_username' => 'nullable|string',
-            'mail_password' => 'nullable|string',
-            'mail_encryption' => 'nullable|string',
-            'mail_from_address' => 'required|email',
-            'mail_from_name' => 'required|string',
-        ]);
-
-        foreach ($data as $key => $value) {
-            InstitutionSetting::set($institutionId, $key, trim($value), 'smtp');
+        $keys = ['mail_host', 'mail_port', 'mail_username', 'mail_encryption', 'mail_from_address', 'mail_from_name'];
+        
+        foreach ($keys as $key) {
+            $dbKey = str_replace('mail_', 'smtp_', $key);
+            $this->saveSetting($institutionId, $dbKey, $request->input($key), 'smtp');
         }
 
-        return back()->with('success', __('configuration.update_success'));
+        if ($request->filled('mail_password')) {
+            $encrypted = Crypt::encryptString($request->mail_password);
+            $this->saveSetting($institutionId, 'smtp_password', $encrypted, 'smtp');
+        }
+
+        return response()->json(['message' => __('configuration.settings_saved')]);
     }
 
     /**
@@ -134,104 +96,150 @@ class ConfigurationController extends BaseController
         ]);
 
         try {
-            Mail::raw(__('configuration.test_email_body'), function ($message) use ($request) {
+            // In a real app, you would dynamically set the mail config here before sending
+            // e.g., Config::set('mail.mailers.smtp.host', ...);
+
+            Mail::raw('This is a test email from the Digitex System Configuration check.', function ($message) use ($request) {
                 $message->to($request->test_email)
-                        ->subject(__('configuration.test_email_subject'));
+                        ->subject('SMTP Configuration Test');
             });
 
             return response()->json([
                 'status' => 'success',
-                'message' => __('configuration.test_email_success', ['email' => $request->test_email])
+                'message' => 'Test email sent successfully to ' . $request->test_email
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $errorMsg = $e->getMessage();
             if (str_contains($errorMsg, 'getaddrinfo') || str_contains($errorMsg, 'stream_socket_client')) {
-                $errorMsg = __('configuration.connection_failed');
+                $errorMsg = "Connection failed: Could not connect to the Mail Host. Please check your Host and Port settings.";
             }
 
             return response()->json([
                 'status' => 'error',
-                'message' => __('configuration.test_email_failed', ['error' => $errorMsg])
+                'message' => 'Test failed: ' . $errorMsg
             ], 500);
         }
     }
 
-    /**
-     * Update ID Sender SMS (Menu: ID Sender SMS Creat)
-     */
+    // --- 2. SMS / WHATSAPP ---
     public function updateSms(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        
-        $data = $request->validate([
-            'sms_sender_id' => 'required|string|max:11',
-            'sms_provider' => 'required|string',
+        $user = Auth::user();
+        $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value) && is_null($institutionId);
+
+        $request->validate([
+            'sms_provider' => 'required',
+            'whatsapp_provider' => 'required',
         ]);
 
-        foreach ($data as $key => $value) {
-            InstitutionSetting::set($institutionId, $key, $value, 'sms');
+        // 1. Save Active Selection
+        $this->saveSetting($institutionId, 'sms_provider', $request->sms_provider, 'sms');
+        $this->saveSetting($institutionId, 'whatsapp_provider', $request->whatsapp_provider, 'sms');
+
+        // 2. Super Admin: Global Allow List
+        if ($isSuperAdmin) {
+            $allowedSms = $request->input('allowed_sms', []);
+            $allowedWa = $request->input('allowed_whatsapp', []);
+            $this->saveSetting(null, 'allowed_sms_providers', json_encode($allowedSms), 'system');
+            $this->saveSetting(null, 'allowed_whatsapp_providers', json_encode($allowedWa), 'system');
         }
 
-        return back()->with('success', __('configuration.update_success'));
+        // 3. Save Public Keys (Updated for Mobishastra & Infobip)
+        $publicKeys = [
+            // Mobishastra
+            'mobishastra_user', 'mobishastra_sender_id',
+            // Infobip
+            'infobip_subdomain', 'infobip_whatsapp_from', 'infobip_sender_id', // Subdomain stored raw
+            // Meta
+            'meta_phone_number_id', 'meta_business_account_id',
+            // Twilio
+            'twilio_sid', 'twilio_from', 'twilio_whatsapp_from',
+            // SignalWire
+            'sw_project_id', 'sw_space_url', 'sw_from'
+        ];
+
+        foreach ($publicKeys as $key) {
+            if ($request->has($key)) {
+                $this->saveSetting($institutionId, $key, $request->input($key), 'sms');
+            }
+        }
+
+        // 4. Save Encrypted Secrets (Passwords/API Keys)
+        $secretKeys = [
+            'mobishastra_password', // Mobishastra uses Password as key
+            'infobip_api_key', 
+            'meta_access_token',
+            'twilio_token', 
+            'sw_token'
+        ];
+
+        foreach ($secretKeys as $key) {
+            if ($request->filled($key)) {
+                $encrypted = Crypt::encryptString($request->input($key));
+                $this->saveSetting($institutionId, $key, $encrypted, 'sms');
+            }
+        }
+
+        return response()->json(['message' => __('configuration.sms_settings_updated')]);
     }
 
-    /**
-     * Test SMS/WhatsApp Connection
-     */
     public function testSms(Request $request)
     {
-        $request->validate([
-            'phone' => 'required|string|min:8',
-            'channel' => 'required|in:sms,whatsapp'
-        ]);
-
+        $request->validate(['phone' => 'required', 'channel' => 'required|in:sms,whatsapp']);
         $institutionId = $this->getInstitutionId();
-        $institution = Institution::findOrFail($institutionId);
         
-        $notificationService = app(NotificationService::class);
-        
-        $message = __('configuration.test_msg_content', ['school' => $institution->name]);
-        
-        // We use performSend which handles:
-        // 1. Credit Check (deducts if successful)
-        // 2. Provider Selection (Factory)
-        // 3. Error Handling (Returns array with success boolean and message)
-        // We pass $isUnlimited = false to respect credit limits as requested.
-        
-        $result = $notificationService->performSend(
-            $request->phone, 
-            $message, 
-            $institutionId, 
-            false, // Enforce credit check
-            $request->channel
-        );
+        // Resolve Notification Service
+        try {
+            $notificationService = app(\App\Services\NotificationService::class);
+            $result = $notificationService->performSend(
+                $request->phone, 
+                "Test message from E-Digitex (" . date('H:i:s') . ")", 
+                $institutionId, // NULL handles Super Admin check in service if needed
+                true, // Unlimited / No credit deduction for test
+                $request->channel
+            );
 
-        if ($result['success']) {
-            return response()->json([
-                'status' => 'success',
-                'message' => $result['message']
-            ]);
-        } else {
-            return response()->json([
-                'status' => 'error',
-                'message' => $result['message']
-            ], 500);
+            if($result['success']) {
+                return response()->json(['message' => $result['message']]);
+            }
+            return response()->json(['message' => $result['message']], 422);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Update Module Purchased (Menu: Module Purchased)
-     */
+    // --- 3. NOTIFICATIONS ---
+    public function updateNotifications(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        $prefs = $request->input('preferences', []);
+        
+        $this->saveSetting($institutionId, 'notification_preferences', json_encode($prefs), 'notifications');
+        return response()->json(['message' => __('configuration.settings_saved')]);
+    }
+
+    // --- 4. SCHOOL YEAR ---
+    public function updateSchoolYear(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        $keys = ['academic_start_date', 'academic_end_date', 'school_start_time', 'school_end_time'];
+        
+        foreach($keys as $key) {
+            $this->saveSetting($institutionId, $key, $request->input($key), 'academics');
+        }
+        return response()->json(['message' => __('configuration.settings_saved')]);
+    }
+
+    // --- 5. MODULES (Super Admin) ---
     public function updateModules(Request $request)
     {
-        if (!Auth::user()->hasRole('Super Admin')) abort(403, __('configuration.only_super_admin_modules'));
-
         $institutionId = $this->getInstitutionId();
-        
         $modules = $request->input('modules', []);
-        InstitutionSetting::set($institutionId, 'enabled_modules', json_encode($modules), 'modules');
-
-        return back()->with('success', __('configuration.update_success'));
+        
+        $this->saveSetting($institutionId, 'enabled_modules', json_encode($modules), 'system');
+        return response()->json(['message' => __('configuration.settings_saved')]);
     }
 
     /**
@@ -260,49 +268,40 @@ class ConfigurationController extends BaseController
 
         return back()->with('success', __('configuration.recharge_success') . ' - ' . __('configuration.balance') . ': ' . ($request->type === 'sms' ? $institution->sms_credits : $institution->whatsapp_credits));
     }
-    
-    /**
-     * Update School Year Config (Menu: School Year Config)
+
+   /**
+     * Helper to save settings using updateOrCreate.
      */
-    public function updateSchoolYear(Request $request)
+    private function saveSetting($institutionId, $key, $value, $group = 'general')
     {
-        $institutionId = $this->getInstitutionId();
-        
-        // UPDATED: Validating Dates AND Times
-        $data = $request->validate([
-            'academic_start_date' => 'required|date',
-            'academic_end_date'   => 'required|date|after:academic_start_date',
-            'school_start_time'   => 'required|date_format:H:i',
-            'school_end_time'     => 'required|date_format:H:i|after:school_start_time',
-        ]);
-        
-        foreach ($data as $key => $value) {
-            InstitutionSetting::set($institutionId, $key, $value, 'general');
+        // institutionId can be NULL for Global Settings
+        InstitutionSetting::updateOrCreate(
+            ['institution_id' => $institutionId, 'key' => $key],
+            ['value' => $value, 'group' => $group]
+        );
+    }
+
+    private function getSmtpSettings($settings) {
+        return [
+            'host' => $settings['smtp_host'] ?? '',
+            'port' => $settings['smtp_port'] ?? '',
+            'username' => $settings['smtp_username'] ?? '',
+            'password' => isset($settings['smtp_password']) ? '' : '', // Don't send back encrypted string
+            'encryption' => $settings['smtp_encryption'] ?? 'tls',
+            'from_address' => $settings['smtp_from_address'] ?? '',
+            'from_name' => $settings['smtp_from_name'] ?? '',
+            'driver' => 'smtp',
+        ];
+    }
+}
+
+// Global Helper function to decrypt settings (if not exists elsewhere)
+if (!function_exists('try_decrypt')) {
+    function try_decrypt($value) {
+        try {
+            return \Illuminate\Support\Facades\Crypt::decryptString($value);
+        } catch (\Exception $e) {
+            return '';
         }
-
-        return back()->with('success', __('configuration.update_success'));
-    }
-    /**
-     * NEW: Update Notification Preferences
-     */
-    public function updateNotifications(Request $request)
-    {
-        $institutionId = $this->getInstitutionId();
-        
-        // Validate input array structure
-        // Expecting: preferences[event_key][channel] = 1/0
-        $data = $request->input('preferences', []);
-        
-        // Save as JSON
-        InstitutionSetting::set($institutionId, 'notification_preferences', json_encode($data), 'notifications');
-
-        return back()->with('success', __('configuration.update_success'));
-    }
-    /**
-     * Helper to get current institution model
-     */
-    private function getInstitution()
-    {
-        return Institution::findOrFail($this->getInstitutionId());
     }
 }

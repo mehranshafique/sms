@@ -6,6 +6,8 @@ use App\Models\Subject;
 use App\Models\GradeLevel;
 use App\Models\Institution;
 use App\Models\Department; 
+use App\Models\AcademicUnit; // Added
+use App\Models\Program; // Added
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
@@ -25,7 +27,8 @@ class SubjectController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $data = Subject::with(['gradeLevel', 'institution', 'department']) 
+            // Added academicUnit relationship
+            $data = Subject::with(['gradeLevel', 'institution', 'department', 'academicUnit']) 
                 ->select('subjects.*');
 
             if ($institutionId) {
@@ -50,8 +53,9 @@ class SubjectController extends BaseController
                 ->addColumn('grade', function($row){
                     return $row->gradeLevel->name ?? 'N/A';
                 })
-                ->addColumn('department', function($row){
-                    return $row->department->name ?? '-';
+                // Display UE if available
+                ->addColumn('unit', function($row){
+                    return $row->academicUnit ? $row->academicUnit->code : '-';
                 })
                 ->addColumn('credits', function($row){
                     return $row->credit_hours > 0 ? $row->credit_hours : '-';
@@ -107,32 +111,65 @@ class SubjectController extends BaseController
             $institutions = Institution::where('is_active', true)->pluck('name', 'id');
         }
         
+        // Grades
         $gradeLevelsQuery = GradeLevel::query();
         if ($institutionId) {
             $gradeLevelsQuery->where('institution_id', $institutionId);
         } else {
             $gradeLevelsQuery->with('institution');
         }
-        
         $grades = $gradeLevelsQuery->orderBy('order_index')->get()->map(function($item) use ($institutionId) {
             return [
                 'id' => $item->id,
                 'name' => $item->name . ($institutionId ? '' : ' (' . ($item->institution->name ?? '') . ')'),
-                'cycle' => $item->education_cycle 
+                'cycle' => is_object($item->education_cycle) ? $item->education_cycle->value : $item->education_cycle 
             ];
         });
 
+        // Departments
         $departments = [];
         if ($institutionId) {
             $departments = Department::where('institution_id', $institutionId)->pluck('name', 'id');
         }
 
+        // Programs (NEW: For filtering UEs)
+        $programs = [];
+        if ($institutionId) {
+            $programs = Program::where('institution_id', $institutionId)->where('is_active', true)->pluck('name', 'id');
+        }
+
+        // Prerequisites
         $prerequisites = [];
         if ($institutionId) {
             $prerequisites = Subject::where('institution_id', $institutionId)->where('is_active', true)->pluck('name', 'id');
         }
             
-        return view('subjects.create', compact('grades', 'institutions', 'institutionId', 'departments', 'prerequisites'));
+        return view('subjects.create', compact('grades', 'institutions', 'institutionId', 'departments', 'prerequisites', 'programs'));
+    }
+
+    /**
+     * AJAX: Get Academic Units based on Program and/or Grade
+     */
+    public function getUnits(Request $request)
+    {
+        $institutionId = $this->getInstitutionId() ?? $request->institution_id;
+        
+        $query = AcademicUnit::where('institution_id', $institutionId);
+
+        if ($request->program_id) {
+            $query->where('program_id', $request->program_id);
+        }
+        
+        if ($request->grade_level_id) {
+            $query->where('grade_level_id', $request->grade_level_id);
+        }
+
+        // Return formatted list
+        $units = $query->get()->mapWithKeys(function($u) {
+            return [$u->id => $u->code . ' - ' . $u->name];
+        });
+
+        return response()->json($units);
     }
 
     public function store(Request $request)
@@ -143,6 +180,7 @@ class SubjectController extends BaseController
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
             'department_id'  => 'nullable|exists:departments,id', 
+            'academic_unit_id' => 'nullable|exists:academic_units,id',
             'prerequisite_id'=> 'nullable|exists:subjects,id', 
             'name'           => ['required', 'string', 'max:100', 
                 Rule::unique('subjects')
@@ -152,6 +190,7 @@ class SubjectController extends BaseController
             'semester'       => 'nullable|string|max:20', 
             'type'           => 'required|in:theory,practical,both',
             'credit_hours'   => 'nullable|numeric|min:0', 
+            'coefficient'    => 'nullable|numeric|min:0',
             'total_marks'    => 'required|integer|min:0',
             'passing_marks'  => 'required|integer|min:0|lte:total_marks',
             'is_active'      => 'boolean'
@@ -162,8 +201,6 @@ class SubjectController extends BaseController
         // Auto-generate code if empty
         if (empty($validated['code'])) {
             $baseCode = Str::upper(Str::slug($validated['name'], ''));
-            // Take first 3-4 chars for brevity if needed, but full slug is safer for uniqueness base
-            // Let's keep full slug to avoid collision initially
             $code = $baseCode;
             $counter = 1;
 
@@ -181,48 +218,44 @@ class SubjectController extends BaseController
         return response()->json(['message' => __('subject.messages.success_create'), 'redirect' => route('subjects.index')]);
     }
 
-    public function show(Subject $subject)
-    {
-        $institutionId = $this->getInstitutionId();
-        if ($institutionId && $subject->institution_id != $institutionId) abort(403);
-        
-        $subject->load('gradeLevel', 'institution', 'department', 'prerequisite');
-        return view('subjects.show', compact('subject'));
-    }
-
     public function edit(Subject $subject)
     {
         $institutionId = $this->getInstitutionId();
-
-        if ($institutionId && $subject->institution_id != $institutionId) {
-            abort(403, 'Unauthorized access.');
-        }
+        if ($institutionId && $subject->institution_id != $institutionId) abort(403);
 
         $institutions = Institution::where('id', $subject->institution_id)->pluck('name', 'id');
 
-        $gradeLevelsQuery = GradeLevel::query();
-        if ($institutionId) {
-            $gradeLevelsQuery->where('institution_id', $institutionId);
-        } else {
-            $gradeLevelsQuery->with('institution');
-        }
-        
-        $grades = $gradeLevelsQuery->orderBy('order_index')->get()->map(function($item) use ($institutionId) {
-            return [
-                'id' => $item->id,
-                'name' => $item->name . ($institutionId ? '' : ' (' . ($item->institution->name ?? '') . ')'),
-                'cycle' => $item->education_cycle
-            ];
-        });
+        $grades = GradeLevel::where('institution_id', $subject->institution_id)
+            ->orderBy('order_index')->get()->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'cycle' => is_object($item->education_cycle) ? $item->education_cycle->value : $item->education_cycle
+                ];
+            });
 
         $departments = Department::where('institution_id', $subject->institution_id)->pluck('name', 'id');
+        
+        // Programs for filter
+        $programs = Program::where('institution_id', $subject->institution_id)->where('is_active', true)->pluck('name', 'id');
+        
+        // Get Pre-selected Program ID from the assigned Unit
+        $selectedProgramId = $subject->academicUnit ? $subject->academicUnit->program_id : null;
+
+        // Units (Load all initially, or based on saved program)
+        $unitsQuery = AcademicUnit::where('institution_id', $subject->institution_id);
+        if($selectedProgramId) $unitsQuery->where('program_id', $selectedProgramId);
+        
+        $units = $unitsQuery->get()->mapWithKeys(function($u) {
+            return [$u->id => $u->code . ' - ' . $u->name];
+        });
         
         $prerequisites = Subject::where('institution_id', $subject->institution_id)
             ->where('id', '!=', $subject->id) 
             ->where('is_active', true)
             ->pluck('name', 'id');
 
-        return view('subjects.edit', compact('subject', 'grades', 'institutions', 'institutionId', 'departments', 'prerequisites'));
+        return view('subjects.edit', compact('subject', 'grades', 'institutions', 'institutionId', 'departments', 'prerequisites', 'programs', 'units', 'selectedProgramId'));
     }
 
     public function update(Request $request, Subject $subject)
@@ -237,6 +270,7 @@ class SubjectController extends BaseController
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
             'grade_level_id' => 'required|exists:grade_levels,id',
             'department_id'  => 'nullable|exists:departments,id',
+            'academic_unit_id' => 'nullable|exists:academic_units,id', // Added
             'prerequisite_id'=> 'nullable|exists:subjects,id|different:id', 
             'name'           => ['required', 'string', 'max:100', 
                 Rule::unique('subjects')
@@ -247,6 +281,7 @@ class SubjectController extends BaseController
             'semester'       => 'nullable|string|max:20',
             'type'           => 'required|in:theory,practical,both',
             'credit_hours'   => 'nullable|numeric|min:0',
+            'coefficient'    => 'nullable|numeric|min:0', // Added
             'total_marks'    => 'required|integer|min:0',
             'passing_marks'  => 'required|integer|min:0|lte:total_marks',
             'is_active'      => 'boolean'
@@ -256,13 +291,11 @@ class SubjectController extends BaseController
             $validated['institution_id'] = $institutionId;
         }
 
-        // Auto-generate code if empty
         if (empty($validated['code'])) {
             $baseCode = Str::upper(Str::slug($validated['name'], ''));
             $code = $baseCode;
             $counter = 1;
 
-            // Check uniqueness against other subjects (excluding self)
             while (Subject::where('institution_id', $institutionId ?? $subject->institution_id)
                           ->where('code', $code)
                           ->where('id', '!=', $subject->id)
@@ -286,7 +319,8 @@ class SubjectController extends BaseController
         $subject->delete();
         return response()->json(['message' => __('subject.messages.success_delete')]);
     }
-
+    
+    // bulkDelete method remains the same as previously provided...
     public function bulkDelete(Request $request)
     {
         $this->authorize('deleteAny', Subject::class); 

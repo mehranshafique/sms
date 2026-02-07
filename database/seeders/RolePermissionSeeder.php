@@ -45,8 +45,11 @@ class RolePermissionSeeder extends Seeder
             
             // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'University Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Added for new module
+            
+            // SPLIT ENROLLMENTS
+            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Standard
+            'University Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // University
+            
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
             'Student Promotion' => ['view', 'create'],
             'Student Transfers' => ['view', 'create', 'print'],
@@ -81,6 +84,10 @@ class RolePermissionSeeder extends Seeder
             'Notices' => ['view', 'create', 'update', 'delete','viewAny'],
             'Voting' => ['view', 'create', 'update', 'delete'],
             'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
+
+            // Extra
+            'Library' => ['view', 'create', 'update', 'delete'],
+            'Transport' => ['view', 'create', 'update', 'delete'],
         ];
 
         // 3. Create Modules and Permissions dynamically
@@ -95,10 +102,16 @@ class RolePermissionSeeder extends Seeder
             );
 
             foreach ($actions as $action) {
+                // Determine Singular Key for Permission String
                 $singularKey = Str::singular($slug);
+                
+                // Specific overrides for clarity
                 if ($slug === 'settings') $singularKey = 'setting';
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
                 if ($slug === 'sms_templates') $singularKey = 'sms_template';
+                
+                // Keep 'student_enrollments' as 'student_enrollment' (standard behavior of singular())
+                // Keep 'university_enrollments' as 'university_enrollment'
 
                 $permissionName = "{$singularKey}.{$action}";
 

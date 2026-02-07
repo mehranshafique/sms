@@ -7,11 +7,12 @@ use App\Models\Student;
 use App\Models\ClassSection; // Used as 'Program'
 use App\Models\AcademicSession;
 use App\Models\Institution;
+use App\Models\AcademicUnit; // Added for UE check
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
-use Spatie\Permission\Middleware\PermissionMiddleware; // Import Middleware
+use Spatie\Permission\Middleware\PermissionMiddleware; 
 use Illuminate\Support\Facades\DB;
 
 class UniversityEnrollmentController extends BaseController
@@ -37,7 +38,7 @@ class UniversityEnrollmentController extends BaseController
         $currentSession = $querySession->where('is_current', true)->first();
 
         if ($request->ajax()) {
-            $data = StudentEnrollment::with(['student', 'classSection.gradeLevel'])
+            $data = StudentEnrollment::with(['student', 'classSection.gradeLevel.program'])
                 ->whereHas('classSection.gradeLevel', function($q) {
                     $q->whereIn('education_cycle', ['university', 'lmd']);
                 })
@@ -56,7 +57,9 @@ class UniversityEnrollmentController extends BaseController
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('admission_no', fn($row) => $row->student->admission_number ?? '-')
                 ->addColumn('program', function($row){
-                    return $row->classSection->name ?? 'N/A';
+                    // Display Program Name via GradeLevel relation if available, else Class Name
+                    $prog = $row->classSection->gradeLevel->program->code ?? $row->classSection->name;
+                    return $prog ?? 'N/A';
                 })
                 ->addColumn('level', function($row){
                     return $row->classSection->gradeLevel->name ?? '-';
@@ -88,16 +91,19 @@ class UniversityEnrollmentController extends BaseController
         $institutionId = $this->getInstitutionId();
         
         // Filter Classes (Programs) that are University Cycle
+        // Eager load Program via GradeLevel to show "BSCS - L1" instead of just "Section A"
         $programsQuery = ClassSection::whereHas('gradeLevel', function($q){
             $q->whereIn('education_cycle', ['university', 'lmd']);
-        })->with('gradeLevel');
+        })->with(['gradeLevel.program']);
 
         if ($institutionId) {
             $programsQuery->where('institution_id', $institutionId);
         }
         
         $programs = $programsQuery->get()->mapWithKeys(function($item){
-            return [$item->id => $item->name . ' (' . $item->gradeLevel->name . ')'];
+            $progCode = $item->gradeLevel->program->code ?? 'General';
+            $level = $item->gradeLevel->name;
+            return [$item->id => "$progCode - $level ({$item->name})"];
         });
 
         // Get Active Session
@@ -124,14 +130,45 @@ class UniversityEnrollmentController extends BaseController
         return view('university.enrollments.create', compact('programs', 'students'));
     }
 
+    /**
+     * Helper to check if Program has UEs defined (Optional UX improvement)
+     */
+    public function checkProgramStats(Request $request)
+    {
+        $classId = $request->class_section_id;
+        $classSection = ClassSection::with('gradeLevel.program')->find($classId);
+        
+        if (!$classSection) return response()->json(['ues' => 0, 'credits' => 0]);
+
+        $programId = $classSection->gradeLevel->program_id ?? null;
+        $gradeId = $classSection->grade_level_id;
+
+        // Count UEs linked to this Program/Grade
+        $query = AcademicUnit::where('grade_level_id', $gradeId);
+        if ($programId) {
+            $query->orWhere('program_id', $programId);
+        }
+        
+        $ueCount = $query->count();
+        $totalCredits = $query->sum('total_credits');
+
+        return response()->json([
+            'ues' => $ueCount, 
+            'credits' => (float)$totalCredits,
+            'message' => $ueCount > 0 ? '' : 'Warning: No Academic Units (UE) defined for this level yet.'
+        ]);
+    }
+
     public function store(Request $request)
     {
         $institutionId = $this->getInstitutionId();
         
         // Ensure Class is University Type
         $program = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
+        
+        // Strict Cycle Check
         if(!in_array($program->gradeLevel->education_cycle, ['university', 'lmd'])) {
-             return response()->json(['message' => 'Invalid program type for this module.'], 422);
+             return response()->json(['message' => 'Invalid program type for this module. Please use standard enrollment.'], 422);
         }
 
         $session = AcademicSession::where('institution_id', $program->institution_id)->where('is_current', true)->first();
@@ -159,7 +196,7 @@ class UniversityEnrollmentController extends BaseController
                         'student_id' => $studentId,
                         'class_section_id' => $request->class_section_id,
                         'grade_level_id' => $program->grade_level_id,
-                        'roll_number' => null, // or custom logic
+                        'roll_number' => null, 
                         'status' => $request->status,
                         'enrolled_at' => $request->enrolled_at
                     ]);
@@ -178,12 +215,14 @@ class UniversityEnrollmentController extends BaseController
 
         $programsQuery = ClassSection::whereHas('gradeLevel', function($q){
             $q->whereIn('education_cycle', ['university', 'lmd']);
-        })->with('gradeLevel');
+        })->with(['gradeLevel.program']);
 
         if ($institutionId) $programsQuery->where('institution_id', $institutionId);
         
         $programs = $programsQuery->get()->mapWithKeys(function($item){
-            return [$item->id => $item->name . ' (' . $item->gradeLevel->name . ')'];
+            $progCode = $item->gradeLevel->program->code ?? 'General';
+            $level = $item->gradeLevel->name;
+            return [$item->id => "$progCode - $level ({$item->name})"];
         });
 
         $students = [$enrollment->student_id => $enrollment->student->full_name];
@@ -203,6 +242,7 @@ class UniversityEnrollmentController extends BaseController
 
         $program = ClassSection::find($request->class_section_id);
 
+        // Update Grade Level along with Class (Program)
         $enrollment->update([
             'class_section_id' => $request->class_section_id,
             'grade_level_id' => $program->grade_level_id,

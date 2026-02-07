@@ -9,6 +9,7 @@ use App\Models\Staff;
 use App\Models\AcademicSession;
 use App\Models\Institution;
 use App\Models\GradeLevel;
+use App\Models\InstitutionSetting; // Added
 use App\Models\ClassSubject;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -30,7 +31,8 @@ class TimetableController extends BaseController
         $user = Auth::user();
 
         if ($request->ajax()) {
-            $query = Timetable::with(['classSection.gradeLevel', 'subject', 'teacher.user'])
+            // UPDATED: Eager load academicUnit for subjects
+            $query = Timetable::with(['classSection.gradeLevel', 'subject.academicUnit', 'teacher.user'])
                 ->select('timetables.*', 'timetables.day_of_week as day')
                 ->latest('timetables.created_at');
 
@@ -90,7 +92,12 @@ class TimetableController extends BaseController
                     return ($gradeName ? $gradeName . ' ' : '') . $sectionName;
                 })
                 ->addColumn('subject', function($row){
-                    return $row->subject->name ?? 'N/A';
+                    // UPDATED: Show UE Code if available
+                    $name = $row->subject->name ?? 'N/A';
+                    if($row->subject && $row->subject->academicUnit) {
+                         $name .= ' <small class="text-muted">(' . $row->subject->academicUnit->code . ')</small>';
+                    }
+                    return $name;
                 })
                 ->addColumn('teacher', function($row){
                     return $row->teacher ? $row->teacher->user->name : 'N/A';
@@ -115,7 +122,7 @@ class TimetableController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'action'])
+                ->rawColumns(['checkbox', 'action', 'subject'])
                 ->make(true);
         }
 
@@ -143,7 +150,7 @@ class TimetableController extends BaseController
 
     public function classRoutine(Request $request)
     {
-        // ... (existing code remains the same) ...
+        // ... (existing code remains unchanged) ...
         $institutionId = $this->getInstitutionId();
         $user = Auth::user();
         
@@ -224,7 +231,6 @@ class TimetableController extends BaseController
         $viewName = $isViewer ? 'timetables.viewer' : 'timetables.show';
         $timetable = $timetable ?? ($data['timetable'] ?? null);
         
-        // Ensure collections are passed if null
         $classes = $classes ?? collect();
         $teachers = $teachers ?? collect();
         $rooms = $rooms ?? collect();
@@ -252,7 +258,7 @@ class TimetableController extends BaseController
             $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         }
 
-        $query = Timetable::with(['subject', 'teacher.user', 'classSection.gradeLevel', 'academicSession'])
+        $query = Timetable::with(['subject.academicUnit', 'teacher.user', 'classSection.gradeLevel', 'academicSession']) // Updated eager load
             ->select('timetables.*')
             ->orderBy('timetables.start_time'); 
 
@@ -327,10 +333,19 @@ class TimetableController extends BaseController
              return [$item->id => $label];
         });
 
+        // UPDATED: Fetch Data with UE Context
         $fetchData = function($model) use ($institutionId) {
             $query = $model::query();
             if ($institutionId) {
                 $query->where('institution_id', $institutionId);
+                
+                // If it's Subject model, eager load UE and format name
+                if ($model === Subject::class) {
+                    return $query->with('academicUnit')->get()->mapWithKeys(function($item) {
+                        $name = $item->name . ($item->academicUnit ? ' (' . $item->academicUnit->code . ')' : '');
+                        return [$item->id => $name];
+                    });
+                }
                 return $query->pluck('name', 'id');
             } else {
                 return $query->with('institution')->get()->mapWithKeys(function($item) {
@@ -353,7 +368,11 @@ class TimetableController extends BaseController
             return [$item->id => $label];
         });
 
-        return view('timetables.create', compact('gradeLevels', 'subjects', 'teachers', 'institutions', 'institutionId'));
+        // NEW: Get School Hours for suggestions
+        $schoolStart = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
+        $schoolEnd = InstitutionSetting::get($institutionId, 'school_end_time', '15:00');
+
+        return view('timetables.create', compact('gradeLevels', 'subjects', 'teachers', 'institutions', 'institutionId', 'schoolStart', 'schoolEnd'));
     }
 
     public function getAllocatedSubjects(Request $request) 
@@ -366,31 +385,35 @@ class TimetableController extends BaseController
         $allocations = [];
 
         if ($classId) {
-            // Updated to include Teacher relationship for Read-Only logic
             $allocations = ClassSubject::where('class_section_id', $classId)
-                ->with(['subject', 'teacher.user'])
+                ->with(['subject.academicUnit', 'teacher.user'])
                 ->get();
             
             if ($allocations->isNotEmpty()) {
                 $subjects = $allocations->map(function($alloc) {
+                    $s = $alloc->subject;
+                    $name = $s->name . ($s->academicUnit ? ' (' . $s->academicUnit->code . ')' : '');
+                    
                     return [
                         'id' => $alloc->subject_id, 
-                        'name' => $alloc->subject->name,
+                        'name' => $name,
                         'default_teacher' => $alloc->teacher_id,
-                        'teacher_name' => $alloc->teacher->user->name ?? null // Return Teacher Name
+                        'teacher_name' => $alloc->teacher->user->name ?? null 
                     ];
                 });
             }
         }
 
         if (empty($subjects) && $gradeId) {
-            $query = Subject::where('grade_level_id', $gradeId)->where('is_active', true);
+            $query = Subject::with('academicUnit')->where('grade_level_id', $gradeId)->where('is_active', true);
             if ($institutionId) $query->where('institution_id', $institutionId);
             
             $subjects = $query->get()->map(function($sub) {
+                $name = $sub->name . ($sub->academicUnit ? ' (' . $sub->academicUnit->code . ')' : '');
+                
                 return [
                     'id' => $sub->id, 
-                    'name' => $sub->name,
+                    'name' => $name,
                     'default_teacher' => null,
                     'teacher_name' => null
                 ];
@@ -510,7 +533,11 @@ class TimetableController extends BaseController
 
         $teachers = Staff::with('user')->where('institution_id', $timetable->institution_id)->get()->mapWithKeys(fn($t)=>[$t->id => $t->user->name]);
 
-        return view('timetables.edit', compact('timetable', 'gradeLevels', 'classes', 'subjects', 'teachers', 'institutions', 'institutionId'));
+        // NEW: Get School Hours
+        $schoolStart = InstitutionSetting::get($timetable->institution_id, 'school_start_time', '08:00');
+        $schoolEnd = InstitutionSetting::get($timetable->institution_id, 'school_end_time', '15:00');
+
+        return view('timetables.edit', compact('timetable', 'gradeLevels', 'classes', 'subjects', 'teachers', 'institutions', 'institutionId', 'schoolStart', 'schoolEnd'));
     }
 
     public function update(Request $request, Timetable $timetable)

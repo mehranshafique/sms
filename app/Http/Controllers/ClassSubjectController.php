@@ -44,7 +44,9 @@ class ClassSubjectController extends BaseController
             if ($selectedClass && $selectedClass->institution_id == $institutionId) {
                 
                 // 1. Get Global Subjects for this Grade
-                $gradeSubjects = Subject::where('grade_level_id', $selectedClass->grade_level_id)
+                // UPDATED: Eager load academicUnit
+                $gradeSubjects = Subject::with('academicUnit')
+                    ->where('grade_level_id', $selectedClass->grade_level_id)
                     ->where('is_active', true)
                     ->get();
 

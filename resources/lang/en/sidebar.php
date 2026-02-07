@@ -44,7 +44,7 @@ return [
     'budget_allocation' => 'Budget Allocation', 
     'fund_requests' => 'Fund Requests', 
     'budget_categories' => 'Budget Categories', 
-    
+    'programs' => 'Programs',
     'communication' => 'Communication',
     'notices' => [
         'title' => 'Notices Board',

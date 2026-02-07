@@ -1,0 +1,45 @@
+<?php
+
+return [
+    'units_page_title' => 'Unités d\'Enseignement (UE)',
+    'programs_page_title' => 'Programmes & Filières',
+    'create_program' => 'Créer un Programme',
+    'edit_program' => 'Modifier le Programme',
+    'program_name' => 'Nom du Programme (ex: Licence Info)',
+    'program_code' => 'Code du Programme',
+    'total_semesters' => 'Total Semestres',
+    'duration_years' => 'Durée (Années)',
+    
+    'create_unit' => 'Créer une Unité (UE)',
+    'edit_unit' => 'Modifier l\'Unité',
+    'unit_name' => 'Nom de l\'Unité',
+    'code' => 'Code',
+    'type' => 'Type',
+    'semester' => 'Semestre',
+    'credits' => 'Crédits',
+    'fundamental' => 'Fondamentale',
+    'transversal' => 'Transversale',
+    'optional' => 'Optionnelle',
+    
+    'unit_saved' => 'Unité d\'enseignement enregistrée avec succès.',
+    'unit_deleted' => 'Unité supprimée avec succès.',
+    'program_saved' => 'Programme enregistré avec succès.',
+    'program_deleted' => 'Programme supprimé avec succès.',
+    'subjects_assigned' => 'Matières assignées à l\'UE avec succès.',
+    
+    // Transcript Terms
+    'report_header' => 'Relevé de Notes Académique',
+    'ue_title' => 'Unité d\'Enseignement (UE)',
+    'ec_title' => 'Élément Constitutif (EC)',
+    'grade' => 'Grade',
+    'decision' => 'Décision',
+    'admitted' => 'Admis',
+    'adjourned' => 'Ajourné',
+    'validated' => 'Validé (V)',
+    'compensated' => 'Compensé (Cmp)',
+    'failed' => 'Non Validé (NV)',
+    'average' => 'Moyenne',
+    'mention' => 'Mention',
+    'credits_earned' => 'Crédits Acquis',
+    'credits_attempted' => 'Crédits Tentés',
+];

@@ -17,13 +17,11 @@ class StudentEnrollmentController extends BaseController
 {
     public function __construct()
     {
-        // Replace authorizeResource with explicit middleware to match Seeder permissions (enrollment.*)
-        // Seeder uses 'Enrollments' -> 'enrollment' prefix
-        
-        $this->middleware(PermissionMiddleware::class . ':enrollment.viewAny')->only(['index']);
-        $this->middleware(PermissionMiddleware::class . ':enrollment.create')->only(['create', 'store']);
-        $this->middleware(PermissionMiddleware::class . ':enrollment.update')->only(['edit', 'update']);
-        $this->middleware(PermissionMiddleware::class . ':enrollment.delete')->only(['destroy', 'bulkDelete']);
+        // FIXED: Permissions matched to RolePermissionSeeder (student_enrollment.*)
+        $this->middleware(PermissionMiddleware::class . ':student_enrollment.viewAny')->only(['index']);
+        $this->middleware(PermissionMiddleware::class . ':student_enrollment.create')->only(['create', 'store']);
+        $this->middleware(PermissionMiddleware::class . ':student_enrollment.update')->only(['edit', 'update']);
+        $this->middleware(PermissionMiddleware::class . ':student_enrollment.delete')->only(['destroy', 'bulkDelete']);
         
         $this->setPageTitle(__('enrollment.page_title'));
     }
@@ -40,6 +38,10 @@ class StudentEnrollmentController extends BaseController
 
         if ($request->ajax()) {
             $data = StudentEnrollment::with(['student', 'classSection.gradeLevel', 'gradeLevel'])
+                // Exclude University level enrollments from this standard view
+                ->whereHas('gradeLevel', function($q) {
+                    $q->whereNotIn('education_cycle', ['university', 'lmd']);
+                })
                 ->select('student_enrollments.*')
                 ->latest('student_enrollments.created_at');
 
@@ -58,7 +60,7 @@ class StudentEnrollmentController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
-                    if(auth()->user()->can('enrollment.delete')){
+                    if(auth()->user()->can('student_enrollment.delete')){
                         return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">
                                     <input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'">
                                     <label class="form-check-label"></label>
@@ -70,7 +72,6 @@ class StudentEnrollmentController extends BaseController
                     return $row->student->full_name ?? 'N/A';
                 })
                 ->addColumn('student_code', function($row){
-                    // UPDATED: Explicitly use admission_number instead of any ID
                     return $row->student->admission_number ?? '-';
                 })
                 ->addColumn('class', function($row){
@@ -89,10 +90,10 @@ class StudentEnrollmentController extends BaseController
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
-                    if(auth()->user()->can('enrollment.update')){
+                    if(auth()->user()->can('student_enrollment.update')){
                         $btn .= '<a href="'.route('enrollments.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
                     }
-                    if(auth()->user()->can('enrollment.delete')){
+                    if(auth()->user()->can('student_enrollment.delete')){
                         $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
                     }
                     $btn .= '</div>';
@@ -102,14 +103,13 @@ class StudentEnrollmentController extends BaseController
                 ->make(true);
         }
 
-        $classSectionsQuery = ClassSection::with('gradeLevel');
-        if ($institutionId) {
-            $classSectionsQuery->where('institution_id', $institutionId);
-        }
-        $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) {
-             $grade = $item->gradeLevel->name ?? '';
-             return [$item->id => $item->name . ($grade ? ' (' . $grade . ')' : '')];
-        });
+        // Filter Classes: Only Schools
+        $classSections = ClassSection::whereHas('gradeLevel', function($q) {
+                $q->whereNotIn('education_cycle', ['university', 'lmd']);
+            })
+            ->when($institutionId, fn($q) => $q->where('institution_id', $institutionId))
+            ->get()
+            ->mapWithKeys(fn($item) => [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')']);
         
         $sessionName = $currentSession ? $currentSession->name : __('enrollment.no_active_session');
 
@@ -120,43 +120,24 @@ class StudentEnrollmentController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        // 1. Get Classes (Target)
-        $classesQuery = ClassSection::with(['gradeLevel', 'institution']);
-        if ($institutionId) {
-            $classesQuery->where('institution_id', $institutionId);
-        }
-        $classes = $classesQuery->get()->mapWithKeys(function($item) use ($institutionId){
-            $label = $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')';
-            if (!$institutionId && $item->institution) {
-                $label .= ' - ' . $item->institution->code;
-            }
-            return [$item->id => $label];
-        });
+        // 1. Get School Classes Only
+        $classes = ClassSection::with(['gradeLevel', 'institution'])
+            ->whereHas('gradeLevel', fn($q) => $q->whereNotIn('education_cycle', ['university', 'lmd']))
+            ->when($institutionId, fn($q) => $q->where('institution_id', $institutionId))
+            ->get()
+            ->mapWithKeys(fn($item) => [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')']);
 
         // 2. Get Current Session
-        $querySession = AcademicSession::where('is_current', true);
-        if($institutionId) {
-            $querySession->where('institution_id', $institutionId);
-        }
-        $currentSession = $querySession->first();
-        $sessionId = $currentSession ? $currentSession->id : 0;
+        $sessionId = AcademicSession::where('is_current', true)
+            ->when($institutionId, fn($q) => $q->where('institution_id', $institutionId))
+            ->value('id');
 
-        // 3. Get Students NOT enrolled in the current session
-        // Only fetch students belonging to this institution
-        $studentsQuery = Student::whereDoesntHave('enrollments', function($q) use ($sessionId) {
-            $q->where('academic_session_id', $sessionId);
-        });
-        
-        if ($institutionId) {
-            $studentsQuery->where('institution_id', $institutionId);
-        }
-
-        // Return ID => Name mapping
-        $students = $studentsQuery->select('id', 'first_name', 'last_name', 'admission_number')
+        // 3. Get Unenrolled Students (Bulk)
+        $students = Student::whereDoesntHave('enrollments', fn($q) => $q->where('academic_session_id', $sessionId))
+            ->when($institutionId, fn($q) => $q->where('institution_id', $institutionId))
+            ->select('id', 'first_name', 'last_name', 'admission_number')
             ->get()
-            ->mapWithKeys(function($item){
-                return [$item->id => $item->full_name . ' (' . $item->admission_number . ')'];
-            });
+            ->mapWithKeys(fn($item) => [$item->id => $item->full_name . ' (' . $item->admission_number . ')']);
 
         return view('enrollments.create', compact('classes', 'students'));
     }
@@ -167,7 +148,7 @@ class StudentEnrollmentController extends BaseController
         
         $request->validate([
             'class_section_id' => 'required|exists:class_sections,id',
-            'student_ids' => 'required|array', // CHANGED: Expecting array of IDs
+            'student_ids' => 'required|array', 
             'student_ids.*' => 'exists:students,id',
             'status' => 'required|in:active,promoted,detained,left',
             'enrolled_at' => 'required|date',
@@ -185,12 +166,12 @@ class StudentEnrollmentController extends BaseController
             ->first();
 
         if(!$currentSession) {
-            return response()->json(['message' => __('enrollment.no_active_session_error')], 422);
+            return response()->json(['message' => __('enrollment.no_active_session')], 422);
         }
 
         DB::transaction(function () use ($request, $classSection, $targetInstituteId, $currentSession) {
             foreach ($request->student_ids as $studentId) {
-                // Check if already enrolled in this session to prevent duplicates
+                // Check uniqueness for session
                 $exists = StudentEnrollment::where('academic_session_id', $currentSession->id)
                     ->where('student_id', $studentId)
                     ->exists();
@@ -204,7 +185,6 @@ class StudentEnrollmentController extends BaseController
                         'class_section_id' => $classSection->id,
                         'status' => $request->status,
                         'enrolled_at' => $request->enrolled_at,
-                        // Roll number can be null or auto-generated logic if needed
                         'roll_number' => null 
                     ]);
                 }
@@ -214,29 +194,29 @@ class StudentEnrollmentController extends BaseController
         return response()->json(['message' => __('enrollment.messages.success_create'), 'redirect' => route('enrollments.index')]);
     }
 
-    public function edit(StudentEnrollment $enrollment)
+    public function edit($id)
     {
+        $enrollment = StudentEnrollment::findOrFail($id);
         $institutionId = $this->getInstitutionId();
         
         if ($institutionId && $enrollment->institution_id != $institutionId) {
             abort(403);
         }
         
-        $classesQuery = ClassSection::with('gradeLevel');
-        if ($institutionId) {
-            $classesQuery->where('institution_id', $institutionId);
-        }
-        $classes = $classesQuery->get()->mapWithKeys(function($item){
-            return [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')'];
-        });
+        $classes = ClassSection::with('gradeLevel')
+            ->whereHas('gradeLevel', fn($q) => $q->whereNotIn('education_cycle', ['university', 'lmd']))
+            ->when($institutionId, fn($q) => $q->where('institution_id', $institutionId))
+            ->get()
+            ->mapWithKeys(fn($item) => [$item->id => $item->name . ' (' . ($item->gradeLevel->name ?? '') . ')']);
 
         $students = [$enrollment->student_id => $enrollment->student->full_name];
 
         return view('enrollments.edit', compact('enrollment', 'classes', 'students'));
     }
 
-    public function update(Request $request, StudentEnrollment $enrollment)
+    public function update(Request $request, $id)
     {
+        $enrollment = StudentEnrollment::findOrFail($id);
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $enrollment->institution_id != $institutionId) {
             abort(403);
@@ -263,8 +243,9 @@ class StudentEnrollmentController extends BaseController
         return response()->json(['message' => __('enrollment.messages.success_update'), 'redirect' => route('enrollments.index')]);
     }
 
-    public function destroy(StudentEnrollment $enrollment)
+    public function destroy($id)
     {
+        $enrollment = StudentEnrollment::findOrFail($id);
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $enrollment->institution_id != $institutionId) {
             abort(403);
@@ -276,16 +257,10 @@ class StudentEnrollmentController extends BaseController
 
     public function bulkDelete(Request $request)
     {
-        // Use 'delete' or 'deleteAny' depending on your seeder
-        $this->authorize('deleteAny', StudentEnrollment::class); // Fallback to Policy if exists
-        
-        // OR explicit permission check if Policy is missing/incomplete
-        if (!auth()->user()->can('enrollment.delete')) {
-             abort(403);
-        }
+        // Fix permission key
+        if (!auth()->user()->can('student_enrollment.delete')) abort(403);
 
         $ids = $request->ids;
-        
         if (!empty($ids)) {
             $institutionId = $this->getInstitutionId();
             $query = StudentEnrollment::whereIn('id', $ids);

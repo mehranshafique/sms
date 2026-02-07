@@ -14,7 +14,6 @@
                     <div class="basic-form">
                         <div class="row">
                             
-                            {{-- Institution Field --}}
                             @php
                                 $hasContext = isset($institutionId) && $institutionId;
                                 $isSuperAdmin = auth()->user()->hasRole('Super Admin');
@@ -36,7 +35,7 @@
                                 </div>
                             @endif
 
-                            {{-- 1. Grade Level --}}
+                            {{-- Grade Level --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('grade_level.grade_name') }} <span class="text-danger">*</span></label>
                                 <select name="grade_level_id" id="gradeSelect" class="form-control default-select" data-live-search="true" required>
@@ -52,7 +51,7 @@
                                 </select>
                             </div>
 
-                            {{-- 2. Class Section --}}
+                            {{-- Class Section --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.select_class') }} <span class="text-danger">*</span></label>
                                 <select name="class_section_id" id="classSelect" class="form-check-input default-select" required disabled>
@@ -71,7 +70,7 @@
                                 </div>
                             </div>
 
-                            {{-- 3. Subject --}}
+                            {{-- Subject --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.select_subject') }} <span class="text-danger">*</span></label>
                                 <select name="subject_id" id="subjectSelect" class="form-control default-select" data-live-search="true" required disabled>
@@ -79,7 +78,7 @@
                                 </select>
                             </div>
 
-                            {{-- 4. Teacher (READ ONLY) --}}
+                            {{-- Teacher (Read Only) --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('timetable.select_teacher') }}</label>
                                 <input type="text" id="teacherNameDisplay" class="form-control bg-light" readonly placeholder="{{ __('timetable.no_teacher_assigned') }}">
@@ -122,7 +121,7 @@
         <div class="col-xl-4 col-lg-4">
             <div class="card h-auto">
                 <div class="card-header border-0 pb-0">
-                    <h4 class="card-title text-primary"><i class="fa fa-calendar-o me-2"></i> Reserved Slots</h4>
+                    <h4 class="card-title text-primary"><i class="fa fa-calendar-o me-2"></i> Schedule</h4>
                 </div>
                 <div class="card-body">
                     <div id="scheduleLoader" class="text-center d-none">
@@ -130,8 +129,17 @@
                             <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
-                    <div id="scheduleVisuals" class="timeline-visuals">
+                    
+                    {{-- Busy Slots Container --}}
+                    <h6 class="text-muted text-uppercase fs-12 font-w600 mt-2">Reserved Slots</h6>
+                    <div id="scheduleVisuals" class="timeline-visuals mb-4">
                         <p class="text-muted small text-center">Select Class, Teacher, Room & Day to see reservations.</p>
+                    </div>
+                    
+                    {{-- Available Slots Container (NEW) --}}
+                    <h6 class="text-success text-uppercase fs-12 font-w600 mt-3"><i class="fa fa-check-circle me-1"></i> Available Slots</h6>
+                    <div id="availableSlots" class="d-flex flex-wrap gap-2">
+                        <p class="text-muted small">Select criteria to see suggestions.</p>
                     </div>
                 </div>
             </div>
@@ -156,22 +164,40 @@
         left: -6.5px;
         top: 0;
     }
-    .timeline-item.conflict-Class { border-color: #ffb822; } /* Orange for Class Busy */
+    .timeline-item.conflict-Class { border-color: #ffb822; }
     .timeline-item.conflict-Class::before { background: #ffb822; }
     
-    .timeline-item.conflict-Teacher { border-color: #f64e60; } /* Red for Teacher Busy */
+    .timeline-item.conflict-Teacher { border-color: #f64e60; }
     .timeline-item.conflict-Teacher::before { background: #f64e60; }
     
-    .timeline-item.conflict-Room { border-color: #8950fc; } /* Purple for Room Busy */
+    .timeline-item.conflict-Room { border-color: #8950fc; }
     .timeline-item.conflict-Room::before { background: #8950fc; }
 
     .time-badge { font-weight: bold; font-size: 0.9em; display: block; margin-bottom: 2px; }
     .slot-info { font-size: 0.85em; color: #666; }
+    
+    .btn-suggestion {
+        font-size: 11px;
+        padding: 5px 10px;
+        border-radius: 20px;
+        background-color: #e6fffa;
+        color: #009975;
+        border: 1px solid #009975;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-suggestion:hover {
+        background-color: #009975;
+        color: #fff;
+    }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
+        const schoolStartStr = "{{ $schoolStart ?? '08:00' }}";
+        const schoolEndStr = "{{ $schoolEnd ?? '15:00' }}";
+
         function refreshSelect(element) {
             if (typeof $ !== 'undefined' && $(element).is('select')) {
                 if ($.fn.selectpicker) {
@@ -189,16 +215,29 @@
         const roomInput = document.getElementById('roomInput');
         const saveBtn = document.getElementById('saveBtn');
         const dayInputs = document.querySelectorAll('input[name="day"]');
+        const startInput = document.getElementById('startTimeInput');
+        const endInput = document.getElementById('endTimeInput');
         
         const oldClassId = "{{ old('class_section_id', isset($timetable) ? $timetable->class_section_id : '') }}";
         const oldSubjectId = "{{ old('subject_id', isset($timetable) ? $timetable->subject_id : '') }}";
         const editTeacherName = "{{ isset($timetable) && $timetable->teacher ? $timetable->teacher->user->name : '' }}";
         const editTeacherId = "{{ isset($timetable) ? $timetable->teacher_id : '' }}";
 
-        // Pre-fill Edit Mode Data
         if(editTeacherId) {
             teacherHidden.value = editTeacherId;
             teacherDisplay.value = editTeacherName;
+        }
+
+        // --- TIME HELPER FUNCTIONS ---
+        function timeToMinutes(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        function minutesToTime(minutes) {
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
         }
 
         // --- CHECK AVAILABILITY LOGIC ---
@@ -208,14 +247,17 @@
             const staffId = teacherHidden.value;
             const room = roomInput.value;
 
-            if (!day || (!classId && !staffId && !room)) return;
-
             const loader = document.getElementById('scheduleLoader');
             const container = document.getElementById('scheduleVisuals');
+            const suggestions = document.getElementById('availableSlots');
             
-            loader.classList.remove('d-none');
             container.innerHTML = '';
+            suggestions.innerHTML = '';
 
+            if (!day || (!classId && !staffId && !room)) return;
+
+            loader.classList.remove('d-none');
+            
             const params = new URLSearchParams({
                 day: day,
                 class_section_id: classId,
@@ -227,33 +269,36 @@
                 .then(res => res.json())
                 .then(slots => {
                     loader.classList.add('d-none');
+                    let busyIntervals = [];
+
                     if(slots.length === 0) {
-                        container.innerHTML = '<div class="alert alert-success light"><i class="fa fa-check-circle me-2"></i> No reservations found for selected criteria. Slot is likely free.</div>';
-                        return;
+                        container.innerHTML = '<div class="text-muted small text-center mb-3">No reservations found.</div>';
+                    } else {
+                        let html = '';
+                        slots.forEach(slot => {
+                            // Store interval for calculation
+                            busyIntervals.push([timeToMinutes(slot.start_time), timeToMinutes(slot.end_time)]);
+
+                            let conflictClass = slot.conflicts.length > 0 ? `conflict-${slot.conflicts[0]}` : '';
+                            let conflictBadges = slot.conflicts.map(c => {
+                                let color = c === 'Teacher' ? 'danger' : (c === 'Class' ? 'warning text-dark' : 'info');
+                                return `<span class="badge badge-xs badge-${color} me-1">${c} Busy</span>`;
+                            }).join('');
+
+                            html += `
+                            <div class="timeline-item ${conflictClass}">
+                                <span class="time-badge">${slot.start_time} - ${slot.end_time}</span>
+                                <div class="slot-info">
+                                    <strong>${slot.subject}</strong>
+                                    <div class="mt-1">${conflictBadges}</div>
+                                </div>
+                            </div>`;
+                        });
+                        container.innerHTML = html;
                     }
 
-                    let html = '';
-                    slots.forEach(slot => {
-                        // Determine conflict types
-                        let conflictClass = slot.conflicts.length > 0 ? `conflict-${slot.conflicts[0]}` : '';
-                        let conflictBadges = slot.conflicts.map(c => {
-                            let color = c === 'Teacher' ? 'danger' : (c === 'Class' ? 'warning text-dark' : 'info');
-                            return `<span class="badge badge-xs badge-${color} me-1">${c} Busy</span>`;
-                        }).join('');
-
-                        html += `
-                        <div class="timeline-item ${conflictClass}">
-                            <span class="time-badge">${slot.start_time} - ${slot.end_time}</span>
-                            <div class="slot-info">
-                                <strong>${slot.subject}</strong><br>
-                                <span class="text-muted">Class:</span> ${slot.class}<br>
-                                <span class="text-muted">Teacher:</span> ${slot.teacher}<br>
-                                <span class="text-muted">Room:</span> ${slot.room}
-                            </div>
-                            <div class="mt-1">${conflictBadges}</div>
-                        </div>`;
-                    });
-                    container.innerHTML = html;
+                    // --- CALCULATE GREEN SLOTS ---
+                    calculateFreeSlots(busyIntervals);
                 })
                 .catch(err => {
                     loader.classList.add('d-none');
@@ -261,14 +306,74 @@
                 });
         }
 
-        // Attach Availability Listeners
+        function calculateFreeSlots(busyIntervals) {
+            const suggestions = document.getElementById('availableSlots');
+            const schoolStart = timeToMinutes(schoolStartStr);
+            const schoolEnd = timeToMinutes(schoolEndStr);
+            
+            // Sort busy intervals by start time
+            busyIntervals.sort((a, b) => a[0] - b[0]);
+
+            let mergedBusy = [];
+            if (busyIntervals.length > 0) {
+                let current = busyIntervals[0];
+                for (let i = 1; i < busyIntervals.length; i++) {
+                    if (busyIntervals[i][0] < current[1]) { // Overlap
+                        current[1] = Math.max(current[1], busyIntervals[i][1]);
+                    } else {
+                        mergedBusy.push(current);
+                        current = busyIntervals[i];
+                    }
+                }
+                mergedBusy.push(current);
+            }
+
+            // Find Gaps
+            let freeSlots = [];
+            let currentTime = schoolStart;
+
+            mergedBusy.forEach(interval => {
+                if (interval[0] > currentTime) {
+                    freeSlots.push([currentTime, interval[0]]);
+                }
+                currentTime = Math.max(currentTime, interval[1]);
+            });
+
+            if (currentTime < schoolEnd) {
+                freeSlots.push([currentTime, schoolEnd]);
+            }
+
+            // Render Buttons
+            if(freeSlots.length > 0) {
+                suggestions.innerHTML = '';
+                freeSlots.forEach(slot => {
+                    // Only show slots > 30 mins
+                    if ((slot[1] - slot[0]) >= 30) {
+                        let startStr = minutesToTime(slot[0]);
+                        let endStr = minutesToTime(slot[0] + 60 > slot[1] ? slot[1] : slot[0] + 60); // Suggest 1 hour blocks
+                        let label = `${minutesToTime(slot[0])} - ${minutesToTime(slot[1])}`;
+                        
+                        let btn = document.createElement('div');
+                        btn.className = 'btn-suggestion';
+                        btn.innerHTML = `<i class="fa fa-plus-circle me-1"></i> ${label}`;
+                        btn.onclick = () => {
+                            startInput.value = startStr;
+                            endInput.value = endStr;
+                        };
+                        suggestions.appendChild(btn);
+                    }
+                });
+            } else {
+                suggestions.innerHTML = '<span class="text-danger small">No free slots available within school hours.</span>';
+            }
+        }
+
+        // Attach Listeners
         dayInputs.forEach(input => input.addEventListener('change', checkAvailability));
         classSelect.addEventListener('change', checkAvailability);
-        roomInput.addEventListener('input', checkAvailability); // Debounce ideally
+        roomInput.addEventListener('input', checkAvailability);
         
-        // --- EXISTING DROPDOWN LOGIC ---
-
-        // 1. Grade -> Class
+        // --- DROPDOWN LOGIC (UNCHANGED) ---
         if (gradeSelect) {
             gradeSelect.addEventListener('change', function() {
                 classSelect.innerHTML = '<option value="">{{ __('timetable.select_class_first') }}</option>';
@@ -299,7 +404,6 @@
             });
         }
 
-        // 2. Class -> Subject
         if (classSelect) {
             classSelect.addEventListener('change', function() {
                 subjectSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
@@ -328,7 +432,6 @@
             });
         }
 
-        // 3. Subject -> Display Teacher & Trigger Check
         if (subjectSelect) {
             subjectSelect.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
@@ -341,13 +444,14 @@
                     teacherDisplay.classList.remove('is-invalid');
                     teacherWarning.classList.add('d-none');
                     saveBtn.disabled = false;
-                    checkAvailability(); // Check slots for this teacher
+                    checkAvailability(); 
                 } else {
                     teacherDisplay.value = '';
                     teacherHidden.value = '';
                     if(this.value) {
                         teacherDisplay.classList.add('is-invalid');
                         teacherWarning.classList.remove('d-none');
+                        saveBtn.disabled = true; 
                     } else {
                         teacherDisplay.classList.remove('is-invalid');
                         teacherWarning.classList.add('d-none');
@@ -357,12 +461,10 @@
             });
         }
 
-        // Trigger initial load if editing
         if (gradeSelect.value) {
             gradeSelect.dispatchEvent(new Event('change'));
         }
         
-        // Initial Availability Check (if editing)
         setTimeout(checkAvailability, 1000); 
     });
 </script>

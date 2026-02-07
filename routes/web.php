@@ -29,7 +29,8 @@ use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\ClassSubjectController; // Added
 use App\Http\Controllers\DepartmentController;   // Added
-
+use App\Http\Controllers\AcademicUnitController;
+use App\Http\Controllers\ProgramController;
 // --- Controllers: People ---
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentEnrollmentController; 
@@ -59,8 +60,9 @@ use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
-use App\Http\Controllers\Finance\FinancialReportController;
+use App\Http\Controllers\Finance\FinancialReportController; 
 use App\Http\Controllers\Finance\StudentFinanceController; 
+use App\Http\Controllers\Finance\StudentStatementController; 
 use App\Http\Controllers\SalaryStructureController; 
 use App\Http\Controllers\Finance\BudgetController; 
 use App\Http\Controllers\Finance\StudentBalanceController; // Added
@@ -153,6 +155,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('academic-sessions', AcademicSessionController::class);
     });
     
+
+    // --- ACADEMICS SECTION ---
+    Route::prefix('academics')->group(function () {
+        // ... existing academics routes ...
+         // NEW: LMD Programs
+        Route::get('programs', [ProgramController::class, 'index'])->name('programs.index');
+        Route::post('programs/store', [ProgramController::class, 'store'])->name('programs.store');
+        Route::delete('programs/{id}', [ProgramController::class, 'destroy'])->name('programs.destroy');
+
+        // NEW: LMD Academic Units (UE)
+        Route::get('units', [AcademicUnitController::class, 'index'])->name('units.index');
+        Route::post('units/store', [AcademicUnitController::class, 'store'])->name('units.store');
+        Route::post('units/assign-subjects', [AcademicUnitController::class, 'assignSubjects'])->name('units.assign_subjects');
+        Route::delete('units/{id}', [AcademicUnitController::class, 'destroy'])->name('units.destroy');
+    });
+
     // Departments (University)
     Route::middleware([CheckModuleAccess::class . ':departments'])->group(function () {
         Route::resource('departments', DepartmentController::class);
@@ -173,6 +191,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Subjects
     Route::middleware([CheckModuleAccess::class . ':subjects'])->group(function () {
         Route::post('subjects/bulk-delete', [SubjectController::class, 'bulkDelete'])->name('subjects.bulkDelete');
+        Route::get('subjects/get-units', [SubjectController::class, 'getUnits'])->name('subjects.get_units');
         Route::resource('subjects', SubjectController::class);
     });
 
@@ -220,13 +239,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     
     // Enrollments
-    Route::middleware([CheckModuleAccess::class . ':enrollments'])->group(function () {
+    Route::middleware([CheckModuleAccess::class . ':student_enrollments'])->group(function () {
         Route::post('enrollments/bulk-delete', [StudentEnrollmentController::class, 'bulkDelete'])->name('enrollments.bulkDelete');
         Route::resource('enrollments', StudentEnrollmentController::class);
     });
 
     // NEW: University Enrollments
-    Route::middleware([CheckModuleAccess::class . ':enrollments'])->prefix('university')->name('university.')->group(function () {
+    Route::middleware([CheckModuleAccess::class . ':university_enrollments'])->prefix('university')->name('university.')->group(function () {
         Route::resource('enrollments', UniversityEnrollmentController::class);
     });
 
@@ -337,7 +356,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('balances', [StudentBalanceController::class, 'index'])->name('finance.balances.index');
         Route::get('balances/class/{id}', [StudentBalanceController::class, 'getClassDetails'])->name('finance.balances.class_details'); 
 
-
+         // NEW STATEMENT ROUTES
+        Route::get('student/{id}/statement', [StudentStatementController::class, 'show'])->name('statement.show');
+        Route::get('student/{id}/statement/pdf', [StudentStatementController::class, 'downloadPdf'])->name('statement.pdf');
         // BUDGET MODULE
         // Categories
         Route::get('budgets/categories', [BudgetController::class, 'categories'])->name('budgets.categories');
@@ -469,7 +490,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Institution Configuration
     Route::prefix('configuration')
-        ->middleware([RoleMiddleware::class . ':Super Admin|Head Officer'])
+        ->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin']) // Restrict to specific roles
         ->group(function () {
             Route::get('/', [ConfigurationController::class, 'index'])->name('configuration.index');
             Route::post('/smtp', [ConfigurationController::class, 'updateSmtp'])->name('configuration.smtp.update');

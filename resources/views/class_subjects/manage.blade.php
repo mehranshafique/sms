@@ -50,6 +50,7 @@
                                 <tr>
                                     <th width="50" class="text-center">{{ __('class_subject.active') }}</th>
                                     <th>{{ __('class_subject.subject_name') }}</th>
+                                    <th>{{ __('lmd.ue_title') }}</th> {{-- NEW COLUMN --}}
                                     <th width="150">{{ __('class_subject.weekly_periods') }}</th>
                                     <th width="150">{{ __('class_subject.exam_weight') }}</th>
                                     <th width="250">{{ __('class_subject.assigned_teacher') }}</th>
@@ -60,6 +61,8 @@
                                     @php
                                         $alloc = $allocations->get($subject->id);
                                         $isEnabled = $alloc ? true : false;
+                                        // Check if linked to UE
+                                        $ueName = $subject->academicUnit ? ($subject->academicUnit->code . ' - ' . $subject->academicUnit->name) : '-';
                                     @endphp
                                     <tr>
                                         <td class="text-center">
@@ -71,6 +74,12 @@
                                             <strong>{{ $subject->name }}</strong>
                                             <br><small class="text-muted">{{ $subject->code }}</small>
                                         </td>
+                                        <td class="text-muted small">
+                                            {{ $ueName }}
+                                            @if($subject->coefficient > 0)
+                                                <br><span class="badge badge-xs badge-light">Coeff: {{ $subject->coefficient }}</span>
+                                            @endif
+                                        </td>
                                         <td>
                                             <input type="number" name="assignments[{{ $subject->id }}][weekly_periods]" class="form-control form-control-sm" value="{{ $alloc->weekly_periods ?? 0 }}" min="0">
                                         </td>
@@ -78,7 +87,7 @@
                                             <input type="number" name="assignments[{{ $subject->id }}][exam_weight]" class="form-control form-control-sm" value="{{ $alloc->exam_weight ?? 100 }}" min="0" max="100">
                                         </td>
                                         <td>
-                                            <select name="assignments[{{ $subject->id }}][teacher_id]" class="form-control form-control-sm default-select">
+                                            <select name="assignments[{{ $subject->id }}][teacher_id]" class="form-control form-control-sm default-select" data-live-search="true">
                                                 <option value="">{{ __('class_subject.select_teacher') }}</option>
                                                 @foreach($teachers as $id => $name)
                                                     <option value="{{ $id }}" {{ ($alloc && $alloc->teacher_id == $id) ? 'selected' : '' }}>{{ $name }}</option>
@@ -88,7 +97,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center">{{ __('class_subject.no_subjects_defined') }}</td>
+                                        <td colspan="6" class="text-center">{{ __('class_subject.no_subjects_defined') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>

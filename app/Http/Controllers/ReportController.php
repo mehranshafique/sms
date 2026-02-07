@@ -18,13 +18,16 @@ use App\Models\ExamSchedule; // Added for Schedules
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
+use App\Services\LmdCalculationService; // NEW Injection
 
 class ReportController extends BaseController
 {
-    public function __construct()
+    protected $lmdService;
+    public function __construct(LmdCalculationService $lmdService)
     {
         $this->middleware('auth');
         $this->setPageTitle(__('reports.page_title'));
+        $this->lmdService = $lmdService;
     }
 
     /**
@@ -216,67 +219,96 @@ class ReportController extends BaseController
             return $pdf->stream('Class_Bulletin_'.$classSection->name.'.pdf');
         }
     }
-
+    /**
+     * Generate Academic Transcript (Cumulative History)
+     * Handles both Standard and LMD formats based on student's grade cycle.
+     */
     public function transcript(Request $request)
     {
         $request->validate([
             'student_id' => 'required|exists:students,id',
         ]);
 
-        $student = Student::with('institution')->findOrFail($request->student_id);
+        $student = Student::with(['institution', 'gradeLevel', 'enrollments.academicSession'])->findOrFail($request->student_id);
         $institutionId = $this->getInstitutionId();
         
         if ($institutionId && $student->institution_id != $institutionId) {
             abort(403, 'Unauthorized access.');
         }
 
-        // 1. Fetch raw records first (ungrouped)
-        $records = ExamRecord::with(['exam.academicSession', 'subject'])
-            ->where('student_id', $student->id)
-            ->get();
+        // Determine Cycle (LMD vs Standard)
+        // Check if education_cycle is an Enum object or string
+        $cycle = $student->gradeLevel->education_cycle ?? 'primary';
+        $cycleValue = is_object($cycle) ? $cycle->value : $cycle;
+        
+        $isLmd = in_array($cycleValue, ['university', 'lmd', 'mixed']);
 
-        if ($records->isEmpty()) {
-            if ($request->check_only) {
-                return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+        if ($isLmd) {
+            // --- LMD LOGIC ---
+            $history = [];
+            
+            // Loop through all enrollments to build semester history
+            foreach($student->enrollments as $enrol) {
+                $sessionId = $enrol->academic_session_id;
+                $sessionName = $enrol->academicSession->name;
+
+                // Calculate for Sem 1 & 2
+                // Ideally we should detect which semesters apply to this grade, but 1 & 2 is standard
+                $sem1 = $this->lmdService->calculateSemesterResults($student, $sessionId, 1);
+                if ($sem1) $history[$sessionName]['Semester 1'] = $sem1;
+
+                $sem2 = $this->lmdService->calculateSemesterResults($student, $sessionId, 2);
+                if ($sem2) $history[$sessionName]['Semester 2'] = $sem2;
             }
-            return back()->with('error', __('reports.no_records_found'));
-        }
 
-        // 2. Fetch Exam Configurations (Schedules) to get the CORRECT Max Marks
-        // We look for schedules matching the Exam + Subject + Class found in the records
-        $schedules = ExamSchedule::whereIn('exam_id', $records->pluck('exam_id'))
-            ->whereIn('subject_id', $records->pluck('subject_id'))
-            ->whereIn('class_section_id', $records->pluck('class_section_id'))
-            ->select('exam_id', 'subject_id', 'class_section_id', 'max_marks')
-            ->get();
+            if ($request->check_only) {
+                if (empty($history)) return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+                return response()->json(['status' => 'success']);
+            }
 
-        // Map for fast lookup: "examID_subjectID_classID" => max_marks
-        $scheduleMap = [];
-        foreach($schedules as $sch) {
-            $key = $sch->exam_id . '_' . $sch->subject_id . '_' . $sch->class_section_id;
-            $scheduleMap[$key] = $sch->max_marks;
-        }
+            // Load LMD specific view
+            // NOTE: Using 'reports.transcript_lmd' which corresponds to the file updated above
+            $pdf = Pdf::loadView('reports.transcript_lmd', compact('student', 'history'));
+            return $pdf->stream('LMD_Transcript_' . $student->admission_number . '.pdf');
 
-        // 3. Inject correct Max Marks into each record
-        foreach($records as $record) {
-            $key = $record->exam_id . '_' . $record->subject_id . '_' . $record->class_section_id;
+        } else {
+            // --- STANDARD LOGIC (Primary/Secondary) ---
+            // (Same logic as previously provided for standard schools)
+            $records = ExamRecord::with(['exam.academicSession', 'subject'])
+                ->where('student_id', $student->id)
+                ->get();
+
+            if ($records->isEmpty()) {
+                if ($request->check_only) return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+                return back()->with('error', __('reports.no_records_found'));
+            }
+
+            // Calculate Max Marks Logic... (omitted for brevity, same as existing)
+            $schedules = ExamSchedule::whereIn('exam_id', $records->pluck('exam_id'))
+                ->whereIn('subject_id', $records->pluck('subject_id'))
+                ->whereIn('class_section_id', $records->pluck('class_section_id'))
+                ->get();
             
-            // Logic: Schedule Override > Subject Default > Fallback 100
-            $configuredMax = $scheduleMap[$key] ?? null;
-            $defaultMax = $record->subject->total_marks ?? 100;
-            
-            $record->calculated_max_marks = ($configuredMax > 0) ? $configuredMax : $defaultMax;
+            $scheduleMap = [];
+            foreach($schedules as $sch) {
+                $key = $sch->exam_id . '_' . $sch->subject_id . '_' . $sch->class_section_id;
+                $scheduleMap[$key] = $sch->max_marks;
+            }
+
+            foreach($records as $record) {
+                $key = $record->exam_id . '_' . $record->subject_id . '_' . $record->class_section_id;
+                $configuredMax = $scheduleMap[$key] ?? null;
+                $defaultMax = $record->subject->total_marks ?? 100;
+                $record->calculated_max_marks = ($configuredMax > 0) ? $configuredMax : $defaultMax;
+            }
+
+            $history = $records->groupBy('exam.academic_session_id');
+
+            if ($request->check_only) return response()->json(['status' => 'success']);
+
+            $pdf = Pdf::loadView('reports.transcript', compact('student', 'history'));
+            return $pdf->stream('Transcript_' . $student->admission_number . '.pdf');
         }
-
-        // 4. Group for View
-        $history = $records->groupBy('exam.academic_session_id');
-
-        if ($request->check_only) {
-            return response()->json(['status' => 'success']);
-        }
-
-        $pdf = Pdf::loadView('reports.transcript', compact('student', 'history'));
-        return $pdf->stream('Transcript_' . $student->admission_number . '.pdf');
     }
 
     // --- HELPERS ---

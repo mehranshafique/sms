@@ -32,7 +32,7 @@ class ResultCardController extends BaseController
             return $this->studentIndex($user);
         }
 
-        if (!$user->can('view result_card') && !$user->hasRole(['Super Admin', 'Head Officer', 'Teacher'])) {
+        if (!$user->can('result_card.view') && !$user->hasRole(['Super Admin', 'Head Officer', 'Teacher'])) {
             abort(403, __('results.unauthorized_access'));
         }
 

@@ -14,7 +14,7 @@
                     <div class="basic-form">
                         <div class="row">
                             
-                            {{-- LOGIC: Auto-Assign vs Select Institute --}}
+                            {{-- Institution Logic --}}
                             @php
                                 $hasContext = isset($institutionId) && $institutionId;
                                 $isSuperAdmin = auth()->user()->hasRole('Super Admin');
@@ -36,7 +36,7 @@
                                 </div>
                             @endif
 
-                            {{-- Grade Level Selection (Enhanced with Data Attributes for JS) --}}
+                            {{-- Grade Level --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('subject.select_grade') }} <span class="text-danger">*</span></label>
                                 <select name="grade_level_id" id="gradeSelect" class="form-control default-select" required>
@@ -53,6 +53,7 @@
                                 </select>
                             </div>
                             
+                            {{-- Basic Info --}}
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('subject.subject_name') }} <span class="text-danger">*</span></label>
                                 <input type="text" name="name" class="form-control" value="{{ old('name', $subject->name ?? '') }}" placeholder="{{ __('subject.enter_name') }}" required>
@@ -72,10 +73,42 @@
                                 </select>
                             </div>
 
-                            {{-- UNIVERSITY FIELDS CONTAINER --}}
+                            {{-- UNIVERSITY SPECIFIC FIELDS --}}
                             <div id="universityFields" style="display: none;" class="col-12 p-0">
                                 <div class="row m-0">
-                                    {{-- Department --}}
+                                    <div class="col-12 mb-3">
+                                        <hr class="border-secondary opacity-25">
+                                        <h6 class="text-primary"><i class="fa fa-university me-1"></i> University Configuration</h6>
+                                    </div>
+
+                                    {{-- Program Filter (UI Only) --}}
+                                    <div class="mb-3 col-md-6">
+                                        <label class="form-label">{{ __('lmd.program_name') }} <small class="text-muted">(Filter for UEs)</small></label>
+                                        <select id="programFilter" class="form-control default-select" data-live-search="true">
+                                            <option value="">-- All Programs --</option>
+                                            @if(isset($programs))
+                                                @foreach($programs as $id => $name)
+                                                    <option value="{{ $id }}" {{ (isset($selectedProgramId) && $selectedProgramId == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
+
+                                    {{-- Academic Unit (UE) --}}
+                                    <div class="mb-3 col-md-6">
+                                        <label class="form-label">{{ __('lmd.ue_title') }} <span class="text-danger">*</span></label>
+                                        <select name="academic_unit_id" id="unitSelect" class="form-control default-select" data-live-search="true">
+                                            <option value="">-- Select Academic Unit (UE) --</option>
+                                            @if(isset($units))
+                                                @foreach($units as $id => $name)
+                                                    <option value="{{ $id }}" {{ (old('academic_unit_id', $subject->academic_unit_id ?? '') == $id) ? 'selected' : '' }}>
+                                                        {{ $name }}
+                                                    </option>
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                    </div>
+
                                     <div class="mb-3 col-md-6">
                                         <label class="form-label">{{ __('subject.department') }}</label>
                                         <select name="department_id" class="form-control default-select">
@@ -90,35 +123,25 @@
                                         </select>
                                     </div>
 
-                                    {{-- Prerequisite --}}
-                                    <div class="mb-3 col-md-6">
-                                        <label class="form-label">{{ __('subject.prerequisite') }}</label>
-                                        <select name="prerequisite_id" class="form-control default-select" data-live-search="true">
-                                            <option value="">-- {{ __('subject.select_prerequisite') }} --</option>
-                                            @if(isset($prerequisites))
-                                                @foreach($prerequisites as $id => $name)
-                                                    <option value="{{ $id }}" {{ (old('prerequisite_id', $subject->prerequisite_id ?? '') == $id) ? 'selected' : '' }}>
-                                                        {{ $name }}
-                                                    </option>
-                                                @endforeach
-                                            @endif
-                                        </select>
+                                    <div class="mb-3 col-md-3">
+                                        <label class="form-label">{{ __('subject.credit_hours') }}</label>
+                                        <input type="number" name="credit_hours" class="form-control" value="{{ old('credit_hours', $subject->credit_hours ?? 0) }}" placeholder="e.g. 3.0" step="0.5">
+                                    </div>
+                                    
+                                    <div class="mb-3 col-md-3">
+                                        <label class="form-label">{{ __('lmd.coefficient') }}</label>
+                                        <input type="number" name="coefficient" class="form-control" value="{{ old('coefficient', $subject->coefficient ?? 1) }}" placeholder="e.g. 1" step="0.1">
                                     </div>
 
-                                    {{-- Semester --}}
-                                    <div class="mb-3 col-md-4">
+                                    <div class="mb-3 col-md-6">
                                         <label class="form-label">{{ __('subject.semester') }}</label>
                                         <input type="text" name="semester" class="form-control" value="{{ old('semester', $subject->semester ?? '') }}" placeholder="{{ __('subject.enter_semester') }}">
                                     </div>
-
-                                    {{-- Credit Hours (Moved inside University fields) --}}
-                                    <div class="mb-3 col-md-4">
-                                        <label class="form-label">{{ __('subject.credit_hours') }}</label>
-                                        <input type="number" name="credit_hours" class="form-control" value="{{ old('credit_hours', $subject->credit_hours ?? 0) }}" placeholder="{{ __('subject.enter_credits') }}" step="0.5">
-                                    </div>
+                                    
+                                    <div class="col-12"><hr class="border-secondary opacity-25"></div>
                                 </div>
                             </div>
-                            {{-- END UNIVERSITY FIELDS --}}
+                            {{-- END UNIVERSITY --}}
 
                             <div class="mb-3 col-md-4">
                                 <label class="form-label">{{ __('subject.total_marks') }} <span class="text-danger">*</span></label>
@@ -149,18 +172,17 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const gradeSelect = document.getElementById('gradeSelect');
+        const programFilter = document.getElementById('programFilter');
+        const unitSelect = document.getElementById('unitSelect');
         const uniFields = document.getElementById('universityFields');
 
+        // Toggle University Section based on Grade Cycle
         function toggleUniFields() {
             if (!gradeSelect) return;
-            
-            // Get selected option
             const selectedOption = gradeSelect.options[gradeSelect.selectedIndex];
             const cycle = selectedOption.getAttribute('data-cycle');
             
-            // Show if University, hide otherwise
-            // Note: 'university' here must match the enum value in GradeLevel migration
-            if (cycle === 'university' || cycle === 'cycle_lmd') { 
+            if (cycle === 'university' || cycle === 'lmd') { 
                 uniFields.style.display = 'block';
             } else {
                 uniFields.style.display = 'none';
@@ -169,7 +191,38 @@
 
         if (gradeSelect) {
             gradeSelect.addEventListener('change', toggleUniFields);
-            toggleUniFields();
+            toggleUniFields(); // Init on load
+        }
+
+        // AJAX: Filter Academic Units by Program
+        if (programFilter) {
+            programFilter.addEventListener('change', function() {
+                const programId = this.value;
+                const gradeId = gradeSelect.value;
+                
+                // Reset Unit Dropdown
+                unitSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                unitSelect.disabled = true;
+                if($.fn.selectpicker) $(unitSelect).selectpicker('refresh');
+
+                // Build URL
+                let url = "{{ route('subjects.get_units') }}"; // Route to be created in web.php
+                let params = new URLSearchParams();
+                if(programId) params.append('program_id', programId);
+                // Optional: Filter by Grade too if desired, though Programs usually span grades
+                // params.append('grade_level_id', gradeId); 
+
+                fetch(`${url}?${params.toString()}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        unitSelect.innerHTML = '<option value="">-- Select Academic Unit (UE) --</option>';
+                        Object.entries(data).forEach(([id, name]) => {
+                            unitSelect.add(new Option(name, id));
+                        });
+                        unitSelect.disabled = false;
+                        if($.fn.selectpicker) $(unitSelect).selectpicker('refresh');
+                    });
+            });
         }
     });
 </script>

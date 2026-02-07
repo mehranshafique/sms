@@ -12,6 +12,7 @@ class GradeLevel extends Model
 
     protected $fillable = [
         'institution_id',
+        'program_id', // Ensure this is fillable
         'name',
         'code',
         'order_index',
@@ -40,7 +41,20 @@ class GradeLevel extends Model
     {
         return $this->hasMany(Subject::class);
     }
-
+    // --- FIX: Added Program Relationship ---
+    public function program()
+    {
+        return $this->belongsTo(Program::class);
+    }
+    public function classSections()
+    {
+        return $this->hasMany(ClassSection::class);
+    }
+    
+    public function academicUnits()
+    {
+        return $this->hasMany(AcademicUnit::class);
+    }
     /*
     |--------------------------------------------------------------------------
     | SCOPES
