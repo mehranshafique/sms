@@ -21,6 +21,7 @@ use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SmsTemplateController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\PickupWebController;
 
 // --- Controllers: Academics ---
 use App\Http\Controllers\GradeLevelController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentEnrollmentController; 
 use App\Http\Controllers\UniversityEnrollmentController; // Added
+use App\Http\Controllers\ParentController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
@@ -54,7 +56,7 @@ use App\Http\Controllers\StudentNoticeController;
 use App\Http\Controllers\ElectionController;
 use App\Http\Controllers\VotingController;
 use App\Http\Controllers\StudentVotingController;
-
+use App\Http\Controllers\ChatbotSettingController;
 // --- Controllers: Finance ---
 use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
@@ -225,8 +227,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 3. PEOPLE & HR MODULE
     // =========================================================================
     // Parent / Guardian Management
-    Route::get('parents/check', [App\Http\Controllers\ParentController::class, 'check'])->name('parents.check');
-    
+
+    Route::get('parents/check', [ParentController::class, 'check'])->name('parents.check');
+    // Parent Management
+    Route::resource('parents', ParentController::class);
     // Students
     Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
     Route::resource('students', StudentController::class);
@@ -264,6 +268,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('attendance/print-report', [StudentAttendanceController::class, 'printReport'])->name('attendance.print_report');
     });
 
+    // Pickup Scanner Routes
+    // Accessible by Admin, Head Officer, Teacher, Guard
+    Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () { 
+        // PICKUP SYSTEM ROUTES
+        // Guard View
+        Route::get('/pickup/scanner', [PickupWebController::class, 'guardScanner'])->name('pickups.scanner');
+        Route::post('/pickup/process', [PickupWebController::class, 'processScan'])->name('pickups.process');
+        
+        // Teacher View
+        Route::get('/pickup/manage', [PickupWebController::class, 'teacherView'])->name('pickups.teacher');
+        Route::post('/pickup/update/{id}', [PickupWebController::class, 'updateStatus'])->name('pickups.update');
+        // NEW PARENT ROUTES
+    Route::get('/pickup/my-children', [PickupWebController::class, 'parentView'])->name('pickups.parent');
+    Route::post('/pickup/generate', [PickupWebController::class, 'generateParentQr'])->name('pickups.generate_parent');
+    });
     // HR / Staff Management
     Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);
@@ -450,6 +469,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
     });
 
+    // --- NEW: CHATBOT SETTINGS ---
+    // Accessible by Super Admin, Head Officer, and School Admin
+    Route::middleware(['auth', RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->prefix('chatbot')->name('chatbot.')->group(function () {
+        Route::get('/settings', [ChatbotSettingController::class, 'index'])->name('settings.index');
+        Route::post('/config', [ChatbotSettingController::class, 'updateConfig'])->name('config.update');
+        Route::post('/keywords', [ChatbotSettingController::class, 'storeKeyword'])->name('keywords.store');
+        Route::put('/keywords/{id}', [ChatbotSettingController::class, 'updateKeyword'])->name('keywords.update');
+        Route::delete('/keywords/{id}', [ChatbotSettingController::class, 'destroyKeyword'])->name('keywords.destroy');
+    });
     // =========================================================================
     // 7. VOTING & ELECTIONS MODULE
     // =========================================================================
@@ -517,3 +545,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
 }); // End Auth Middleware Group
 
 require __DIR__.'/auth.php';
+// require __DIR__.'/api.php';

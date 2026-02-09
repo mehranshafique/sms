@@ -24,7 +24,8 @@ class NotificationService
         'subscription_expiry',
         'subscription_expired',
         'system_alert',
-        'user_welcome'
+        'user_welcome',
+        'otp_verification' // Added OTP to unlimited list
     ];
 
     /**
@@ -348,7 +349,7 @@ class NotificationService
             } else {
                 $result = $gateway->sendSms($to, $message);
             }
-
+            // Log::info("Notification Sent via $finalProviderName [Channel: $channel, To: $to, Inst: $institutionId] Result: " . ($result ? 'Success' : 'Failure'));
             // 4. Deduct Credits (Only on Success & System Mode)
             if ($result['success'] && $shouldDeductCredits && !$isUnlimited && $institution) {
                 if($institution->$creditCol > 0) {
@@ -361,6 +362,29 @@ class NotificationService
         } catch (\Exception $e) {
             Log::error("Notification Error [Inst: $institutionId]: " . $e->getMessage());
             return ['success' => false, 'message' => __('configuration.gateway_connection_error') . ': ' . $e->getMessage()];
+        }
+    }
+    // --- NEW METHOD FOR OTP ---
+    public function sendOtpNotification(Student $student, $otp)
+    {
+        // Try Parent Phone first
+        $phone = $student->parent->father_phone 
+              ?? $student->parent->mother_phone 
+              ?? $student->parent->guardian_phone 
+              ?? $student->mobile_number; // Fallback to student mobile if University
+
+        if (!$phone) {
+            Log::error("OTP Failed: No phone number found for Student ID {$student->id}");
+            return;
+        }
+
+        $message = __('chatbot.otp_message', ['code' => $otp]);
+        
+        // Prioritize WhatsApp, fallback to SMS
+        $result = $this->performSend($phone, $message, $student->institution_id, true, 'whatsapp');
+        
+        if (!$result['success']) {
+            $this->performSend($phone, $message, $student->institution_id, true, 'sms');
         }
     }
 }

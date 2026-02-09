@@ -86,7 +86,11 @@ class InfobipService implements SmsGatewayInterface
     {
         try {
             $url = rtrim($this->baseUrl, '/') . '/whatsapp/1/message/text';
-            
+            Log::info("Infobip WhatsApp Payload: " . json_encode([
+                'from' => $this->whatsappSender,
+                'to' => $to,
+                'content' => ['text' => $message]
+            ]));
             $response = Http::withHeaders([
                 'Authorization' => "App {$this->apiKey}",
                 'Content-Type' => 'application/json',
@@ -96,7 +100,7 @@ class InfobipService implements SmsGatewayInterface
                 'to' => $to,
                 'content' => ['text' => $message]
             ]);
-
+            Log::info("Infobip WhatsApp Response: " . $response->body());
             if ($response->successful()) {
                 return ['success' => true, 'message' => __('configuration.whatsapp_sent_success')];
             }

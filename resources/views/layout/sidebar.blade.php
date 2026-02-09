@@ -174,13 +174,18 @@
                 )
                     <li class="nav-label">{{ __('sidebar.people') }}</li>
                     
-                    <li class="{{ request()->routeIs('students.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span></a>
                         <ul aria-expanded="false">
                             @if($hasModule('students') && $user->can('student.view'))
                                 <li><a href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
                             @endif
                             
+                            {{-- NEW: Parents Link --}}
+                            @can('student.view') 
+                                <li><a href="{{ route('parents.index') }}">{{ __('parent.page_title') ?? 'Parents' }}</a></li>
+                            @endcan
+
                             {{-- Standard Enrollment --}}
                             @if($hasModule('student_enrollments') && in_array($institutionType, ['primary', 'secondary', 'mixed', 'vocational']) && $user->can('student_enrollment.view'))
                                 <li><a href="{{ route('enrollments.index') }}">{{ __('sidebar.enrollments.title') }}</a></li>
@@ -198,6 +203,12 @@
                             @if($hasModule('student_promotion') && $user->can('student_promotion.create'))
                                 <li><a href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
                             @endif
+                            
+                            {{-- NEW: Pickup System (Admin/Guard View) --}}
+                            <li><a href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</a></li>
+                            
+                            {{-- UPDATED: Pickup System (QR Generator for Admins) --}}
+                            <li><a href="{{ route('pickups.parent') }}">{{ __('pickup.page_title') ?? 'Generate Student QR' }}</a></li>
                         </ul>
                     </li>
 
@@ -213,6 +224,14 @@
                         </li>
                     @endif
                 @endif
+                
+                {{-- NEW: SECURITY / GUARD LINK --}}
+                @if($user->hasRole('Guard') || $user->can('student.view'))
+                    <li class="nav-label">Security</li>
+                    <li>
+                        <a class="ai-icon" href="{{ route('pickups.scanner') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.scanner_title') ?? 'QR Scanner' }}</span></a>
+                    </li>
+                @endif
 
                 {{-- FINANCE --}}
                 @if(
@@ -224,7 +243,7 @@
                     
                     {{-- Fees & Collection --}}
                     @if($hasModule('invoices') && $user->can('invoice.view'))
-                    <li class="{{ request()->routeIs('fee-types.*', 'fees.*', 'invoices.*', 'finance.balances.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('fee-types.*', 'fees.*', 'invoices.*', 'finance.balances.*', 'finance.reports.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fees_collection') }}</span></a>
                         <ul aria-expanded="false">
                             @if($hasModule('fee_types') && $user->can('fee_type.view'))
@@ -295,7 +314,13 @@
                     <li class="nav-label">{{ __('sidebar.communication') }}</li>
                     @if($hasModule('communication') && $user->can('notice.view'))
                         <li><a class="ai-icon" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
+                        
+                        {{-- NEW CHATBOT LINK --}}
+                        @if($user->hasRole(['Super Admin','School Admin', 'Head Officer']))
+                        <li><a class="ai-icon" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
+                        @endif
                     @endif
+
                     @if($hasModule('voting') && $user->can('election.view'))
                         <li><a class="ai-icon" href="{{ route('elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
                     @endif
@@ -339,6 +364,10 @@
 
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
                 <li><a class="ai-icon" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span></a></li>
+
+                {{-- NEW: Teacher Pickup Approval View --}}
+                <li class="nav-label">Pickup System</li>
+                <li><a class="ai-icon" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span></a></li>
             @endif
 
 
@@ -367,6 +396,13 @@
                 @if($hasModule('voting'))
                     <li><a class="ai-icon" href="{{ route('student.elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.my_elections') }}</span></a></li>
                 @endif
+            @endif
+
+            {{-- 5. PARENT / GUARDIAN SECTION --}}
+            @if(auth()->user()->hasRole('Guardian'))
+                <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
+                {{-- NEW: Pickup QR Generation --}}
+                <li><a class="ai-icon" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
             @endif
 
         </ul>

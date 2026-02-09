@@ -46,8 +46,8 @@ class RolePermissionSeeder extends Seeder
             // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             
-            // SPLIT ENROLLMENTS
-            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Standard
+            // SPLIT ENROLLMENTS: Replaces the old 'Enrollments' module
+            'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Standard School
             'University Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // University
             
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
@@ -55,7 +55,7 @@ class RolePermissionSeeder extends Seeder
             'Student Transfers' => ['view', 'create', 'print'],
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Staff Attendance' => ['view', 'create', 'update', 'delete'],
-            
+            'Student Parents' => ['view', 'create', 'update', 'delete'],
             // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Schedules' => ['view', 'create', 'update', 'delete', 'download_admit_card'],
@@ -110,8 +110,12 @@ class RolePermissionSeeder extends Seeder
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
                 if ($slug === 'sms_templates') $singularKey = 'sms_template';
                 
-                // Keep 'student_enrollments' as 'student_enrollment' (standard behavior of singular())
-                // Keep 'university_enrollments' as 'university_enrollment'
+                // Note: 
+                // 'Student Enrollments' -> slug: 'student_enrollments' -> singular: 'student_enrollment'
+                // Permission: 'student_enrollment.view'
+                
+                // 'University Enrollments' -> slug: 'university_enrollments' -> singular: 'university_enrollment'
+                // Permission: 'university_enrollment.view'
 
                 $permissionName = "{$singularKey}.{$action}";
 

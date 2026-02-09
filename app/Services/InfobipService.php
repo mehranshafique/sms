@@ -68,7 +68,7 @@ class InfobipService implements SmsGatewayInterface
                     'text' => $message
                 ]
             ];
-
+            Log::info("Infobip WhatsApp Payload: " . json_encode($payload));
             $response = Http::withHeaders([
                 'Authorization' => "App {$this->apiKey}",
                 'Content-Type' => 'application/json',
