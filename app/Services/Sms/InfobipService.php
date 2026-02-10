@@ -86,11 +86,7 @@ class InfobipService implements SmsGatewayInterface
     {
         try {
             $url = rtrim($this->baseUrl, '/') . '/whatsapp/1/message/text';
-            Log::info("Infobip WhatsApp Payload: " . json_encode([
-                'from' => $this->whatsappSender,
-                'to' => $to,
-                'content' => ['text' => $message]
-            ]));
+            
             $response = Http::withHeaders([
                 'Authorization' => "App {$this->apiKey}",
                 'Content-Type' => 'application/json',
@@ -100,7 +96,7 @@ class InfobipService implements SmsGatewayInterface
                 'to' => $to,
                 'content' => ['text' => $message]
             ]);
-            Log::info("Infobip WhatsApp Response: " . $response->body());
+
             if ($response->successful()) {
                 return ['success' => true, 'message' => __('configuration.whatsapp_sent_success')];
             }
@@ -111,6 +107,44 @@ class InfobipService implements SmsGatewayInterface
 
         } catch (\Exception $e) {
             return ['success' => false, 'message' => __('configuration.gateway_connection_error')];
+        }
+    }
+
+    /**
+     * Send WhatsApp Document/Image
+     */
+    public function sendWhatsAppFile(string $to, string $fileUrl, string $caption = '', string $filename = 'document.pdf'): array
+    {
+        try {
+            $url = rtrim($this->baseUrl, '/') . '/whatsapp/1/message/document';
+            
+            $payload = [
+                'from' => $this->whatsappSender,
+                'to' => $to,
+                'content' => [
+                    'mediaUrl' => $fileUrl,
+                    'caption' => $caption,
+                    'filename' => $filename
+                ]
+            ];
+
+            $response = Http::withHeaders([
+                'Authorization' => "App {$this->apiKey}",
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ])->timeout(30)->post($url, $payload);
+
+            if ($response->successful()) {
+                return ['success' => true, 'message' => 'Document sent successfully'];
+            }
+            
+            $err = $response->json();
+            Log::error("Infobip WhatsApp File Error: " . json_encode($err));
+            return ['success' => false, 'message' => 'Failed to send file'];
+
+        } catch (\Exception $e) {
+            Log::error("Infobip File Exception: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Connection error'];
         }
     }
 }

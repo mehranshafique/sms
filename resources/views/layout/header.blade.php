@@ -113,7 +113,31 @@
         ***********************************-->
         <div class="nav-header" style="background-color: transparent">
             <a href="{{ route('dashboard')  }}" class="brand-logo">
-                <img src="https://e-digitex.com/public/images/smsslogonew.png" style="width: 117px;" alt="Logo">
+                @php
+                    $activeInstId = session('active_institution_id');
+                    $user = Auth::user();
+                    $institutionLogo = null;
+                    $activeInst = null; // Declare variable
+
+                    if ($user) {
+                         // Resolve Active ID properly
+                         $activeId = session('active_institution_id', $user->institute_id);
+
+                         if ($activeId && $activeId !== 'global') {
+                             // Try to find the institution model.
+                             // We might need to fetch it if not already available in $user context or allowed list
+                             $activeInst = \App\Models\Institution::find($activeId); 
+                         }
+                    }
+
+                    if ($activeInst && $activeInst->logo) {
+                        $institutionLogo = asset('storage/' . $activeInst->logo);
+                    } else {
+                        // Fallback to default system logo
+                        $institutionLogo = "https://e-digitex.com/public/images/smsslogonew.png";
+                    }
+                @endphp
+                <img src="{{ $institutionLogo }}" style="max-width: 117px; max-height: 50px; object-fit: contain;" alt="Logo">
             </a>
 
             <div class="nav-control">
@@ -169,10 +193,16 @@
                                     $activeId = session('active_institution_id', $user->institute_id);
                                     
                                     if ($activeId && $activeId !== 'global') {
-                                        $activeInst = $allowedInstitutions->where('id', $activeId)->first();
-                                        if (!$activeInst && $user->institute) $activeInst = $user->institute;
-                                        if ($activeInst) {
-                                            $activeInstitutionName = $activeInst->name;
+                                        // $activeInst is calculated at the top for logo, reuse or refetch if scope issues (PHP block scope is usually fine here)
+                                        // But logic above was inside a specific block. Let's re-verify or use the one from allowed list.
+                                        $activeInstObj = $allowedInstitutions->where('id', $activeId)->first();
+                                        if (!$activeInstObj && $user->institute && $user->institute->id == $activeId) $activeInstObj = $user->institute;
+                                        
+                                        // Fallback fetch if not in list (e.g. direct link)
+                                        if(!$activeInstObj) $activeInstObj = \App\Models\Institution::find($activeId);
+
+                                        if ($activeInstObj) {
+                                            $activeInstitutionName = $activeInstObj->name;
                                         }
 
                                         // FETCH CURRENT SESSION

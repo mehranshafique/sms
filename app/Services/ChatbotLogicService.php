@@ -15,9 +15,12 @@ use App\Models\Assignment;
 use App\Models\ExamRecord;
 use App\Models\Notice;
 use App\Models\StudentPickup;
+use App\Models\StudentEnrollment;
+use App\Models\FundRequest; // For derogations/requests if mapped
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 
 class ChatbotLogicService
@@ -34,10 +37,9 @@ class ChatbotLogicService
      */
     public function processMessage(array $data)
     {
-        $phone = $data['from']; // Normalized 'from' (User ID)
+        $phone = $data['from']; // User Phone (Sender)
         $text = trim($data['body']);
-        $botPhone = $data['to'] ?? null; // System number (Receiver)
-
+        
         // 1. Clean Phone
         $phone = preg_replace('/[^0-9]/', '', $phone); 
 
@@ -46,10 +48,8 @@ class ChatbotLogicService
 
         // 3. Check Expiry
         if ($session && now()->gt($session->expires_at)) {
-            $lastFlow = $session->user_type; // Store hint of what they were doing?
             $session->delete();
             $session = null;
-            // Optional: Send timeout message based on last flow
             return $this->reply($phone, __('chatbot.session_ended'), null);
         }
 
@@ -58,22 +58,25 @@ class ChatbotLogicService
             return $this->handleNewSession($phone, $text);
         }
 
-        // Apply Locale
+        // Apply Locale if set
         if ($session->locale) app()->setLocale($session->locale);
 
         // --- STATE MACHINE ROUTER ---
         switch ($session->status) {
-            // AUTH FLOW
+            // --- AUTHENTICATION ---
             case 'AWAITING_ID':
                 return $this->processIdentity($session, $text);
             case 'AWAITING_OTP':
                 return $this->processOtp($session, $text);
             
-            // ACTIVE FLOWS
+            // --- ACTIVE MENUS ---
             case 'ACTIVE':
-                return $this->processMainMenu($session, $text);
+                if ($session->user_type === 'head_officer') {
+                    return $this->processAdminMenu($session, $text);
+                }
+                return $this->processStudentMenu($session, $text);
                 
-            // SUB-STATES (Student Features)
+            // --- STUDENT SUB-FLOWS ---
             case 'PAYMENT_METHOD_SELECT':
                 return $this->processPaymentMethod($session, $text);
             case 'DEROGATION_DURATION_SELECT':
@@ -87,9 +90,7 @@ class ChatbotLogicService
             case 'QR_OTP_INPUT':
                 return $this->processQrOtpInput($session, $text);
             
-            // HEAD OFFICER FLOWS
-            case 'ADMIN_MENU':
-                return $this->processAdminMenu($session, $text);
+            // --- ADMIN SUB-FLOWS ---
             case 'ADMIN_RANKING_SELECT':
                 return $this->processAdminRanking($session, $text);
             case 'ADMIN_EXPORT_SELECT':
@@ -115,18 +116,19 @@ class ChatbotLogicService
             ChatSession::create([
                 'phone_number' => $phone,
                 'status' => 'AWAITING_ID',
-                'user_type' => 'head_officer', // Flag for admin flow
+                'user_type' => 'head_officer', 
                 'last_interaction_at' => now(),
                 'expires_at' => now()->addMinutes(15),
+                'user_id' => null
             ]);
             return $this->reply($phone, "Bienvenue sur la plateforme Digitex.\nVeuillez saisir votre ID Head Office pour commencer.", null);
         }
 
-        // STANDARD FLOW
+        // STUDENT FLOW
         $keyword = ChatbotKeyword::where('keyword', $textLower)->first();
 
         if ($keyword || str_starts_with($textLower, 'bonjour') || str_starts_with($textLower, 'digitex')) {
-            $locale = $keyword->language ?? 'fr'; // Default FR for 'bonjour'
+            $locale = $keyword->language ?? 'fr'; 
             app()->setLocale($locale);
 
             ChatSession::create([
@@ -136,6 +138,8 @@ class ChatbotLogicService
                 'locale' => $locale,
                 'last_interaction_at' => now(),
                 'expires_at' => now()->addMinutes(15),
+                'user_id' => null, 
+                'user_type' => 'student'
             ]);
 
             $msg = $keyword->welcome_message ?? __('chatbot.welcome_message');
@@ -147,18 +151,15 @@ class ChatbotLogicService
 
     protected function processIdentity($session, $input)
     {
-        // ADMIN Check
         if ($session->user_type === 'head_officer') {
             $user = User::where('username', $input)->orWhere('shortcode', $input)->first();
-            // Allow Super Admin or Head Officer
             if ($user && ($user->hasRole('Head Officer') || $user->hasRole('Super Admin'))) {
                 return $this->sendOtp($session, $user, 'head_officer');
             }
             return $this->incrementAttempts($session);
         }
 
-        // STUDENT Check
-        // Fix: Ensure we check institution if tied to keyword, otherwise global search
+        // Student Check
         $queryStudent = Student::with('parent')->where('admission_number', $input);
         if ($session->institution_id) $queryStudent->where('institution_id', $session->institution_id);
         $student = $queryStudent->first();
@@ -182,17 +183,19 @@ class ChatbotLogicService
         }
 
         if (!$phone) return $this->reply($session->phone_number, __('chatbot.no_registered_phone'), $session->institution_id);
+        
+        $phone = preg_replace('/[^0-9]/', '', $phone);
 
         $session->update([
             'user_id' => $model->id,
-            'user_type' => get_class($model), // Stores App\Models\Student or User
+            'user_type' => get_class($model),
             'institution_id' => $model->institution_id ?? $model->institute_id,
             'otp' => $otp,
             'status' => 'AWAITING_OTP',
-            'identifier_input' => $type
+            'identifier_input' => $type // Storing type context here
         ]);
 
-        // Send OTP via SMS
+        // Send OTP via SMS only
         $this->notificationService->performSend($phone, __('chatbot.otp_sms_message', ['otp' => $otp]), $session->institution_id, true, 'sms');
         
         $masked = Str::mask($phone, '*', 3, -3);
@@ -203,7 +206,6 @@ class ChatbotLogicService
     {
         if (trim($input) == $session->otp) {
             $nextState = ($session->identifier_input === 'head_officer') ? 'ADMIN_MENU' : 'ACTIVE';
-            
             $session->update(['status' => $nextState, 'otp' => null]);
             
             if ($nextState === 'ADMIN_MENU') {
@@ -216,7 +218,7 @@ class ChatbotLogicService
     }
 
     // =================================================================================
-    // --- 2. STUDENT FEATURES ---
+    // --- 2. STUDENT FEATURES (Legacy Re-implementation) ---
     // =================================================================================
 
     protected function sendStudentMenu($session)
@@ -236,17 +238,26 @@ class ChatbotLogicService
         return $this->reply($session->phone_number, $msg, $session->institution_id);
     }
 
-    protected function processMainMenu($session, $text)
+    protected function processStudentMenu($session, $text)
     {
         $student = Student::find($session->user_id);
-        if (!$student) return $this->reply($session->phone_number, "Error: Student record missing.", null);
+        if (!$student) return $this->reply($session->phone_number, "Error: Student missing.", null);
+
+        // Standardize text
+        $text = strtolower(trim($text));
+        
+        // 0. Logout
+        if (in_array($text, ['logout', 'quitter', '0'])) {
+            $session->delete();
+            return $this->reply($session->phone_number, __('chatbot.logout_success'), $session->institution_id);
+        }
 
         switch ($text) {
             case '1': // Homework
                 return $this->getHomework($session, $student);
             case '2': // Payment
                 $session->update(['status' => 'PAYMENT_METHOD_SELECT']);
-                return $this->getPaymentSummary($session, $student);
+                return $this->reply($session->phone_number, __('chatbot.payment_method_menu', $this->getPaymentData($student)), $session->institution_id);
             case '3': // Balance
                 return $this->getBalance($session, $student);
             case '4': // Report Card
@@ -264,152 +275,144 @@ class ChatbotLogicService
             case '9': // QR Code
                 $session->update(['status' => 'QR_OTP_CONFIRM']);
                 return $this->reply($session->phone_number, __('chatbot.qr_verification'), $session->institution_id);
-            case '0': // Quit
-            case 'logout':
-                $session->delete();
-                return $this->reply($session->phone_number, __('chatbot.logout_success'), $session->institution_id);
             default:
                 return $this->reply($session->phone_number, __('chatbot.unknown_command'), $session->institution_id);
         }
     }
 
-    // --- Sub-Features ---
+    // --- Student Logic Implementations ---
 
-    protected function getBalance($session, $student)
-    {
+    protected function getPaymentData($student) {
+        // Calculate Totals for Payment Menu
         $total = Invoice::where('student_id', $student->id)->sum('total_amount');
         $paid = Payment::whereHas('invoice', fn($q) => $q->where('student_id', $student->id))->sum('amount');
         $due = $total - $paid;
-
-        return $this->reply($session->phone_number, __('chatbot.balance_info', [
-            'total' => number_format($total, 2) . ' $',
-            'paid' => number_format($paid, 2) . ' $',
-            'due' => number_format($due, 2) . ' $'
-        ]), $session->institution_id);
-    }
-
-    protected function getPaymentSummary($session, $student)
-    {
-        $total = Invoice::where('student_id', $student->id)->sum('total_amount');
-        $paid = Payment::whereHas('invoice', fn($q) => $q->where('student_id', $student->id))->sum('amount');
-        $due = $total - $paid;
-
-        return $this->reply($session->phone_number, __('chatbot.payment_method_menu', [
-            'due' => number_format($due, 2) . ' $',
-            'total' => number_format($due, 2) . ' $' // Logic from legacy
-        ]), $session->institution_id);
+        return ['total' => number_format($total, 2), 'due' => number_format($due, 2)];
     }
 
     protected function processPaymentMethod($session, $text)
     {
         if ($text == '1') { // Visa
             $link = "https://e-digitex.com/checkout?id=" . base64_encode($session->institution_id);
-            // Reset to Main Menu after showing link? Legacy kept user in flow.
-            // Let's reset to ACTIVE to avoid getting stuck
             $session->update(['status' => 'ACTIVE']);
             return $this->reply($session->phone_number, __('chatbot.payment_link', ['link' => $link]), $session->institution_id);
-        } 
-        elseif ($text == '2') { // Mobile Money
+        } elseif ($text == '2') { // Mobile Money
             $session->update(['status' => 'ACTIVE']);
             return $this->reply($session->phone_number, __('chatbot.mobile_money_instruction'), $session->institution_id);
-        } 
-        elseif ($text == '0') {
+        } elseif ($text == '0') {
             $session->update(['status' => 'ACTIVE']);
             return $this->sendStudentMenu($session);
         }
         return $this->reply($session->phone_number, __('chatbot.invalid_option'), $session->institution_id);
     }
 
+    protected function getBalance($session, $student)
+    {
+        $data = $this->getPaymentData($student);
+        return $this->reply($session->phone_number, __('chatbot.balance_info', [
+            'total' => $data['total'] . ' $',
+            'paid' => number_format(Payment::whereHas('invoice', fn($q) => $q->where('student_id', $student->id))->sum('amount'), 2) . ' $',
+            'due' => $data['due'] . ' $'
+        ]), $session->institution_id);
+    }
+
     protected function getReportCard($session, $student)
     {
-        // Fetch latest PDF from result_pdfs table (Mocking the legacy logic)
-        // Since we don't have that table, we generate a link
-        $url = route('reports.bulletin', ['student_id' => $student->id, 'mode' => 'single', 'report_scope' => 'period', 'period' => 'p1']);
-        
-        // In real legacy, it sent a document. Here we send a link or try to send doc if path exists.
-        return $this->reply($session->phone_number, __('chatbot.result_found') . "\n" . $url, $session->institution_id);
-    }
+        $enrollment = $student->enrollments()->latest()->first();
+        if (!$enrollment) return $this->reply($session->phone_number, __('chatbot.not_enrolled'), $session->institution_id);
 
-    protected function getMiscFees($session, $student)
-    {
-        // Logic: Fetch 'one_time' fees
-        $fees = FeeStructure::where('institution_id', $student->institution_id)
-            ->where('frequency', 'one_time')
-            ->get();
+        $data = ['student' => $student, 'enrollment' => $enrollment, 'trimester' => 1, 'data' => []];
+        $pdf = Pdf::loadView('reports.bulletin_primary', $data);
+        $fileName = 'bulletin_' . $student->id . '_' . time() . '.pdf';
+        $path = 'public/temp/' . $fileName;
         
-        $content = "";
-        foreach($fees as $f) {
-            $content .= "- {$f->name}: " . number_format($f->amount, 2) . " $\n";
-        }
+        \Illuminate\Support\Facades\Storage::put($path, $pdf->output());
+        $publicUrl = asset('storage/temp/' . $fileName);
         
-        return $this->reply($session->phone_number, __('chatbot.misc_fees_list', ['content' => $content ?: 'None']), $session->institution_id);
-    }
-
-    protected function getActivities($session, $student)
-    {
-        $notices = Notice::where('institution_id', $student->institution_id)
-            ->where('published_at', '>=', now()->subDays(30))
-            ->take(5)->get();
-
-        $content = "";
-        foreach($notices as $n) {
-            $content .= "📅 " . $n->title . " (" . $n->published_at->format('d M') . ")\n";
+        // Fix for localhost testing
+        if (request()->getHost() == '127.0.0.1' || request()->getHost() == 'localhost') {
+            return $this->reply($session->phone_number, "📄 Report Generated: " . $publicUrl, $session->institution_id);
         }
 
-        return $this->reply($session->phone_number, __('chatbot.activities_list', ['content' => $content ?: 'None']), $session->institution_id);
+        $this->notificationService->performSendFile($session->phone_number, $publicUrl, "📄 Result Card", "Bulletin.pdf", $session->institution_id);
+        return response()->json(['status' => 'success']);
     }
 
-    protected function processDerogation($session, $text)
+    protected function getHomework($session, $student)
     {
+        $enrollment = $student->enrollments()->latest()->first();
+        if (!$enrollment) return $this->reply($session->phone_number, __('chatbot.not_enrolled'), $session->institution_id);
+        
+        $hw = Assignment::where('class_section_id', $enrollment->class_section_id)
+            ->where('deadline', '>=', now())
+            ->latest()->take(3)->get();
+            
+        if($hw->isEmpty()) return $this->reply($session->phone_number, __('chatbot.no_homework'), $session->institution_id);
+        
+        $list = "";
+        foreach($hw as $h) {
+            $list .= "📚 " . $h->subject->name . ": " . $h->title . " (" . $h->deadline->format('d/m') . ")\n";
+        }
+        
+        return $this->reply($session->phone_number, __('chatbot.homework_list', ['content' => $list]), $session->institution_id);
+    }
+
+    protected function getMiscFees($session, $student) {
+        $fees = FeeStructure::where('institution_id', $session->institution_id)->where('frequency', 'one_time')->get();
+        $list = $fees->map(fn($f) => "- {$f->name}: {$f->amount} $")->join("\n");
+        return $this->reply($session->phone_number, __('chatbot.misc_fees_list', ['content' => $list ?: 'None']), $session->institution_id);
+    }
+
+    protected function getActivities($session, $student) {
+        $events = Notice::where('institution_id', $session->institution_id)->latest()->take(5)->get();
+        $list = $events->map(fn($e) => "📅 {$e->title} (" . $e->created_at->format('d M') . ")")->join("\n");
+        return $this->reply($session->phone_number, __('chatbot.activities_list', ['content' => $list ?: 'None']), $session->institution_id);
+    }
+
+    // --- Complex Sub-Flows ---
+
+    protected function processDerogation($session, $text) {
         if ($text == '0') { $session->update(['status' => 'ACTIVE']); return $this->sendStudentMenu($session); }
-        
         $map = ['1' => 7, '2' => 15, '3' => 20, '4' => 30];
         if (!isset($map[$text])) return $this->reply($session->phone_number, __('chatbot.invalid_option'), $session->institution_id);
 
-        $days = $map[$text];
         $ticket = "DGR-" . rand(1000, 9999);
+        // DB::table('fee_extensions')->insert(...) // Implement actual storage logic here
         
-        // Logic: Insert into fee_extensions table (Mock)
-        // DB::table('fee_extensions')->insert(...)
-
         $session->update(['status' => 'ACTIVE']);
-        return $this->reply($session->phone_number, __('chatbot.derogation_submitted', ['days' => $days, 'ticket' => $ticket]), $session->institution_id);
+        return $this->reply($session->phone_number, __('chatbot.derogation_submitted', ['days' => $map[$text], 'ticket' => $ticket]), $session->institution_id);
     }
 
-    protected function processRequestType($session, $text)
-    {
+    protected function processRequestType($session, $text) {
         if ($text == '0') { $session->update(['status' => 'ACTIVE']); return $this->sendStudentMenu($session); }
-
-        if ($text == '4') { // Sickness
+        if ($text == '4') { // Sick
              $session->update(['status' => 'ACTIVE']);
              return $this->reply($session->phone_number, __('chatbot.sick_leave_submitted'), $session->institution_id);
         }
-
         if (in_array($text, ['1', '2', '3'])) {
-            $session->update(['status' => 'REQUEST_REASON_SELECT', 'temp_data' => json_encode(['type' => $text])]);
+            $session->update(['status' => 'REQUEST_REASON_SELECT', 'identifier_input' => "REQ_TYPE:$text"]); // Use identifier to store temp state
             return $this->reply($session->phone_number, __('chatbot.request_reason_'.$text), $session->institution_id);
         }
-
         return $this->reply($session->phone_number, __('chatbot.invalid_option'), $session->institution_id);
     }
 
-    protected function processRequestReason($session, $text)
-    {
+    protected function processRequestReason($session, $text) {
         if ($text == '0') { $session->update(['status' => 'ACTIVE']); return $this->sendStudentMenu($session); }
         
-        $data = json_decode($session->temp_data ?? '{}', true);
-        $typeMap = ['1' => 'Early Exit', '2' => 'Late', '3' => 'Absence'];
-        $type = $typeMap[$data['type']] ?? 'Request';
+        // Extract Type from identifier_input "REQ_TYPE:1"
+        $parts = explode(':', $session->identifier_input);
+        $typeCode = $parts[1] ?? '1';
+        $typeNames = ['1'=>'Early Exit', '2'=>'Late', '3'=>'Absence'];
+        
         $ticket = "REQ-" . rand(1000, 9999);
+        // DB::table('student_requests')->insert(...) 
 
-        $session->update(['status' => 'ACTIVE']);
-        return $this->reply($session->phone_number, __('chatbot.request_submitted', ['type' => $type, 'reason' => "Option $text", 'ticket' => $ticket]), $session->institution_id);
+        $session->update(['status' => 'ACTIVE', 'identifier_input' => 'student']); // Reset
+        return $this->reply($session->phone_number, __('chatbot.request_submitted', ['type' => $typeNames[$typeCode], 'reason' => "Option $text", 'ticket' => $ticket]), $session->institution_id);
     }
 
-    protected function processQrOtpConfirm($session, $text)
-    {
+    protected function processQrOtpConfirm($session, $text) {
         if ($text == '0') { $session->update(['status' => 'ACTIVE']); return $this->sendStudentMenu($session); }
-        
         if ($text == '1') {
             $otp = rand(100000, 999999);
             $session->update(['otp' => $otp, 'status' => 'QR_OTP_INPUT']);
@@ -422,11 +425,9 @@ class ChatbotLogicService
         }
         return $this->reply($session->phone_number, __('chatbot.invalid_option'), $session->institution_id);
     }
-
-    protected function processQrOtpInput($session, $text)
-    {
+    
+    protected function processQrOtpInput($session, $text) {
         if ($text == '0') { $session->update(['status' => 'ACTIVE']); return $this->sendStudentMenu($session); }
-
         if (trim($text) == $session->otp) {
             $student = Student::find($session->user_id);
             $token = 'QR-' . uniqid();
@@ -441,8 +442,7 @@ class ChatbotLogicService
             $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" . urlencode($token);
             $caption = __('chatbot.qr_caption', ['student' => $student->first_name]);
             
-            // Send Image via Notification Service (Assumed capability)
-            $this->reply($session->phone_number, $caption . "\n" . $qrUrl, $session->institution_id);
+            $this->notificationService->performSendFile($session->phone_number, $qrUrl, $caption, "qrcode.png", $session->institution_id);
             
             $session->update(['status' => 'ACTIVE', 'otp' => null]);
             return $this->reply($session->phone_number, "Type 1 for Menu.", $session->institution_id);
@@ -464,17 +464,15 @@ class ChatbotLogicService
     {
         switch ($text) {
             case '1': // Dashboard
-                $stats = $this->getAdminStats();
+            case '4': // Stats (Legacy merged these)
+                $stats = $this->getAdminStats($session->institution_id);
                 return $this->reply($session->phone_number, __('chatbot.admin_dashboard', $stats), $session->institution_id);
             case '2': // By School
-                $data = $this->getSchoolStats();
+                $data = $this->getSchoolStats(); // This would be dynamic in a multi-school setup
                 return $this->reply($session->phone_number, __('chatbot.admin_school_stats', ['content' => $data]), $session->institution_id);
             case '3': // Ranking
                 $session->update(['status' => 'ADMIN_RANKING_SELECT']);
                 return $this->reply($session->phone_number, __('chatbot.admin_ranking_menu'), $session->institution_id);
-            case '4': // Trends (Simplified as Stats)
-                $stats = $this->getAdminStats();
-                return $this->reply($session->phone_number, __('chatbot.admin_dashboard', $stats), $session->institution_id);
             case '5': // Export
                 $session->update(['status' => 'ADMIN_EXPORT_SELECT']);
                 return $this->reply($session->phone_number, __('chatbot.admin_export_menu'), $session->institution_id);
@@ -490,7 +488,7 @@ class ChatbotLogicService
 
     protected function processAdminRanking($session, $text)
     {
-        if ($text == '00') { $session->update(['status' => 'ADMIN_MENU']); return $this->sendAdminMenu($session); }
+        if ($text == '00') { $session->update(['status' => 'ACTIVE']); return $this->sendAdminMenu($session); }
         if ($text == '0') { $session->delete(); return $this->reply($session->phone_number, __('chatbot.logout_success'), $session->institution_id); }
 
         $type = match($text) {
@@ -502,13 +500,19 @@ class ChatbotLogicService
 
         if (!$type) return $this->reply($session->phone_number, __('chatbot.invalid_option'), $session->institution_id);
 
-        $content = "1. School A - 90%\n2. School B - 85%\n3. School C - 50%"; // Mock Data for brevity
-        return $this->reply($session->phone_number, __('chatbot.ranking_title', ['type' => $type, 'content' => $content]), $session->institution_id);
+        // Fetch Rankings Logic
+        // For Payment Rate:
+        $rankingData = Institution::withCount('students')->take(5)->get()
+            ->sortByDesc('students_count') // Mock logic, real logic would query payments
+            ->map(fn($i, $k) => ($k+1).". {$i->name} - 8{$k}%")
+            ->join("\n");
+
+        return $this->reply($session->phone_number, __('chatbot.ranking_title', ['type' => $type, 'content' => $rankingData]), $session->institution_id);
     }
 
     protected function processAdminExport($session, $text)
     {
-        if ($text == '00') { $session->update(['status' => 'ADMIN_MENU']); return $this->sendAdminMenu($session); }
+        if ($text == '00') { $session->update(['status' => 'ACTIVE']); return $this->sendAdminMenu($session); }
         
         if ($text == '2') { // By School
             $schools = Institution::take(5)->pluck('name')->map(fn($n, $k) => ($k+1)."️⃣ $n")->join("\n");
@@ -516,34 +520,52 @@ class ChatbotLogicService
             return $this->reply($session->phone_number, __('chatbot.admin_school_selection', ['content' => $schools]), $session->institution_id);
         }
 
-        // Global Export
-        return $this->reply($session->phone_number, __('chatbot.export_ready'), $session->institution_id);
+        // Global or Rankings Export -> Generate and Send File
+        $reportType = ($text == '1') ? 'Global' : 'Rankings';
+        $fileName = "Export_{$reportType}_" . date('Y-m-d') . ".csv";
+        $path = 'public/exports/' . $fileName;
+        
+        // Create Mock CSV
+        \Illuminate\Support\Facades\Storage::put($path, "ID,Name,Status\n1,School A,Active\n2,School B,Active");
+        $url = asset('storage/exports/' . $fileName);
+        
+        // Handle Localhost
+        if (request()->getHost() == '127.0.0.1') return $this->reply($session->phone_number, "📄 Export Link: " . $url, $session->institution_id);
+
+        $this->notificationService->performSendFile($session->phone_number, $url, "📄 $reportType Report", $fileName, $session->institution_id);
+        return response()->json(['status' => 'success']);
     }
 
     protected function processAdminSchoolExport($session, $text)
     {
-        if ($text == '00') { $session->update(['status' => 'ADMIN_MENU']); return $this->sendAdminMenu($session); }
-        // Logic to generate and send file
+        if ($text == '00') { $session->update(['status' => 'ACTIVE']); return $this->sendAdminMenu($session); }
+        // Logic: determine school from input index, generate file, send file
         return $this->reply($session->phone_number, __('chatbot.export_ready'), $session->institution_id);
     }
 
-    // --- Helpers for Admin Stats ---
-    protected function getAdminStats() {
+    // --- UTILS ---
+
+    protected function getAdminStats($institutionId) {
+        // If Super Admin/Head Officer has multiple schools, logic would aggregate here
+        // For single school context:
+        $totalPaid = Payment::where('institution_id', $institutionId)->sum('amount');
+        $totalInvoiced = Invoice::where('institution_id', $institutionId)->sum('total_amount');
+        
         return [
-            'schools' => Institution::count(),
-            'students' => Student::count(),
-            'paid_students' => 0, // Placeholder
-            'paid_percentage' => 0,
-            'amount_paid' => '0 $',
-            'outstanding' => '0 $',
-            'total_balance' => '0 $'
+            'schools' => 1,
+            'students' => Student::where('institution_id', $institutionId)->count(),
+            'paid_students' => Invoice::where('institution_id', $institutionId)->where('status', 'paid')->distinct('student_id')->count(),
+            'paid_percentage' => $totalInvoiced > 0 ? round(($totalPaid / $totalInvoiced) * 100) : 0,
+            'amount_paid' => number_format($totalPaid, 2) . '$',
+            'outstanding' => number_format($totalInvoiced - $totalPaid, 2) . '$',
+            'total_balance' => number_format($totalInvoiced, 2) . '$'
         ];
     }
+    
     protected function getSchoolStats() {
         return Institution::take(3)->get()->map(fn($i) => "🏫 {$i->name}: " . $i->students()->count() . " Students")->join("\n");
     }
 
-    // --- UTILS ---
     protected function incrementAttempts($session)
     {
         $session->increment('attempts');

@@ -10,10 +10,15 @@
                 $isTeacher = $user->hasRole('Teacher');
                 $isStudent = $user->hasRole('Student');
                 
+                // Determine Active Context
+                $activeInstId = session('active_institution_id');
+                // Super Admin is in "Global Mode" if no specific institution is selected or explicitly 'global'
+                $isGlobalSuperAdmin = $isSuperAdmin && (!$activeInstId || $activeInstId === 'global');
+                
                 // Helper to check module access
                 if (!isset($enabledModules)) {
                     $enabledModules = [];
-                    $institutionId = session('active_institution_id') ?: $user->institute_id;
+                    $institutionId = $activeInstId ?: $user->institute_id;
                     
                     if ($institutionId && $institutionId !== 'global') {
                         $setting = \App\Models\InstitutionSetting::where('institution_id', $institutionId)
@@ -47,8 +52,8 @@
 
                 // Helper to check Institution Type
                 $institutionType = 'mixed';
-                if (!$isSuperAdmin) {
-                    $instId = session('active_institution_id') ?: $user->institute_id;
+                if (!$isGlobalSuperAdmin) {
+                    $instId = $activeInstId ?: $user->institute_id;
                     if($instId) {
                         $inst = \App\Models\Institution::find($instId);
                         if($inst) $institutionType = $inst->type;
@@ -56,8 +61,9 @@
                 }
             @endphp
 
-            {{-- 1. SUPER ADMIN SECTION --}}
-            @if($isSuperAdmin)
+            {{-- 1. SUPER ADMIN GLOBAL SECTION --}}
+            {{-- Only show this if user is Super Admin AND in Global Mode --}}
+            @if($isGlobalSuperAdmin)
                 <li class="nav-label first">{{ __('sidebar.main_admin') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
                 <li><a class="ai-icon {{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}"><i class="la la-shield"></i><span class="nav-text">{{ __('sidebar.permissions.roles') }}</span></a></li>
@@ -103,8 +109,9 @@
             @endif
 
 
-            {{-- 2. SCHOOL ADMIN / HEAD OFFICER SECTION --}}
-            @if($isSchoolAdmin || $isHeadOfficer)
+            {{-- 2. SCHOOL CONTEXT SECTION --}}
+            {{-- Show if School Admin OR Head Officer OR (Super Admin switched to a school context) --}}
+            @if(($isSchoolAdmin || $isHeadOfficer) || ($isSuperAdmin && !$isGlobalSuperAdmin))
                 
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
@@ -281,7 +288,7 @@
                     </li>
                     @endif
 
-                    {{-- Platform Billing --}}
+                    {{-- Platform Billing (Only for Head Officer or Switched Super Admin) --}}
                     @can('institution.view')
                     <li><a class="ai-icon" href="{{ route('subscriptions.invoices') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.billing') }}</span></a></li>
                     @endcan
