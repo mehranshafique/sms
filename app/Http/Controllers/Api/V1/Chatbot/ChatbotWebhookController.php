@@ -59,7 +59,7 @@ class ChatbotWebhookController extends Controller
 
     /**
      * Helper to validate and normalize data
-     * * @param string|null $from The User's phone number (Sender of the message)
+     * @param string|null $from The User's phone number (Sender)
      * @param string|null $to   The Bot/System's phone number (Receiver)
      * @param string|null $body The message content
      * @param string $provider
@@ -73,7 +73,6 @@ class ChatbotWebhookController extends Controller
         }
 
         // 2. Validate 'From' (User/Sender) - Mandatory
-        // Note: For Infobip, we are passing the payload's 'to' field here as per requirements
         $cleanFrom = $this->cleanPhoneNumber($from);
         if (!$cleanFrom) {
             Log::warning("[$provider] Validation Failed: Invalid 'from' number ($from). Must include country code (cannot start with 0).");
@@ -84,12 +83,11 @@ class ChatbotWebhookController extends Controller
         $cleanTo = null;
         if (!empty($to)) {
             $cleanTo = $this->cleanPhoneNumber($to);
-            // We allow processing even if 'to' is weird, as long as we have the user's number ($from)
         }
 
         return [
-            'from' => $cleanFrom, // This is the User's number used for replies
-            'to' => $cleanTo,     // This is the System/Bot number
+            'from' => $cleanFrom, // Correctly mapped to User
+            'to' => $cleanTo,     // Correctly mapped to System
             'body' => trim($body),
             'provider' => $provider
         ];
@@ -111,7 +109,6 @@ class ChatbotWebhookController extends Controller
         $number = preg_replace('/[^0-9+]/', '', $number);
 
         // Rule: Optional +, Starts with 1-9 (Country Code), 7-14 following digits (Total 8-15)
-        // This ensures numbers like '0303...' are rejected (must be '92303...' or '+92303...')
         if (preg_match('/^\+?[1-9]\d{7,14}$/', $number)) {
             return $number;
         }
@@ -123,19 +120,15 @@ class ChatbotWebhookController extends Controller
     {
         $results = $request->input('results');
         
-        // Logic A: Standard Array Structure
+        // Logic A: Standard Array Structure (Webhook)
         if (!empty($results) && is_array($results) && isset($results[0])) {
             $msg = $results[0];
             
-            // SPECIAL HANDLING FOR INFOBIP: 
-            // Based on logs, the User's number appears in the 'to' field.
-            // We map payload['to'] -> normalized 'from' (User Identity).
-            $userNumber = $msg['to'] ?? null;
-            $botNumber = $msg['from'] ?? null;
-
+            // FIX: Reverted to standard mapping. 
+            // Infobip 'from' is the User. Infobip 'to' is the System.
             return $this->validateAndFormat(
-                $userNumber, // Map 'to' as the Sender/User
-                $botNumber,  // Map 'from' as the Receiver/Bot
+                $msg['from'] ?? null, // User
+                $msg['to'] ?? null,   // Bot
                 $msg['message']['text'] ?? $msg['cleanText'] ?? null,
                 'infobip'
             );
@@ -143,12 +136,9 @@ class ChatbotWebhookController extends Controller
         
         // Logic B: Direct Object
         if ($request->has('message')) {
-            $userNumber = $request->input('to');
-            $botNumber = $request->input('from');
-
             return $this->validateAndFormat(
-                $userNumber, // Map 'to' as the Sender/User
-                $botNumber,  // Map 'from' as the Receiver/Bot
+                $request->input('from'), // User
+                $request->input('to'),   // Bot
                 $request->input('message.text'),
                 'infobip'
             );
