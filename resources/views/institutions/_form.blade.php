@@ -63,10 +63,12 @@
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('institute.institute_type') }} <span class="text-danger">*</span></label>
                                 <select name="type" class="form-control default-select" required>
-                                    <option value="primary" {{ (old('type', $institute->type ?? '') == 'primary') ? 'selected' : '' }}>{{ __('institute.primary_school') }}</option>
-                                    <option value="secondary" {{ (old('type', $institute->type ?? '') == 'secondary') ? 'selected' : '' }}>{{ __('institute.secondary_school') }}</option>
-                                    <option value="university" {{ (old('type', $institute->type ?? '') == 'university') ? 'selected' : '' }}>{{ __('institute.university') }}</option>
-                                    <option value="mixed" {{ (old('type', $institute->type ?? '') == 'mixed') ? 'selected' : '' }}>{{ __('institute.mixed_level') }}</option>
+                                    @foreach(\App\Enums\InstitutionType::cases() as $type)
+                                        <option value="{{ $type->value }}" 
+                                            {{ (old('type', isset($institute->type) && is_object($institute->type) ? $institute->type->value : ($institute->type ?? '')) == $type->value) ? 'selected' : '' }}>
+                                            {{ $type->label() }}
+                                        </option>
+                                    @endforeach
                                 </select>
                             </div>
                             

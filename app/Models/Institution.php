@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\LogsActivity;
-
+use App\Enums\InstitutionType; // Import Enum
 class Institution extends Model
 {
     use HasFactory, LogsActivity;
@@ -24,6 +24,11 @@ class Institution extends Model
         'logo', 
         'sms_credits',
         'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'type' => InstitutionType::class, // Cast to Enum
     ];
 
     /**

@@ -44,7 +44,7 @@
                                     </span>
                                 @endif
                                 <span class="ms-2 badge badge-info badge-pill light px-3 py-2">
-                                    {{ ucfirst($institute->type) }}
+                                    {{ $institute->type instanceof \App\Enums\InstitutionType ? $institute->type->label() : ucfirst($institute->type) }}
                                 </span>
                             </div>
 

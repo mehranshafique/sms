@@ -8,6 +8,7 @@ use App\Services\NotificationService;
 use App\Services\IdGeneratorService;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
+use App\Enums\InstitutionType; // Import Enum
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -31,7 +32,6 @@ class InstituteController extends BaseController
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            // Eager load the cityRelation to get city names
             $data = Institution::with('cityRelation')->select('institutions.*');
             
             return DataTables::of($data)
@@ -55,7 +55,6 @@ class InstituteController extends BaseController
                                 <span class="fs-12 text-muted">'.$row->phone.'</span>
                             </div>';
                 })
-                // Show City Name instead of ID
                 ->editColumn('city', function($row){
                     return $row->cityRelation ? $row->cityRelation->name : '-';
                 })
@@ -108,7 +107,8 @@ class InstituteController extends BaseController
         $rules = [
             'name'      => 'required|string|max:150',
             'acronym'   => 'nullable|string|max:20',
-            'type'      => 'required|in:primary,secondary,university,mixed',
+            // Updated validation using Enum
+            'type'      => ['required', Rule::enum(InstitutionType::class)],
             'country'   => 'required|exists:countries,id',
             'state'     => 'required|exists:states,id',
             'city'      => 'required|exists:cities,id',
@@ -153,7 +153,6 @@ class InstituteController extends BaseController
 
             $institute->save();
 
-            // Fix Audit Log Context (Update to actual institute ID if needed)
             try {
                 \App\Models\AuditLog::where('user_id', Auth::id())
                     ->where('created_at', '>=', now()->subSeconds(10))
@@ -175,7 +174,7 @@ class InstituteController extends BaseController
                     'email'         => $request->email,
                     'password'      => Hash::make($request->password),
                     'institute_id'  => $institute->id,
-                    'shortcode'     => $institute->code, // Institute Code is the Admin's Shortcode
+                    'shortcode'     => $institute->code, 
                     'username'      => $institute->code,
                     'user_type'     => UserType::SCHOOL_ADMIN->value, 
                     'phone'         => $request->full_phone,
@@ -183,7 +182,6 @@ class InstituteController extends BaseController
                     'is_active'     => true,
                 ]);
 
-                // Assign SCHOOL_ADMIN Role
                 $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
                             ->where('institution_id', $institute->id)
                             ->first();
@@ -192,7 +190,6 @@ class InstituteController extends BaseController
                     $adminUser->assignRole($role);
                 }
 
-                // Send Credentials via all channels
                 $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
             }
         });
@@ -213,14 +210,15 @@ class InstituteController extends BaseController
     public function update(Request $request, Institution $institute)
     {
         $adminUser = User::where('institute_id', $institute->id)
-                         ->whereIn('user_type', [UserType::SCHOOL_ADMIN->value, UserType::HEAD_OFFICER->value]) // Check both to support legacy
+                         ->whereIn('user_type', [UserType::SCHOOL_ADMIN->value, UserType::HEAD_OFFICER->value]) 
                          ->first();
         $adminUserId = $adminUser ? $adminUser->id : null;
 
         $rules = [
             'name'      => 'required|string|max:150',
             'acronym'   => 'nullable|string|max:20',
-            'type'      => 'required|in:primary,secondary,university,mixed',
+            // Updated validation using Enum
+            'type'      => ['required', Rule::enum(InstitutionType::class)],
             'country'   => 'required|exists:countries,id',
             'state'     => 'required|exists:states,id',
             'city'      => 'required|exists:cities,id',
@@ -278,13 +276,11 @@ class InstituteController extends BaseController
                     if ($request->filled('password')) {
                         $updateData['password'] = Hash::make($request->password);
                     }
-                    // Update shortcode/username if code changed (unlikely but safe)
                     $updateData['shortcode'] = $institute->code;
                     $updateData['username'] = $institute->code;
 
                     $adminUser->update($updateData);
 
-                    // Ensure School Admin Role
                     $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
                         ->where('institution_id', $institute->id)
                         ->first();
@@ -294,7 +290,6 @@ class InstituteController extends BaseController
                     }
 
                     if ($request->filled('password')) {
-                        // Send updated credentials
                         app(NotificationService::class)->sendInstitutionCreation($institute, $adminUser, $request->password);
                     }
                 }
@@ -338,22 +333,17 @@ class InstituteController extends BaseController
         return response()->json(['error' => __('institute.something_went_wrong')]);
     }
 
-    /**
-     * Check if email exists in Users or Institutions table.
-     */
     public function checkEmail(Request $request)
     {
         $email = $request->input('email');
         $ignoreId = $request->input('id'); 
         
-        // 1. Prepare Institution Check
         $instQuery = Institution::where('email', $email);
         if ($ignoreId) {
             $instQuery->where('id', '!=', $ignoreId);
         }
         $existsInst = $instQuery->exists();
 
-        // 2. Prepare User Check
         $userQuery = User::where('email', $email);
         if ($ignoreId) {
             $adminUser = User::where('institute_id', $ignoreId)
