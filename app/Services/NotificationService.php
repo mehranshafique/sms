@@ -259,12 +259,12 @@ class NotificationService
         return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel);
     }
 
+    // --- MAIN SEND METHOD ---
     public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms') 
     {
         $institution = Institution::find($institutionId);
         
         $providerKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
-        
         $selectedProvider = InstitutionSetting::where('institution_id', $institutionId)
             ->where('key', $providerKey)
             ->value('value') ?? 'system';
@@ -278,7 +278,6 @@ class NotificationService
             $finalProviderName = InstitutionSetting::whereNull('institution_id')
                 ->where('key', $globalKey)
                 ->value('value') ?? 'mobishastra';
-            
             $credentialsContextId = null; 
             $shouldDeductCredits = true;
         } else {
@@ -313,12 +312,12 @@ class NotificationService
             return $result;
 
         } catch (\Exception $e) {
-            Log::error("Notification Error [Inst: $institutionId]: " . $e->getMessage());
-            return ['success' => false, 'message' => __('configuration.gateway_connection_error') . ': ' . $e->getMessage()];
+            Log::error("Notification Error: " . $e->getMessage());
+            return ['success' => false, 'message' => __('configuration.gateway_connection_error')];
         }
     }
     
-    // --- UPDATED OTP METHOD (FORCE SMS) ---
+    // --- OTP (SMS ONLY) ---
     public function sendOtpNotification(Student $student, $otp)
     {
         // Try Parent Phone first
@@ -328,25 +327,25 @@ class NotificationService
               ?? $student->mobile_number; 
 
         if (!$phone) {
-            Log::error("OTP Failed: No phone number found for Student ID {$student->id}");
+            Log::error("OTP Failed: No phone for Student ID {$student->id}");
             return;
         }
 
-        $message = __('chatbot.otp_sms_message', ['otp' => $otp]); // Ensure translation uses :otp
-        
-        // FORCE SMS CHANNEL regardless of settings to ensure it goes to SIM
+        $message = __('chatbot.otp_sms_message', ['otp' => $otp]);
+        // Force SMS channel
         $this->performSend($phone, $message, $student->institution_id, true, 'sms');
     }
 
     /**
-     * Send File (PDF/Image) via WhatsApp
+     * Send File (PDF) via WhatsApp
      */
     public function performSendFile($to, $fileUrl, $caption, $filename, $institutionId)
     {
-        $institution = Institution::find($institutionId);
-        if (!$institution) return ['success' => false];
-
-        $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'infobip');
+        $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'system');
+        if($providerName === 'system') {
+            $providerName = InstitutionSetting::get(null, 'whatsapp_provider', 'infobip');
+            $institutionId = null; 
+        }
         
         try {
             $gateway = GatewayFactory::create($providerName, $institutionId);
@@ -354,12 +353,37 @@ class NotificationService
             if (method_exists($gateway, 'sendWhatsAppFile')) {
                 return $gateway->sendWhatsAppFile($to, $fileUrl, $caption, $filename);
             }
-
-            // Fallback if provider doesn't support files
+            // Fallback
             return $gateway->sendWhatsApp($to, $caption . " " . $fileUrl);
 
         } catch (\Exception $e) {
             Log::error("File Send Error: " . $e->getMessage());
+            return ['success' => false];
+        }
+    }
+
+    /**
+     * Send Image (JPG/PNG) via WhatsApp
+     */
+    public function performSendImage($to, $imageUrl, $caption, $institutionId)
+    {
+        $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'system');
+        if($providerName === 'system') {
+            $providerName = InstitutionSetting::get(null, 'whatsapp_provider', 'infobip');
+            $institutionId = null;
+        }
+
+        try {
+            $gateway = GatewayFactory::create($providerName, $institutionId);
+            
+            if (method_exists($gateway, 'sendWhatsAppImage')) {
+                return $gateway->sendWhatsAppImage($to, $imageUrl, $caption);
+            }
+            // Fallback
+            return $gateway->sendWhatsApp($to, $caption . " " . $imageUrl);
+
+        } catch (\Exception $e) {
+            Log::error("Image Send Error: " . $e->getMessage());
             return ['success' => false];
         }
     }
