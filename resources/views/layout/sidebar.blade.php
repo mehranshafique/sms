@@ -3,33 +3,55 @@
         <ul class="metismenu" id="menu">
             
             @php
+                use App\Enums\RoleEnum;
+                use App\Enums\InstitutionType;
+                use App\Enums\UserType;
+                use App\Models\InstitutionSetting;
+                use App\Models\Subscription;
+                use App\Models\Institution;
+
                 $user = auth()->user();
-                $isSuperAdmin = $user->hasRole('Super Admin');
-                $isHeadOfficer = $user->hasRole('Head Officer');
-                $isSchoolAdmin = $user->hasRole('School Admin');
-                $isTeacher = $user->hasRole('Teacher');
-                $isStudent = $user->hasRole('Student');
+                
+                // Role Checks using Enums
+                $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
+                $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value);
+                $isSchoolAdmin = $user->hasRole(RoleEnum::SCHOOL_ADMIN->value);
+                $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
+                $isStudent = $user->hasRole(RoleEnum::STUDENT->value);
+                $isGuardian = $user->hasRole(RoleEnum::GUARDIAN->value);
                 
                 // Determine Active Context
                 $activeInstId = session('active_institution_id');
-                // Super Admin is in "Global Mode" if no specific institution is selected or explicitly 'global'
-                $isGlobalSuperAdmin = $isSuperAdmin && (!$activeInstId || $activeInstId === 'global');
                 
+                // Super Admin is in "Global Mode" ONLY if no specific institution is selected
+                $isGlobalMode = $isSuperAdmin && (!$activeInstId || $activeInstId === 'global');
+                
+                // Get Active Institution Object (for ID display and Type check)
+                $activeInstitution = null;
+                $activeInstType = null;
+
+                // Only fetch institution details if we are NOT in global mode, or if user is strictly a school-level user
+                if (!$isGlobalMode || $isHeadOfficer || $isSchoolAdmin) {
+                    $targetId = $activeInstId ?: $user->institute_id;
+                    if ($targetId && $targetId !== 'global') {
+                        $activeInstitution = Institution::find($targetId);
+                        $activeInstType = $activeInstitution ? $activeInstitution->type : null;
+                    }
+                }
+
                 // Helper to check module access
                 if (!isset($enabledModules)) {
                     $enabledModules = [];
-                    $institutionId = $activeInstId ?: $user->institute_id;
-                    
-                    if ($institutionId && $institutionId !== 'global') {
-                        $setting = \App\Models\InstitutionSetting::where('institution_id', $institutionId)
+                    if ($activeInstitution) {
+                        $setting = InstitutionSetting::where('institution_id', $activeInstitution->id)
                             ->where('key', 'enabled_modules')
                             ->first();
                         
                         if ($setting && $setting->value) {
                             $enabledModules = is_array($setting->value) ? $setting->value : json_decode($setting->value, true);
                         } else {
-                            $sub = \App\Models\Subscription::with('package')
-                                ->where('institution_id', $institutionId)
+                            $sub = Subscription::with('package')
+                                ->where('institution_id', $activeInstitution->id)
                                 ->where('status', 'active')
                                 ->where('end_date', '>=', now()->startOfDay())
                                 ->latest('created_at')
@@ -49,23 +71,25 @@
                     $cleanModules = array_map(fn($m) => strtolower(trim($m)), $modules);
                     return in_array($slug, $cleanModules);
                 };
-
-                // Helper to check Institution Type
-                $institutionType = 'mixed';
-                if (!$isGlobalSuperAdmin) {
-                    $instId = $activeInstId ?: $user->institute_id;
-                    if($instId) {
-                        $inst = \App\Models\Institution::find($instId);
-                        if($inst) $institutionType = $inst->type;
-                    }
-                }
             @endphp
 
-            {{-- 1. SUPER ADMIN GLOBAL SECTION --}}
-            {{-- Only show this if user is Super Admin AND in Global Mode --}}
-            @if($isGlobalSuperAdmin)
+            {{-- ============================================================= --}}
+            {{-- PART 1: SUPER ADMIN GLOBAL SECTION --}}
+            {{-- ============================================================= --}}
+            {{-- Visible ONLY to Super Admins (Always visible) --}}
+            @if($isSuperAdmin)
                 <li class="nav-label first">{{ __('sidebar.main_admin') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
+                
+                {{-- Global Dashboard Link --}}
+                {{-- LOGIC FIX: If in School Mode, this link switches BACK to Global Mode. If in Global Mode, it stays on Dashboard. --}}
+                <li>
+                    <a class="ai-icon {{ request()->routeIs('dashboard') && $isGlobalMode ? 'mm-active' : '' }}" 
+                       href="{{ $isGlobalMode ? route('dashboard') : route('institution.switch', 'global') }}">
+                        <i class="la la-home"></i>
+                        <span class="nav-text">{{ __('sidebar.dashboard.title') }}</span>
+                    </a>
+                </li>
+                
                 <li><a class="ai-icon {{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}"><i class="la la-shield"></i><span class="nav-text">{{ __('sidebar.permissions.roles') }}</span></a></li>
 
                 <li class="nav-label">{{ __('sidebar.reporting') }}</li>
@@ -109,12 +133,24 @@
             @endif
 
 
-            {{-- 2. SCHOOL CONTEXT SECTION --}}
-            {{-- Show if School Admin OR Head Officer OR (Super Admin switched to a school context) --}}
-            @if(($isSchoolAdmin || $isHeadOfficer) || ($isSuperAdmin && !$isGlobalSuperAdmin))
+            {{-- ============================================================= --}}
+            {{-- PART 2: SCHOOL CONTEXT SECTION --}}
+            {{-- ============================================================= --}}
+            {{-- Visible if School Admin/Head Officer OR if Super Admin has selected a school --}}
+            
+            @if(($isSchoolAdmin || $isHeadOfficer) || ($isSuperAdmin && $activeInstitution))
                 
-                <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
+                {{-- SEPARATOR / HEADER WITH SCHOOL ID --}}
+                <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                    {{ RoleEnum::SCHOOL_ADMIN->value }} <br>
+                    @if($activeInstitution)
+                        <span style="font-size: 11px; opacity: 0.7; font-weight: normal; letter-spacing: 1px;">
+                            ({{ $activeInstitution->code ?? $activeInstitution->id }})
+                        </span>
+                    @endif
+                </li>
+
+                <li><a class="ai-icon {{ request()->routeIs('dashboard') && !$isGlobalMode ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
 
                 {{-- ACADEMICS --}}
                 @if(
@@ -131,12 +167,12 @@
                         <li><a class="ai-icon" href="{{ route('academic-sessions.index') }}"><i class="la la-calendar-check-o"></i><span class="nav-text">{{ __('sidebar.sessions.title') }}</span></a></li>
                     @endif
 
-                    @if($hasModule('departments') && $user->can('department.view') && in_array($institutionType, ['university', 'mixed', 'lmd']))
+                    @if($hasModule('departments') && $user->can('department.view') && in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']))
                         <li><a class="ai-icon" href="{{ route('departments.index') }}"><i class="la la-building"></i><span class="nav-text">{{ __('sidebar.departments.title') }}</span></a></li>
                     @endif
 
                     {{-- PROGRAMS (University Only) --}}
-                    @if(in_array($institutionType, ['university', 'mixed', 'lmd']))
+                    @if(in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']))
                         <li>
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
                                 <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs') ?? 'Programs' }}</span>
@@ -188,18 +224,17 @@
                                 <li><a href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
                             @endif
                             
-                            {{-- NEW: Parents Link --}}
                             @can('student.view') 
                                 <li><a href="{{ route('parents.index') }}">{{ __('parent.page_title') ?? 'Parents' }}</a></li>
                             @endcan
 
-                            {{-- Standard Enrollment --}}
-                            @if($hasModule('student_enrollments') && in_array($institutionType, ['primary', 'secondary', 'mixed', 'vocational']) && $user->can('student_enrollment.view'))
+                            {{-- Standard Enrollment (Primary/Secondary) --}}
+                            @if($hasModule('student_enrollments') && in_array($activeInstType, [InstitutionType::PRIMARY->value, InstitutionType::SECONDARY->value, 'mixed', InstitutionType::VOCATIONAL->value]) && $user->can('student_enrollment.view'))
                                 <li><a href="{{ route('enrollments.index') }}">{{ __('sidebar.enrollments.title') }}</a></li>
                             @endif
 
                             {{-- University Enrollment --}}
-                            @if($hasModule('university_enrollments') && in_array($institutionType, ['university', 'mixed', 'lmd']) && $user->can('university_enrollment.view'))
+                            @if($hasModule('university_enrollments') && in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']) && $user->can('university_enrollment.view'))
                                 <li><a href="{{ route('university.enrollments.index') }}">{{ __('sidebar.university_enrollments.title') }}</a></li>
                             @endif
 
@@ -211,10 +246,7 @@
                                 <li><a href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
                             @endif
                             
-                            {{-- NEW: Pickup System (Admin/Guard View) --}}
                             <li><a href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</a></li>
-                            
-                            {{-- UPDATED: Pickup System (QR Generator for Admins) --}}
                             <li><a href="{{ route('pickups.parent') }}">{{ __('pickup.page_title') ?? 'Generate Student QR' }}</a></li>
                         </ul>
                     </li>
@@ -323,7 +355,7 @@
                         <li><a class="ai-icon" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
                         
                         {{-- NEW CHATBOT LINK --}}
-                        @if($user->hasRole(['Super Admin','School Admin', 'Head Officer']))
+                        @if($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value]))
                         <li><a class="ai-icon" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
                         @endif
                     @endif
@@ -334,7 +366,8 @@
                 @endif
 
                 {{-- CONFIGURATION --}}
-                @if($user->can('setting.manage'))
+                {{-- Show settings for school admins, but hide for super admins to prevent clutter/duplication as they have the top section --}}
+                @if($user->can('setting.manage') && !$isSuperAdmin)
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
                     <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
@@ -350,7 +383,9 @@
             @endif
 
 
-            {{-- 3. TEACHER SECTION --}}
+            {{-- ============================================================= --}}
+            {{-- PART 3: TEACHER SECTION --}}
+            {{-- ============================================================= --}}
             @if($isTeacher)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
                 <li><a class="ai-icon" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
@@ -372,13 +407,14 @@
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
                 <li><a class="ai-icon" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span></a></li>
 
-                {{-- NEW: Teacher Pickup Approval View --}}
                 <li class="nav-label">Pickup System</li>
                 <li><a class="ai-icon" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span></a></li>
             @endif
 
 
-            {{-- 4. STUDENT SECTION --}}
+            {{-- ============================================================= --}}
+            {{-- PART 4: STUDENT SECTION --}}
+            {{-- ============================================================= --}}
             @if($isStudent)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
                 <li><a class="ai-icon" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
@@ -405,10 +441,11 @@
                 @endif
             @endif
 
-            {{-- 5. PARENT / GUARDIAN SECTION --}}
-            @if(auth()->user()->hasRole('Guardian'))
+            {{-- ============================================================= --}}
+            {{-- PART 5: PARENT / GUARDIAN SECTION --}}
+            {{-- ============================================================= --}}
+            @if($isGuardian)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
-                {{-- NEW: Pickup QR Generation --}}
                 <li><a class="ai-icon" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
             @endif
 
