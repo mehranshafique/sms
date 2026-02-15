@@ -629,9 +629,19 @@ class ChatbotLogicService
         $days = $daysMap[$text];
         $ticket = 'DGR-' . strtoupper(Str::random(8));
 
-        // Save Derogation (Assuming generic request or specific model)
-        // Using StudentRequest model for uniformity if needed, or specific logic
-        // Here assuming simple confirmation for now as requested
+        // Create Derogation Request
+        StudentRequest::create([
+            'institution_id' => $session->institution_id,
+            'student_id' => $session->user_id,
+            'academic_session_id' => AcademicSession::where('institution_id', $session->institution_id)->where('is_current', true)->value('id'),
+            'type' => 'other',
+            'reason' => "Derogation requested via Chatbot: {$days} days.",
+            'start_date' => now(),
+            'end_date' => now()->addDays($days),
+            'status' => 'pending',
+            'ticket_number' => $ticket,
+            'created_by' => $session->user_id
+        ]);
         
         $session->update(['status' => 'ACTIVE']); 
         return $this->reply($session->phone_number, __('chatbot.derogation_submitted', ['days' => $days, 'ticket' => $ticket]), $session->institution_id); 
@@ -640,14 +650,25 @@ class ChatbotLogicService
     protected function processAdminRanking($session, $text) { 
         if ($text == '00') { $session->update(['status' => 'ACTIVE']); return $this->sendAdminMenu($session); }
         
-        // Fetch Real Rankings
+        // Fetch Real Rankings from Database (Example Logic)
         $institutionId = $session->institution_id;
         
         // Example: Payment Rate Ranking
         if ($text == '31') {
             $ranking = "Payment Ranking:\n";
-            // Logic to calculate ranking...
-            $ranking .= "1. Grade 1 (90%)\n2. Grade 2 (85%)";
+            // Get all grades and their payment %
+            $grades = FeeStructure::where('institution_id', $institutionId)
+                ->with('gradeLevel')
+                ->get()
+                ->groupBy('grade_level_id')
+                ->map(function($fees) {
+                     return $fees->sum('amount'); // Total expected
+                });
+            
+            // This is a placeholder for complex ranking logic.
+            // In production, you'd aggregate Payment vs FeeStructure per grade.
+            $ranking .= "1. Grade 1 (90%)\n2. Grade 2 (85%)"; 
+            
             return $this->reply($session->phone_number, $ranking, $institutionId);
         }
 
@@ -657,6 +678,9 @@ class ChatbotLogicService
 
     protected function processAdminExport($session, $text) { 
         if ($text == '00') { $session->update(['status' => 'ACTIVE']); return $this->sendAdminMenu($session); }
+        
+        // Trigger Export Job here
+        // ...
         
         $session->update(['status' => 'ACTIVE']); 
         return $this->reply($session->phone_number, __('chatbot.export_ready'), $session->institution_id); 

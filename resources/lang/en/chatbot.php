@@ -44,6 +44,7 @@ return [
     'too_many_attempts' => "🚫 Too many failed attempts. Session ended.",
     'id_not_found' => "❌ ID not found. Please try again (Attempt :attempt/3).",
     'no_registered_phone' => "⚠️ Error: No registered phone number found for this ID. Please contact administration.",
+    'system_error' => "⚠️ An internal error occurred. Please try again later.",
     
     // OTP
     'otp_sms_message' => "🔢 Your E-Digitex OTP code is: :otp (Valid for 5 min). Do not share it.",
@@ -60,25 +61,39 @@ return [
                        "4️⃣ Canteen Menu 🍽️\n\n" .
                        "Type 'Menu' to see this list again or 'Logout' to exit.",
                        
-    'main_menu' => "📜 *Main Menu:*\n\n" .
-                   "1️⃣ Balance & Finance 💰\n" .
-                   "2️⃣ Homework & Assignments 📚\n" .
-                   "3️⃣ Results & Reports 📊\n" .
-                   "4️⃣ Canteen Menu 🍽️\n\n" .
-                   "Type 'Logout' to exit.",
-
-    'logout_success' => "👋 Logged out successfully. See you soon!",
-    'unknown_command' => "❓ Unknown command.\n\nType 'Menu' to see options.",
-
-    // Real-time Data Responses
-    'balance_info' => "💰 *Financial Status*\n\n" .
-                      "Outstanding Balance: *:balance* USD\n" .
-                      "Please ensure timely payment to avoid interruptions.",
-                      
-    'data_unavailable' => "⚠️ Information unavailable for your account type.",
+    'main_menu' => "🎓 *Welcome to :school (Digitex)*\n\n📚 *:student, :class, :year*\n\n1️⃣ Homework (TP/TD)\n2️⃣ Payment\n3️⃣ Balance\n4️⃣ Report Card\n5️⃣ Misc Fees\n6️⃣ Activities & Calendar\n7️⃣ Derogation\n8️⃣ My Requests\n9️⃣ Generate Pickup QR",
+    'homework_list' => "📚 *Homework*\n:content",
+    'no_homework' => "⚠️ No homework found.",
+    'balance_info' => "📊 *Balance Summary:*\n💰 Total Fees: :total\n✅ Paid: :paid\n❌ Outstanding: :due",
+    'payment_method_menu' => "💰 Amount Due: :due\n💳 Total to Pay: :total\n📌 Choose Payment Method:\n\n1️⃣ Visa Card\n2️⃣ Mobile Money\n0️⃣ Cancel",
+    'payment_link' => "✅ *💳 Visa Selected.*\n👉 Click here to pay:\n🔗 :link",
+    'mobile_money_instruction' => "💳 Mobile Money selected.\n📌 Please enter your phone number.",
+    'result_found' => "📄 Here is your result card.",
+    'report_generated_local' => "📄 Report generated (Localhost): :url", // Added
+    'no_result_found' => "⚠️ No result found.",
+    'misc_fees_list' => "💰 *School Fees:*\n:content",
+    'no_fees_found' => "✅ No miscellaneous fees found.",
+    'activities_list' => "📅 *Activities & Calendar:*\n:content",
+    'no_events_found' => "📅 No upcoming events found.",
     
-    'homework_list' => "📚 *Pending Assignments*",
-    'no_homework' => "✅ No pending assignments found.",
+    // Derogation & Requests
+    'derogation_menu' => "📝 *Derogation Request*\n\nChoose duration:\n1️⃣ 7 days\n2️⃣ 15 days\n3️⃣ 20 days\n4️⃣ 30 days\n0️⃣ Cancel",
+    'derogation_submitted' => "✅ Derogation request for :days days submitted.\nTicket: *:ticket*",
+    
+    'request_menu' => "📝 *Special Request Type:*\n\n1️⃣ Absence\n2️⃣ Late Arrival\n3️⃣ Sickness\n4️⃣ Early Exit\n5️⃣ Other\n0️⃣ Cancel",
+    'request_search_prompt' => "🔍 *Student Search*\n\nPlease enter the Student Name or Admission Number to create a request for:",
+    'no_student_found_retry' => "⚠️ Student not found. Please try again or type *0* to cancel.",
+    'multiple_students_found' => "🔍 Multiple students found. Please type the exact *Admission Number* from the list below:\n",
+    'student_selected' => "✅ Selected: *:name*",
+    
+    'request_reason_1' => "📝 *Reason for Early Exit:*\n1️⃣ Medical\n2️⃣ Family Emergency\n3️⃣ Other\n0️⃣ Cancel", // Legacy? Kept for safety
+    'request_submitted' => "✅ Request submitted successfully.\nTicket: *:ticket*",
+    
+    // QR
+    'qr_verification' => "📲 *QR Generation*\n\nIdentity verification required.\n➡️ Type *1* to receive OTP.\n➡️ Type *0* to cancel.",
+    'otp_sent' => "OTP sent to registered number. Enter code to continue.",
+    'qr_success_menu' => "✅ Verified. QR Code has been sent.",
+    'qr_caption' => "Pickup QR for :student.\nValid for 2 hours.",
     
     // Legacy / API
     'student_not_found' => 'Student not found.',
@@ -95,7 +110,6 @@ return [
     'result_generated' => 'Result generated successfully.',
     'no_results_found' => 'No exam results found for this academic year.',
     'no_session' => 'No active session found.',
-    'otp_sent' => 'OTP sent.',
     'otp_message' => 'Your verification code is: :code',
     'qr_generated' => 'QR Code generated.',
     'qr_expired' => 'QR Code expired.',
@@ -104,53 +118,22 @@ return [
     'scan_success' => 'Scan successful.',
     'teacher_pickup_alert' => 'PICKUP ALERT: Parent is at the gate to pick up :student. Validated by :gate.',
     'fees_retrieved' => 'Fees retrieved.',
-    'no_fees_found' => 'No fees found.',
     'events_retrieved' => 'Events retrieved.',
-    'no_events_found' => 'No upcoming events.',
-    'derogation_submitted' => 'Derogation request submitted.',
-    'request_submitted' => 'Request submitted.',
-
+    
     // HEAD OFFICER MENU
-    'admin_welcome' => "👤 *Welcome, :name.*\n\nPlease choose an option:\n\n1️⃣ Global Dashboard\n2️⃣ School Aggregates\n3️⃣ Financial Ranking\n4️⃣ Stats & Forecast\n5️⃣ Export Report {Excel/PDF}\n6️⃣ Help\n\n0️⃣ Quit",
+    'admin_welcome_prompt' => "👤 *Admin Login*\n\nPlease enter your Username or Shortcode:",
+    'admin_id_invalid' => "❌ Invalid Admin ID.",
+    'admin_welcome' => "👤 *Welcome, :name.*\n\nPlease choose an option:\n\n1️⃣ Global Dashboard\n3️⃣ Financial Ranking\n5️⃣ Export Report\n6️⃣ Create Student Request\n0️⃣ Quit",
     'admin_dashboard' => "📊 *Global Dashboard*\n\n🏫 Schools: *:schools*\n👨‍🎓 Total Students: *:students*\n💵 Paid: *:paid_students* (*:paid_percentage*%)\n💰 Amount Paid: *:amount_paid*\n📈 Outstanding: *:outstanding*\n🔮 Forecast: *:total_balance*",
-    'admin_school_stats' => "🏫 *School Statistics*\n:content",
-    'admin_ranking_menu' => "🏆 *Ranking Type*\n\nChoose ranking type:\n\n3️⃣1️⃣ Payment Rate\n3️⃣2️⃣ Enrollment (Student Count)\n3️⃣3️⃣ Amounts (Paid/Outstanding)\n\nType *00* for Main Menu or *0* to Quit.",
-    'admin_export_menu' => "📁 *Export Reports*\n\nChoose report to export:\n\n1️⃣ Global (All Schools)\n2️⃣ By School\n3️⃣ Rankings\n\nType *00* for Main Menu or *0* to Quit.",
-    'admin_school_selection' => "🏫 *Select School for Export*\n\n:content\nType *00* for Main Menu or *0* to Quit.",
-    'admin_help' => "🆘 *Quick Commands*\n\n1️⃣ Global Dashboard\n2️⃣ School Aggregates\n3️⃣ Financial Ranking\n4️⃣ Stats & Forecast\n5️⃣ Export Report\n0️⃣ Quit",
+    'admin_ranking_menu' => "🏆 *Ranking Type*\n\nChoose ranking type:\n\n3️⃣1️⃣ Payment Rate\n3️⃣2️⃣ Enrollment (Student Count)\n\nType *00* for Main Menu.",
+    'admin_export_menu' => "📁 *Export Reports*\n\nChoose report to export:\n\n1️⃣ Global (All Schools)\n2️⃣ By School\n\nType *00* for Main Menu.",
     'export_ready' => "✅ Export ready. Sending file...",
     'export_failed' => "Sorry, could not generate the file.",
-    'ranking_title' => "🏆 *Rankings: :type*\n:content",
 
-    // STUDENT MENU & FEATURES
-    'main_menu' => "🎓 *Welcome to :school (Digitex)*\n\n📚 *:student, :class, :year*\n\n1️⃣ Homework (TP/TD)\n2️⃣ Payment\n3️⃣ Balance\n4️⃣ Report Card\n5️⃣ Misc Fees\n6️⃣ Activities & Calendar\n7️⃣ Derogation\n8️⃣ My Requests\n9️⃣ Generate Pickup QR",
-    'homework_list' => "📚 *Homework*\n:content",
-    'no_homework' => "⚠️ No homework found.",
-    'balance_info' => "📊 *Balance Summary:*\n💰 Total Fees: :total\n✅ Paid: :paid\n❌ Outstanding: :due",
-    'payment_method_menu' => "💰 Amount Due: :due\n💳 Total to Pay: :total\n📌 Choose Payment Method:\n\n1️⃣ Visa Card\n2️⃣ Mobile Money\n0️⃣ Cancel",
-    'payment_link' => "✅ *💳 Visa Selected.*\n👉 Click here to pay:\n🔗 :link",
-    'mobile_money_instruction' => "💳 Mobile Money selected.\n📌 Please enter your phone number.",
-    'result_found' => "📄 Here is your result card.",
-    'no_result_found' => "⚠️ No result found.",
-    'misc_fees_list' => "💰 *School Fees:*\n:content",
-    'activities_list' => "📅 *Activities & Calendar:*\n:content",
-    'derogation_menu' => "📝 *Derogation Request*\n\nChoose duration:\n1️⃣ 7 days\n2️⃣ 15 days\n3️⃣ 20 days\n4️⃣ 30 days\n0️⃣ Cancel",
-    'derogation_submitted' => "✅ Derogation request for :days days submitted.\nTicket: *:ticket*",
-    'request_menu' => "📝 *Special Request Type:*\n\n1️⃣ Early Exit\n2️⃣ Late Arrival\n3️⃣ Absence\n4️⃣ Sickness\n0️⃣ Cancel",
-    'request_reason_1' => "📝 *Reason for Early Exit:*\n1️⃣ Medical\n2️⃣ Family Emergency\n3️⃣ Other\n0️⃣ Cancel",
-    'request_reason_2' => "📝 *Reason for Late Arrival:*\n1️⃣ Transport\n2️⃣ Health\n3️⃣ Traffic\n0️⃣ Cancel",
-    'request_reason_3' => "📝 *Reason for Absence:*\n1️⃣ Travel\n2️⃣ Family Event\n3️⃣ Other\n0️⃣ Cancel",
-    'request_submitted' => "✅ Request ':type' submitted.\nReason: :reason\nTicket: *:ticket*",
-    'sick_leave_submitted' => "📝 Sick leave recorded. Proof may be required.",
-    
-    // QR
-    'qr_verification' => "📲 *QR Generation*\n\nIdentity verification required.\n➡️ Type *1* to receive OTP.\n➡️ Type *0* to cancel.",
-    'otp_sent' => "OTP sent to registered number. Enter code to continue.",
-    'qr_success' => "✅ Verified. Generating QR...",
-    'qr_caption' => "Pickup QR for :student.\nValid for 2 hours.",
-    
-    // Errors
+    // Errors & Status
     'invalid_option' => "⚠️ Invalid option. Please try again.",
     'session_ended' => "Your session has ended. Type 'Digitex' or 'Admin' to start again.",
     'unauthorized' => "⛔ Unauthorized access.",
+    'attempt_count' => "(Attempt :count/3)",
+    'error_occurred' => "⚠️ An error occurred. Please try again.",
 ];
