@@ -131,10 +131,12 @@ return [
     'promotions' => [
         'title' => 'Promotions'
     ],
+    'requests' => 'Requests', // Added Request Key
     'staff' => [
         'title' => 'Staff'
     ],
     'staff_attendance' => 'Staff Attendance',
+    'staff_leaves' => 'Staff Leaves',
     
     'fee_types' => [
         'title' => 'Fee Types'

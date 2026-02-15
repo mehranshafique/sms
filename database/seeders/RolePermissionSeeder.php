@@ -53,9 +53,13 @@ class RolePermissionSeeder extends Seeder
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
             'Student Promotion' => ['view', 'create'],
             'Student Transfers' => ['view', 'create', 'print'],
+            'Student Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
+
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Staff Attendance' => ['view', 'create', 'update', 'delete'],
+            'Staff Leaves' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
             'Student Parents' => ['view', 'create', 'update', 'delete'],
+            
             // Assessment
             'Exams' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Exam Schedules' => ['view', 'create', 'update', 'delete', 'download_admit_card'],
@@ -110,12 +114,9 @@ class RolePermissionSeeder extends Seeder
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
                 if ($slug === 'sms_templates') $singularKey = 'sms_template';
                 
-                // Note: 
-                // 'Student Enrollments' -> slug: 'student_enrollments' -> singular: 'student_enrollment'
-                // Permission: 'student_enrollment.view'
-                
-                // 'University Enrollments' -> slug: 'university_enrollments' -> singular: 'university_enrollment'
-                // Permission: 'university_enrollment.view'
+                // Manual fix for 'Staff Leaves' and 'Student Requests' to ensure clean permission names
+                if ($slug === 'staff_leaves') $singularKey = 'staff_leave';
+                if ($slug === 'student_requests') $singularKey = 'student_request';
 
                 $permissionName = "{$singularKey}.{$action}";
 

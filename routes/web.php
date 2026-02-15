@@ -40,9 +40,10 @@ use App\Http\Controllers\ParentController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
+use App\Http\Controllers\StaffLeaveController;
 use App\Http\Controllers\StudentPromotionController;
 use App\Http\Controllers\TransferController; 
-
+use App\Http\Controllers\StudentRequestController;
 // --- Controllers: Examinations ---
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
@@ -160,13 +161,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- ACADEMICS SECTION ---
     Route::prefix('academics')->group(function () {
-        // ... existing academics routes ...
-         // NEW: LMD Programs
+         // LMD Programs
         Route::get('programs', [ProgramController::class, 'index'])->name('programs.index');
         Route::post('programs/store', [ProgramController::class, 'store'])->name('programs.store');
         Route::delete('programs/{id}', [ProgramController::class, 'destroy'])->name('programs.destroy');
 
-        // NEW: LMD Academic Units (UE)
+        // LMD Academic Units (UE)
         Route::get('units', [AcademicUnitController::class, 'index'])->name('units.index');
         Route::post('units/store', [AcademicUnitController::class, 'store'])->name('units.store');
         Route::post('units/assign-subjects', [AcademicUnitController::class, 'assignSubjects'])->name('units.assign_subjects');
@@ -226,11 +226,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
     // 3. PEOPLE & HR MODULE
     // =========================================================================
+    
     // Parent / Guardian Management
-
     Route::get('parents/check', [ParentController::class, 'check'])->name('parents.check');
-    // Parent Management
     Route::resource('parents', ParentController::class);
+    
     // Students
     Route::get('students/get-sections', [StudentController::class, 'getSections'])->name('students.get_sections');
     Route::resource('students', StudentController::class);
@@ -248,7 +248,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('enrollments', StudentEnrollmentController::class);
     });
 
-    // NEW: University Enrollments
+    // University Enrollments
     Route::middleware([CheckModuleAccess::class . ':university_enrollments'])->prefix('university')->name('university.')->group(function () {
         Route::resource('enrollments', UniversityEnrollmentController::class);
     });
@@ -268,10 +268,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('attendance/print-report', [StudentAttendanceController::class, 'printReport'])->name('attendance.print_report');
     });
 
+    // Student Requests
+    Route::middleware([CheckModuleAccess::class . ':student_requests'])->group(function () {
+        Route::get('requests/update-status/{id}', [StudentRequestController::class, 'updateStatus'])->name('requests.update_status');
+        Route::resource('requests', StudentRequestController::class);
+    });
+
     // Pickup Scanner Routes
-    // Accessible by Admin, Head Officer, Teacher, Guard
     Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () { 
-        // PICKUP SYSTEM ROUTES
         // Guard View
         Route::get('/pickup/scanner', [PickupWebController::class, 'guardScanner'])->name('pickups.scanner');
         Route::post('/pickup/process', [PickupWebController::class, 'processScan'])->name('pickups.process');
@@ -279,10 +283,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Teacher View
         Route::get('/pickup/manage', [PickupWebController::class, 'teacherView'])->name('pickups.teacher');
         Route::post('/pickup/update/{id}', [PickupWebController::class, 'updateStatus'])->name('pickups.update');
-        // NEW PARENT ROUTES
-    Route::get('/pickup/my-children', [PickupWebController::class, 'parentView'])->name('pickups.parent');
-    Route::post('/pickup/generate', [PickupWebController::class, 'generateParentQr'])->name('pickups.generate_parent');
+        
+        // Parent View
+        Route::get('/pickup/my-children', [PickupWebController::class, 'parentView'])->name('pickups.parent');
+        Route::post('/pickup/generate', [PickupWebController::class, 'generateParentQr'])->name('pickups.generate_parent');
     });
+
     // HR / Staff Management
     Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);
@@ -299,6 +305,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Staff Attendance
         Route::resource('staff-attendance', StaffAttendanceController::class)->only(['index', 'create', 'store']);
+    });
+
+    // Staff Leaves (Separate Module)
+    Route::middleware([CheckModuleAccess::class . ':staff_leaves'])->group(function () {
+        Route::post('staff-leaves/{id}/status', [StaffLeaveController::class, 'updateStatus'])->name('staff-leaves.status');
+        Route::resource('staff-leaves', StaffLeaveController::class);
     });
 
     // =========================================================================
@@ -331,10 +343,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Exam Schedules & Admit Cards
     Route::middleware([CheckModuleAccess::class . ':exam_schedules'])->group(function () {
         Route::get('exam-schedules', [ExamScheduleController::class, 'manage'])->name('exam-schedules.manage');
-        Route::get('exam-schedules/view', [ExamScheduleController::class, 'index'])->name('exam-schedules.index'); // ADDED THIS LINE
+        Route::get('exam-schedules/view', [ExamScheduleController::class, 'index'])->name('exam-schedules.index'); 
         Route::get('exam-schedules/get-subjects', [ExamScheduleController::class, 'getSubjects'])->name('exam-schedules.get-subjects');
-        Route::get('exam-schedules/get-students', [ExamScheduleController::class, 'getStudents'])->name('exam-schedules.get-students'); // Added missing route
-        Route::get('exam-schedules/auto-generate', [ExamScheduleController::class, 'autoGenerate'])->name('exam-schedules.auto-generate'); // Added missing route
+        Route::get('exam-schedules/get-students', [ExamScheduleController::class, 'getStudents'])->name('exam-schedules.get-students'); 
+        Route::get('exam-schedules/auto-generate', [ExamScheduleController::class, 'autoGenerate'])->name('exam-schedules.auto-generate'); 
         Route::post('exam-schedules', [ExamScheduleController::class, 'store'])->name('exam-schedules.store');
         Route::post('exam-schedules/download-admit-cards', [ExamScheduleController::class, 'downloadAdmitCards'])->name('exam-schedules.download-admit-cards');
     });
@@ -378,6 +390,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
          // NEW STATEMENT ROUTES
         Route::get('student/{id}/statement', [StudentStatementController::class, 'show'])->name('statement.show');
         Route::get('student/{id}/statement/pdf', [StudentStatementController::class, 'downloadPdf'])->name('statement.pdf');
+        
         // BUDGET MODULE
         // Categories
         Route::get('budgets/categories', [BudgetController::class, 'categories'])->name('budgets.categories');
@@ -386,16 +399,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Allocations & Index
         Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
         Route::post('budgets', [BudgetController::class, 'store'])->name('budgets.store');
-        Route::get('budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit'); // Added Edit
-        Route::put('budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update'); // Added Update
+        Route::get('budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit');
+        Route::put('budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
         
         // Requests
         Route::get('budgets/requests', [BudgetController::class, 'fundRequests'])->name('budgets.requests');
         Route::post('budgets/requests/store', [BudgetController::class, 'storeFundRequest'])->name('budgets.requests.store');
         
-        // Approvals (Using 'update' naming convention for clarity, maps to approveFundRequest)
+        // Approvals
         Route::post('budgets/requests/{id}/update', [BudgetController::class, 'approveFundRequest'])->name('budgets.requests.update');
-
 
         // Invoices - AJAX Routes
         Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
@@ -469,7 +481,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
     });
 
-    // --- NEW: CHATBOT SETTINGS ---
+    // --- CHATBOT SETTINGS ---
     // Accessible by Super Admin, Head Officer, and School Admin
     Route::middleware(['auth', RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->prefix('chatbot')->name('chatbot.')->group(function () {
         Route::get('/settings', [ChatbotSettingController::class, 'index'])->name('settings.index');
@@ -524,9 +536,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/smtp', [ConfigurationController::class, 'updateSmtp'])->name('configuration.smtp.update');
             Route::post('/smtp/test', [ConfigurationController::class, 'testSmtp'])->name('configuration.smtp.test');
             Route::post('/sms', [ConfigurationController::class, 'updateSms'])->name('configuration.sms.update');
-            Route::post('/sms/test', [ConfigurationController::class, 'testSms'])->name('configuration.sms.test'); // NEW ROUTE
+            Route::post('/sms/test', [ConfigurationController::class, 'testSms'])->name('configuration.sms.test');
             Route::post('/school-year', [ConfigurationController::class, 'updateSchoolYear'])->name('configuration.year.update');
-            // NEW ROUTE
             Route::post('/notifications/update', [ConfigurationController::class, 'updateNotifications'])->name('configuration.notifications.update');
             // SMS Templates
             Route::middleware([CheckModuleAccess::class . ':sms_templates'])->group(function() {

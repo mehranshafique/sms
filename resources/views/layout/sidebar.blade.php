@@ -81,7 +81,6 @@
                 <li class="nav-label first">{{ __('sidebar.main_admin') }}</li>
                 
                 {{-- Global Dashboard Link --}}
-                {{-- LOGIC FIX: If in School Mode, this link switches BACK to Global Mode. If in Global Mode, it stays on Dashboard. --}}
                 <li>
                     <a class="ai-icon {{ request()->routeIs('dashboard') && $isGlobalMode ? 'mm-active' : '' }}" 
                        href="{{ $isGlobalMode ? route('dashboard') : route('institution.switch', 'global') }}">
@@ -90,27 +89,37 @@
                     </a>
                 </li>
                 
-                <li><a class="ai-icon {{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}"><i class="la la-shield"></i><span class="nav-text">{{ __('sidebar.permissions.roles') }}</span></a></li>
+                {{-- Permissions & Modules --}}
+                <li>
+                    <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
+                        <i class="la la-shield"></i><span class="nav-text">{{ __('sidebar.permissions.title') }}</span>
+                    </a>
+                    <ul aria-expanded="false">
+                        <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
+                        {{-- Modules link removed as requested --}}
+                    </ul>
+                </li>
 
                 <li class="nav-label">{{ __('sidebar.reporting') }}</li>
                 <li class="{{ request()->routeIs('institutes.create', 'header-officers.create', 'audit-logs.*') ? 'mm-active' : '' }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.creation') }}</span></a>
                     <ul aria-expanded="false">
-                        <li><a href="{{ route('institutes.create') }}" class="{{ request()->routeIs('institutes.create') ? 'mm-active' : '' }}">{{ __('sidebar.institution_creation') }}</a></li>
-                        <li><a href="{{ route('header-officers.create') }}" class="{{ request()->routeIs('header-officers.create') ? 'mm-active' : '' }}">{{ __('sidebar.headoff_creation') }}</a></li>
-                        <li><a href="{{ route('audit-logs.index') }}" class="{{ request()->routeIs('audit-logs.*') ? 'mm-active' : '' }}">{{ __('sidebar.audit_log') }}</a></li>
+                        <li><a class="{{ request()->routeIs('institutes.create') ? 'mm-active' : '' }}" href="{{ route('institutes.create') }}">{{ __('sidebar.institution_creation') }}</a></li>
+                        <li><a class="{{ request()->routeIs('header-officers.create') ? 'mm-active' : '' }}" href="{{ route('header-officers.create') }}">{{ __('sidebar.headoff_creation') }}</a></li>
+                        <li><a class="{{ request()->routeIs('audit-logs.*') ? 'mm-active' : '' }}" href="{{ route('audit-logs.index') }}">{{ __('sidebar.audit_log') }}</a></li>
                     </ul>
                 </li>
 
                 <li class="nav-label">{{ __('sidebar.management') }}</li>
-                <li class="{{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show', 'header-officers.index', 'header-officers.edit', 'packages.*', 'subscriptions.*') ? 'mm-active' : '' }}">
+                <li class="{{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show', 'campuses.*', 'header-officers.index', 'header-officers.edit', 'packages.*', 'subscriptions.*') ? 'mm-active' : '' }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-university"></i><span class="nav-text">{{ __('sidebar.institution_mgmt') }}</span></a>
                     <ul aria-expanded="false">
-                        <li><a href="{{ route('institutes.index') }}">{{ __('sidebar.all_institutions') }}</a></li>
-                        <li><a href="{{ route('header-officers.index') }}">{{ __('sidebar.header_officers.title') }}</a></li>
+                        <li><a class="{{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show') ? 'mm-active' : '' }}" href="{{ route('institutes.index') }}">{{ __('sidebar.all_institutions') }}</a></li>
+                        <li><a class="{{ request()->routeIs('campuses.*') ? 'mm-active' : '' }}" href="{{ route('campuses.index') }}">{{ __('sidebar.campuses.title') }}</a></li>
+                        <li><a class="{{ request()->routeIs('header-officers.index', 'header-officers.edit') ? 'mm-active' : '' }}" href="{{ route('header-officers.index') }}">{{ __('sidebar.header_officers.title') }}</a></li>
                         <li><a href="{{ route('institutes.index') }}?status=0">{{ __('sidebar.expired_institution') }}</a></li>
-                        <li><a href="{{ route('packages.index') }}">{{ __('sidebar.packages.title') }}</a></li>
-                        <li><a href="{{ route('subscriptions.index') }}">{{ __('sidebar.subscriptions.title') }}</a></li>
+                        <li><a class="{{ request()->routeIs('packages.*') ? 'mm-active' : '' }}" href="{{ route('packages.index') }}">{{ __('sidebar.packages.title') }}</a></li>
+                        <li><a class="{{ request()->routeIs('subscriptions.index', 'subscriptions.edit') ? 'mm-active' : '' }}" href="{{ route('subscriptions.index') }}">{{ __('sidebar.subscriptions.title') }}</a></li>
                     </ul>
                 </li>
 
@@ -118,7 +127,7 @@
                 <li>
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.finance') }}</span></a>
                     <ul aria-expanded="false">
-                        <li><a href="{{ route('subscriptions.invoices') }}">{{ __('sidebar.billing_requests') }}</a></li>
+                        <li><a class="{{ request()->routeIs('subscriptions.invoices*') ? 'mm-active' : '' }}" href="{{ route('subscriptions.invoices') }}">{{ __('sidebar.billing_requests') }}</a></li>
                     </ul>
                 </li>
 
@@ -126,8 +135,8 @@
                 <li>
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.system_config') }}</span></a>
                     <ul aria-expanded="false">
-                        <li><a href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
-                        <li><a href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
+                        <li><a class="{{ request()->routeIs('configuration.index') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
+                        <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
                     </ul>
                 </li>
             @endif
@@ -136,7 +145,6 @@
             {{-- ============================================================= --}}
             {{-- PART 2: SCHOOL CONTEXT SECTION --}}
             {{-- ============================================================= --}}
-            {{-- Visible if School Admin/Head Officer OR if Super Admin has selected a school --}}
             
             @if(($isSchoolAdmin || $isHeadOfficer) || ($isSuperAdmin && $activeInstitution))
                 
@@ -159,16 +167,17 @@
                     ($hasModule('class_sections') && $user->can('class_section.view')) ||
                     ($hasModule('departments') && $user->can('department.view')) ||
                     ($hasModule('subjects') && $user->can('subject.view')) ||
-                    ($hasModule('timetables') && $user->can('timetable.view'))
+                    ($hasModule('timetables') && $user->can('timetable.view')) ||
+                    ($hasModule('assignments') && $user->can('assignment.view'))
                 )
                     <li class="nav-label">{{ __('sidebar.academics') }}</li>
                     
                     @if($hasModule('academic_sessions') && $user->can('academic_session.view'))
-                        <li><a class="ai-icon" href="{{ route('academic-sessions.index') }}"><i class="la la-calendar-check-o"></i><span class="nav-text">{{ __('sidebar.sessions.title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('academic-sessions.*') ? 'mm-active' : '' }}" href="{{ route('academic-sessions.index') }}"><i class="la la-calendar-check-o"></i><span class="nav-text">{{ __('sidebar.sessions.title') }}</span></a></li>
                     @endif
 
                     @if($hasModule('departments') && $user->can('department.view') && in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']))
-                        <li><a class="ai-icon" href="{{ route('departments.index') }}"><i class="la la-building"></i><span class="nav-text">{{ __('sidebar.departments.title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('departments.*') ? 'mm-active' : '' }}" href="{{ route('departments.index') }}"><i class="la la-building"></i><span class="nav-text">{{ __('sidebar.departments.title') }}</span></a></li>
                     @endif
 
                     {{-- PROGRAMS (University Only) --}}
@@ -178,31 +187,34 @@
                                 <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs') ?? 'Programs' }}</span>
                             </a>
                             <ul aria-expanded="false">
-                                <li><a href="{{ route('programs.index') }}">{{ __('lmd.programs_page_title') }}</a></li>
-                                <li><a href="{{ route('units.index') }}">{{ __('lmd.units_page_title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('programs.*') ? 'mm-active' : '' }}" href="{{ route('programs.index') }}">{{ __('lmd.programs_page_title') ?? 'Programs' }}</a></li>
+                                <li><a class="{{ request()->routeIs('units.*') ? 'mm-active' : '' }}" href="{{ route('units.index') }}">{{ __('lmd.units_page_title') ?? 'Academic Units' }}</a></li>
                             </ul>
                         </li>
                     @endif
 
                     @if($hasModule('grade_levels') && $user->can('grade_level.view'))
-                        <li><a class="ai-icon" href="{{ route('grade-levels.index') }}"><i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.grade_levels.title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('grade-levels.*') ? 'mm-active' : '' }}" href="{{ route('grade-levels.index') }}"><i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.grade_levels.title') }}</span></a></li>
                     @endif
 
                     {{-- Class & Subject Config Group --}}
-                    <li class="{{ request()->routeIs('class-sections.*', 'subjects.*', 'class-subjects.*', 'timetables.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('class-sections.*', 'subjects.*', 'class-subjects.*', 'timetables.*', 'assignments.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-book"></i><span class="nav-text">{{ __('sidebar.class_subjects.title') }}</span></a>
                         <ul aria-expanded="false">
                             @if($hasModule('class_sections') && $user->can('class_section.view'))
-                                <li><a href="{{ route('class-sections.index') }}">{{ __('sidebar.class_sections.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('class-sections.*') ? 'mm-active' : '' }}" href="{{ route('class-sections.index') }}">{{ __('sidebar.class_sections.title') }}</a></li>
                             @endif
                             @if($hasModule('subjects') && $user->can('subject.view'))
-                                <li><a href="{{ route('subjects.index') }}">{{ __('sidebar.subjects.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('subjects.*') ? 'mm-active' : '' }}" href="{{ route('subjects.index') }}">{{ __('sidebar.subjects.title') }}</a></li>
                             @endif
                             @if($hasModule('class_subjects') && $user->can('class_subject.view'))
-                                <li><a href="{{ route('class-subjects.index') }}">{{ __('sidebar.class_subjects.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('class-subjects.*') ? 'mm-active' : '' }}" href="{{ route('class-subjects.index') }}">{{ __('sidebar.class_subjects.title') }}</a></li>
                             @endif
                             @if($hasModule('timetables') && $user->can('timetable.view'))
-                                <li><a href="{{ route('timetables.index') }}">{{ __('sidebar.timetables.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('timetables.*') ? 'mm-active' : '' }}" href="{{ route('timetables.index') }}">{{ __('sidebar.timetables.title') }}</a></li>
+                            @endif
+                            @if($hasModule('assignments') && $user->can('assignment.view'))
+                                <li><a class="{{ request()->routeIs('assignments.*') ? 'mm-active' : '' }}" href="{{ route('assignments.index') }}">{{ __('sidebar.assignments.title') }}</a></li>
                             @endif
                         </ul>
                     </li>
@@ -217,37 +229,40 @@
                 )
                     <li class="nav-label">{{ __('sidebar.people') }}</li>
                     
-                    <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span></a>
                         <ul aria-expanded="false">
                             @if($hasModule('students') && $user->can('student.view'))
-                                <li><a href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('students.*') ? 'mm-active' : '' }}" href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
                             @endif
                             
                             @can('student.view') 
-                                <li><a href="{{ route('parents.index') }}">{{ __('parent.page_title') ?? 'Parents' }}</a></li>
+                                <li><a class="{{ request()->routeIs('parents.*') ? 'mm-active' : '' }}" href="{{ route('parents.index') }}">{{ __('parent.page_title') ?? 'Parents' }}</a></li>
                             @endcan
 
-                            {{-- Standard Enrollment (Primary/Secondary) --}}
+                            {{-- Standard Enrollment --}}
                             @if($hasModule('student_enrollments') && in_array($activeInstType, [InstitutionType::PRIMARY->value, InstitutionType::SECONDARY->value, 'mixed', InstitutionType::VOCATIONAL->value]) && $user->can('student_enrollment.view'))
-                                <li><a href="{{ route('enrollments.index') }}">{{ __('sidebar.enrollments.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('enrollments.*') ? 'mm-active' : '' }}" href="{{ route('enrollments.index') }}">{{ __('sidebar.enrollments.title') }}</a></li>
                             @endif
 
                             {{-- University Enrollment --}}
                             @if($hasModule('university_enrollments') && in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']) && $user->can('university_enrollment.view'))
-                                <li><a href="{{ route('university.enrollments.index') }}">{{ __('sidebar.university_enrollments.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('university.enrollments.*') ? 'mm-active' : '' }}" href="{{ route('university.enrollments.index') }}">{{ __('sidebar.university_enrollments.title') }}</a></li>
                             @endif
 
                             @if($hasModule('student_attendance') && $user->can('student_attendance.view'))
-                                <li><a href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('attendance.*') ? 'mm-active' : '' }}" href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.title') }}</a></li>
                             @endif
 
                             @if($hasModule('student_promotion') && $user->can('student_promotion.create'))
-                                <li><a href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('promotions.*') ? 'mm-active' : '' }}" href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
                             @endif
                             
-                            <li><a href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</a></li>
-                            <li><a href="{{ route('pickups.parent') }}">{{ __('pickup.page_title') ?? 'Generate Student QR' }}</a></li>
+                            {{-- Requests / Leaves --}}
+                            <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}</a></li>
+                            
+                            <li><a class="{{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</a></li>
+                            <li><a class="{{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}">{{ __('pickup.page_title') ?? 'Generate Student QR' }}</a></li>
                         </ul>
                     </li>
 
@@ -255,20 +270,21 @@
                         <li class="{{ request()->routeIs('staff.*', 'staff-attendance.*') ? 'mm-active' : '' }}">
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-chalkboard-teacher"></i><span class="nav-text">{{ __('sidebar.staff.title') }}</span></a>
                             <ul aria-expanded="false">
-                                <li><a href="{{ route('staff.index') }}">{{ __('sidebar.staff.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('staff.*') ? 'mm-active' : '' }}" href="{{ route('staff.index') }}">{{ __('sidebar.staff.title') }}</a></li>
                                 @if($user->can('staff_attendance.view'))
-                                    <li><a href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
+                                    <li><a class="{{ request()->routeIs('staff-attendance.*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
                                 @endif
+                                 <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}</a></li>
                             </ul>
                         </li>
                     @endif
                 @endif
                 
-                {{-- NEW: SECURITY / GUARD LINK --}}
+                {{-- SECURITY / GUARD LINK --}}
                 @if($user->hasRole('Guard') || $user->can('student.view'))
                     <li class="nav-label">Security</li>
                     <li>
-                        <a class="ai-icon" href="{{ route('pickups.scanner') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.scanner_title') ?? 'QR Scanner' }}</span></a>
+                        <a class="ai-icon {{ request()->routeIs('pickups.scanner') ? 'mm-active' : '' }}" href="{{ route('pickups.scanner') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.scanner_title') ?? 'QR Scanner' }}</span></a>
                     </li>
                 @endif
 
@@ -286,18 +302,18 @@
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fees_collection') }}</span></a>
                         <ul aria-expanded="false">
                             @if($hasModule('fee_types') && $user->can('fee_type.view'))
-                                <li><a href="{{ route('fee-types.index') }}">{{ __('sidebar.fee_types.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('fee-types.*') ? 'mm-active' : '' }}" href="{{ route('fee-types.index') }}">{{ __('sidebar.fee_types.title') }}</a></li>
                             @endif
                             @if($hasModule('fee_structures') && $user->can('fee_structure.view'))
-                                <li><a href="{{ route('fees.index') }}">{{ __('sidebar.fee_structures.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('fees.*') ? 'mm-active' : '' }}" href="{{ route('fees.index') }}">{{ __('sidebar.fee_structures.title') }}</a></li>
                             @endif
                             
                             @if($user->can('invoice.create'))
-                                <li><a href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
+                                <li><a class="{{ request()->routeIs('invoices.create') ? 'mm-active' : '' }}" href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
                             @endif
-                            <li><a href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
-                            <li><a href="{{ route('finance.balances.index') }}">{{ __('sidebar.student_balances') }}</a></li>
-                            <li><a href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
+                            <li><a class="{{ request()->routeIs('invoices.index', 'invoices.show', 'invoices.edit') ? 'mm-active' : '' }}" href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
+                            <li><a class="{{ request()->routeIs('finance.balances.*') ? 'mm-active' : '' }}" href="{{ route('finance.balances.index') }}">{{ __('sidebar.student_balances') }}</a></li>
+                            <li><a class="{{ request()->routeIs('finance.reports.*') ? 'mm-active' : '' }}" href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
                         </ul>
                     </li>
                     @endif
@@ -308,21 +324,21 @@
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-wallet"></i><span class="nav-text">{{ __('sidebar.budget_payroll') }}</span></a>
                         <ul aria-expanded="false">
                             @if($hasModule('budgets'))
-                                <li><a href="{{ route('budgets.categories') }}">{{ __('sidebar.budget_categories') }}</a></li>
-                                <li><a href="{{ route('budgets.index') }}">{{ __('sidebar.budget_allocation') }}</a></li>
-                                <li><a href="{{ route('budgets.requests') }}">{{ __('sidebar.fund_requests') }}</a></li>
+                                <li><a class="{{ request()->routeIs('budgets.categories') ? 'mm-active' : '' }}" href="{{ route('budgets.categories') }}">{{ __('sidebar.budget_categories') }}</a></li>
+                                <li><a class="{{ request()->routeIs('budgets.index', 'budgets.create', 'budgets.edit') ? 'mm-active' : '' }}" href="{{ route('budgets.index') }}">{{ __('sidebar.budget_allocation') }}</a></li>
+                                <li><a class="{{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}">{{ __('sidebar.fund_requests') }}</a></li>
                             @endif
                             @if($hasModule('payrolls'))
-                                <li><a href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
-                                <li><a href="{{ route('payroll.index') }}">{{ __('sidebar.generate_payroll') }}</a></li>
+                                <li><a class="{{ request()->routeIs('salary-structures.*') ? 'mm-active' : '' }}" href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
+                                <li><a class="{{ request()->routeIs('payroll.*') ? 'mm-active' : '' }}" href="{{ route('payroll.index') }}">{{ __('sidebar.generate_payroll') }}</a></li>
                             @endif
                         </ul>
                     </li>
                     @endif
 
-                    {{-- Platform Billing (Only for Head Officer or Switched Super Admin) --}}
+                    {{-- Platform Billing --}}
                     @can('institution.view')
-                    <li><a class="ai-icon" href="{{ route('subscriptions.invoices') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.billing') }}</span></a></li>
+                    <li><a class="ai-icon {{ request()->routeIs('subscriptions.invoices*') ? 'mm-active' : '' }}" href="{{ route('subscriptions.invoices') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.billing') }}</span></a></li>
                     @endcan
                 @endif
 
@@ -332,18 +348,18 @@
                     <li class="{{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span></a>
                         <ul aria-expanded="false">
-                            <li><a href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}</a></li>
+                            <li><a class="{{ request()->routeIs('exams.*') ? 'mm-active' : '' }}" href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}</a></li>
                             
                             @if($hasModule('exam_schedules'))
-                                <li><a href="{{ route('exam-schedules.manage') }}">{{ __('sidebar.exam_schedules.manage') }}</a></li>
+                                <li><a class="{{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.manage') }}">{{ __('sidebar.exam_schedules.manage') }}</a></li>
                             @endif
                             
                             @if($hasModule('exam_marks'))
-                                <li><a href="{{ route('marks.create') }}">{{ __('sidebar.marks.title') }}</a></li>
+                                <li><a class="{{ request()->routeIs('marks.*') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}">{{ __('sidebar.marks.title') }}</a></li>
                             @endif
                             
-                            <li><a href="{{ route('results.index') }}">{{ __('sidebar.results') }}</a></li>
-                            <li><a href="{{ route('reports.index') }}">{{ __('sidebar.academic_reports') }}</a></li>
+                            <li><a class="{{ request()->routeIs('results.*') ? 'mm-active' : '' }}" href="{{ route('results.index') }}">{{ __('sidebar.results') }}</a></li>
+                            <li><a class="{{ request()->routeIs('reports.*') ? 'mm-active' : '' }}" href="{{ route('reports.index') }}">{{ __('sidebar.academic_reports') }}</a></li>
                         </ul>
                     </li>
                 @endif
@@ -352,30 +368,28 @@
                 @if($hasModule('communication') || $hasModule('voting'))
                     <li class="nav-label">{{ __('sidebar.communication') }}</li>
                     @if($hasModule('communication') && $user->can('notice.view'))
-                        <li><a class="ai-icon" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
                         
-                        {{-- NEW CHATBOT LINK --}}
                         @if($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value]))
-                        <li><a class="ai-icon" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('chatbot.*') ? 'mm-active' : '' }}" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
                         @endif
                     @endif
 
                     @if($hasModule('voting') && $user->can('election.view'))
-                        <li><a class="ai-icon" href="{{ route('elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('elections.*') ? 'mm-active' : '' }}" href="{{ route('elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
                     @endif
                 @endif
 
                 {{-- CONFIGURATION --}}
-                {{-- Show settings for school admins, but hide for super admins to prevent clutter/duplication as they have the top section --}}
                 @if($user->can('setting.manage') && !$isSuperAdmin)
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
-                    <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
                         <ul aria-expanded="false">
-                            <li><a href="{{ route('settings.index') }}">{{ __('settings.page_title') }}</a></li>
-                            <li><a href="{{ route('configuration.index') }}">{{ __('configuration.page_title') }}</a></li>
-                            <li><a href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
-                            <li><a href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
+                            <li><a class="{{ request()->routeIs('settings.*') ? 'mm-active' : '' }}" href="{{ route('settings.index') }}">{{ __('settings.page_title') ?? 'Settings' }}</a></li>
+                            <li><a class="{{ request()->routeIs('configuration.*') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('configuration.page_title') ?? 'Configuration' }}</a></li>
+                            <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
+                            <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
                         </ul>
                     </li>
                 @endif
@@ -388,27 +402,30 @@
             {{-- ============================================================= --}}
             @if($isTeacher)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
-                <li><a class="ai-icon" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
                 
                 <li class="nav-label">{{ __('sidebar.academics') }}</li>
-                <li><a class="ai-icon" href="{{ route('timetables.routine') }}"><i class="la la-calendar"></i><span class="nav-text">{{ __('sidebar.timetables.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('timetables.routine') ? 'mm-active' : '' }}" href="{{ route('timetables.routine') }}"><i class="la la-calendar"></i><span class="nav-text">{{ __('sidebar.timetables.title') }}</span></a></li>
                 
                 @if($hasModule('assignments'))
-                    <li><a class="ai-icon" href="{{ route('assignments.index') }}"><i class="la la-tasks"></i><span class="nav-text">{{ __('sidebar.assignments.class_assignments') }}</span></a></li>
+                    <li><a class="ai-icon {{ request()->routeIs('assignments.*') ? 'mm-active' : '' }}" href="{{ route('assignments.index') }}"><i class="la la-tasks"></i><span class="nav-text">{{ __('sidebar.assignments.class_assignments') }}</span></a></li>
                 @endif
                 
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                <li><a class="ai-icon" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('marks.*') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
                 
                 @if($hasModule('exam_schedules'))
-                    <li><a class="ai-icon" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
+                    <li><a class="ai-icon {{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
                 @endif
 
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
-                <li><a class="ai-icon" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span></a></li>
+                
+                {{-- Teacher Requests/Leaves --}}
+                <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span></a></li>
 
                 <li class="nav-label">Pickup System</li>
-                <li><a class="ai-icon" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span></a></li>
             @endif
 
 
@@ -417,27 +434,28 @@
             {{-- ============================================================= --}}
             @if($isStudent)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
-                <li><a class="ai-icon" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
                 
                 <li class="nav-label">{{ __('sidebar.academics') }}</li>
-                <li><a class="ai-icon" href="{{ route('timetables.routine') }}"><i class="la la-calendar"></i><span class="nav-text">{{ __('sidebar.timetables.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('timetables.routine') ? 'mm-active' : '' }}" href="{{ route('timetables.routine') }}"><i class="la la-calendar"></i><span class="nav-text">{{ __('sidebar.timetables.title') }}</span></a></li>
                 
                 @if($hasModule('assignments'))
-                    <li><a class="ai-icon" href="{{ route('assignments.index') }}"><i class="la la-tasks"></i><span class="nav-text">{{ __('sidebar.assignments.my_assignments') }}</span></a></li>
+                    <li><a class="ai-icon {{ request()->routeIs('assignments.*') ? 'mm-active' : '' }}" href="{{ route('assignments.index') }}"><i class="la la-tasks"></i><span class="nav-text">{{ __('sidebar.assignments.my_assignments') }}</span></a></li>
                 @endif
 
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                <li><a class="ai-icon" href="{{ route('marks.my_marks') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('marks.my_marks') ? 'mm-active' : '' }}" href="{{ route('marks.my_marks') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
                 
                 @if($hasModule('exam_schedules'))
-                    <li><a class="ai-icon" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
+                    <li><a class="ai-icon {{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
                 @endif
 
                 <li class="nav-label">{{ __('sidebar.communication') }}</li>
-                <li><a class="ai-icon" href="{{ route('student.notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.my_notices') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('student.notices.*') ? 'mm-active' : '' }}" href="{{ route('student.notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.my_notices') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span></a></li>
                 
                 @if($hasModule('voting'))
-                    <li><a class="ai-icon" href="{{ route('student.elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.my_elections') }}</span></a></li>
+                    <li><a class="ai-icon {{ request()->routeIs('student.elections.*') ? 'mm-active' : '' }}" href="{{ route('student.elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.my_elections') }}</span></a></li>
                 @endif
             @endif
 
@@ -446,7 +464,7 @@
             {{-- ============================================================= --}}
             @if($isGuardian)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
-                <li><a class="ai-icon" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
             @endif
 
         </ul>
