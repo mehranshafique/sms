@@ -13,14 +13,14 @@ class StudentRequest extends Model
         'institution_id',
         'student_id',
         'academic_session_id',
-        'type',
+        'type',             // absence, late, sick, early_exit
         'reason',
         'start_date',
         'end_date',
-        'status',
+        'status',           // pending, approved, rejected
         'ticket_number',
-        'created_by',
-        'approved_by',
+        'created_by',       // User ID of creator (Student or Admin)
+        'approved_by',      // User ID of approver
         'approved_at',
         'file_path'
     ];
