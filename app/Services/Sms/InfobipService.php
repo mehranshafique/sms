@@ -175,7 +175,7 @@ class InfobipService implements SmsGatewayInterface
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
             ])->timeout(30)->post($url, $payload);
-
+            Log::info("Infobip Image Response: " . $response->body());
             if ($response->successful()) {
                 return ['success' => true, 'message' => 'Image sent successfully'];
             }

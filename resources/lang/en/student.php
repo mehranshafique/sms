@@ -25,7 +25,7 @@ return [
     'student_details' => 'Student Details',
     'create_new' => 'Admit Student',
     'profile_details' => 'Profile Details',
-    
+    'validation_error' => 'Validation Error', 
     'total_students' => 'Total Students',
     'active_students' => 'Active Students',
     'transferred_students' => 'Transferred',
