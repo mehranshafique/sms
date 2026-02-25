@@ -51,9 +51,9 @@ class ExamMarkController extends BaseController
         if (!$isAdmin) {
             if (!empty($activePeriods)) {
                 $examsQuery->whereIn('category', $activePeriods);
-            } else {
-                $examsQuery->whereRaw('1 = 0'); 
             }
+            // FIXED: Removed the `else { $examsQuery->whereRaw('1 = 0'); }` 
+            // so teachers can see ongoing exams even if 'active_periods' is not configured in settings.
         }
 
         $exams = $examsQuery->pluck('name', 'id');
@@ -122,7 +122,7 @@ class ExamMarkController extends BaseController
             RoleEnum::SCHOOL_ADMIN->value 
         ]);
 
-        // STRICT TEACHER/STAFF FILTERING (Fixed to include ClassSubjects)
+        // STRICT TEACHER/STAFF FILTERING
         if (!$isAdmin) {
             if ($user->staff) {
                 $staffId = $user->staff->id;
@@ -251,12 +251,12 @@ class ExamMarkController extends BaseController
 
             return [
                 'id' => $subject->id,
-                'name' => $displayName . $ueInfo, // Updated Name Display
+                'name' => $displayName . $ueInfo,
                 'raw_name' => $subject->name,
                 'total_marks' => (float)$maxMarks,
                 'teacher_name' => $teacherName,
                 'coefficient' => $subject->coefficient ?? 1,
-                'ue_code' => $subject->academicUnit->code ?? null
+                'ue_code' => $subject->academicUnit?->code ?? null
             ];
         });
 
@@ -273,7 +273,7 @@ class ExamMarkController extends BaseController
             ->where('subject_id', $subjectId)
             ->first();
             
-        if ($alloc && $alloc->teacher) {
+        if ($alloc && $alloc->teacher && $alloc->teacher->user) {
             return $alloc->teacher->user->name;
         }
 
@@ -283,7 +283,8 @@ class ExamMarkController extends BaseController
             ->where('subject_id', $subjectId)
             ->first();
             
-        return $tt->teacher->user->name ?? 'N/A';
+        // FIXED: Using null-safe operators (?->) prevents the 500 error if Timetable doesn't exist
+        return $tt?->teacher?->user?->name ?? 'N/A';
     }
 
     private function validateAccess($examId, $classId, $subjectId)
