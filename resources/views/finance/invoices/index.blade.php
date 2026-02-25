@@ -33,7 +33,7 @@
                                         <th>#</th>
                                         <th>{{ __('invoice.invoice_number') }}</th>
                                         <th>{{ __('invoice.student') }}</th>
-                                        <th>{{ __('invoice.description') }}</th> {{-- Added Fee Name/Description Column --}}
+                                        <th>{{ __('invoice.description') }}</th>
                                         <th>{{ __('invoice.issue_date') }}</th>
                                         <th>{{ __('invoice.due_date') }}</th>
                                         <th>{{ __('invoice.total') }}</th>
@@ -66,10 +66,11 @@
             serverSide: true,
             ajax: "{{ route('invoices.index') }}",
             columns: [
-                { data: 'DT_RowIndex', name: 'id' },
+                { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
                 { data: 'invoice_number', name: 'invoice_number' },
-                { data: 'student_name', name: 'student.first_name' },
-                { data: 'fee_name', name: 'fee_name', orderable: false, searchable: false }, // Added Fee Name Data
+                // CHANGED: Use student_name as the internal 'name' property to map to the new backend flexible search filter.
+                { data: 'student_name', name: 'student_name' }, 
+                { data: 'fee_name', name: 'fee_name', orderable: false, searchable: false },
                 { data: 'issue_date', name: 'issue_date' },
                 { data: 'due_date', name: 'due_date' },
                 { data: 'total_amount', name: 'total_amount' },

@@ -57,11 +57,11 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">{{ __('requests.start_date') }} <span class="text-danger">*</span></label>
-                                    <input type="date" name="start_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                                    <input type="text" name="start_date" class="form-control datepicker" value="{{ date('Y-m-d') }}" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">{{ __('requests.end_date') }}</label>
-                                    <input type="date" name="end_date" class="form-control">
+                                    <input type="text" name="end_date" class="form-control datepicker">
                                 </div>
                             </div>
 

@@ -57,7 +57,14 @@ class ClassSection extends Model
         return $this->hasMany(StudentEnrollment::class);
     }
 
-    public function timetables(){
+    public function timetables()
+    {
         return $this->hasMany(Timetable::class);
+    }
+
+    // ADDED: Missing relationship to fix the AssignmentController / ExamMarkController crash
+    public function classSubjects()
+    {
+        return $this->hasMany(ClassSubject::class);
     }
 }

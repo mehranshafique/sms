@@ -26,23 +26,26 @@ class StudentRequestController extends BaseController
         $user = Auth::user();
 
         if ($request->ajax()) {
-            // FIXED: Removed 'staff' relation, added 'creator'
+            // FIXED: Added select('student_requests.*') and explicit table prefixes to avoid "Ambiguous Column" errors during DataTables JOINs.
             $query = StudentRequest::with(['student', 'creator'])
-                ->where('institution_id', $institutionId)
-                ->latest();
+                ->select('student_requests.*')
+                ->where('student_requests.institution_id', $institutionId)
+                ->latest('student_requests.created_at');
 
             // Student: View Own
             if ($user->hasRole(RoleEnum::STUDENT->value)) {
-                $query->where('student_id', $user->student->id ?? 0);
+                $query->where('student_requests.student_id', $user->student->id ?? 0);
             }
             
-            // Teacher: NO VIEW (As per instruction "Teacher can't create", assuming no view access either)
+            // Teacher: NO VIEW
             if ($user->hasRole(RoleEnum::TEACHER->value)) {
                 $query->whereRaw('1 = 0');
             }
 
             return DataTables::of($query)
                 ->addIndexColumn()
+                // FIXED: Provided 'applicant' to match frontend JS, kept 'student_name' as a fallback just in case
+                ->addColumn('applicant', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('ticket', fn($row) => '<span class="fw-bold">'.$row->ticket_number.'</span>')
                 ->editColumn('type', fn($row) => __('requests.type_' . $row->type))
@@ -86,6 +89,8 @@ class StudentRequestController extends BaseController
         }
 
         $isAdmin = $user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value]);
+        $isStaff = $user->hasRole(RoleEnum::TEACHER->value) || $user->staff !== null;
+        
         $students = [];
 
         if ($isAdmin) {
@@ -95,7 +100,7 @@ class StudentRequestController extends BaseController
                 ->mapWithKeys(fn($s) => [$s->id => $s->full_name . ' (' . $s->admission_number . ')']);
         }
 
-        return view('requests.create', compact('isAdmin', 'students'));
+        return view('requests.create', compact('isAdmin', 'students', 'isStaff'));
     }
 
     public function store(Request $request)

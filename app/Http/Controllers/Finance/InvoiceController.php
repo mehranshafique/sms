@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Services\NotificationService; // Added
+use App\Services\NotificationService;
 use Illuminate\Support\Str;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use PDF;
@@ -22,9 +22,9 @@ use App\Enums\CurrencySymbol;
 
 class InvoiceController extends BaseController
 {
-    protected $notificationService; // Added
+    protected $notificationService;
 
-    public function __construct(NotificationService $notificationService) // Injected
+    public function __construct(NotificationService $notificationService)
     {
         $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'show', 'print', 'downloadPdf']);
         $this->middleware(PermissionMiddleware::class . ':invoice.create')->only(['create', 'store']);
@@ -51,16 +51,24 @@ class InvoiceController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
-                // FIXED: Grouped OR conditions inside a nested closure to preserve relationship constraints
-                // ADDED: post_name to search criteria
+                // FIXED: Advanced Flexible Multi-word search for any part of the name
                 ->filterColumn('student_name', function($query, $keyword) {
                     $query->whereHas('student', function($q) use ($keyword) {
-                        $q->where(function($subQ) use ($keyword) {
-                            $subQ->where('first_name', 'like', "%{$keyword}%")
-                                 ->orWhere('last_name', 'like', "%{$keyword}%")
-                                 ->orWhere('post_name', 'like', "%{$keyword}%")
-                                 ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', "%{$keyword}%")
-                                 ->orWhere('admission_number', 'like', "%{$keyword}%");
+                        // Split the keyword into terms to support searches like "Jo Mb"
+                        $terms = explode(' ', $keyword);
+                        $q->where(function($subQ) use ($terms) {
+                            foreach ($terms as $term) {
+                                $term = trim($term);
+                                if (!empty($term)) {
+                                    // Each term must match at least one of these fields
+                                    $subQ->where(function($fieldQ) use ($term) {
+                                        $fieldQ->where('first_name', 'like', "%{$term}%")
+                                               ->orWhere('last_name', 'like', "%{$term}%")
+                                               ->orWhere('post_name', 'like', "%{$term}%")
+                                               ->orWhere('admission_number', 'like', "%{$term}%");
+                                    });
+                                }
+                            }
                         });
                     });
                 })
@@ -438,7 +446,7 @@ class InvoiceController extends BaseController
             }
         });
         
-        // Send Notifications (Outside Transaction to prevent locking issues)
+        // Send Notifications
         foreach ($invoicesToNotify as $inv) {
             $this->notificationService->sendInvoiceNotification($inv);
         }

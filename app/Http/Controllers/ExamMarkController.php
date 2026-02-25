@@ -11,7 +11,7 @@ use App\Models\StudentEnrollment;
 use App\Models\Timetable;
 use App\Models\InstitutionSetting; 
 use App\Models\ClassSubject; 
-use App\Models\ExamSchedule; // Added
+use App\Models\ExamSchedule; 
 use App\Enums\RoleEnum;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,14 +41,14 @@ class ExamMarkController extends BaseController
             $examsQuery->where('institution_id', $institutionId);
         }
 
-        $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
         $isAdmin = $user->hasRole([
             RoleEnum::SUPER_ADMIN->value, 
             RoleEnum::HEAD_OFFICER->value, 
             RoleEnum::SCHOOL_ADMIN->value 
         ]);
 
-        if ($isTeacher && !$isAdmin) {
+        // Restrict Exams for Non-Admins based on active grading periods
+        if (!$isAdmin) {
             if (!empty($activePeriods)) {
                 $examsQuery->whereIn('category', $activePeriods);
             } else {
@@ -65,18 +65,24 @@ class ExamMarkController extends BaseController
             $classesQuery->where('institution_id', $institutionId);
         }
 
-        // Teacher visibility for Classes via Timetable AND Allocation
-        if ($isTeacher && !$isAdmin && $user->staff) {
-            $staffId = $user->staff->id;
-            $classesQuery->where(function($q) use ($staffId) {
-                $q->where('staff_id', $staffId) // Class Teacher
-                  ->orWhereHas('timetables', function($t) use ($staffId) {
-                      $t->where('teacher_id', $staffId); 
-                  })
-                  ->orWhereHas('classSubjects', function($c) use ($staffId) {
-                      $c->where('teacher_id', $staffId);
-                  });
-            });
+        // STRICT TEACHER/STAFF FILTERING: 
+        // If not an admin, they ONLY see classes assigned to them via Timetable or Allocation
+        if (!$isAdmin) {
+            if ($user->staff) {
+                $staffId = $user->staff->id;
+                $classesQuery->where(function($q) use ($staffId) {
+                    $q->where('staff_id', $staffId) // Class Teacher
+                      ->orWhereHas('timetables', function($t) use ($staffId) {
+                          $t->where('teacher_id', $staffId); 
+                      })
+                      ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                          $c->where('teacher_id', $staffId);
+                      });
+                });
+            } else {
+                // Not an admin and has no staff profile = Sees no classes
+                $classesQuery->whereRaw('1 = 0');
+            }
         }
 
         $classes = $classesQuery->get()->mapWithKeys(function ($item) {
@@ -110,15 +116,28 @@ class ExamMarkController extends BaseController
                              ->where('is_active', true);
 
         $user = Auth::user();
-        // Check for Teacher role strictly for data filtering
-        if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
-            $staffId = $user->staff->id;
-            $query->where(function($q) use ($staffId) {
-                $q->where('staff_id', $staffId) // Class Teacher
-                  ->orWhereHas('timetables', function($t) use ($staffId) { 
-                      $t->where('teacher_id', $staffId); // Subject Teacher
-                  }); 
-            });
+        $isAdmin = $user->hasRole([
+            RoleEnum::SUPER_ADMIN->value, 
+            RoleEnum::HEAD_OFFICER->value, 
+            RoleEnum::SCHOOL_ADMIN->value 
+        ]);
+
+        // STRICT TEACHER/STAFF FILTERING (Fixed to include ClassSubjects)
+        if (!$isAdmin) {
+            if ($user->staff) {
+                $staffId = $user->staff->id;
+                $query->where(function($q) use ($staffId) {
+                    $q->where('staff_id', $staffId) // Class Teacher
+                      ->orWhereHas('timetables', function($t) use ($staffId) { 
+                          $t->where('teacher_id', $staffId); // Subject Teacher via Timetable
+                      })
+                      ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                          $c->where('teacher_id', $staffId); // Subject Teacher via Allocation
+                      }); 
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         }
         
         // Return "Grade Name Section Name"
@@ -148,34 +167,39 @@ class ExamMarkController extends BaseController
         $user = Auth::user();
         $query = null;
 
-        // Get Exam Session to filter Allocations correctly
         $examSessionId = null;
         if ($examId) {
             $exam = Exam::find($examId);
             if ($exam) $examSessionId = $exam->academic_session_id;
         }
-        
-        // ... (Teacher Access Logic remains the same - kept for brevity) ...
-        // Note: Re-implementing logic here for completeness as per instructions
-        if ($user->hasRole(RoleEnum::TEACHER->value) && $user->staff) {
-            $staffId = $user->staff->id;
-            $timetableIds = Timetable::where('teacher_id', $staffId);
-            if ($classSectionId) $timetableIds->where('class_section_id', $classSectionId);
-            else $timetableIds->whereHas('classSection', fn($q) => $q->where('grade_level_id', $gradeLevelId));
-            $ttIds = $timetableIds->pluck('subject_id')->toArray();
 
-            $allocationIds = ClassSubject::where('teacher_id', $staffId);
-            if ($classSectionId) $allocationIds->where('class_section_id', $classSectionId);
-            else $allocationIds->whereHas('classSection', fn($q) => $q->where('grade_level_id', $gradeLevelId));
-            if ($examSessionId) $allocationIds->where('academic_session_id', $examSessionId);
-            $allocIds = $allocationIds->pluck('subject_id')->toArray();
+        $isAdmin = $user->hasRole([
+            RoleEnum::SUPER_ADMIN->value, 
+            RoleEnum::HEAD_OFFICER->value, 
+            RoleEnum::SCHOOL_ADMIN->value 
+        ]);
 
-            $subjectIds = array_unique(array_merge($ttIds, $allocIds));
-            if (empty($subjectIds)) return response()->json([]);
+        if (!$isAdmin) {
+            if ($user->staff) {
+                $staffId = $user->staff->id;
+                $timetableIds = Timetable::where('teacher_id', $staffId);
+                if ($classSectionId) $timetableIds->where('class_section_id', $classSectionId);
+                else $timetableIds->whereHas('classSection', fn($q) => $q->where('grade_level_id', $gradeLevelId));
+                $ttIds = $timetableIds->pluck('subject_id')->toArray();
 
-            // UPDATED: Eager load AcademicUnit
-            $query = Subject::with('academicUnit')->whereIn('id', $subjectIds)->where('is_active', true);
-        
+                $allocationIds = ClassSubject::where('teacher_id', $staffId);
+                if ($classSectionId) $allocationIds->where('class_section_id', $classSectionId);
+                else $allocationIds->whereHas('classSection', fn($q) => $q->where('grade_level_id', $gradeLevelId));
+                if ($examSessionId) $allocationIds->where('academic_session_id', $examSessionId);
+                $allocIds = $allocationIds->pluck('subject_id')->toArray();
+
+                $subjectIds = array_unique(array_merge($ttIds, $allocIds));
+                if (empty($subjectIds)) return response()->json([]);
+
+                $query = Subject::with('academicUnit')->whereIn('id', $subjectIds)->where('is_active', true);
+            } else {
+                return response()->json([]);
+            }
         } else {
             // Admin Logic
             if ($classSectionId) {
@@ -265,12 +289,17 @@ class ExamMarkController extends BaseController
     private function validateAccess($examId, $classId, $subjectId)
     {
         $user = Auth::user();
-        if ($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value])) {
+        $isAdmin = $user->hasRole([
+            RoleEnum::SUPER_ADMIN->value, 
+            RoleEnum::HEAD_OFFICER->value, 
+            RoleEnum::SCHOOL_ADMIN->value
+        ]);
+
+        if ($isAdmin) {
             return true;
         }
 
-        if ($user->hasRole(RoleEnum::TEACHER->value)) {
-            if (!$user->staff) return false;
+        if ($user->staff) {
             $staffId = $user->staff->id;
 
             $isClassTeacher = ClassSection::where('id', $classId)
@@ -356,7 +385,12 @@ class ExamMarkController extends BaseController
 
         $exam = Exam::findOrFail($request->exam_id);
         
-        $isAdmin = Auth::user()->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value]);
+        $isAdmin = Auth::user()->hasRole([
+            RoleEnum::SUPER_ADMIN->value, 
+            RoleEnum::HEAD_OFFICER->value, 
+            RoleEnum::SCHOOL_ADMIN->value
+        ]);
+
         if (($exam->finalized_at || $exam->status == 'published') && !$isAdmin) {
              return response()->json(['message' => __('exam.messages.exam_finalized_error')], 403);
         }
@@ -370,7 +404,7 @@ class ExamMarkController extends BaseController
             ->where('subject_id', $request->subject_id)
             ->first();
 
-        // FIX: Prioritize schedule max_marks if available
+        // Prioritize schedule max_marks if available
         if ($schedule && !is_null($schedule->max_marks) && $schedule->max_marks > 0) {
             $maxMarks = $schedule->max_marks;
         }

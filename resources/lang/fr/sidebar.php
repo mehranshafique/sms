@@ -59,32 +59,32 @@ return [
         'title' => 'Départements',
     ],
     'grade_levels' => [
-        'title' => 'Niveaux'
+        'title' => 'Niveaux[Classe]'
     ],
     'class_sections' => [
         'title' => 'Classes'
     ],
     'subjects' => [
-        'title' => 'Matières'
+        'title' => 'Matières[Cours]'
     ],
     'class_subjects' => [
         'title' => 'Cours par classe',
     ],
     'timetables' => [
-        'title' => 'Emplois du temps'
+        'title' => 'Horaire'
     ],
-    'examinations' => 'Examens',
+    'examinations' => 'Epreuves',
     'exams' => [
-        'title' => 'Examens'
+        'title' => 'Epreuves'
     ],
     'marks' => [
-        'title' => 'Notes'
+        'title' => 'Notes[Points]'
     ],
-    'results' => 'Cartes de résultats',
-    'academic_reports' => 'Rapports (PDF)',
+    'results' => 'Relevé',
+    'academic_reports' => 'e-Bulletin',
     'exam_schedules' => [
         'title' => 'Horaires d\'examen',
-        'manage' => 'Gérer l\'horaire',
+        'manage' => 'Gestion Horaire',
         'my_admit_card' => 'Ma carte d\'accès',
         'view_schedule' => 'Voir l\'horaire',
     ],
@@ -99,9 +99,9 @@ return [
     'transport' => [
         'title' => 'Transport',
     ],
-    'people' => 'Personnes',
+    'people' => 'INSCRIPTION & Plus',
     'students' => [
-        'title' => 'Élèves'
+        'title' => 'Etudiant'
     ],
     'enrollments' => [
         'title' => 'Inscriptions'
@@ -110,7 +110,7 @@ return [
         'title' => 'Inscriptions Univ.'
     ],
     'attendance' => [
-        'title' => 'Présence'
+        'title' => 'e-Registre d\'Appel'
     ],
     'promotions' => [
         'title' => 'Promotions'

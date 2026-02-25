@@ -192,6 +192,15 @@ class NotificationService
         }
     }
 
+    /**
+     * Alias method to handle Head Officer creation securely without crashing.
+     */
+    public function sendHeadOfficerCredentials(User $user, $plainPassword)
+    {
+        // Re-use the existing logic by passing the Head Officer role
+        return $this->sendUserCredentials($user, $plainPassword, \App\Enums\RoleEnum::HEAD_OFFICER->value);
+    }
+
     public function sendInstitutionCreation($institution, $adminUser, $plainPassword)
     {
         $eventKey = 'institution_created';
