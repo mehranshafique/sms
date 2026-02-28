@@ -1,5 +1,5 @@
 <!-- Add intl-tel-input CSS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/css/intlTelInput.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.4/build/css/intlTelInput.css">
 <style>
     .iti { width: 100%; display: block; }
     .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid var(--primary); color: var(--primary); }
@@ -67,26 +67,36 @@
                         </div>
 
                         {{-- Personal Identifiers --}}
+                        <!-- 1. First Name -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.first_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="first_name" class="form-control" value="{{ old('first_name', $student->first_name ?? '') }}" required>
                             <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
                         </div>
+                        <!-- 2. Last Name -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.last_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="last_name" class="form-control" value="{{ old('last_name', $student->last_name ?? '') }}" required>
                             <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
                         </div>
+                        <!-- 3. Post Name -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.post_name') }}</label>
                             <input type="text" name="post_name" class="form-control" value="{{ old('post_name', $student->post_name ?? '') }}">
                         </div>
 
+                        <!-- 4. Place of Birth -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.place_of_birth') }}</label>
+                            <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}">
+                        </div>
+                        <!-- 5. Date of Birth -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.dob') }} <span class="text-danger">*</span></label>
                             <input type="text" name="dob" class="datepicker form-control" value="{{ old('dob', isset($student) ? $student->dob->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
                             <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
                         </div>
+                        <!-- 6. Gender -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.gender') }} <span class="text-danger">*</span></label>
                             <select name="gender" class="form-control default-select" required>
@@ -94,21 +104,9 @@
                                 <option value="female" {{ (old('gender', $student->gender ?? '') == 'female') ? 'selected' : '' }}>{{ __('student.female') ?? 'Female' }}</option>
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">{{ __('student.place_of_birth') }}</label>
-                            <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}">
-                        </div>
 
                         {{-- Additional Details --}}
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.religion') }}</label>
-                            <select name="religion" class="form-control default-select">
-                                <option value="">{{ __('student.select_option') }}</option>
-                                @foreach(['Christian', 'Muslim', 'Hindu', 'Buddhist', 'Other'] as $rel)
-                                    <option value="{{ $rel }}" {{ (old('religion', $student->religion ?? '') == $rel) ? 'selected' : '' }}>{{ $rel }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <!-- 7. Blood Group -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.blood_group') }}</label>
                             <select name="blood_group" class="form-control default-select">
@@ -118,20 +116,32 @@
                                 @endforeach
                             </select>
                         </div>
+                        <!-- 8. Religion -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.religion') }}</label>
+                            <select name="religion" class="form-control default-select">
+                                <option value="">{{ __('student.select_option') }}</option>
+                                @foreach(['Christian', 'Muslim', 'Hindu', 'Buddhist', 'Other'] as $rel)
+                                    <option value="{{ $rel }}" {{ (old('religion', $student->religion ?? '') == $rel) ? 'selected' : '' }}>{{ $rel }}</option>
+                                @endforeach
+                            </select>
+                        </div>
 
                         {{-- Contact --}}
                         <div class="col-md-12"><hr class="my-3"></div>
                         
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ __('student.email') }}</label>
-                            <input type="email" name="email" class="form-control" value="{{ old('email', $student->email ?? '') }}" placeholder="student@example.com">
-                        </div>
+                        <!-- 9. Mobile Number -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.mobile_no') }}</label>
                             <div class="input-group">
                                 <input type="hidden" name="mobile_number" id="hidden_mobile_number" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                                 <input type="tel" id="mobile_number_input" class="form-control phone-input" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                             </div>
+                        </div>
+                        <!-- 10. Email -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('student.email') }}</label>
+                            <input type="email" name="email" class="form-control" value="{{ old('email', $student->email ?? '') }}" placeholder="student@example.com">
                         </div>
 
                         {{-- Address --}}
@@ -382,18 +392,35 @@
 
 {{-- SCRIPTS --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/intlTelInput.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.4/build/js/intlTelInput.min.js"></script>
 
 <script>
-    // --- LOCALIZED CONSTANTS ---
-    const LANG_LOADING = "{{ __('student.loading') }}";
-    const LANG_SELECT_OPTION = "{{ __('student.select_option_placeholder') }}";
-    const LANG_SELECT_CLASS_FIRST = "{{ __('student.select_class_first') }}";
-    const LANG_NO_OPTIONS = "{{ __('student.no_options') }}";
-    const LANG_ERROR = "{{ __('student.error_loading') }}";
-    const LANG_SUCCESS_TITLE = "{{ __('student.messages.success') }}";
-    const LANG_ERROR_TITLE = "{{ __('student.messages.error') }}";
-    const LANG_BTN_OK = "{{ __('student.ok') }}";
+    // --- LOCALIZED CONSTANTS (Safely escaped via json to prevent Syntax Errors)
+   
+     const LANG = {
+        loading: @json(__('student.loading')),
+        selectOption: @json(__('student.select_option')),
+        selectClassFirst: @json(__('student.select_class_first')),
+        noOptions: @json(__('student.no_options')),
+        errorLoading: @json(__('student.error_loading')),
+        successTitle: @json(__('student.messages.success')),
+        errorTitle: @json(__('student.messages.error')),
+        btnOk: @json(__('student.ok')),
+        linkedTo: @json(__('student.linked_to')),
+        parentFound: @json(__('student.parent_found')),
+        recordsAutofilled: @json(__('student.records_autofilled')),
+        notSupported: @json(__('student.not_supported')),
+        webNfcNotSupported: @json(__('student.web_nfc_not_supported')),
+        scanned: @json(__('student.scanned')),
+        nfcReadError: @json(__('student.nfc_read_error')),
+        selectCountry: @json(__('student.select_country')),
+        selectState: @json(__('student.select_state')),
+        selectCity: @json(__('student.select_city')),
+        validationError: @json(__('student.validation_error')),
+        checkForm: @json(__('student.messages.check_form')),
+        errorOccurred: @json(__('student.error_occurred')),
+        somethingWentWrong: @json(__('student.something_went_wrong'))
+    };
 
     // --- HELPER FUNCTIONS ---
     function generateQR() {
@@ -406,11 +433,31 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         
+        // --- 0. Tab Switching for HTML5 Validation ---
+        // If a required field is empty in a hidden tab, the browser triggers 'invalid'.
+        // We catch it and switch to that tab so the user can see what's missing.
+        document.getElementById('studentForm').addEventListener('invalid', function(e) {
+            let invalidInput = e.target;
+            let pane = invalidInput.closest('.tab-pane');
+            if (pane) {
+                let tabId = pane.id;
+                let tabButton = document.querySelector(`[data-bs-target="#${tabId}"]`);
+                if (tabButton && !tabButton.classList.contains('active')) {
+                    tabButton.click(); // Switch to the specific tab
+                    
+                    // Small delay to allow the tab transition before focusing
+                    setTimeout(() => invalidInput.focus(), 100);
+                }
+            }
+        }, true); // Capture phase is required because 'invalid' events do not bubble up natively
+
         // --- 1. Phone Input Setup ---
         const phoneOptions = {
-            utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js",
+            utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.4/build/js/utils.js",
             initialCountry: "cd",
             separateDialCode: true,
+            showSelectedDialCode: true, // Specific for v20+ compatibility
+            countrySearch: true, // Automatically provides the search field inside the dropdown
             preferredCountries: ['cd', 'us', 'fr'],
         };
 
@@ -468,15 +515,15 @@
                     const statusId = type === 'guardian' && method === 'email' ? 'guardian_email_status' : type + '_status';
                     const statusDiv = document.getElementById(statusId);
                     if(statusDiv) {
-                        statusDiv.innerHTML = `<span class="text-success"><i class="fa fa-check-circle"></i> {{ __('student.linked_to') }} ${data.name}</span>`;
+                        statusDiv.innerHTML = `<span class="text-success"><i class="fa fa-check-circle"></i> ${LANG.linkedTo} ${data.name}</span>`;
                         statusDiv.classList.remove('d-none');
                     }
                     Swal.fire({
                         toast: true,
                         position: 'top-end',
                         icon: 'success',
-                        title: "{{ __('student.parent_found') }}",
-                        text: "{{ __('student.records_autofilled') }} " + data.name,
+                        title: LANG.parentFound,
+                        text: LANG.recordsAutofilled + " " + data.name,
                         showConfirmButton: false,
                         timer: 3000
                     });
@@ -504,10 +551,6 @@
                 if (field && val) {
                     field.value = val;
                     field.classList.add('auto-filled');
-                    if (id.endsWith('_input') && window.intlTelInputGlobals) {
-                        // Attempt to update intl-tel input via the stored instances if available
-                         // Alternatively re-init or just set val and let user see it
-                    }
                 }
             }
         }
@@ -537,7 +580,7 @@
         if (btnScanNFC) {
             btnScanNFC.addEventListener('click', async () => {
                 if (!('NDEFReader' in window)) {
-                    Swal.fire("{{ __('student.not_supported') }}", "{{ __('student.web_nfc_not_supported') }}", 'warning');
+                    Swal.fire(LANG.notSupported, LANG.webNfcNotSupported, 'warning');
                     return;
                 }
                 try {
@@ -554,20 +597,20 @@
                         btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
                         Swal.fire({
                             icon: 'success',
-                            title: "{{ __('student.scanned') }}",
+                            title: LANG.scanned,
                             text: 'UID: ' + serialNumber,
                             timer: 1500,
                             showConfirmButton: false
                         });
                     };
                     ndef.onreadingerror = () => {
-                        Swal.fire(LANG_ERROR_TITLE, "{{ __('student.nfc_read_error') }}", 'error');
+                        Swal.fire(LANG.errorTitle, LANG.nfcReadError, 'error');
                         if(nfcStatus) nfcStatus.classList.add('d-none');
                         btnScanNFC.disabled = false;
                         btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
                     };
                 } catch (error) {
-                    Swal.fire(LANG_ERROR_TITLE, 'NFC Scan failed: ' + error, 'error');
+                    Swal.fire(LANG.errorTitle, 'NFC Scan failed: ' + error, 'error');
                     btnScanNFC.disabled = false;
                     btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
                 }
@@ -601,7 +644,7 @@
             fetch("{{ route('locations.countries') }}")
                 .then(res => res.json())
                 .then(data => {
-                    countrySelect.innerHTML = '<option value="">{{ __('student.select_country') }}</option>';
+                    countrySelect.innerHTML = `<option value="">${LANG.selectCountry}</option>`;
                     data.forEach(item => {
                         let option = new Option(item.name, item.id);
                         if(String(item.id) === String(savedCountry)) option.selected = true;
@@ -612,9 +655,9 @@
                 });
 
             countrySelect.addEventListener('change', function() {
-                stateSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                stateSelect.innerHTML = `<option value="">${LANG.loading}</option>`;
                 stateSelect.disabled = true;
-                citySelect.innerHTML = '<option value="">{{ __('student.select_city') }}</option>';
+                citySelect.innerHTML = `<option value="">${LANG.selectCity}</option>`;
                 citySelect.disabled = true;
                 refreshSelect(stateSelect);
                 refreshSelect(citySelect);
@@ -623,7 +666,7 @@
                     fetch(`{{ route('locations.states') }}?country_id=${this.value}`)
                         .then(res => res.json())
                         .then(data => {
-                            stateSelect.innerHTML = '<option value="">{{ __('student.select_state') }}</option>';
+                            stateSelect.innerHTML = `<option value="">${LANG.selectState}</option>`;
                             data.forEach(item => {
                                 let option = new Option(item.name, item.id);
                                 if(String(item.id) === String(savedState)) option.selected = true;
@@ -634,7 +677,7 @@
                             if(savedState) triggerChangeEvent(stateSelect);
                         });
                 } else {
-                    stateSelect.innerHTML = '<option value="">{{ __('student.select_state') }}</option>';
+                    stateSelect.innerHTML = `<option value="">${LANG.selectState}</option>`;
                     refreshSelect(stateSelect);
                 }
             });
@@ -642,7 +685,7 @@
 
         if (stateSelect) {
             stateSelect.addEventListener('change', function() {
-                citySelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                citySelect.innerHTML = `<option value="">${LANG.loading}</option>`;
                 citySelect.disabled = true;
                 refreshSelect(citySelect);
 
@@ -650,7 +693,7 @@
                     fetch(`{{ route('locations.cities') }}?state_id=${this.value}`)
                         .then(res => res.json())
                         .then(data => {
-                            citySelect.innerHTML = '<option value="">{{ __('student.select_city') }}</option>';
+                            citySelect.innerHTML = `<option value="">${LANG.selectCity}</option>`;
                             data.forEach(item => {
                                 let option = new Option(item.name, item.id);
                                 if(String(item.id) === String(savedCity)) option.selected = true;
@@ -660,7 +703,7 @@
                             refreshSelect(citySelect);
                         });
                 } else {
-                    citySelect.innerHTML = '<option value="">{{ __('student.select_city') }}</option>';
+                    citySelect.innerHTML = `<option value="">${LANG.selectCity}</option>`;
                     refreshSelect(citySelect);
                 }
             });
@@ -673,7 +716,7 @@
 
         if(gradeSelect) {
             gradeSelect.addEventListener('change', function() {
-                sectionSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
+                sectionSelect.innerHTML = `<option value="">${LANG.loading}</option>`;
                 sectionSelect.disabled = true;
                 refreshSelect(sectionSelect);
 
@@ -681,18 +724,18 @@
                     fetch(`{{ route('students.get_sections') }}?grade_id=${this.value}`)
                         .then(res => res.json())
                         .then(data => {
-                            sectionSelect.innerHTML = '<option value="">{{ __('student.select_option') }}</option>';
+                            sectionSelect.innerHTML = `<option value="">${LANG.selectOption}</option>`;
                             Object.entries(data).forEach(([id, name]) => {
                                 let option = new Option(name, id);
                                 if(String(id) === String(savedSectionId)) option.selected = true;
                                 sectionSelect.add(option);
                             });
                             sectionSelect.disabled = (Object.keys(data).length === 0);
-                            if(sectionSelect.disabled) sectionSelect.innerHTML = '<option value="">{{ __('student.no_options') }}</option>';
+                            if(sectionSelect.disabled) sectionSelect.innerHTML = `<option value="">${LANG.noOptions}</option>`;
                             refreshSelect(sectionSelect);
                         });
                 } else {
-                    sectionSelect.innerHTML = '<option value="">{{ __('student.select_class_first') }}</option>';
+                    sectionSelect.innerHTML = `<option value="">${LANG.selectClassFirst}</option>`;
                     refreshSelect(sectionSelect);
                 }
             });
@@ -726,7 +769,7 @@
             }
         }
 
-        // --- 7. Submit Handler (UPDATED FOR PHONE FIX) ---
+        // --- 7. Submit Handler ---
         $('#studentForm').on('submit', function(e) {
             e.preventDefault();
             let form = this;
@@ -763,10 +806,10 @@
                     if (response.redirect) {
                         Swal.fire({
                             icon: 'success',
-                            title: LANG_SUCCESS_TITLE,
+                            title: LANG.successTitle,
                             text: response.message,
                             showConfirmButton: true,
-                            confirmButtonText: LANG_BTN_OK
+                            confirmButtonText: LANG.btnOk
                         }).then((result) => {
                             if (result.isConfirmed || result.isDismissed) {
                                 window.location.href = response.redirect;
@@ -780,21 +823,43 @@
                         let errors = xhr.responseJSON.errors;
                         Swal.fire({
                             icon: 'error',
-                            title: "{{ __('student.validation_error') }}",
-                            text: "{{ __('student.messages.check_form') }}",
+                            title: LANG.validationError,
+                            text: LANG.checkForm,
                         });
+                        
+                        let firstErrorInput = null;
+                        
                         $.each(errors, function(field, messages) {
                             let input = $('[name="' + field + '"]');
-                            input.addClass('is-invalid');
-                            if(input.next('.invalid-feedback').length === 0) {
-                                input.after('<div class="invalid-feedback d-block">' + messages[0] + '</div>');
+                            if(input.length) {
+                                // Track the very first error encountered to snap to that tab
+                                if(!firstErrorInput) firstErrorInput = input;
+                                
+                                input.addClass('is-invalid');
+                                if(input.next('.invalid-feedback').length === 0) {
+                                    input.after('<div class="invalid-feedback d-block">' + messages[0] + '</div>');
+                                }
                             }
                         });
+                        
+                        // Switch to the tab containing the server-side validation error
+                        if(firstErrorInput) {
+                            let pane = firstErrorInput.closest('.tab-pane');
+                            if (pane && pane.length) {
+                                let tabId = pane.attr('id');
+                                let tabButton = document.querySelector(`[data-bs-target="#${tabId}"]`);
+                                if (tabButton && !tabButton.classList.contains('active')) {
+                                    tabButton.click();
+                                }
+                                setTimeout(() => firstErrorInput.focus(), 100);
+                            }
+                        }
+                        
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: "{{ __('student.error_occurred') }}",
-                            text: xhr.responseJSON?.message || "{{ __('student.something_went_wrong') }}",
+                            title: LANG.errorOccurred,
+                            text: xhr.responseJSON?.message || LANG.somethingWentWrong,
                         });
                     }
                 }

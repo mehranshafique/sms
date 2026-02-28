@@ -33,6 +33,16 @@
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
+                                {{-- ADDED: Table Footer for Totals --}}
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3" style="text-align:right; font-weight:bold;">Total:</th>
+                                        <th id="total-base-salary" style="font-weight:bold;">0.00</th>
+                                        <th></th>
+                                        <th id="total-net-salary" style="font-weight:bold;">0.00</th>
+                                        <th></th>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -64,6 +74,40 @@
                 search: "{{ __('pagination.search') ?? 'Search' }}",
                 lengthMenu: "{{ __('pagination.show') ?? 'Show' }} _MENU_ {{ __('pagination.entries') ?? 'entries' }}",
                 info: "Showing _START_ to _END_ of _TOTAL_ entries" // Add specific keys if needed
+            },
+            // ADDED: Footer Callback to calculate totals
+            footerCallback: function (row, data, start, end, display) {
+                var api = this.api();
+
+                // Helper function to reliably get integer/float data for summation
+                var intVal = function (i) {
+                    if (typeof i === 'string') {
+                        i = i.replace(/<[^>]*>?/gm, ''); // Strip HTML tags (e.g., span badges)
+                        i = i.replace(/[^\d.-]/g, '');   // Keep only numbers, decimals, and minus signs
+                    }
+                    var val = parseFloat(i);
+                    return isNaN(val) ? 0 : val;         // Return 0 if Not a Number (e.g., "Not Set")
+                };
+
+                // Total over current page for Base Salary (Column Index 3)
+                var pageTotalBase = api
+                    .column(3, { page: 'current' })
+                    .data()
+                    .reduce(function (a, b) {
+                        return intVal(a) + intVal(b);
+                    }, 0);
+
+                // Total over current page for Net Salary (Column Index 5)
+                var pageTotalNet = api
+                    .column(5, { page: 'current' })
+                    .data()
+                    .reduce(function (a, b) {
+                        return intVal(a) + intVal(b);
+                    }, 0);
+
+                // Update footer HTML with 2 decimal places
+                $(api.column(3).footer()).html(pageTotalBase.toFixed(2));
+                $(api.column(5).footer()).html(pageTotalNet.toFixed(2));
             }
         });
     });

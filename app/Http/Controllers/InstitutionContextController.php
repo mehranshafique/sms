@@ -27,6 +27,7 @@ class InstitutionContextController extends Controller
                 // FIX: Set explicit 'global' state so middlewares know to bypass school-specific checks
                 session(['active_institution_id' => 'global']);
                 
+                // Remains strictly routing to the dashboard as requested
                 return redirect()->route('dashboard')->with('success', __('messages.switched_global_view'));
             }
             
@@ -47,7 +48,8 @@ class InstitutionContextController extends Controller
 
         if ($canSwitch) {
             session(['active_institution_id' => $id]);
-            return redirect()->route('dashboard')->with('success', __('messages.context_switched_success'));
+            // MODIFIED: Return the user back to the exact URL they were on
+            return redirect()->back()->with('success', __('messages.context_switched_success'));
         }
 
         return redirect()->back()->with('error', __('messages.unauthorized_access'));
