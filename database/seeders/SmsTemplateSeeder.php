@@ -106,8 +106,24 @@ class SmsTemplateSeeder extends Seeder
                 'available_tags' => '$StudentName, $Position',
                 'is_active' => true,
             ],
+            // Smart Reminders (NEW)
+            [
+                'event_key' => 'fee_reminder',
+                'name' => 'Smart Fee Reminder',
+                'body' => 'Dear $ParentName, this is a reminder that the outstanding fee balance for $StudentName is $Currency $TotalDebt. Please arrange payment at your earliest convenience. Thank you, $SchoolName.',
+                'available_tags' => '$ParentName, $StudentName, $Currency, $TotalDebt, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'exam_reminder',
+                'name' => 'Next-Day Exam Reminder',
+                'body' => 'Dear $ParentName, The following exams are scheduled for tomorrow for your child $StudentName ($ClassName): $ExamDetails. Thank you for your attention, $SchoolName.',
+                'available_tags' => '$ParentName, $StudentName, $ClassName, $ExamDetails, $SchoolName',
+                'is_active' => true,
+            ],
         ];
 
+        
         foreach ($templates as $tmpl) {
             SmsTemplate::updateOrCreate(
                 ['event_key' => $tmpl['event_key'], 'institution_id' => null], // Null = Global Template

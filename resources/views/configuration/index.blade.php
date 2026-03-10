@@ -20,6 +20,16 @@
 @endsection
 
 @section('content')
+
+@php
+    // Safe fallback to resolve undefined variable $institution 
+    // This ensures $institution->name doesn't crash the header
+    if (!isset($institution) || !$institution) {
+        $instId = session('active_institution_id') === 'global' ? null : (session('active_institution_id') ?: auth()->user()->institute_id);
+        $institution = $instId ? \App\Models\Institution::find($instId) : auth()->user();
+    }
+@endphp
+
 <div class="content-body">
     <div class="container-fluid">
         
@@ -27,11 +37,11 @@
             <div class="col-sm-6 p-0">
                 <div class="welcome-text">
                     <h4>{{ __('configuration.page_title') }}</h4>
-                    <p class="mb-0 text-muted">{{ __('configuration.subtitle') }}</p>
+                    <p class="mb-0 text-muted">{{ __('configuration.subtitle') ?? 'System Configuration Settings' }}</p>
                 </div>
             </div>
             <div class="col-sm-6 p-0 text-end">
-                <span class="badge badge-primary">{{ $institution->name }}</span>
+                <span class="badge badge-primary">{{ $institution->name ?? 'Global Environment' }}</span>
             </div>
         </div>
 
@@ -99,12 +109,12 @@
                         </div>
                     </div>
 
-                    {{-- 2. SMS (Updated to include partial) --}}
+                    {{-- 2. SMS --}}
                     <div id="sms" class="tab-pane fade">
                         @include('configuration.partials.sms_settings')
                     </div>
 
-                    {{-- NEW: Notification Settings --}}
+                    {{-- 3. Dynamic Notification Settings --}}
                     <div id="notifications" class="tab-pane fade">
                         <div class="card">
                             <div class="card-header">
@@ -117,51 +127,55 @@
                                         <table class="table table-bordered table-striped">
                                             <thead class="bg-light">
                                                 <tr>
-                                                    <th>{{ __('configuration.event_name') }}</th>
-                                                    <th class="text-center">{{ __('configuration.email_channel') }}</th>
-                                                    <th class="text-center">{{ __('configuration.sms_channel') }}</th>
-                                                    <th class="text-center">{{ __('configuration.whatsapp_channel') }}</th>
+                                                    <th>{{ __('configuration.event') ?? 'Event' }}</th>
+                                                    <th class="text-center"><i class="fa fa-comment text-primary"></i> SMS</th>
+                                                    <th class="text-center"><i class="fab fa-whatsapp text-success"></i> WhatsApp</th>
+                                                    <th class="text-center"><i class="fa fa-envelope text-warning"></i> Email</th>
+                                                    <th class="text-center"><i class="fa fa-bell text-info"></i> System</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                @php
-                                                    $events = [
-                                                        'student_created' => __('configuration.student_created'),
-                                                        'staff_created' => __('configuration.staff_created'),
-                                                        'payment_received' => __('configuration.payment_received'),
-                                                        'institution_created' => __('configuration.institution_created'),
-                                                    ];
-                                                @endphp
-                                                @foreach($events as $key => $label)
-                                                <tr>
-                                                    <td><strong>{{ $label }}</strong></td>
-                                                    <td class="text-center">
-                                                        <div class="form-check form-switch d-inline-block">
-                                                            <input type="hidden" name="preferences[{{ $key }}][email]" value="0">
-                                                            <input class="form-check-input" type="checkbox" name="preferences[{{ $key }}][email]" value="1" 
-                                                                {{ ($notificationPrefs[$key]['email'] ?? false) ? 'checked' : '' }}>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <div class="form-check form-switch d-inline-block">
-                                                            <input type="hidden" name="preferences[{{ $key }}][sms]" value="0">
-                                                            <input class="form-check-input" type="checkbox" name="preferences[{{ $key }}][sms]" value="1" 
-                                                                {{ ($notificationPrefs[$key]['sms'] ?? false) ? 'checked' : '' }}>
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <div class="form-check form-switch d-inline-block">
-                                                            <input type="hidden" name="preferences[{{ $key }}][whatsapp]" value="0">
-                                                            <input class="form-check-input" type="checkbox" name="preferences[{{ $key }}][whatsapp]" value="1" 
-                                                                {{ ($notificationPrefs[$key]['whatsapp'] ?? false) ? 'checked' : '' }}>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                @endforeach
+                                                @if(isset($events) && count($events) > 0)
+                                                    @foreach($events as $event)
+                                                        @php
+                                                            $notifyKey = 'notify_' . $event->event_key;
+                                                            $prefs = json_decode($settings[$notifyKey] ?? '{}', true) ?: [];
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="fw-bold text-dark">{{ $event->name }}</td>
+                                                            <td class="text-center">
+                                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_sms" {{ !empty($prefs['sms']) ? 'checked' : '' }}>
+                                                                </div>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_whatsapp" {{ !empty($prefs['whatsapp']) ? 'checked' : '' }}>
+                                                                </div>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_email" {{ !empty($prefs['email']) ? 'checked' : '' }}>
+                                                                </div>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <div class="form-check form-switch d-flex justify-content-center">
+                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_system" {{ !empty($prefs['system']) ? 'checked' : '' }}>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                @else
+                                                    <tr>
+                                                        <td colspan="5" class="text-center text-muted py-4">No events found. Please run the database seeder.</td>
+                                                    </tr>
+                                                @endif
                                             </tbody>
                                         </table>
                                     </div>
-                                    <button type="submit" class="btn btn-primary mt-3 submit-btn">{{ __('configuration.save_changes') }}</button>
+                                    <div class="text-end mt-3">
+                                        <button type="submit" class="btn btn-primary submit-btn shadow"><i class="fa fa-save me-2"></i> {{ __('configuration.save_changes') ?? 'Save Changes' }}</button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
@@ -206,7 +220,7 @@
                         </div>
                     </div>
                     
-                    {{-- 3. School Year --}}
+                    {{-- School Year --}}
                     <div id="school_year" class="tab-pane fade">
                         <div class="card">
                              <div class="card-header"><h4 class="card-title">{{ __('configuration.school_year') }} & Timings</h4></div>
@@ -229,7 +243,7 @@
                         </div>
                     </div>
 
-                    {{-- 4. Modules --}}
+                    {{-- Modules --}}
                     @if(auth()->user()->hasRole('Super Admin'))
                     <div id="modules" class="tab-pane fade">
                         <div class="card">
@@ -259,14 +273,14 @@
                         </div>
                     </div>
                     
-                    {{-- 5. Recharging --}}
+                    {{-- Recharging --}}
                     <div id="recharge" class="tab-pane fade">
                         <div class="card">
                             <div class="card-header"><h4 class="card-title">{{ __('configuration.sms_recharge') }} / WhatsApp</h4></div>
                             <div class="card-body">
                                 <div class="row mb-4">
-                                    <div class="col-md-6"><div class="widget-stat card bg-primary text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-envelope"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.sms_purchased') }}</p><h3 class="text-white" id="smsBalance">{{ number_format($institution->sms_credits) }}</h3></div></div></div></div></div>
-                                    <div class="col-md-6"><div class="widget-stat card bg-success text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-whatsapp"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.whatsapp_purchased') }}</p><h3 class="text-white" id="waBalance">{{ number_format($institution->whatsapp_credits) }}</h3></div></div></div></div></div>
+                                    <div class="col-md-6"><div class="widget-stat card bg-primary text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-envelope"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.sms_purchased') }}</p><h3 class="text-white" id="smsBalance">{{ number_format($institution->sms_credits ?? 0) }}</h3></div></div></div></div></div>
+                                    <div class="col-md-6"><div class="widget-stat card bg-success text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-whatsapp"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.whatsapp_purchased') }}</p><h3 class="text-white" id="waBalance">{{ number_format($institution->whatsapp_credits ?? 0) }}</h3></div></div></div></div></div>
                                 </div>
                                 <h4 class="mb-3">{{ __('configuration.add_credits') }}</h4>
                                 <form action="{{ route('configuration.recharge') }}" method="POST" id="rechargeForm">
@@ -321,7 +335,7 @@
                 let btn = form.find('.submit-btn');
                 let originalText = btn.html();
                 
-                btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> {{ __('configuration.saving') }}');
+                btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> {{ __('configuration.saving') ?? 'Saving...' }}');
 
                 $.ajax({
                     url: form.attr('action'),
@@ -331,7 +345,7 @@
                         btn.prop('disabled', false).html(originalText);
                         Swal.fire({
                             icon: 'success',
-                            title: '{{ __('configuration.success') }}',
+                            title: '{{ __('configuration.success') ?? 'Success!' }}',
                             text: response.message,
                             showConfirmButton: true,
                             confirmButtonText: 'OK',
@@ -344,12 +358,12 @@
                     },
                     error: function(xhr) {
                         btn.prop('disabled', false).html(originalText);
-                        let msg = '{{ __('configuration.something_went_wrong') }}';
+                        let msg = '{{ __('configuration.something_went_wrong') ?? 'An error occurred.' }}';
                         if(xhr.responseJSON) {
                             if(xhr.responseJSON.message) msg = xhr.responseJSON.message;
                             else if (xhr.responseJSON.errors) msg = Object.values(xhr.responseJSON.errors)[0][0];
                         }
-                        Swal.fire({ icon: 'error', title: '{{ __('configuration.error') }}', text: msg, confirmButtonText: 'OK', confirmButtonColor: '#d33' });
+                        Swal.fire({ icon: 'error', title: '{{ __('configuration.error') ?? 'Error!' }}', text: msg, confirmButtonText: 'OK', confirmButtonColor: '#d33' });
                     }
                 });
             });
@@ -368,19 +382,19 @@
             e.preventDefault(); 
             let btn = $('#testEmailBtn');
             let originalText = btn.html();
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> {{ __('configuration.sending') }}');
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> {{ __('configuration.sending') ?? 'Sending...' }}');
             $.ajax({
                 url: $(this).attr('action'),
                 type: "POST",
                 data: $(this).serialize(),
                 success: function(response) {
                     btn.prop('disabled', false).html(originalText);
-                    Swal.fire({ icon: 'success', title: '{{ __('configuration.success') }}', text: response.message, confirmButtonText: 'OK', confirmButtonColor: '#3085d6' });
+                    Swal.fire({ icon: 'success', title: '{{ __('configuration.success') ?? 'Success!' }}', text: response.message, confirmButtonText: 'OK', confirmButtonColor: '#3085d6' });
                 },
                 error: function(xhr) {
                     btn.prop('disabled', false).html(originalText);
-                    let msg = xhr.responseJSON ? (xhr.responseJSON.message || xhr.responseJSON.error) : '{{ __('configuration.failed_to_send') }}';
-                    Swal.fire({ icon: 'error', title: '{{ __('configuration.error') }}', text: msg, confirmButtonText: 'OK', confirmButtonColor: '#d33' });
+                    let msg = xhr.responseJSON ? (xhr.responseJSON.message || xhr.responseJSON.error) : '{{ __('configuration.failed_to_send') ?? 'Failed to send' }}';
+                    Swal.fire({ icon: 'error', title: '{{ __('configuration.error') ?? 'Error!' }}', text: msg, confirmButtonText: 'OK', confirmButtonColor: '#d33' });
                 }
             });
         });
@@ -393,7 +407,7 @@
             let originalText = btn.html();
             let resultArea = $('#testResultArea');
             let resultContent = $('#testResultContent');
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> {{ __('configuration.sending') }}');
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> {{ __('configuration.sending') ?? 'Sending...' }}');
             resultArea.hide();
             $.ajax({
                 url: "{{ route('configuration.sms.test') }}",
@@ -407,8 +421,8 @@
                 error: function(xhr) {
                     btn.prop('disabled', false).html(originalText);
                     resultArea.show();
-                    let msg = xhr.responseJSON ? xhr.responseJSON.message : '{{ __('configuration.unknown_error') }}';
-                    resultContent.html(`<div class="alert alert-danger"><strong>{{ __('configuration.failed') }}:</strong> ${msg}<br><small>{{ __('configuration.check_logs') }}</small></div>`);
+                    let msg = xhr.responseJSON ? xhr.responseJSON.message : '{{ __('configuration.unknown_error') ?? 'Unknown Error' }}';
+                    resultContent.html(`<div class="alert alert-danger"><strong>{{ __('configuration.failed') ?? 'Failed' }}:</strong> ${msg}<br><small>{{ __('configuration.check_logs') ?? 'Please check settings' }}</small></div>`);
                 }
             });
         });

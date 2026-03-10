@@ -7,6 +7,9 @@
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
+                    <h3 class="text-white fw-bold mb-1">
+                                {{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}, {{ Auth::user()->roles->pluck('name')->first() ?? 'User' }}!
+                    </h3>
                     <h4>{{ __('dashboard.my_schools_overview') }}</h4>
                     <p class="mb-0">{{ __('dashboard.global_dashboard') }}</p>
                 </div>

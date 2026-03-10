@@ -58,6 +58,7 @@ use App\Http\Controllers\ElectionController;
 use App\Http\Controllers\VotingController;
 use App\Http\Controllers\StudentVotingController;
 use App\Http\Controllers\ChatbotSettingController;
+use App\Http\Controllers\ReminderController; // Added Reminder Controller
 // --- Controllers: Finance ---
 use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
@@ -108,7 +109,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Access Control (Roles & Permissions)
     Route::resource('roles', RolesController::class);
-    
+    Route::get('/roles/{role}/test', [RolesController::class, 'test'])->name('roles.test');
     Route::prefix('modules')->name('modules.')->group(function () {
         Route::get('/', [ModuleController::class, 'index'])->name('index');
         Route::post('/', [ModuleController::class, 'store'])->name('store');
@@ -396,6 +397,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('budgets/categories', [BudgetController::class, 'categories'])->name('budgets.categories');
         Route::post('budgets/categories', [BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
         
+        Route::get('/overview', [BudgetController::class, 'financeOverview'])->name('finance.overview');
         // Allocations & Index
         Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');
         Route::post('budgets', [BudgetController::class, 'store'])->name('budgets.store');
@@ -479,6 +481,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Student View
         Route::get('my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
         Route::get('my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
+        // Smart Reminders
+        Route::get('reminders', [ReminderController::class, 'index'])->name('reminders.index');
+        Route::post('reminders/fees', [ReminderController::class, 'sendFeeReminders'])->name('reminders.fees.send');
+        Route::post('reminders/exams', [ReminderController::class, 'sendExamReminders'])->name('reminders.exams.send');
+
     });
 
     // --- CHATBOT SETTINGS ---

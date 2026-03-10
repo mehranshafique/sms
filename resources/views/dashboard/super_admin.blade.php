@@ -11,7 +11,7 @@
                     <div class="card-body d-flex justify-content-between align-items-center p-4">
                         <div>
                             <h3 class="text-white fw-bold mb-1">
-                                {{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}!
+                                {{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}, {{ Auth::user()->roles->pluck('name')->first() ?? 'User' }}!
                             </h3>
                             <p class="mb-0 opacity-75">
                                 @if(isset($currentSession))

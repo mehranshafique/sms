@@ -22,7 +22,6 @@ class ConfigurationController extends BaseController
 
     public function index()
     {
-        // ... (Keep existing index logic) ...
         $institutionId = $this->getInstitutionId(); 
         $user = Auth::user();
         $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value) && is_null($institutionId);
@@ -59,10 +58,19 @@ class ConfigurationController extends BaseController
         $enabledModules = isset($settings['enabled_modules']) ? json_decode($settings['enabled_modules'], true) : [];
         $smtp = $this->getSmtpSettings($settings);
 
+        // --- ONLY ADDED EVENTS LOGIC HERE ---
+        $globalTemplates = \App\Models\SmsTemplate::whereNull('institution_id')->get()->keyBy('event_key');
+        if ($institutionId) {
+            $institutionTemplates = \App\Models\SmsTemplate::where('institution_id', $institutionId)->get()->keyBy('event_key');
+            $events = $globalTemplates->merge($institutionTemplates)->values();
+        } else {
+            $events = $globalTemplates->values();
+        }
+
         return view('configuration.index', compact(
             'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 
             'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
-            'allowedSms', 'allowedWa', 'isSuperAdmin'
+            'allowedSms', 'allowedWa', 'isSuperAdmin', 'events'
         ));
     }
 
@@ -214,10 +222,22 @@ class ConfigurationController extends BaseController
     public function updateNotifications(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        $prefs = $request->input('preferences', []);
         
-        $this->saveSetting($institutionId, 'notification_preferences', json_encode($prefs), 'notifications');
-        return response()->json(['message' => __('configuration.settings_saved')]);
+        // Loop through all events dynamically from DB instead of hardcoded array
+        $globalTemplates = \App\Models\SmsTemplate::whereNull('institution_id')->get();
+        
+        foreach ($globalTemplates as $template) {
+            $event = $template->event_key;
+            $val = [
+                'sms' => $request->has("{$event}_sms"),
+                'whatsapp' => $request->has("{$event}_whatsapp"),
+                'email' => $request->has("{$event}_email"),
+                'system' => $request->has("{$event}_system"),
+            ];
+            $this->saveSetting($institutionId, "notify_{$event}", json_encode($val), 'notifications');
+        }
+
+        return redirect()->back()->with('success', __('configuration.notifications_updated') ?? 'Notifications updated successfully.');
     }
 
     // --- 4. SCHOOL YEAR ---

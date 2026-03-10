@@ -52,6 +52,10 @@ return [
     'enabled' => 'Enabled (Blocked)',
     'disabled' => 'Disabled (Open)',
     
+    'financial_restrictions' => 'Financial Restrictions',
+    'block_reports_on_debt' => 'Block   Report Cards & Transcripts for Students with Unpaid Fees',
+    'block_reports_on_debt_help' => 'If enabled, students with an outstanding fee balance will be automatically blocked from downloading or receiving their academic reports (including via the Chatbot and Automated SMS/WhatsApp).',      
+    
     // Errors
     'admin_blocked' => 'Action blocked by administrator.',
     'admin_blocked_error' => 'This action has been disabled by the administrator.',

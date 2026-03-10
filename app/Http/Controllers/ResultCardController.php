@@ -8,8 +8,11 @@ use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
 use App\Models\Institution;
 use App\Models\Subject;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
+use App\Models\InstitutionSetting;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -29,6 +32,12 @@ class ResultCardController extends BaseController
         $user = Auth::user();
         
         if ($user->hasRole('Student')) {
+            $studentId = $user->student->id ?? null;
+            $institutionId = session('active_institution_id') ?? $user->institute_id;
+            
+            // Block student directly before rendering their index
+            $this->checkFinancialClearance($studentId, $institutionId, true);
+
             return $this->studentIndex($user);
         }
 
@@ -82,7 +91,7 @@ class ResultCardController extends BaseController
             ->latest()
             ->get();
 
-        return view('results.student_index', compact('exams'));
+        return view('results.index', compact('exams'));
     }
 
     /**
@@ -212,6 +221,32 @@ class ResultCardController extends BaseController
     }
 
     // --- PRIVATE METHODS ---
+
+    /**
+     * Centralized check for outstanding fees to restrict report access
+     */
+    public function checkFinancialClearance($studentId, $institutionId, $abort = true)
+    {
+        if (!$studentId || !$institutionId) return true;
+
+        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
+                        ->where('key', 'block_reports_on_debt')
+                        ->value('value');
+                        
+        if ($isBlocked == '1') {
+            $unpaid = Invoice::where('student_id', $studentId)
+                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                ->sum(DB::raw('total_amount - paid_amount'));
+                
+            if ($unpaid > 0) {
+                if ($abort) {
+                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance of ' . \App\Enums\CurrencySymbol::default() . ' ' . number_format($unpaid, 2) . '. Please settle the account to access academic reports.');
+                }
+                return false;
+            }
+        }
+        return true;
+    }
 
     private function calculateResultData($records, $type)
     {

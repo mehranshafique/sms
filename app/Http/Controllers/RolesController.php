@@ -140,7 +140,7 @@ class RolesController extends BaseController
                     if ($allowDelete) {
                         $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" title="'.__('roles.delete').'"><i class="fa fa-trash"></i></button>';
                     }
-                    
+                    $btn .= '<a href="'.route('roles.test', $row->id).'" class="btn btn-info btn-xs shadow sharp me-1" title="Test Role"><i class="fa fa-shield"></i></a>';
                     $btn .= '</div>';
                     return $btn;
                 })
@@ -387,6 +387,20 @@ class RolesController extends BaseController
                 abort(403, __('roles.messages.unauthorized_assignment', ['perm' => $perm]));
             }
         }
+    }
+
+    /**
+     * Display a read-only test matrix of the role's capabilities
+     */
+    public function test(Role $role)
+    {
+        // Use your existing authorization logic so schools can only test their own roles
+        $this->authorizeRoleAccess($role);
+        
+        $modules = Module::with('permissions')->get();
+        $rolePermissions = $role->permissions()->pluck('name')->toArray();
+        
+        return view('roles.test', compact('role', 'modules', 'rolePermissions'));
     }
 
     private function authorizeRoleAccess($role)

@@ -7,7 +7,11 @@
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4>{{ __('dashboard.main_admin_title') }}</h4>
+                    <!-- <h4>{{ __('dashboard.main_admin_title') }}</h4> -->
+                     {{-- Dynamically greeting User Name and Role --}}
+                    <h3 class="text-white fw-bold mb-1">
+                        Hello {{ Auth::user()->name }}, {{ Auth::user()->roles->pluck('name')->first() ?? 'School Admin' }}
+                    </h3>
                     <p class="mb-0">{{ __('dashboard.platform_overview') }}</p>
                 </div>
             </div>

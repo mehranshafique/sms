@@ -65,7 +65,7 @@ return [
     'cotes' => 'Scores',
     'credit' => 'Credit',
     'credit_valide' => 'Credit Validated',
-    
+    'financial_restriction_msg' => 'Note: This student has an outstanding fee balance. Academic reports are blocked until the balance is cleared.',
     'principal' => 'Principal / Head of Establishment',
     'class_teacher' => 'Class Teacher',
     'parent_signature' => 'Parent Signature',

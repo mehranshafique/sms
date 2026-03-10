@@ -11,14 +11,19 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str; // Added for Ticket Number
+use App\Services\NotificationService; // Added
+use App\Enums\RoleEnum; // Added
+use App\Models\Institution; // Added
 
 class BudgetController extends BaseController
 {
-    public function __construct()
+    public function __construct(NotificationService $notificationService)
     {
         $this->middleware('auth');
         $this->authorizeResource(Budget::class, 'budget');
         $this->setPageTitle(__('budget.page_title'));
+        $this->notificationService = $notificationService;
     }
 
     // --- BUDGET CATEGORIES ---
@@ -115,6 +120,102 @@ class BudgetController extends BaseController
 
         $categories = BudgetCategory::where('institution_id', $institutionId)->get();
         return view('finance.budgets.index', compact('categories', 'session', 'globalStats'));
+    }
+
+     // --- FUND REQUESTS ---
+    public function fundRequests(Request $request)
+    {
+        $user = Auth::user();
+        $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value) || $user->hasRole(RoleEnum::SUPER_ADMIN->value);
+        $institutionId = $this->getInstitutionId();
+
+        // Scope institutions based on hierarchy
+        $allowedInstitutionIds = [];
+        if ($isHeadOfficer && $user->institutes) {
+            $allowedInstitutionIds = $user->institutes->pluck('id')->toArray();
+        } elseif ($institutionId) {
+            $allowedInstitutionIds = [$institutionId];
+        }
+
+        if ($request->ajax()) {
+            $query = FundRequest::with(['budget.category', 'requester', 'institution'])
+                ->select('fund_requests.*')->latest();
+
+            if (!empty($allowedInstitutionIds)) {
+                $query->whereIn('fund_requests.institution_id', $allowedInstitutionIds);
+            }
+
+            return DataTables::of($query)
+                ->addColumn('ticket_number', fn($row) => '<span class="text-primary fw-bold">'.$row->ticket_number.'</span>')
+                ->addColumn('branch', fn($row) => $row->institution->name ?? 'N/A')
+                ->editColumn('created_at', fn($row) => $row->created_at->format('d M, Y H:i'))
+                ->addColumn('request_title', fn($row) => $row->title)
+                ->addColumn('category', fn($row) => $row->budget->category->name ?? 'N/A')
+                ->editColumn('amount', fn($row) => number_format($row->amount, 2))
+                ->addColumn('requested_by', fn($row) => $row->requester->name ?? 'N/A')
+                ->editColumn('status', function($row){
+                    $badges = ['pending' => 'badge-warning', 'approved' => 'badge-success', 'rejected' => 'badge-danger'];
+                    return '<span class="badge '.($badges[$row->status] ?? 'badge-secondary').'">'.ucfirst($row->status).'</span>';
+                })
+                ->addColumn('action', function($row) use ($user) {
+                    if ($row->status == 'pending' && $user->can('budget.approve_funds')) {
+                        return '<div class="d-flex justify-content-end">
+                            <button class="btn btn-success btn-xs shadow approve-btn me-1" data-id="'.$row->id.'" title="Approve"><i class="fa fa-check"></i></button>
+                            <button class="btn btn-danger btn-xs shadow reject-btn" data-id="'.$row->id.'" title="Reject"><i class="fa fa-times"></i></button>
+                        </div>';
+                    }
+                    return '';
+                })
+                ->rawColumns(['ticket_number', 'status', 'action'])
+                ->make(true);
+        }
+
+        // Summary Metrics for HeadOff & Admins
+        $statsQuery = FundRequest::query();
+        if (!empty($allowedInstitutionIds)) {
+            $statsQuery->whereIn('institution_id', $allowedInstitutionIds);
+        }
+
+        $totalPending = (clone $statsQuery)->where('status', 'pending')->count();
+        $totalProcessed = (clone $statsQuery)->whereIn('status', ['approved', 'rejected'])->count();
+        $totalRequestedAmt = (clone $statsQuery)->sum('amount');
+        $totalApprovedAmt = (clone $statsQuery)->where('status', 'approved')->sum('amount');
+        
+        return view('finance.budgets.requests', compact('totalPending', 'totalProcessed', 'totalRequestedAmt', 'totalApprovedAmt', 'isHeadOfficer'));
+    }
+
+     public function storeRequest(Request $request)
+    {
+        $request->validate([
+            'budget_id' => 'required|exists:budgets,id',
+            'title' => 'required|string|max:255',
+            'amount' => 'required|numeric|min:0.01',
+            'description' => 'nullable|string'
+        ]);
+
+        $budget = Budget::findOrFail($request->budget_id);
+        $institutionId = $budget->institution_id;
+        $ticketNumber = 'REQ-' . strtoupper(Str::random(8));
+
+        $fundRequest = FundRequest::create([
+            'budget_id' => $budget->id,
+            'institution_id' => $institutionId,
+            'ticket_number' => $ticketNumber,
+            'title' => $request->title,
+            'amount' => $request->amount,
+            'description' => $request->description,
+            'status' => 'pending',
+            'requested_by' => Auth::id()
+        ]);
+
+        // Send Notification to Initiator
+        $user = Auth::user();
+        $phone = $user->staff->phone ?? $user->phone ?? null; 
+        if ($phone) {
+            $this->notificationService->sendFundRequestConfirmation($fundRequest, $phone, $user->name, $institutionId);
+        }
+
+        return redirect()->back()->with('success', __('budget.success_request_submitted'));
     }
 
     public function store(Request $request)
@@ -219,49 +320,98 @@ class BudgetController extends BaseController
         return response()->json(['message' => __('budget.success_request_submitted')]);
     }
 
-    public function fundRequests(Request $request)
-    {
-        $this->authorize('viewAny', Budget::class);
-        $institutionId = $this->getInstitutionId();
+    // public function fundRequests(Request $request)
+    // {
+    //     $this->authorize('viewAny', Budget::class);
+    //     $institutionId = $this->getInstitutionId();
         
-        if ($request->ajax()) {
-            $data = FundRequest::with(['budget.category', 'requester'])
-                ->where('institution_id', $institutionId)
-                ->latest();
+    //     if ($request->ajax()) {
+    //         $data = FundRequest::with(['budget.category', 'requester'])
+    //             ->where('institution_id', $institutionId)
+    //             ->latest();
 
-            return DataTables::of($data)
-                ->editColumn('status', function($row){
-                    $badges = ['pending'=>'warning', 'approved'=>'success', 'rejected'=>'danger'];
-                    $statusKey = 'budget.' . $row->status;
-                    return '<span class="badge badge-'.$badges[$row->status].'">'.__($statusKey).'</span>';
-                })
-                ->addColumn('requester_name', function($row){
-                    return $row->requester->name ?? 'Unknown';
-                })
-                ->addColumn('category_name', function($row){
-                    return $row->budget->category->name ?? '-';
-                })
-                ->addColumn('period', function($row){
-                    return $row->budget->period_label;
-                })
-                ->editColumn('created_at', function($row){
-                    return $row->created_at->format('d M, Y');
-                })
-                ->addColumn('action', function($row){
-                    if($row->status == 'pending' && Auth::user()->can('budget.approve_funds')) {
-                        return '
-                        <div class="d-flex">
-                            <button class="btn btn-success btn-xs me-1 approve-btn" data-id="'.$row->id.'"><i class="fa fa-check"></i></button>
-                            <button class="btn btn-danger btn-xs reject-btn" data-id="'.$row->id.'"><i class="fa fa-times"></i></button>
-                        </div>';
-                    }
-                    return '';
-                })
-                ->rawColumns(['status', 'action'])
-                ->make(true);
-        }
+    //         return DataTables::of($data)
+    //             ->editColumn('status', function($row){
+    //                 $badges = ['pending'=>'warning', 'approved'=>'success', 'rejected'=>'danger'];
+    //                 $statusKey = 'budget.' . $row->status;
+    //                 return '<span class="badge badge-'.$badges[$row->status].'">'.__($statusKey).'</span>';
+    //             })
+    //             ->addColumn('requester_name', function($row){
+    //                 return $row->requester->name ?? 'Unknown';
+    //             })
+    //             ->addColumn('category_name', function($row){
+    //                 return $row->budget->category->name ?? '-';
+    //             })
+    //             ->addColumn('period', function($row){
+    //                 return $row->budget->period_label;
+    //             })
+    //             ->editColumn('created_at', function($row){
+    //                 return $row->created_at->format('d M, Y');
+    //             })
+    //             ->addColumn('action', function($row){
+    //                 if($row->status == 'pending' && Auth::user()->can('budget.approve_funds')) {
+    //                     return '
+    //                     <div class="d-flex">
+    //                         <button class="btn btn-success btn-xs me-1 approve-btn" data-id="'.$row->id.'"><i class="fa fa-check"></i></button>
+    //                         <button class="btn btn-danger btn-xs reject-btn" data-id="'.$row->id.'"><i class="fa fa-times"></i></button>
+    //                     </div>';
+    //                 }
+    //                 return '';
+    //             })
+    //             ->rawColumns(['status', 'action'])
+    //             ->make(true);
+    //     }
         
-        return view('finance.budgets.requests');
+    //     return view('finance.budgets.requests');
+    // }
+    // --- FINANCE OVERVIEW (HEADOFF DASHBOARD) ---
+    public function financeOverview()
+    {
+        $user = Auth::user();
+        $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value) || $user->hasRole(RoleEnum::SUPER_ADMIN->value);
+        $institutionId = $this->getInstitutionId();
+        $this->setPageTitle(__('budget.finance_overview'));
+        
+        $allowedInstitutionIds = [];
+        if ($isHeadOfficer && $user->institutes) {
+            $allowedInstitutionIds = $user->institutes->pluck('id')->toArray();
+        } elseif ($institutionId) {
+            $allowedInstitutionIds = [$institutionId];
+        }
+
+        // Global Aggregation
+        $enrollments = \App\Models\StudentEnrollment::where('status', 'active');
+        $invoices = \App\Models\Invoice::query();
+
+        if (!empty($allowedInstitutionIds)) {
+            $enrollments->whereIn('institution_id', $allowedInstitutionIds);
+            $invoices->whereIn('institution_id', $allowedInstitutionIds);
+        }
+
+        $totalStudents = $enrollments->count();
+        $totalExpected = $invoices->sum('total_amount');
+        $totalPaid = $invoices->sum('paid_amount');
+        $remainingBalance = max(0, $totalExpected - $totalPaid);
+
+        // Breakdown by school
+        $schoolBreakdown = [];
+        if ($isHeadOfficer) {
+            $schools = Institution::whereIn('id', $allowedInstitutionIds)->get();
+            foreach ($schools as $school) {
+                $schoolExpected = \App\Models\Invoice::where('institution_id', $school->id)->sum('total_amount');
+                $schoolPaid = \App\Models\Invoice::where('institution_id', $school->id)->sum('paid_amount');
+                
+                $schoolBreakdown[] = [
+                    'name' => $school->name,
+                    'students' => \App\Models\StudentEnrollment::where('status', 'active')->where('institution_id', $school->id)->count(),
+                    'expected' => $schoolExpected,
+                    'paid' => $schoolPaid,
+                    'remaining' => max(0, $schoolExpected - $schoolPaid)
+                ];
+            }
+        }
+
+        return view('finance.budgets.overview', compact('totalStudents', 'totalExpected', 'totalPaid', 'remainingBalance', 'isHeadOfficer', 'schoolBreakdown'));
     }
 
     public function approveFundRequest(Request $request, $id)

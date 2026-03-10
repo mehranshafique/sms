@@ -14,6 +14,7 @@ use App\Models\ClassSubject;
 use App\Models\ExamSchedule; 
 use App\Enums\RoleEnum;
 use Illuminate\Http\Request;
+use App\Models\Invoice;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -530,6 +531,11 @@ class ExamMarkController extends BaseController
             abort(403, __('marks.messages.unauthorized'));
         }
 
+        $studentId = $user->student->id ?? null;
+        $institutionId = session('active_institution_id') ?? $user->institute_id;
+
+        // Block student directly before rendering their index
+        $this->checkFinancialClearance($studentId, $institutionId, true);
         $student = $user->student;
         if (!$student) abort(404);
 
@@ -548,5 +554,31 @@ class ExamMarkController extends BaseController
             ->groupBy('exam_id');
 
         return view('marks.my_marks', compact('records', 'student'));
+    }
+
+    /**
+     * Centralized check for outstanding fees to restrict report access
+     */
+    public function checkFinancialClearance($studentId, $institutionId, $abort = true)
+    {
+        if (!$studentId || !$institutionId) return true;
+
+        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
+                        ->where('key', 'block_reports_on_debt')
+                        ->value('value');
+                        
+        if ($isBlocked == '1') {
+            $unpaid = Invoice::where('student_id', $studentId)
+                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                ->sum(DB::raw('total_amount - paid_amount'));
+                
+            if ($unpaid > 0) {
+                if ($abort) {
+                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance of ' . \App\Enums\CurrencySymbol::default() . ' ' . number_format($unpaid, 2) . '. Please settle the account to access academic reports.');
+                }
+                return false;
+            }
+        }
+        return true;
     }
 }

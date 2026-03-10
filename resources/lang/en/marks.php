@@ -50,6 +50,11 @@ return [
     'save_marks' => 'Save Marks',
     'load_students' => 'Loading Students...',
     'validation_error' => 'Validation Error',
+    'no_records_found' => 'No records found.',
+    'invalid_marks' => 'Invalid marks entered for Student ID :id. Please enter a number between 0 and :max.',
+    'mark_absent' => 'Mark as Absent',
+    'mark_present' => 'Mark as Present',    
+    'view_your_results' => 'View Your Results',
     
     // Statuses (Added for Award List)
     'pass' => 'Pass',

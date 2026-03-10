@@ -73,6 +73,15 @@
             </div>
         </div>
 
+        {{-- NEW: Financial Restrictions for Reports --}}
+        <div class="col-md-12 mb-4 mt-2">
+            <h5 class="text-primary border-bottom pb-2"><i class="fa fa-lock me-2"></i>{{ __('settings.financial_restrictions') ?? 'Financial Restrictions' }}</h5>
+            <div class="form-check form-switch custom-switch mt-3">
+                <input class="form-check-input" style="width: 3.5em; height: 1.75em; cursor: pointer;" type="checkbox" name="block_reports_on_debt" id="block_reports_on_debt" {{ (isset($blockReportsOnDebt) && $blockReportsOnDebt === true) ? 'checked' : '' }}>
+                <label class="form-check-label fw-bold text-dark ms-2 mt-1" style="cursor: pointer;" for="block_reports_on_debt">{{ __('settings.block_reports_on_debt') ?? 'Block Report Cards & Transcripts for Students with Unpaid Fees' }}</label>
+            </div>
+            <p class="text-muted small mt-2 ms-5">{{ __('settings.block_reports_on_debt_help') ?? 'If enabled, students with an outstanding fee balance will be automatically blocked from downloading or receiving their academic reports (including via the Chatbot and Automated SMS/WhatsApp).' }}</p>
+        </div>
         <div class="col-12 mt-3">
             <button type="submit" class="btn btn-primary">{{ __('settings.save_settings') }}</button>
         </div>

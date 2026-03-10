@@ -39,7 +39,8 @@ class SettingsController extends BaseController
 
         // NEW: Active Periods (for Marks Entry Control)
         $activePeriods = isset($settings['active_periods']) ? json_decode($settings['active_periods'], true) : [];
-
+        $blockReportsOnDebt = isset($settings['block_reports_on_debt']) ? (bool)$settings['block_reports_on_debt'] : false;
+       
         return view('settings.index', compact(
             'attendanceLocked', 
             'attendanceGracePeriod', 
@@ -47,7 +48,8 @@ class SettingsController extends BaseController
             'examsGracePeriod',
             'lmdThreshold',
             'gradingScale',
-            'activePeriods' // Pass to view
+            'activePeriods', // Pass to view
+            'blockReportsOnDebt'  
         ));
     }
 
@@ -72,7 +74,6 @@ class SettingsController extends BaseController
             'lmd_validation_threshold' => 'sometimes|numeric|min:0|max:100',
             'grade' => 'sometimes|array',
             'grade_min' => 'sometimes|array',
-            
             // NEW: Active Periods
             'active_periods' => 'sometimes|array'
         ]);
@@ -83,14 +84,18 @@ class SettingsController extends BaseController
             'exams_locked' => 'exams',
             'exams_grace_period' => 'exams',
             'lmd_validation_threshold' => 'academic',
+            'block_reports_on_debt' => 'academic',
         ];
-
+         
         foreach ($keysToSave as $key => $group) {
             if ($request->has($key)) {
                 InstitutionSetting::set($institutionId, $key, $request->input($key), $group);
             }
         }
 
+        // NEW: Save Financial Restriction Setting
+        $blockReports = $request->has('block_reports_on_debt') ? 1 : 0;
+        InstitutionSetting::set($institutionId, 'block_reports_on_debt', $blockReports, 'academic');
         // Handle Active Periods (Save as JSON)
         if ($request->has('active_periods')) {
             InstitutionSetting::set($institutionId, 'active_periods', json_encode($request->active_periods), 'academic');
@@ -101,8 +106,10 @@ class SettingsController extends BaseController
             // Better: If we are updating academic settings specifically:
             if ($request->has('lmd_validation_threshold')) { 
                  // Assuming this is the academic form
+                 
                  $periods = $request->input('active_periods', []);
                  InstitutionSetting::set($institutionId, 'active_periods', json_encode($periods), 'academic');
+                 
             }
         }
 

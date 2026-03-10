@@ -369,7 +369,8 @@
                     <li class="nav-label">{{ __('sidebar.communication') }}</li>
                     @if($hasModule('communication') && $user->can('notice.view'))
                         <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
-                        
+                        {{-- NEW: Smart Reminders --}}
+                        <li><a class="ai-icon {{ request()->routeIs('reminders.*') ? 'mm-active' : '' }}" href="{{ route('reminders.index') }}"><i class="la la-bell"></i><span class="nav-text">{{ __('sidebar.reminders') ?? 'Reminders' }}</span></a></li>
                         @if($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value]))
                         <li><a class="ai-icon {{ request()->routeIs('chatbot.*') ? 'mm-active' : '' }}" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
                         @endif

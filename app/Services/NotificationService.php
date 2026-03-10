@@ -396,4 +396,29 @@ class NotificationService
             return ['success' => false];
         }
     }
+
+    /**
+     * Send confirmation for Fund Request Submission to the Initiator
+     */
+    public function sendFundRequestConfirmation($fundRequest, $phone, $name, $institutionId)
+    {
+        $providerName = InstitutionSetting::get($institutionId, 'sms_provider', 'system');
+        if ($providerName === 'system') {
+            $providerName = InstitutionSetting::get(null, 'sms_provider', 'system');
+        }
+
+        try {
+            $gateway = GatewayFactory::create($providerName, $institutionId);
+            $currency = \App\Enums\CurrencySymbol::default();
+            $amount = $currency . ' ' . number_format($fundRequest->amount, 2);
+            
+            // Personalized message with Ticket Reference
+            $message = "Hello {$name}, your fund request (Ticket: {$fundRequest->ticket_number}) for {$amount} has been successfully submitted and is pending approval.";
+            
+            // Dispatch via SMS
+            $gateway->sendSms($phone, $message);
+        } catch (\Exception $e) {
+            Log::error("Fund Request Notification Error: " . $e->getMessage());
+        }
+    }
 }
