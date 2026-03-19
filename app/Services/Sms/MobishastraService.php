@@ -35,13 +35,13 @@ class MobishastraService implements SmsGatewayInterface
             $query->where('institution_id', $institutionId);
         }
 
-        $settings = $query->whereIn('key', ['mobishastra_api_key', 'mobishastra_sender_id'])
+        $settings = $query->whereIn('key', ['mobishastra_password', 'mobishastra_sender_id'])
             ->pluck('value', 'key');
 
-        if (isset($settings['mobishastra_api_key'])) {
+        if (isset($settings['mobishastra_password'])) {
             try {
-                // Assuming 'api_key' stores the password in encrypted format
-                $this->password = Crypt::decryptString($settings['mobishastra_api_key']);
+                // Assuming 'password' stores the password in encrypted format
+                $this->password = Crypt::decryptString($settings['mobishastra_password']);
                 
                 // If Sender ID is overridden
                 if (isset($settings['mobishastra_sender_id'])) {
