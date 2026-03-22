@@ -19,8 +19,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'payment_received',
                 'name' => 'Payment Received',
-                'body' => 'Dear Parent, payment of $Amount for $StudentName has been received. Remaining Balance: $Balance. Thank you, $SchoolName.',
-                'available_tags' => '$StudentName, $Amount, $Balance, $SchoolName, $Date, $TransactionID',
+                'body' => 'Dear Parent, payment of $Amount for $StudentName ($Class, $Session) for $PaymentReason has been received. Remaining Balance: $Balance. Thank you, $SchoolName.',
+                'available_tags' => '$StudentName, $Amount, $Balance, $SchoolName, $Date, $TransactionID, $Class, $Session, $PaymentReason',
                 'is_active' => true,
             ],
             

@@ -18,6 +18,7 @@ use App\Models\Institution; // Added
 
 class BudgetController extends BaseController
 {
+    protected $notificationService;
     public function __construct(NotificationService $notificationService)
     {
         $this->middleware('auth');
@@ -291,7 +292,7 @@ class BudgetController extends BaseController
     // --- FUND REQUESTS ---
     public function storeFundRequest(Request $request)
     {
-        $this->authorize('create', Budget::class);
+        $this->authorize('create', FundRequest::class);
 
         $request->validate([
             'budget_id' => 'required|exists:budgets,id',

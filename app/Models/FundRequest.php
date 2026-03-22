@@ -13,6 +13,7 @@ class FundRequest extends Model
     protected $fillable = [
         'institution_id',
         'budget_id',
+        'ticket_number', // Added to allow mass assignment from the controller
         'requested_by', // User ID
         'amount',
         'title',
@@ -27,6 +28,12 @@ class FundRequest extends Model
     protected $casts = [
         'approved_at' => 'datetime',
     ];
+
+    // ADDED: Missing relationship causing the undefined relation error
+    public function institution()
+    {
+        return $this->belongsTo(Institution::class);
+    }
 
     public function budget()
     {

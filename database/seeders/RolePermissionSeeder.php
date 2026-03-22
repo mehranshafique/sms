@@ -54,6 +54,7 @@ class RolePermissionSeeder extends Seeder
             'Student Promotion' => ['view', 'create'],
             'Student Transfers' => ['view', 'create', 'print'],
             'Student Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
+            'Fund Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
 
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Staff Attendance' => ['view', 'create', 'update', 'delete'],

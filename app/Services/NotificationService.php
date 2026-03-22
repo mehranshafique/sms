@@ -34,21 +34,26 @@ class NotificationService
             return true;
         }
 
-        $settings = InstitutionSetting::where('institution_id', $institutionId)
-            ->where('key', 'notification_preferences')
-            ->value('value');
+        $eventSettingKey = 'notify_' . $eventKey;
         
-        if (!$settings) {
-            return true; 
+        // Check local school preference
+        $eventPrefs = \App\Models\InstitutionSetting::where('institution_id', $institutionId)
+            ->where('key', $eventSettingKey)
+            ->value('value');
+
+        // Fallback to global preference if missing
+        if (!$eventPrefs && $institutionId) {
+            $eventPrefs = \App\Models\InstitutionSetting::whereNull('institution_id')
+                ->where('key', $eventSettingKey)
+                ->value('value');
         }
 
-        $preferences = is_string($settings) ? json_decode($settings, true) : $settings;
-
-        if (isset($preferences[$eventKey]) && isset($preferences[$eventKey][$channel])) {
-            return (bool) $preferences[$eventKey][$channel];
+        if ($eventPrefs) {
+            $prefs = json_decode($eventPrefs, true);
+            return !empty($prefs[$channel]);
         }
 
-        return true;
+        return false;
     }
 
     public function sendInvoiceNotification(Invoice $invoice)
@@ -93,46 +98,115 @@ class NotificationService
         }
     }
 
-    public function sendPaymentNotification(Payment $payment)
+    public function sendPaymentNotification(\App\Models\Payment $payment)
     {
         $invoice = $payment->invoice;
         $student = $invoice->student;
-        $institution = $payment->institution ?? $invoice->institution;
+        $parent = $student->parent;
+        $institutionId = $payment->institution_id;
+
+        if (!$parent) return;
+
         $eventKey = 'payment_received';
+
+        $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
+        $sendWa = $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp');
+
+        if (!$sendSms && !$sendWa) return;
+
+        $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
         
-        if ($this->isChannelEnabled($institution->id, $eventKey, 'email') && $student->email) {
-            try {
-                if (class_exists(PaymentReceived::class)) {
-                    Mail::to($student->email)->queue(new PaymentReceived($payment));
-                }
-            } catch (\Exception $e) {
-                Log::error("Payment Email Error: " . $e->getMessage());
-            }
+        if (!$template || !$template->is_active) return;
+
+        // Extract Standard Data
+        $currency = \App\Enums\CurrencySymbol::default();
+        $amount = $currency . ' ' . number_format($payment->amount, 2);
+        $balance = $currency . ' ' . number_format(max(0, $invoice->total_amount - $invoice->paid_amount), 2);
+        $schoolName = $payment->institution->name ?? 'School';
+        $date = \Carbon\Carbon::parse($payment->payment_date)->format('d M Y');
+        $transactionId = $payment->transaction_id;
+
+        // Extract NEW Context Data (Session & Class)
+        $sessionName = $invoice->academicSession->name ?? 'N/A';
+        
+        // Find enrollment specifically linked to the invoice's session to ensure accuracy
+        $enrollment = $student->enrollments()->where('academic_session_id', $invoice->academic_session_id)->first() 
+                    ?? $student->enrollments()->latest()->first();
+        $className = $enrollment && $enrollment->classSection ? $enrollment->classSection->name : 'N/A';
+
+        // Extract Payment Reason (Concatenate descriptions of paid invoice items)
+        $reason = $invoice->items->pluck('description')->filter()->implode(', ');
+        
+        // Fallback: If no explicit description is added, use the Fee Structure Name
+        if (empty($reason)) {
+            $reason = $invoice->items->map(function($item) {
+                return $item->feeStructure->name ?? '';
+            })->filter()->implode(', ');
+        }
+        // Final fallback
+        if (empty($reason)) {
+            $reason = 'School Fees';
         }
 
-        $phone = $student->mobile_number ?? $student->parent->father_phone ?? $student->parent->guardian_phone ?? null;
+        // Map and Replace Tags
+        $search = [
+            '$StudentName', 
+            '$Amount', 
+            '$Balance', 
+            '$SchoolName', 
+            '$Date', 
+            '$TransactionID',
+            '$Class',
+            '$Session',
+            '$PaymentReason'
+        ];
+        
+        $replace = [
+            $student->first_name, 
+            $amount, 
+            $balance, 
+            $schoolName, 
+            $date, 
+            $transactionId,
+            $className,
+            $sessionName,
+            $reason
+        ];
 
-        if ($phone) {
-            $data = [
-                'StudentName' => $student->full_name,
-                'Amount' => number_format($payment->amount, 2),
-                'SchoolName' => $institution->name,
-                'Balance' => number_format($invoice->total_amount - $invoice->paid_amount, 2),
-                'Currency' => config('app.currency_symbol', '$'),
-                'Date' => $payment->payment_date->format('d/m/Y'),
-                'TransactionID' => $payment->transaction_id ?? 'N/A',
-                'student_name' => $student->full_name,
-                'school_name' => $institution->name,
-                'transaction_id' => $payment->transaction_id ?? 'N/A'
-            ];
+        $message = str_replace($search, $replace, $template->body);
 
-            if ($this->isChannelEnabled($institution->id, $eventKey, 'sms')) {
-                $this->sendNotificationEvent($eventKey, $phone, $data, $institution->id, 'sms');
+        // Retrieve Parent Phone
+        $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
+        $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+
+        if (empty($phone)) return;
+
+        // Dispatch over enabled channels
+        if ($sendSms) {
+            $this->dispatchMessage($phone, $message, $institutionId, 'sms');
+        }
+
+        if ($sendWa) {
+            $this->dispatchMessage($phone, $message, $institutionId, 'whatsapp');
+        }
+    }
+
+    private function dispatchMessage($phone, $message, $institutionId, $channel)
+    {
+        $providerName = \App\Models\InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
+        if ($providerName === 'system') {
+            $providerName = \App\Models\InstitutionSetting::get(null, $channel . '_provider', 'system');
+        }
+
+        try {
+            $gateway = \App\Services\Sms\GatewayFactory::create($providerName, $institutionId);
+            if ($channel === 'whatsapp') {
+                $gateway->sendWhatsApp($phone, $message);
+            } else {
+                $gateway->sendSms($phone, $message);
             }
-            
-            if ($this->isChannelEnabled($institution->id, $eventKey, 'whatsapp')) {
-                $this->sendNotificationEvent($eventKey, $phone, $data, $institution->id, 'whatsapp');
-            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error(strtoupper($channel) . " Notification Error: " . $e->getMessage());
         }
     }
 
@@ -281,7 +355,7 @@ class NotificationService
         $finalProviderName = $selectedProvider;
         $credentialsContextId = $institutionId; 
         $shouldDeductCredits = false;
-
+        
         if ($selectedProvider === 'system') {
             $globalKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
             $finalProviderName = InstitutionSetting::whereNull('institution_id')

@@ -10,6 +10,11 @@
                     <p class="mb-0 text-muted">Manage and monitor all fund requests</p>
                 </div>
             </div>
+            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+                <button type="button" class="btn btn-primary shadow" data-bs-toggle="modal" data-bs-target="#requestFundModal">
+                    <i class="fa fa-plus me-2"></i> {{ __('budget.request_fund') ?? 'Request Funds' }}
+                </button>
+            </div>
         </div>
 
         {{-- HeadOff Overview Summary Cards --}}
@@ -96,6 +101,54 @@
                 </div>
             </div>
         </div>
+
+        {{-- Request Fund Modal --}}
+        <div class="modal fade" id="requestFundModal">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ __('budget.request_fund') ?? 'Request Funds' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="{{ url('/finance/budgets/requests/store') }}" method="POST">
+                        @csrf
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('budget.category') ?? 'Category' }} / Budget <span class="text-danger">*</span></label>
+                                <select name="budget_id" class="form-control default-select" required>
+                                    <option value="">{{ __('budget.select_category') ?? 'Select Category' }}</option>
+                                    @php
+                                        $institutionId = session('active_institution_id') ?: auth()->user()->institute_id;
+                                        // Fetch budgets securely scoped to this institution
+                                        $availableBudgets = \App\Models\Budget::with('category')->where('institution_id', $institutionId)->get();
+                                    @endphp
+                                    @foreach($availableBudgets as $b)
+                                        <option value="{{ $b->id }}">{{ $b->category->name ?? 'Global' }} ({{ $b->period_label }}) - Bal: {{ \App\Enums\CurrencySymbol::default() }} {{ number_format($b->allocated_amount - $b->spent_amount, 2) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('budget.request_title') ?? 'Request Title' }} <span class="text-danger">*</span></label>
+                                <input type="text" name="title" class="form-control" required placeholder="e.g. Science Lab Equipment">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('budget.amount') ?? 'Amount' }} <span class="text-danger">*</span></label>
+                                <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('budget.description') ?? 'Description' }}</label>
+                                <textarea name="description" class="form-control" rows="3" placeholder="{{ __('budget.request_description') ?? 'Provide details about this request...' }}"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-danger light" data-bs-dismiss="modal">{{ __('budget.cancel') ?? 'Cancel' }}</button>
+                            <button type="submit" class="btn btn-primary">{{ __('budget.save') ?? 'Save' }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 @endsection
