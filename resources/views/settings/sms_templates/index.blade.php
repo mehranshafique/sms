@@ -6,8 +6,8 @@
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4>{{ __('sms_template.page_title') }}</h4>
-                    <p class="mb-0">{{ __('sms_template.subtitle') }}</p>
+                    <h4>{{ __('sms_template.page_title') ?? 'SMS Templates' }}</h4>
+                    <p class="mb-0">{{ __('sms_template.subtitle') ?? 'Manage automated message templates' }}</p>
                 </div>
             </div>
         </div>
@@ -16,7 +16,7 @@
             <div class="col-12">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white border-0 pb-0">
-                        <h4 class="card-title text-primary">{{ __('sms_template.template_list') }}</h4>
+                        <h4 class="card-title text-primary">{{ __('sms_template.template_list') ?? 'Template List' }}</h4>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -24,11 +24,11 @@
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>{{ __('sms_template.event_name') }}</th>
-                                        <th>{{ __('sms_template.message_body') }}</th>
-                                        <th>{{ __('sms_template.tags') }}</th>
-                                        <th>{{ __('sms_template.status') }}</th>
-                                        <th class="text-end">{{ __('sms_template.action') }}</th>
+                                        <th>{{ __('sms_template.event_name') ?? 'Event Name' }}</th>
+                                        <th>{{ __('sms_template.message_body') ?? 'Message Body' }}</th>
+                                        <th>{{ __('sms_template.tags') ?? 'Available Tags' }}</th>
+                                        <th class="text-center">{{ __('sms_template.status') ?? 'Status' }}</th>
+                                        <th class="text-end">{{ __('sms_template.actions') ?? 'Actions' }}</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -38,54 +38,63 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-{{-- Edit Modal --}}
-<div class="modal fade" id="editTemplateModal">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ __('sms_template.edit_template') }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form action="{{ route('sms_templates.override') }}" method="POST" id="templateForm">
-                @csrf
-                <input type="hidden" name="event_key" id="eventKey">
-                <input type="hidden" name="name" id="eventName">
-                <input type="hidden" name="available_tags" id="eventTagsHidden">
-                
-                <div class="modal-body">
-                    <div class="alert alert-info py-2 fs-13">
-                        <i class="fa fa-info-circle me-1"></i> {{ __('sms_template.customize_help') }}
+        
+        <!-- Edit Template Modal -->
+        <div class="modal fade" id="editTemplateModal">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ __('sms_template.edit_template') ?? 'Edit Template' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
+                    <form id="editTemplateForm">
+                        @csrf
+                        <div class="modal-body">
+                            <!-- FIXED: Hidden fields ensure disabled input data is successfully serialized and sent -->
+                            <input type="hidden" name="event_key" id="templateEventKeyHidden">
+                            <input type="hidden" name="name" id="templateNameHidden">
+                            <input type="hidden" name="available_tags" id="templateTagsHidden">
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">{{ __('sms_template.available_tags_label') }}</label>
-                        <div id="tagsDisplay" class="p-2 bg-light border rounded text-primary small font-monospace"></div>
-                        <small class="text-muted">{{ __('sms_template.click_to_copy') }}</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">{{ __('sms_template.body_label') }} <span class="text-danger">*</span></label>
-                        <textarea name="body" id="templateBody" class="form-control" rows="5" required></textarea>
-                        <div class="d-flex justify-content-between mt-1">
-                            <small class="text-muted" id="charCount">0 {{ __('sms_template.characters') }}</small>
-                            <small class="text-muted" id="smsCount">0 {{ __('sms_template.segments') }}</small>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">{{ __('sms_template.event_name') ?? 'Event Name' }}</label>
+                                    <input type="text" id="templateName" class="form-control" disabled>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">{{ __('sms_template.event_key') ?? 'Event Key' }}</label>
+                                    <input type="text" id="templateEventKey" class="form-control" disabled>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label fw-bold">{{ __('sms_template.message_body') ?? 'Message Body' }} <span class="text-danger">*</span></label>
+                                    <textarea name="body" id="templateBody" class="form-control" rows="5" required></textarea>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small class="text-muted" id="charCount">0 {{ __('sms_template.characters') ?? 'characters' }}</small>
+                                        <small class="text-primary fw-bold" id="smsCount">0 {{ __('sms_template.segments') ?? 'SMS' }}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label fw-bold">{{ __('sms_template.available_tags') ?? 'Available Tags' }}</label>
+                                    <div class="p-3 bg-light border rounded">
+                                        <code id="templateTags" class="text-dark"></code>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 mt-2">
+                                    <div class="form-check form-switch custom-switch">
+                                        <input class="form-check-input" style="width: 3.5em; height: 1.75em; cursor: pointer;" type="checkbox" name="is_active" id="templateIsActive" value="1">
+                                        <label class="form-check-label fw-bold ms-2 mt-1" style="cursor: pointer;" for="templateIsActive">{{ __('sms_template.is_active') ?? 'Active (Enable this notification)' }}</label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" name="is_active" id="isActive" value="1" checked>
-                        <label class="form-check-label" for="isActive">{{ __('sms_template.active_label') }}</label>
-                    </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-danger light" data-bs-dismiss="modal">{{ __('sms_template.cancel') ?? 'Cancel' }}</button>
+                            <button type="submit" class="btn btn-primary" id="saveTemplateBtn"><i class="fa fa-save me-2"></i> {{ __('sms_template.save_changes') ?? 'Save Changes' }}</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('sms_template.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('sms_template.save_changes') }}</button>
-                </div>
-            </form>
+            </div>
         </div>
+
     </div>
 </div>
 @endsection
@@ -99,61 +108,92 @@
             serverSide: true,
             ajax: "{{ route('sms_templates.index') }}",
             columns: [
-                { data: 'DT_RowIndex', orderable: false, searchable: false },
-                { data: 'name', name: 'name', className: 'fw-bold' },
-                { data: 'body', name: 'body', render: (data) => data.length > 50 ? data.substr(0, 50) + '...' : data },
-                { data: 'available_tags', name: 'available_tags', className: 'small text-muted font-monospace' },
-                { data: 'is_active', name: 'is_active' },
-                { data: 'action', orderable: false, searchable: false, className: 'text-end' }
-            ],
-            language: {
-                emptyTable: "{{ __('finance.no_records_found') }}" // Fallback or add to sms_template
-            }
+                { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
+                { data: 'name', name: 'name' },
+                { data: 'body', name: 'body' },
+                { data: 'available_tags', name: 'available_tags' },
+                { data: 'is_active', name: 'is_active', className: 'text-center' },
+                { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
+            ]
         });
 
-        // Edit Handler
+        // Open Modal and Populate Data
         $(document).on('click', '.edit-template', function() {
-            let btn = $(this);
-            $('#eventKey').val(btn.data('key'));
-            $('#eventName').val(btn.data('name'));
-            $('#templateBody').val(btn.data('body'));
-            $('#tagsDisplay').text(btn.data('tags'));
-            $('#eventTagsHidden').val(btn.data('tags'));
+            let key = $(this).data('key');
+            let name = $(this).data('name');
+            let body = $(this).data('body');
+            let tags = $(this).data('tags');
+
+            // Populate Visible (Disabled) Fields
+            $('#templateEventKey').val(key);
+            $('#templateName').val(name);
+            $('#templateTags').text(tags);
+
+            // Populate Hidden Fields (These get serialized for POST)
+            $('#templateEventKeyHidden').val(key);
+            $('#templateNameHidden').val(name);
+            $('#templateTagsHidden').val(tags);
+
+            // Populate Editable Fields
+            $('#templateBody').val(body);
             
-            // Trigger char count update
+            // Determine Active Checkbox Status natively from the row HTML
+            let isActive = $(this).closest('tr').find('.badge-danger').length === 0;
+            $('#templateIsActive').prop('checked', isActive);
+
             $('#templateBody').trigger('input');
-            
             $('#editTemplateModal').modal('show');
         });
 
-        // Form Submit
-        $('#templateForm').submit(function(e) {
+        // Submit Form via AJAX
+        $('#editTemplateForm').submit(function(e) {
             e.preventDefault();
-            let btn = $(this).find('button[type="submit"]');
-            btn.prop('disabled', true).text('{{ __('sms_template.save_changes') }}...'); // Could add localized loading text
+            let form = $(this);
+            let btn = $('#saveTemplateBtn');
+            let originalText = btn.html();
+
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-2"></i> {{ __('sms_template.saving') ?? "Saving..." }}');
 
             $.ajax({
-                url: $(this).attr('action'),
+                url: "{{ route('sms_templates.override') }}",
                 type: 'POST',
-                data: $(this).serialize(),
+                data: form.serialize(),
                 success: function(res) {
                     $('#editTemplateModal').modal('hide');
-                    table.ajax.reload();
+                    table.ajax.reload(null, false); // Reload DataTables gently
+                    
+                    // FIXED: Re-enabled Confirm Button for UI clarity
                     Swal.fire({
                         icon: 'success',
-                        title: '{{ __('sms_template.success_saved') }}',
-                        text: res.message,
-                        timer: 1500,
-                        showConfirmButton: false
+                        title: '{{ __('sms_template.success_saved') ?? "Saved!" }}',
+                        text: res.message || 'Template updated successfully.',
+                        showConfirmButton: true,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#3085d6'
                     });
-                    btn.prop('disabled', false).text('{{ __('sms_template.save_changes') }}');
+
+                    btn.prop('disabled', false).html(originalText);
                 },
                 error: function(xhr) {
-                    btn.prop('disabled', false).text('{{ __('sms_template.save_changes') }}');
+                    btn.prop('disabled', false).html(originalText);
+                    
+                    // Enhanced Error Reporting for Validation Failures
+                    let msg = '{{ __('sms_template.error_occurred') ?? "An error occurred." }}';
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.errors) {
+                            msg = Object.values(xhr.responseJSON.errors)[0][0]; // Show first strict validation error
+                        } else if (xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
+                        }
+                    }
+
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: xhr.responseJSON ? xhr.responseJSON.message : '{{ __('sms_template.error_occurred') }}'
+                        text: msg,
+                        showConfirmButton: true,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#d33'
                     });
                 }
             });
@@ -164,8 +204,8 @@
             let len = $(this).val().length;
             let sms = Math.ceil(len / 160);
             if (len === 0) sms = 0;
-            $('#charCount').text(len + ' {{ __('sms_template.characters') }}');
-            $('#smsCount').text(sms + ' {{ __('sms_template.segments') }}');
+            $('#charCount').text(len + ' {{ __('sms_template.characters') ?? "characters" }}');
+            $('#smsCount').text(sms + ' {{ __('sms_template.segments') ?? "SMS" }}');
         });
     });
 </script>

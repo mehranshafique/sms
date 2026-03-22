@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class SmsTemplate extends Model
 {
     use HasFactory;
+    protected $table = 'sms_templates';
 
     protected $fillable = [
         'institution_id',

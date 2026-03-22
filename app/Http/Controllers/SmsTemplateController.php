@@ -20,11 +20,20 @@ class SmsTemplateController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            // Fetch Global Templates OR Institution Specific Overrides
-            // Logic: We show all global templates. If the institution has overridden one, we show that instead.
-            // Simplified: Just show global for now, allow override on edit.
+            // 1. Fetch Global Defaults and index them by their event key
+            $globalTemplates = SmsTemplate::whereNull('institution_id')->get()->keyBy('event_key');
             
-            $data = SmsTemplate::whereNull('institution_id')->get(); // Get Defaults
+            if ($institutionId) {
+                // 2. Fetch Institution Specific Overrides and index them by their event key
+                $institutionTemplates = SmsTemplate::where('institution_id', $institutionId)->get()->keyBy('event_key');
+                
+                // 3. Merge: Use array_merge to force overwriting by the string 'event_key'.
+                // (Eloquent's native merge() uses 'id', which causes the duplicates you saw).
+                $data = collect(array_merge($globalTemplates->all(), $institutionTemplates->all()))->values();
+            } else {
+                // 4. Fallback for Global/Super Admins
+                $data = $globalTemplates->values();
+            }
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -59,7 +68,7 @@ class SmsTemplateController extends BaseController
         ]);
 
         // Save as an institution-specific template
-        SmsTemplate::updateOrCreate(
+        $template = SmsTemplate::updateOrCreate(
             ['institution_id' => $institutionId, 'event_key' => $request->event_key],
             [
                 'name' => $request->name, // Inherit or update name
@@ -68,7 +77,8 @@ class SmsTemplateController extends BaseController
                 'is_active' => $request->has('is_active') ? 1 : 0
             ]
         );
-
+        // echo "Saved Template: " . $template->id; // Debugging line 
+        // dd($request->all(), $institutionId);
         return response()->json(['message' => __('sms_template.success_override')]);
     }
 }

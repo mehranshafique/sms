@@ -21,7 +21,11 @@ return [
     'click_to_copy' => 'Click tags to copy (optional)',
     'body_label' => 'Message Body',
     'active_label' => 'Active (Send for this event)',
-    
+    'event_key' => 'Event Key (System Identifier)',
+    'cancel' => 'Cancel',
+    'is_active' => 'Is Active',
+    'available_tags' => 'Available Tags',
+    'actions' => 'Action',
     // Character Counter
     'characters' => 'characters',
     'segments' => 'SMS segment(s)',
