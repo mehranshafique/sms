@@ -11,9 +11,11 @@ use App\Models\ExamSchedule;
 use App\Models\FeeStructure;
 use App\Models\SmsTemplate;
 use App\Models\InstitutionSetting;
+use App\Models\ClassSection;
 use App\Services\Sms\GatewayFactory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use App\Enums\CurrencySymbol;
 
@@ -27,10 +29,17 @@ class ReminderController extends BaseController
     public function index()
     {
         $institutionId = $this->getInstitutionId();
+        
         // Get active fee structures/tranches for the dropdown
         $feeStructures = FeeStructure::where('institution_id', $institutionId)->get();
         
-        return view('reminders.index', compact('feeStructures'));
+        // Get active class sections for the dropdown
+        $classes = ClassSection::with('gradeLevel')
+            ->where('institution_id', $institutionId)
+            ->where('is_active', true)
+            ->get();
+        
+        return view('reminders.index', compact('feeStructures', 'classes'));
     }
 
     /**
@@ -57,11 +66,13 @@ class ReminderController extends BaseController
     {
         $request->validate([
             'fee_structure_id' => 'nullable|exists:fee_structures,id',
-            'channel' => 'required|in:sms,whatsapp'
+            'class_section_id' => 'nullable|exists:class_sections,id',
+            'channel' => 'required|in:sms,whatsapp,email' // UPDATED: Included email
         ]);
 
         $institutionId = $this->getInstitutionId();
         $feeStructureId = $request->fee_structure_id;
+        $classSectionId = $request->class_section_id; 
         $channel = $request->channel;
         $eventKey = 'fee_reminder';
 
@@ -81,6 +92,14 @@ class ReminderController extends BaseController
             $q->whereIn('status', ['unpaid', 'partial', 'overdue']);
         }])->where('institution_id', $institutionId);
 
+        // Target a specific Class/Option Section
+        if ($classSectionId) {
+            $studentsQuery->whereHas('enrollments', function($q) use ($classSectionId) {
+                $q->where('class_section_id', $classSectionId)
+                  ->where('status', 'active');
+            });
+        }
+
         // Target a specific tranche, but keep the global debt calculation via the loaded invoices
         if ($feeStructureId) {
             $studentsQuery->whereHas('invoices.items', function($q) use ($feeStructureId) {
@@ -93,21 +112,24 @@ class ReminderController extends BaseController
         $students = $studentsQuery->get();
         $sentCount = 0;
         $errors = 0;
+        $schoolName = Institution::find($institutionId)->name ?? 'School';
 
-        // Initialize Gateway
-        $providerName = InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
-        if ($providerName === 'system') {
-            $providerName = InstitutionSetting::get(null, $channel . '_provider', 'system');
-        }
+        // Initialize Gateway (Only if not sending via Email)
+        $gateway = null;
+        if ($channel !== 'email') {
+            $providerName = InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
+            if ($providerName === 'system') {
+                $providerName = InstitutionSetting::get(null, $channel . '_provider', 'system');
+            }
 
-        try {
-            $gateway = GatewayFactory::create($providerName, $institutionId);
-        } catch (\Exception $e) {
-            return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
+            try {
+                $gateway = GatewayFactory::create($providerName, $institutionId);
+            } catch (\Exception $e) {
+                return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
+            }
         }
 
         $currency = CurrencySymbol::default();
-        $schoolName = Institution::find($institutionId)->name ?? 'School';
 
         foreach ($students as $student) {
             // Calculate real global outstanding balance
@@ -120,10 +142,18 @@ class ReminderController extends BaseController
             $parent = $student->parent;
             if (!$parent) continue;
 
-            $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
-            $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+            $contactInfo = null;
+            
+            // Determine Contact info based on channel
+            if ($channel === 'email') {
+                // Prioritize Guardian Email, fallback to Student Email
+                $contactInfo = $parent->guardian_email ?? $student->email;
+            } else {
+                $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
+                $contactInfo = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+            }
 
-            if (empty($phone)) continue;
+            if (empty($contactInfo)) continue;
 
             $parentName = $parent->father_name ?? 'Parent';
             
@@ -133,14 +163,24 @@ class ReminderController extends BaseController
             $message = str_replace($search, $replace, $template->body);
 
             try {
-                $response = ($channel === 'whatsapp') 
-                    ? $gateway->sendWhatsApp($phone, $message) 
-                    : $gateway->sendSms($phone, $message);
-
-                if ($response['success']) {
+                if ($channel === 'email') {
+                    // Send Email natively
+                    Mail::raw($message, function($msg) use ($contactInfo, $schoolName) {
+                        $msg->to($contactInfo)
+                            ->subject("Fee Reminder - " . $schoolName);
+                    });
                     $sentCount++;
                 } else {
-                    $errors++;
+                    // Send SMS/WhatsApp
+                    $response = ($channel === 'whatsapp') 
+                        ? $gateway->sendWhatsApp($contactInfo, $message) 
+                        : $gateway->sendSms($contactInfo, $message);
+
+                    if ($response['success']) {
+                        $sentCount++;
+                    } else {
+                        $errors++;
+                    }
                 }
             } catch (\Exception $e) {
                 $errors++;
@@ -161,10 +201,12 @@ class ReminderController extends BaseController
     public function sendExamReminders(Request $request)
     {
         $request->validate([
-            'channel' => 'required|in:sms,whatsapp'
+            'class_section_id' => 'nullable|exists:class_sections,id', 
+            'channel' => 'required|in:sms,whatsapp,email' // UPDATED: Included email
         ]);
 
         $institutionId = $this->getInstitutionId();
+        $classSectionId = $request->class_section_id; 
         $channel = $request->channel;
         $eventKey = 'exam_reminder';
         $tomorrow = Carbon::tomorrow()->toDateString();
@@ -180,28 +222,39 @@ class ReminderController extends BaseController
             return response()->json(['message' => __('reminders.messages.template_not_found'), 'status' => 'error'], 400);
         }
 
-        $schedules = ExamSchedule::with(['subject', 'classSection', 'exam'])
+        // 3. Query the schedules
+        $schedulesQuery = ExamSchedule::with(['subject', 'classSection', 'exam'])
             ->where(function($q) use ($tomorrow) {
                 $q->whereDate('exam_date', $tomorrow)->orWhereDate('date', $tomorrow);
             })
             ->whereHas('exam', function($q) use ($institutionId) {
                 $q->where('institution_id', $institutionId);
-            })
-            ->get();
+            });
+
+        // Filter schedules strictly by selected class section
+        if ($classSectionId) {
+            $schedulesQuery->where('class_section_id', $classSectionId);
+        }
+
+        $schedules = $schedulesQuery->get();
 
         if ($schedules->isEmpty()) {
-            return response()->json(['message' => __('reminders.messages.no_exams'), 'status' => 'info']);
+            return response()->json(['message' => __('reminders.messages.no_exams', ['default' => 'No exams found for the selected criteria tomorrow.']), 'status' => 'info']);
         }
 
-        $providerName = InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
-        if ($providerName === 'system') {
-            $providerName = InstitutionSetting::get(null, $channel . '_provider', 'system');
-        }
+        // Initialize Gateway (Only if not sending via Email)
+        $gateway = null;
+        if ($channel !== 'email') {
+            $providerName = InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
+            if ($providerName === 'system') {
+                $providerName = InstitutionSetting::get(null, $channel . '_provider', 'system');
+            }
 
-        try {
-            $gateway = GatewayFactory::create($providerName, $institutionId);
-        } catch (\Exception $e) {
-            return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
+            try {
+                $gateway = GatewayFactory::create($providerName, $institutionId);
+            } catch (\Exception $e) {
+                return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
+            }
         }
 
         $classSchedules = $schedules->groupBy('class_section_id');
@@ -232,10 +285,17 @@ class ReminderController extends BaseController
                 $parent = $student->parent;
                 if (!$parent) continue;
 
-                $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
-                $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+                $contactInfo = null;
 
-                if (empty($phone)) continue;
+                // Determine Contact info based on channel
+                if ($channel === 'email') {
+                    $contactInfo = $parent->guardian_email ?? $student->email;
+                } else {
+                    $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
+                    $contactInfo = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+                }
+
+                if (empty($contactInfo)) continue;
 
                 $parentName = $parent->father_name ?? 'Parent';
                 
@@ -245,14 +305,24 @@ class ReminderController extends BaseController
                 $message = str_replace($search, $replace, $template->body);
 
                 try {
-                    $response = ($channel === 'whatsapp') 
-                        ? $gateway->sendWhatsApp($phone, $message) 
-                        : $gateway->sendSms($phone, $message);
-
-                    if ($response['success']) {
+                    if ($channel === 'email') {
+                        // Send Email natively
+                        Mail::raw($message, function($msg) use ($contactInfo, $schoolName) {
+                            $msg->to($contactInfo)
+                                ->subject("Exam Schedule Reminder - " . $schoolName);
+                        });
                         $sentCount++;
                     } else {
-                        $errors++;
+                        // Send SMS/WhatsApp
+                        $response = ($channel === 'whatsapp') 
+                            ? $gateway->sendWhatsApp($contactInfo, $message) 
+                            : $gateway->sendSms($contactInfo, $message);
+
+                        if ($response['success']) {
+                            $sentCount++;
+                        } else {
+                            $errors++;
+                        }
                     }
                 } catch (\Exception $e) {
                     $errors++;

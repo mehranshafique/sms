@@ -23,6 +23,17 @@
                         <p class="text-muted mb-4">{{ __('reminders.fee_reminders_desc') }}</p>
                         <form id="feeReminderForm" action="{{ route('reminders.fees.send') }}" method="POST">
                             @csrf
+                            {{-- Class Section Filter --}}
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('reminders.target_class') ?? 'Target Class & Section (Optional)' }}</label>
+                                <select name="class_section_id" class="form-control default-select" data-live-search="true">
+                                    <option value="">{{ __('reminders.all_classes') ?? 'All Classes & Sections' }}</option>
+                                    @foreach($classes as $class)
+                                        <option value="{{ $class->id }}">{{ $class->gradeLevel->name ?? '' }} - {{ $class->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="mb-3">
                                 <label class="form-label fw-bold">{{ __('reminders.target_tranche') }}</label>
                                 <select name="fee_structure_id" class="form-control default-select">
@@ -40,6 +51,7 @@
                                 <select name="channel" class="form-control default-select" required>
                                     <option value="sms">{{ __('reminders.standard_sms') }}</option>
                                     <option value="whatsapp">{{ __('reminders.whatsapp') }}</option>
+                                    <option value="email">{{ __('reminders.email') ?? 'Email' }}</option>
                                 </select>
                             </div>
                             <button type="submit" class="btn btn-primary submit-btn w-100 shadow"><i class="fa fa-paper-plane me-2"></i> {{ __('reminders.send_fee_reminders') }}</button>
@@ -58,11 +70,24 @@
                         <p class="text-muted mb-4">{!! __('reminders.exam_reminders_desc') !!}</p>
                         <form id="examReminderForm" action="{{ route('reminders.exams.send') }}" method="POST">
                             @csrf
+                            
+                            {{-- Class Section Filter --}}
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('reminders.target_class') ?? 'Target Class & Section (Optional)' }}</label>
+                                <select name="class_section_id" class="form-control default-select" data-live-search="true">
+                                    <option value="">{{ __('reminders.all_classes') ?? 'All Classes & Sections' }}</option>
+                                    @foreach($classes as $class)
+                                        <option value="{{ $class->id }}">{{ $class->gradeLevel->name ?? '' }} - {{ $class->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="mb-4 mt-2">
                                 <label class="form-label fw-bold">{{ __('reminders.delivery_channel') }}</label>
                                 <select name="channel" class="form-control default-select" required>
                                     <option value="sms">{{ __('reminders.standard_sms') }}</option>
                                     <option value="whatsapp">{{ __('reminders.whatsapp') }}</option>
+                                    <option value="email">{{ __('reminders.email') ?? 'Email' }}</option>
                                 </select>
                             </div>
                             <div class="alert alert-info light border-info mb-4">

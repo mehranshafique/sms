@@ -20,6 +20,10 @@
                 $isStudent = $user->hasRole(RoleEnum::STUDENT->value);
                 $isGuardian = $user->hasRole(RoleEnum::GUARDIAN->value);
                 
+                // CRITICAL FIX: Group Custom Roles (Finance, Sales, etc.) with Management
+                // If they are not a Teacher, Student, or Guardian, they are treated as a Management/Staff user.
+                $isManagement = !$isTeacher && !$isStudent && !$isGuardian;
+                
                 // Determine Active Context
                 $activeInstId = session('active_institution_id');
                 
@@ -146,11 +150,13 @@
             {{-- PART 2: SCHOOL CONTEXT SECTION --}}
             {{-- ============================================================= --}}
             
-            @if(($isSchoolAdmin || $isHeadOfficer) || ($isSuperAdmin && $activeInstitution))
+            {{-- FIXED: Uses $isManagement logic instead of strictly checking $isSchoolAdmin --}}
+            @if($isManagement && !$isGlobalMode)
                 
                 {{-- SEPARATOR / HEADER WITH SCHOOL ID --}}
                 <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-                    {{ RoleEnum::SCHOOL_ADMIN->value }} <br>
+                    {{-- Displays the custom role's actual name rather than hardcoding "School Admin" --}}
+                    {{ $user->roles->pluck('name')->first() ?? 'Management' }} <br>
                     @if($activeInstitution)
                         <span style="font-size: 11px; opacity: 0.7; font-weight: normal; letter-spacing: 1px;">
                             ({{ $activeInstitution->code ?? $activeInstitution->id }})
@@ -184,7 +190,7 @@
                     @if(in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']))
                         <li>
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
-                                <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs') ?? 'Programs' }}</span>
+                                <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs.title') ?? 'Programs' }}</span>
                             </a>
                             <ul aria-expanded="false">
                                 <li><a class="{{ request()->routeIs('programs.*') ? 'mm-active' : '' }}" href="{{ route('programs.index') }}">{{ __('lmd.programs_page_title') ?? 'Programs' }}</a></li>
@@ -274,7 +280,6 @@
                                 @if($user->can('staff_attendance.view'))
                                     <li><a class="{{ request()->routeIs('staff-attendance.*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
                                 @endif
-                                 <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}</a></li>
                             </ul>
                         </li>
                     @endif
@@ -369,16 +374,40 @@
                     <li class="nav-label">{{ __('sidebar.communication') }}</li>
                     @if($hasModule('communication') && $user->can('notice.view'))
                         <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
-                        {{-- NEW: Smart Reminders --}}
-                        <li><a class="ai-icon {{ request()->routeIs('reminders.*') ? 'mm-active' : '' }}" href="{{ route('reminders.index') }}"><i class="la la-bell"></i><span class="nav-text">{{ __('sidebar.reminders') ?? 'Reminders' }}</span></a></li>
-                        @if($user->hasRole([RoleEnum::SUPER_ADMIN->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value]))
+                        
+                        @can('setting.manage')
                         <li><a class="ai-icon {{ request()->routeIs('chatbot.*') ? 'mm-active' : '' }}" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
-                        @endif
+                        @endcan
                     @endif
 
                     @if($hasModule('voting') && $user->can('election.view'))
                         <li><a class="ai-icon {{ request()->routeIs('elections.*') ? 'mm-active' : '' }}" href="{{ route('elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
                     @endif
+                @endif
+
+                {{-- OPERATIONS (Library, Transport, Inventory) --}}
+                @if($hasModule('library') || $hasModule('transport') || $hasModule('inventory'))
+                    <!-- @canany(['library.view', 'transport.view', 'inventory.view'])
+                    <li class="nav-label">{{ __('sidebar.operations') ?? 'Operations' }}</li>
+                    
+                    @if($hasModule('library'))
+                        @can('library.view')
+                        <li><a class="ai-icon" href="#"><i class="la la-book-reader"></i><span class="nav-text">{{ __('sidebar.library.title') ?? 'Library' }}</span></a></li>
+                        @endcan
+                    @endif
+
+                    @if($hasModule('transport'))
+                        @can('transport.view')
+                        <li><a class="ai-icon" href="#"><i class="la la-bus"></i><span class="nav-text">{{ __('sidebar.transport.title') ?? 'Transport' }}</span></a></li>
+                        @endcan
+                    @endif
+
+                    @if($hasModule('inventory'))
+                        @can('inventory.view')
+                        <li><a class="ai-icon" href="#"><i class="la la-boxes"></i><span class="nav-text">{{ __('sidebar.inventory.title') ?? 'Inventory' }}</span></a></li>
+                        @endcan
+                    @endif
+                    @endcanany -->
                 @endif
 
                 {{-- CONFIGURATION --}}
@@ -389,7 +418,7 @@
                         <ul aria-expanded="false">
                             <li><a class="{{ request()->routeIs('settings.*') ? 'mm-active' : '' }}" href="{{ route('settings.index') }}">{{ __('settings.page_title') ?? 'Settings' }}</a></li>
                             <li><a class="{{ request()->routeIs('configuration.*') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('configuration.page_title') ?? 'Configuration' }}</a></li>
-                            <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
+                            <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') ?? 'SMS Templates' }}</a></li>
                             <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
                         </ul>
                     </li>

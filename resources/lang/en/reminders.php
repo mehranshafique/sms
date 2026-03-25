@@ -6,6 +6,10 @@ return [
     
     'fee_reminders_title' => 'Fee Reminders (Debt Logic)',
     'fee_reminders_desc' => 'Sends a personalized message to parents indicating their child\'s total real outstanding balance. Automatically filters out students with zero debt.',
+    
+    'target_class' => 'Target Class & Section (Optional)',
+    'all_classes' => 'All Classes & Sections',
+    
     'target_tranche' => 'Target Tranche (Optional)',
     'all_unpaid_tranches' => 'All Unpaid Tranches (Global Debt)',
     'tranche_info' => 'If a specific tranche is selected, the system targets students who owe for that specific tranche, but still calculates their FULL outstanding debt globally to present in the message.',
@@ -20,6 +24,7 @@ return [
     
     'standard_sms' => 'Standard SMS',
     'whatsapp' => 'WhatsApp',
+    'email' => 'Email',
     
     // JS / SweetAlert Prompts
     'initiate_broadcast' => 'Initiate Broadcast?',

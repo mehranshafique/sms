@@ -219,6 +219,14 @@ class StudentController extends BaseController
             'email' => 'nullable|email|unique:users,email', 
         ]);
 
+        // Prevent Student and Guardian from sharing the exact same email (Causes duplicate user exception)
+        if ($request->filled('email') && $request->filled('guardian_email') && $request->email === $request->guardian_email) {
+            return response()->json([
+                'message' => 'Validation Error',
+                'errors' => ['email' => ['The Student and Guardian cannot use the exact same email address.']]
+            ], 422);
+        }
+
         $parentFields = [
             'father_name', 'father_phone', 'father_occupation',
             'mother_name', 'mother_phone', 'mother_occupation',
@@ -243,185 +251,197 @@ class StudentController extends BaseController
             $data['mobile_number'] = $request->mobile_number;
         }
 
-        DB::transaction(function () use ($request, $data, $institutionId) {
-            $institution = Institution::findOrFail($institutionId);
-            $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->firstOrFail();
+        try {
+            DB::transaction(function () use ($request, $data, $institutionId) {
+                $institution = Institution::findOrFail($institutionId);
+                $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->firstOrFail();
 
-            // 1. Find Parent
-            $phones = array_filter([$request->father_phone, $request->mother_phone, $request->guardian_phone]);
-            $email = $request->guardian_email;
+                // 1. Find Parent
+                $phones = array_filter([$request->father_phone, $request->mother_phone, $request->guardian_phone]);
+                $email = $request->guardian_email;
 
-            $parent = StudentParent::where('institution_id', $institutionId)
-                ->where(function($q) use ($phones, $email) {
-                    if(!empty($phones)) {
-                        $q->where(function($sub) use ($phones) {
-                            $sub->whereIn('father_phone', $phones)
-                                ->orWhereIn('mother_phone', $phones)
-                                ->orWhereIn('guardian_phone', $phones);
-                        });
+                $parent = StudentParent::where('institution_id', $institutionId)
+                    ->where(function($q) use ($phones, $email) {
+                        if(!empty($phones)) {
+                            $q->where(function($sub) use ($phones) {
+                                $sub->whereIn('father_phone', $phones)
+                                    ->orWhereIn('mother_phone', $phones)
+                                    ->orWhereIn('guardian_phone', $phones);
+                            });
+                        }
+                        if($email) {
+                            $q->orWhere('guardian_email', $email);
+                        }
+                    })->first();
+
+                // 2. Parent User Account & Shortcode Generation
+                $parentUserId = $parent ? $parent->user_id : null;
+                $parentPlainPassword = null;
+                $parentUserObj = null;
+
+                if ($email) {
+                    $existingUser = User::where('email', $email)->first();
+                    if ($existingUser) {
+                        $parentUserId = $existingUser->id;
+                        $parentUserObj = $existingUser;
+                        if(!$existingUser->hasRole('Guardian')) {
+                            $existingUser->assignRole('Guardian');
+                        }
+                        
+                        // Update parent phone if provided in current request
+                        $primaryPhone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
+                        if($primaryPhone && $primaryPhone !== $existingUser->phone) {
+                            $existingUser->update(['phone' => $primaryPhone]);
+                        }
+
+                    } else {
+                        $parentPlainPassword = 'Parent' . rand(1000, 9999) . '!';
+                        $phone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
+                        $name = $request->guardian_name ?? $request->father_name ?? $request->mother_name ?? 'Parent';
+                        
+                        $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
+                        while(User::where('shortcode', $parentShortcode)->exists()) {
+                             $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
+                        }
+
+                        $newUser = User::create([
+                            'name' => $name,
+                            'email' => $email,
+                            'password' => Hash::make($parentPlainPassword),
+                            'phone' => $phone, // Save Phone to User table
+                            'user_type' => UserType::GUARDIAN->value,
+                            'institute_id' => $institutionId,
+                            'shortcode' => $parentShortcode, 
+                            'username' => $parentShortcode,  
+                            'is_active' => true,
+                        ]);
+                        $newUser->assignRole('Guardian'); 
+                        $parentUserId = $newUser->id;
+                        $parentUserObj = $newUser;
                     }
-                    if($email) {
-                        $q->orWhere('guardian_email', $email);
-                    }
-                })->first();
+                }
 
-            // 2. Parent User Account & Shortcode Generation
-            $parentUserId = $parent ? $parent->user_id : null;
-            $parentPlainPassword = null;
-            $parentUserObj = null;
-
-            if ($email) {
-                $existingUser = User::where('email', $email)->first();
-                if ($existingUser) {
-                    $parentUserId = $existingUser->id;
-                    $parentUserObj = $existingUser;
-                    if(!$existingUser->hasRole('Guardian')) {
-                        $existingUser->assignRole('Guardian');
-                    }
-                    
-                    // Update parent phone if provided in current request
-                    $primaryPhone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
-                    if($primaryPhone && $primaryPhone !== $existingUser->phone) {
-                        $existingUser->update(['phone' => $primaryPhone]);
-                    }
-
-                } else {
-                    $parentPlainPassword = 'Parent' . rand(1000, 9999) . '!';
-                    $phone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
-                    $name = $request->guardian_name ?? $request->father_name ?? $request->mother_name ?? 'Parent';
-                    
-                    $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
-                    while(User::where('shortcode', $parentShortcode)->exists()) {
-                         $parentShortcode = 'PAR-' . $institutionId . '-' . rand(10000, 99999);
-                    }
-
-                    $newUser = User::create([
-                        'name' => $name,
-                        'email' => $email,
-                        'password' => Hash::make($parentPlainPassword),
-                        'phone' => $phone, // Save Phone to User table
-                        'user_type' => UserType::GUARDIAN->value,
-                        'institute_id' => $institutionId,
-                        'shortcode' => $parentShortcode, 
-                        'username' => $parentShortcode,  
-                        'is_active' => true,
+                // 3. Create/Link Parent Record
+                if (!$parent) {
+                    $parent = StudentParent::create([
+                        'institution_id' => $institutionId,
+                        'user_id' => $parentUserId,
+                        'father_name' => $request->father_name,
+                        'father_phone' => $request->father_phone,
+                        'father_occupation' => $request->father_occupation,
+                        'mother_name' => $request->mother_name,
+                        'mother_phone' => $request->mother_phone,
+                        'mother_occupation' => $request->mother_occupation,
+                        'guardian_name' => $request->guardian_name,
+                        'guardian_relation' => $request->primary_guardian,
+                        'guardian_phone' => $request->guardian_phone,
+                        'guardian_email' => $request->guardian_email,
+                        'family_address' => $request->avenue, 
                     ]);
-                    $newUser->assignRole('Guardian'); 
-                    $parentUserId = $newUser->id;
-                    $parentUserObj = $newUser;
+                } else {
+                    if (!$parent->user_id && $parentUserId) {
+                        $parent->update(['user_id' => $parentUserId]);
+                    }
+                    // Update parent record details if changed
+                    $parent->update([
+                        'father_phone' => $request->father_phone,
+                        'mother_phone' => $request->mother_phone,
+                        'guardian_phone' => $request->guardian_phone,
+                    ]);
                 }
-            }
 
-            // 3. Create/Link Parent Record
-            if (!$parent) {
-                $parent = StudentParent::create([
-                    'institution_id' => $institutionId,
-                    'user_id' => $parentUserId,
-                    'father_name' => $request->father_name,
-                    'father_phone' => $request->father_phone,
-                    'father_occupation' => $request->father_occupation,
-                    'mother_name' => $request->mother_name,
-                    'mother_phone' => $request->mother_phone,
-                    'mother_occupation' => $request->mother_occupation,
-                    'guardian_name' => $request->guardian_name,
-                    'guardian_relation' => $request->primary_guardian,
-                    'guardian_phone' => $request->guardian_phone,
-                    'guardian_email' => $request->guardian_email,
-                    'family_address' => $request->avenue, 
-                ]);
-            } else {
-                if (!$parent->user_id && $parentUserId) {
-                    $parent->update(['user_id' => $parentUserId]);
+                // 4. Generate Admission Number
+                $admissionNumber = IdGeneratorService::generateStudentId($institution, $currentSession);
+                $data['institution_id'] = $institutionId;
+                $data['parent_id'] = $parent->id; 
+                $data['admission_number'] = $admissionNumber;
+                $data['primary_guardian'] = $request->primary_guardian; 
+
+                if ($request->hasFile('student_photo')) {
+                    $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
                 }
-                // Update parent record details if changed
-                $parent->update([
-                    'father_phone' => $request->father_phone,
-                    'mother_phone' => $request->mother_phone,
-                    'guardian_phone' => $request->guardian_phone,
+
+                // 5. Create Student USER Account (Updated Logic)
+                $studentEmail = $request->email;
+                $studentPlainPassword = 'Student123!';
+                
+                if (empty($studentEmail)) {
+                    $cleanAcronym = Str::slug($institution->acronym ?? 'school');
+                    $studentEmail = str_replace(['/', ' ', '-'], '', $admissionNumber) . '@' . $cleanAcronym . '.com';
+                }
+
+                $studentUser = User::create([
+                    'name' => $request->first_name . ' ' . $request->last_name,
+                    'email' => $studentEmail,
+                    'password' => Hash::make($studentPlainPassword),
+                    'phone' => $request->mobile_number, // Save Phone to User table (FIX)
+                    'user_type' => UserType::STUDENT->value,
+                    'institute_id' => $institutionId,
+                    'shortcode' => $admissionNumber, 
+                    'username' => $admissionNumber,  
+                    'is_active' => true,
                 ]);
-            }
 
-            // 4. Generate Admission Number
-            $admissionNumber = IdGeneratorService::generateStudentId($institution, $currentSession);
-            $data['institution_id'] = $institutionId;
-            $data['parent_id'] = $parent->id; 
-            $data['admission_number'] = $admissionNumber;
-            $data['primary_guardian'] = $request->primary_guardian; 
+                // Assign Student Role
+                $studentRole = Role::where('name', RoleEnum::STUDENT->value)
+                                   ->where('institution_id', $institutionId)
+                                   ->first();
+                if ($studentRole) {
+                    $studentUser->assignRole($studentRole);
+                }
 
-            if ($request->hasFile('student_photo')) {
-                $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
-            }
+                $data['user_id'] = $studentUser->id;
+                
+                // 6. Create Student Profile
+                $student = Student::create($data);
 
-            // 5. Create Student USER Account (Updated Logic)
-            $studentEmail = $request->email;
-            $studentPlainPassword = 'Student123!';
+                // 7. Enroll
+                $sectionId = $request->class_section_id;
+                if (!$sectionId) {
+                    $section = ClassSection::where('grade_level_id', $request->grade_level_id)
+                        ->where('institution_id', $institutionId)
+                        ->first();
+                    $sectionId = $section ? $section->id : null;
+                }
+                
+                if ($sectionId) {
+                    StudentEnrollment::create([
+                        'institution_id' => $institutionId,
+                        'academic_session_id' => $currentSession->id,
+                        'student_id' => $student->id,
+                        'grade_level_id' => $request->grade_level_id,
+                        'class_section_id' => $sectionId,
+                        'status' => 'active',
+                        'enrolled_at' => now(),
+                        'discount_amount' => $request->discount_amount ?? 0,
+                        'discount_type' => $request->discount_type ?? 'fixed',
+                        'scholarship_reason' => $request->scholarship_reason,
+                    ]);
+                }
+
+                // 8. SEND NOTIFICATIONS
+                // Send to Student
+                $this->notificationService->sendUserCredentials($studentUser, $studentPlainPassword, RoleEnum::STUDENT->value);
+                
+                // Send to Parent (if new user created or updated)
+                if ($parentUserObj && $parentPlainPassword) {
+                    $this->notificationService->sendUserCredentials($parentUserObj, $parentPlainPassword, RoleEnum::GUARDIAN->value);
+                }
+            });
+
+            return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_create')]);
             
-            if (empty($studentEmail)) {
-                $cleanAcronym = Str::slug($institution->acronym ?? 'school');
-                $studentEmail = str_replace(['/', ' ', '-'], '', $admissionNumber) . '@' . $cleanAcronym . '.com';
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Illuminate\Support\Facades\Log::error("Student Store DB Error: " . $e->getMessage());
+            $errorCode = $e->errorInfo[1] ?? 0;
+            if ($errorCode == 1062) {
+                return response()->json(['message' => __('student.error_duplicate', ['default' => 'Duplicate entry detected! The Email, Phone Number, or Admission Number is already linked to another account.'])], 422);
             }
-
-            $studentUser = User::create([
-                'name' => $request->first_name . ' ' . $request->last_name,
-                'email' => $studentEmail,
-                'password' => Hash::make($studentPlainPassword),
-                'phone' => $request->mobile_number, // Save Phone to User table (FIX)
-                'user_type' => UserType::STUDENT->value,
-                'institute_id' => $institutionId,
-                'shortcode' => $admissionNumber, 
-                'username' => $admissionNumber,  
-                'is_active' => true,
-            ]);
-
-            // Assign Student Role
-            $studentRole = Role::where('name', RoleEnum::STUDENT->value)
-                               ->where('institution_id', $institutionId)
-                               ->first();
-            if ($studentRole) {
-                $studentUser->assignRole($studentRole);
-            }
-
-            $data['user_id'] = $studentUser->id;
-            
-            // 6. Create Student Profile
-            // $data already contains mobile_number from line 118
-            $student = Student::create($data);
-
-            // 7. Enroll
-            $sectionId = $request->class_section_id;
-            if (!$sectionId) {
-                $section = ClassSection::where('grade_level_id', $request->grade_level_id)
-                    ->where('institution_id', $institutionId)
-                    ->first();
-                $sectionId = $section ? $section->id : null;
-            }
-            
-            if ($sectionId) {
-                StudentEnrollment::create([
-                    'institution_id' => $institutionId,
-                    'academic_session_id' => $currentSession->id,
-                    'student_id' => $student->id,
-                    'grade_level_id' => $request->grade_level_id,
-                    'class_section_id' => $sectionId,
-                    'status' => 'active',
-                    'enrolled_at' => now(),
-                    'discount_amount' => $request->discount_amount ?? 0,
-                    'discount_type' => $request->discount_type ?? 'fixed',
-                    'scholarship_reason' => $request->scholarship_reason,
-                ]);
-            }
-
-            // 8. SEND NOTIFICATIONS
-            // Send to Student (will use updated User object with phone)
-            $this->notificationService->sendUserCredentials($studentUser, $studentPlainPassword, RoleEnum::STUDENT->value);
-            
-            // Send to Parent (if new user created or updated)
-            if ($parentUserObj && $parentPlainPassword) {
-                $this->notificationService->sendUserCredentials($parentUserObj, $parentPlainPassword, RoleEnum::GUARDIAN->value);
-            }
-        });
-
-        return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_create')]);
+            return response()->json(['message' => __('student.error_database', ['default' => 'A database error occurred while saving. Please review your entries and try again.'])], 500);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Student Store Exception: " . $e->getMessage());
+            return response()->json(['message' => __('student.error_occurred', ['default' => 'An unexpected error occurred: ']) . $e->getMessage()], 500);
+        }
     }
 
     public function edit(Student $student)
@@ -464,101 +484,114 @@ class StudentController extends BaseController
             $studentData['mobile_number'] = $request->mobile_number;
         }
 
-        DB::transaction(function () use ($student, $studentData, $parentData, $request) {
-            if ($request->hasFile('student_photo')) {
-                if ($student->student_photo) Storage::disk('public')->delete($student->student_photo);
-                $studentData['student_photo'] = $request->file('student_photo')->store('students', 'public');
-            }
-            
-            // 1. Update Student Profile
-            $student->update($studentData);
-
-            // 2. Sync Student User (Name, Email, Phone)
-            if ($student->user_id) {
-                $userUpdate = [];
-                if($request->filled('first_name')) $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
-                
-                // Update Phone
-                if ($request->filled('mobile_number')) {
-                    $userUpdate['phone'] = $request->mobile_number;
+        try {
+            DB::transaction(function () use ($student, $studentData, $parentData, $request) {
+                if ($request->hasFile('student_photo')) {
+                    if ($student->student_photo) Storage::disk('public')->delete($student->student_photo);
+                    $studentData['student_photo'] = $request->file('student_photo')->store('students', 'public');
                 }
+                
+                // 1. Update Student Profile
+                $student->update($studentData);
 
-                // Only update email if provided and different
-                if ($request->filled('email') && $request->email !== $student->user->email) {
-                    // Check uniqueness
-                    if (!User::where('email', $request->email)->where('id', '!=', $student->user_id)->exists()) {
-                        $userUpdate['email'] = $request->email;
-                        $student->update(['email' => $request->email]);
+                // 2. Sync Student User (Name, Email, Phone)
+                if ($student->user_id) {
+                    $userUpdate = [];
+                    if($request->filled('first_name')) $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
+                    
+                    // Update Phone
+                    if ($request->filled('mobile_number')) {
+                        $userUpdate['phone'] = $request->mobile_number;
                     }
-                }
-                
-                User::where('id', $student->user_id)->update($userUpdate);
-            }
 
-            // 3. Update Parent Info
-            if ($student->parent) {
-                $student->parent->update($parentData);
-                
-                $parentUser = null;
-                $plainPassword = null;
-                $isNewParent = false;
-
-                if (!empty($parentData['guardian_email']) && !$student->parent->user_id) {
-                    $existingUser = User::where('email', $parentData['guardian_email'])->first();
-                    if ($existingUser) {
-                        $student->parent->update(['user_id' => $existingUser->id]);
-                        $parentUser = $existingUser;
-                    } else {
-                        $plainPassword = 'Parent' . rand(1000, 9999) . '!';
-                        $isNewParent = true;
-                        
-                        $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
-                        while(User::where('shortcode', $parentShortcode)->exists()) {
-                             $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
+                    // Only update email if provided and different
+                    if ($request->filled('email') && $request->email !== $student->user->email) {
+                        // Check uniqueness
+                        if (!User::where('email', $request->email)->where('id', '!=', $student->user_id)->exists()) {
+                            $userUpdate['email'] = $request->email;
+                            $student->update(['email' => $request->email]);
                         }
-
-                        $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
-
-                        $newUser = User::create([
-                            'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
-                            'email' => $parentData['guardian_email'],
-                            'password' => Hash::make($plainPassword),
-                            'phone' => $phone, // Save Phone
-                            'user_type' => UserType::GUARDIAN->value,
-                            'institute_id' => $student->institution_id,
-                            'shortcode' => $parentShortcode,
-                            'username' => $parentShortcode,
-                            'is_active' => true,
-                        ]);
-                        $newUser->assignRole('Guardian');
-                        $student->parent->update(['user_id' => $newUser->id]);
-                        $parentUser = $newUser;
                     }
-                } elseif ($student->parent->user_id) {
-                     // Sync Parent Phone update
-                     $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
-                     if($phone) {
-                         User::where('id', $student->parent->user_id)->update(['phone' => $phone]);
-                     }
+                    
+                    User::where('id', $student->user_id)->update($userUpdate);
                 }
-                
-                // NOTIFY NEW PARENT
-                if ($isNewParent && $parentUser && $plainPassword) {
-                    $this->notificationService->sendUserCredentials($parentUser, $plainPassword, RoleEnum::GUARDIAN->value);
+
+                // 3. Update Parent Info
+                if ($student->parent) {
+                    $student->parent->update($parentData);
+                    
+                    $parentUser = null;
+                    $plainPassword = null;
+                    $isNewParent = false;
+
+                    if (!empty($parentData['guardian_email']) && !$student->parent->user_id) {
+                        $existingUser = User::where('email', $parentData['guardian_email'])->first();
+                        if ($existingUser) {
+                            $student->parent->update(['user_id' => $existingUser->id]);
+                            $parentUser = $existingUser;
+                        } else {
+                            $plainPassword = 'Parent' . rand(1000, 9999) . '!';
+                            $isNewParent = true;
+                            
+                            $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
+                            while(User::where('shortcode', $parentShortcode)->exists()) {
+                                 $parentShortcode = 'PAR-' . $student->institution_id . '-' . rand(10000, 99999);
+                            }
+
+                            $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
+
+                            $newUser = User::create([
+                                'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
+                                'email' => $parentData['guardian_email'],
+                                'password' => Hash::make($plainPassword),
+                                'phone' => $phone, // Save Phone
+                                'user_type' => UserType::GUARDIAN->value,
+                                'institute_id' => $student->institution_id,
+                                'shortcode' => $parentShortcode,
+                                'username' => $parentShortcode,
+                                'is_active' => true,
+                            ]);
+                            $newUser->assignRole('Guardian');
+                            $student->parent->update(['user_id' => $newUser->id]);
+                            $parentUser = $newUser;
+                        }
+                    } elseif ($student->parent->user_id) {
+                         // Sync Parent Phone update
+                         $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
+                         if($phone) {
+                             User::where('id', $student->parent->user_id)->update(['phone' => $phone]);
+                         }
+                    }
+                    
+                    // NOTIFY NEW PARENT
+                    if ($isNewParent && $parentUser && $plainPassword) {
+                        $this->notificationService->sendUserCredentials($parentUser, $plainPassword, RoleEnum::GUARDIAN->value);
+                    }
                 }
-            }
 
-            $enrollment = $student->enrollments()->latest()->first();
-            if ($enrollment) {
-                $enrollment->update([
-                    'discount_amount' => $request->discount_amount ?? 0,
-                    'discount_type' => $request->discount_type ?? 'fixed',
-                    'scholarship_reason' => $request->scholarship_reason,
-                ]);
-            }
-        });
+                $enrollment = $student->enrollments()->latest()->first();
+                if ($enrollment) {
+                    $enrollment->update([
+                        'discount_amount' => $request->discount_amount ?? 0,
+                        'discount_type' => $request->discount_type ?? 'fixed',
+                        'scholarship_reason' => $request->scholarship_reason,
+                    ]);
+                }
+            });
 
-        return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_update')]);
+            return response()->json(['redirect' => route('students.index'), 'message' => __('student.messages.success_update')]);
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Illuminate\Support\Facades\Log::error("Student Update DB Error: " . $e->getMessage());
+            $errorCode = $e->errorInfo[1] ?? 0;
+            if ($errorCode == 1062) {
+                return response()->json(['message' => __('student.error_duplicate', ['default' => 'Duplicate entry detected! The Email or Phone Number you entered is already linked to another account.'])], 422);
+            }
+            return response()->json(['message' => __('student.error_database', ['default' => 'A database error occurred while updating. Please review your entries.'])], 500);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Student Update Exception: " . $e->getMessage());
+            return response()->json(['message' => __('student.error_occurred', ['default' => 'An unexpected error occurred: ']) . $e->getMessage()], 500);
+        }
     }
 
     public function destroy(Student $student)

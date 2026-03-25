@@ -50,6 +50,7 @@ return [
     'documents' => 'Documents',
     'identity_access' => 'Identity & Access',
     'enrollment_history' => 'Enrollment History',
+    'select_section' => 'Select Section',
 
     // Fields
     'admission_no' => 'Admission No',
@@ -128,6 +129,7 @@ return [
     'loading' => 'Loading...',
     'no_options' => 'No Options Available',
     'select_option_placeholder' => 'Select Option',
+    'select_option' => 'Select Option',
     'select_class_first' => 'Select Class First',
     'error_loading' => 'Error Loading Data',
 
@@ -156,6 +158,8 @@ return [
     'no_enrollment_found' => 'No enrollment history found.',
     'payment_global' => 'Global (Annual)',
     'payment_installment' => 'Installment',
+    'error_duplicate' => 'Duplicate entry detected! The Email, Phone Number, or Admission Number is already linked to another account.',
+    'error_database' => 'A database error occurred while saving. Please review your entries and try again.',
 
     // Scholarship / Discount
     'scholarship_discount' => 'Scholarship / Discount',
