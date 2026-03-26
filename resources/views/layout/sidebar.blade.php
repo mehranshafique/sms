@@ -372,9 +372,16 @@
                 {{-- COMMUNICATION & VOTING --}}
                 @if($hasModule('communication') || $hasModule('voting'))
                     <li class="nav-label">{{ __('sidebar.communication') }}</li>
-                    @if($hasModule('communication') && $user->can('notice.view'))
+                    
+                    @if($hasModule('communication'))
+                        @can('notice.view')
                         <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
+                        @endcan
                         
+                        @can('reminder.view')
+                        <li><a class="ai-icon {{ request()->routeIs('reminders.*') ? 'mm-active' : '' }}" href="{{ route('reminders.index') }}"><i class="la la-bell"></i><span class="nav-text">{{ __('sidebar.reminders') ?? 'Reminders' }}</span></a></li>
+                        @endcan
+
                         @can('setting.manage')
                         <li><a class="ai-icon {{ request()->routeIs('chatbot.*') ? 'mm-active' : '' }}" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
                         @endcan
@@ -387,8 +394,8 @@
 
                 {{-- OPERATIONS (Library, Transport, Inventory) --}}
                 @if($hasModule('library') || $hasModule('transport') || $hasModule('inventory'))
-                    <!-- @canany(['library.view', 'transport.view', 'inventory.view'])
-                    <li class="nav-label">{{ __('sidebar.operations') ?? 'Operations' }}</li>
+                    @canany(['library.view', 'transport.view', 'inventory.view'])
+                    <!-- <li class="nav-label">{{ __('sidebar.operations') ?? 'Operations' }}</li>
                     
                     @if($hasModule('library'))
                         @can('library.view')
@@ -406,8 +413,8 @@
                         @can('inventory.view')
                         <li><a class="ai-icon" href="#"><i class="la la-boxes"></i><span class="nav-text">{{ __('sidebar.inventory.title') ?? 'Inventory' }}</span></a></li>
                         @endcan
-                    @endif
-                    @endcanany -->
+                    @endif -->
+                    @endcanany
                 @endif
 
                 {{-- CONFIGURATION --}}

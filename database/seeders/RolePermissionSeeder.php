@@ -89,7 +89,7 @@ class RolePermissionSeeder extends Seeder
             'Notices' => ['view', 'create', 'update', 'delete','viewAny'],
             'Voting' => ['view', 'create', 'update', 'delete'],
             'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
-
+            'Reminders' => ['view', 'create', 'update', 'delete'],
             // Extra
             'Library' => ['view', 'create', 'update', 'delete'],
             'Transport' => ['view', 'create', 'update', 'delete'],
