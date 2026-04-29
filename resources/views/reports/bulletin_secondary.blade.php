@@ -1,177 +1,236 @@
+@if(!isset($is_bulk) || !$is_bulk)
 <!DOCTYPE html>
-<html>
+<html lang="{{ app()->getLocale() }}">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>{{ __('reports.student_bulletin') }} - Semester {{ $semester }}</title>
-    <style>
-        @page { margin: 25px; }
-        body { font-family: 'Helvetica', sans-serif; font-size: 11px; color: #222; }
-        .header-main { width: 100%; margin-bottom: 20px; border-bottom: 3px double #000; padding-bottom: 10px; }
-        .logo { width: 70px; height: 70px; float: left; margin-right: 15px; }
-        .school-info { float: left; width: 400px; }
-        .school-title { font-size: 22px; font-weight: bold; margin: 0; }
-        
-        .clear { clear: both; }
-        
-        .student-badge { background: #f4f4f4; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 20px; }
-        
-        .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-        .marks-table th, .marks-table td { border: 1px solid #333; padding: 6px; text-align: center; }
-        .marks-table th { background: #333; color: #fff; text-transform: uppercase; font-size: 9px; }
-        .text-left { text-align: left !important; padding-left: 10px !important; }
-        
-        .percentage-box { float: right; border: 2px solid #000; padding: 10px 20px; font-size: 16px; font-weight: bold; background: #eee; }
-        
-        .mention { margin-top: 10px; font-style: italic; color: #555; }
-        .fail { color: red; font-weight: bold; }
-    </style>
+    <meta charset="UTF-8">
+    <title>{{ __('reports.bulletin_title') }}</title>
+    @include('reports.partials.bulletin_css') 
 </head>
 <body>
 
-    <div class="header-main">
-        <div class="school-info">
-            <h1 class="school-title">{{ $student->institution->name }}</h1>
-            <p>{{ $student->institution->address }} | {{ $student->institution->email }}</p>
-        </div>
-        <div style="float: right; text-align: right;">
-            <div style="font-size: 18px; font-weight: bold; color: #555;">{{ __('reports.semester_report') }}</div>
-            <div>{{ __('reports.semester') }}: {{ $semester }}</div>
-        </div>
-        <div class="clear"></div>
+    <div class="print-controls" id="printBtnBlock">
+        <button onclick="this.style.display='none'; window.print(); setTimeout(() => this.style.display='flex', 2000);" class="print-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Imprimer
+        </button>
     </div>
 
-    <div class="student-badge">
-        <table style="width: 100%;">
-            <tr>
-                <td style="width: 50%;">
-                    <strong>{{ __('student.name') }}:</strong> {{ $student->full_name }}<br>
-                    <strong>{{ __('student.id') }}:</strong> {{ $student->admission_number }}
-                </td>
-                <td style="width: 50%; text-align: right;">
-                    <strong>{{ __('student.class_grade') }}:</strong> {{ $enrollment->classSection->gradeLevel->name }} - {{ $enrollment->classSection->name }}<br>
-                    <strong>{{ __('student.academic_year') }}:</strong> {{ $enrollment->academicSession->name }}
-                </td>
-            </tr>
-            @if(isset($ranks))
-            <tr>
-                <td colspan="2" style="border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px;">
-                    <strong>Section Rank:</strong> {{ $ranks['section_rank'] }} / {{ $ranks['section_total'] }} &nbsp;&nbsp;|&nbsp;&nbsp;
-                    <strong>Grade Rank:</strong> {{ $ranks['grade_rank'] }} / {{ $ranks['grade_total'] }}
-                </td>
-            </tr>
-            @endif
-        </table>
-    </div>
+    <!-- Container wrapper centers the beautiful Single Card view on the screen natively -->
+    <div style="display: flex; justify-content: center; width: 100%; min-height: 100vh;">
+        <div class="student-column single-card-view">
+@else
+    <!-- Standard bulk mode column rendering -->
+    <div class="student-column" style="float: left; width: 33.33%; height: 210mm;">
+@endif
 
     @php
-        // Determine dynamic headers based on semester
-        $p1_label = ($semester == 1) ? "Period 1" : "Period 3";
-        $p2_label = ($semester == 1) ? "Period 2" : "Period 4";
-        $exam_label = "Exam S" . $semester;
-    @endphp
-
-    <table class="marks-table">
-        <thead>
-            <tr>
-                <th class="text-left" style="width: 25%;">{{ __('reports.subject') }}</th>
-                <th>{{ $p1_label }} <br><small>(Max)</small></th>
-                <th>{{ $p2_label }} <br><small>(Max)</small></th>
-                <th>{{ $exam_label }} <br><small>(Max)</small></th>
-                <th>Total <br><small>(Max)</small></th>
-                <th>{{ __('reports.grade') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            @php 
-                $grandTotalObtained = 0; 
-                $grandTotalMax = 0; 
-            @endphp
-
-            @foreach($data as $row)
-            @php 
-                $isFail = false;
-                $rowGrade = '-';
-                
-                if(is_numeric($row['total_score'])) {
-                    $grandTotalObtained += $row['total_score'];
-                    $grandTotalMax += $row['total_max'];
-                    
-                    // Fail if less than 50%
-                    if ($row['total_score'] < ($row['total_max'] / 2)) {
-                        $isFail = true;
-                    }
-                    
-                    // Per-Subject Grading Logic from gradingScale
-                    $subjPercent = ($row['total_score'] / $row['total_max']) * 100;
-                    if(isset($gradingScale) && is_array($gradingScale) && count($gradingScale) > 0) {
-                        foreach($gradingScale as $g) {
-                            if($subjPercent >= $g['min']) {
-                                $rowGrade = $g['grade'];
-                                break;
-                            }
-                        }
-                    } else {
-                        // Fallback
-                        $rowGrade = $isFail ? 'Fail' : 'Pass';
-                    }
-                }
-            @endphp
-            <tr>
-                <td class="text-left">{{ $row['subject']->name }}</td>
-                <td>{{ $row['p1_score'] }} <span class="text-muted text-xs">/{{ $row['p_max'] }}</span></td>
-                <td>{{ $row['p2_score'] }} <span class="text-muted text-xs">/{{ $row['p_max'] }}</span></td>
-                <td>{{ $row['exam_score'] }} <span class="text-muted text-xs">/{{ $row['exam_max'] }}</span></td>
-                <td style="font-weight: bold; {{ $isFail ? 'color: red;' : '' }}">
-                    {{ $row['total_score'] }} <span class="text-muted" style="font-weight: normal; font-size: 9px;">/{{ $row['total_max'] }}</span>
-                </td>
-                <td>{{ $rowGrade }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-
-    <div class="clear"></div>
-    
-    @php
-        $percentage = ($grandTotalMax > 0) ? ($grandTotalObtained / $grandTotalMax) * 100 : 0;
-        
-        $mention = 'Participated'; // Default
-        
-        // Dynamic Mention Calculation
-        if(isset($gradingScale) && is_array($gradingScale) && count($gradingScale) > 0) {
-            foreach($gradingScale as $g) {
-                if($percentage >= $g['min']) {
-                    // Use remark if available, else use grade
-                    $mention = !empty($g['remark']) ? $g['remark'] : $g['grade'];
-                    break;
-                }
+        $principalName = 'DIRECTION';
+        if (isset($student->institution_id)) {
+            $adminUser = \App\Models\User::where('institute_id', $student->institution_id)
+                            ->where(function($q) {
+                                $q->where('user_type', 'school_admin')
+                                  ->orWhereHas('roles', function($r) {
+                                      $r->where('name', 'School Admin');
+                                  });
+                            })->first();
+            if ($adminUser && !empty($adminUser->name)) {
+                $principalName = $adminUser->name;
             }
-        } else {
-            // Hardcoded Fallback if no settings
-            if ($percentage >= 80) $mention = 'Excellent';
-            elseif ($percentage >= 70) $mention = 'Very Good';
-            elseif ($percentage >= 60) $mention = 'Good';
-            elseif ($percentage >= 50) $mention = 'Satisfactory';
-            else $mention = 'Fail';
         }
+
+        $p1_label = ($semester == 1) ? "P1" : "P3";
+        $p2_label = ($semester == 1) ? "P2" : "P4";
     @endphp
 
-    <div class="percentage-box">
-        {{ __('reports.average') }}: {{ number_format($percentage, 2) }}%
-    </div>
-    
-    <div class="mention">
-        {{ __('reports.mention') }}: {{ $mention }}
-    </div>
-
-    <div style="margin-top: 80px; width: 100%;">
-        <div style="float: left; width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px;">
-            {{ __('reports.class_teacher') }}
+        <div class="header-content">
+            <div class="logo-box">
+                @if(isset($student->institution->logo) && $student->institution->logo)
+                    <img src="{{ asset('storage/' . $student->institution->logo) }}" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                @else
+                    @php $instNameParts = explode(' ', $student->institution->name ?? 'COLLEGE SAINT GABRIEL', 2); @endphp
+                    <span style="text-align:center;">{{ strtoupper(substr($instNameParts[0], 0, 10)) }}<br>...</span>
+                @endif
+            </div>
+            <div class="school-name">{{ strtoupper($student->institution->name ?? '') }}</div>
+            <div class="student-name">{{ strtoupper($student->first_name . ' ' . $student->last_name) }}</div>
+            <div class="class-name">{{ $enrollment->classSection->gradeLevel->name ?? '' }} - {{ $enrollment->classSection->name ?? '' }}</div>
+            <div class="barcode"></div>
+            <div class="term-title">{{ __('reports.bulletin_title') }} {{ $semester }}{{ $semester == 1 ? 'e' : 'e' }} {{ __('reports.semester') }}</div>
         </div>
-        <div style="float: right; width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px;">
-            {{ __('reports.principal') }}
-        </div>
-    </div>
+        
+        <div class="divider-thick"></div>
+        <div class="divider-thin"></div>
 
+        <table>
+            <thead>
+                <tr>
+                    <th class="left-align" style="width: 40%;">{{ __('reports.subject') }}</th>
+                    <th style="width: 15%;">{{ $p1_label }}</th>
+                    <th style="width: 15%;">{{ $p2_label }}</th>
+                    <th style="width: 15%;">EXAM</th>
+                    <th style="width: 15%;">TOTAL</th>
+                </tr>
+            </thead>
+        </table>
+        
+        <div class="divider-bottom"></div>
+
+        <table>
+            <tbody>
+                @php
+                    $totalObtained = 0;
+                    $totalMax = 0;
+                @endphp
+
+                @foreach($data as $row)
+                    @php
+                        // Safely check for array keys using ?? null to prevent undefined key crashes
+                        $p1 = is_numeric($row['p1_score'] ?? null) ? $row['p1_score'] : '-';
+                        $p2 = is_numeric($row['p2_score'] ?? null) ? $row['p2_score'] : '-';
+                        $ex = is_numeric($row['exam_score'] ?? null) ? $row['exam_score'] : '-';
+                        
+                        $p1_val = is_numeric($p1) ? $p1 : 0;
+                        $p2_val = is_numeric($p2) ? $p2 : 0;
+                        $ex_val = is_numeric($ex) ? $ex : 0;
+                        
+                        // Safely grab total_score if pre-calculated, otherwise sum it up natively
+                        $tot = isset($row['total_score']) && is_numeric($row['total_score']) 
+                               ? $row['total_score'] 
+                               : ($p1_val + $p2_val + $ex_val);
+                        
+                        $p_max = $row['p_max'] ?? 20;
+                        $ex_max = $row['exam_max'] ?? 40;
+                        $tot_max = $row['total_max'] ?? ($row['subject']->total_marks ?? 100);
+                        
+                        $totalObtained += $tot;
+                        $totalMax += $tot_max;
+                        
+                        $isP1Fail = (is_numeric($p1) && $p_max > 0 && $p1 < ($p_max / 2));
+                        $isP2Fail = (is_numeric($p2) && $p_max > 0 && $p2 < ($p_max / 2));
+                        $isExFail = (is_numeric($ex) && $ex_max > 0 && $ex < ($ex_max / 2));
+                        $isTotFail = (is_numeric($tot) && $tot_max > 0 && $tot < ($tot_max / 2));
+                    @endphp
+                    <tr>
+                        <td class="left-align" style="width: 40%;">{{ $row['subject']->name }}</td>
+                        <td class="{{ $isP1Fail ? 'fail-grade' : '' }}" style="width: 15%;">
+                            {{ $p1 }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $p_max }}</span>
+                        </td>
+                        <td class="{{ $isP2Fail ? 'fail-grade' : '' }}" style="width: 15%;">
+                            {{ $p2 }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $p_max }}</span>
+                        </td>
+                        <td class="{{ $isExFail ? 'fail-grade' : '' }}" style="width: 15%;">
+                            {{ $ex }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $ex_max }}</span>
+                        </td>
+                        <td class="{{ $isTotFail ? 'fail-grade' : '' }}" style="width: 15%;">
+                            {{ $tot }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $tot_max }}</span>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        @php
+            $percentage = $totalMax > 0 ? ($totalObtained / $totalMax) * 100 : 0;
+            $application = 'F';
+            if ($percentage >= 80) $application = 'E';
+            elseif ($percentage >= 70) $application = 'TB';
+            elseif ($percentage >= 60) $application = 'B';
+            elseif ($percentage >= 50) $application = 'AB';
+            
+            $conduct = !empty($student->conduct) ? $student->conduct : '-';
+        @endphp
+
+        <div class="summary-container">
+            <div class="summary-row">
+                <span class="label">{{ __('reports.maximum_general') }}</span>
+                <span class="val">{{ $totalMax }}</span>
+                <span class="val">{{ $totalMax }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">{{ __('reports.total_obtained') }}</span>
+                <span class="val">{{ $ranks['total_score'] ?? $totalObtained }}</span>
+                <span class="val">{{ $totalObtained }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">{{ __('reports.percentage') }}</span>
+                <span class="val">{{ number_format($percentage, 2) }}%</span>
+                <span class="val">{{ number_format($percentage, 2) }}%</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">{{ __('reports.conduct') }}</span>
+                <span class="val">{{ $conduct }}</span>
+                <span class="val">{{ $conduct }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">{{ __('reports.application') }}</span>
+                <span class="val">{{ $application }}</span>
+                <span class="val">{{ $application }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">{{ __('reports.place_eff') }}</span>
+                @php
+                    $grRank = $ranks['grade_rank'] ?? '-';
+                    $grTotal = $ranks['grade_total'] ?? '-';
+                    $secRank = $ranks['section_rank'] ?? '-';
+                    $secTotal = $ranks['section_total'] ?? '-';
+                @endphp
+                <span class="val">{{ $grRank }}{{ is_numeric($grRank) ? 'e' : '' }} | {{ $grTotal }}</span>
+                <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
+            </div>
+        </div>
+
+        <div class="footer-wrapper" style="position: relative; height: 70px; margin-top: 15px; clear: both; width: 100%;">
+            @php $qrData = urlencode("{$student->first_name} {$student->last_name} | ID: {$student->admission_number}"); @endphp
+            <div class="qr-code" style="position: absolute; left: 0; bottom: 0; width: 32px; height: 32px; background-color: white; padding: 2px; box-sizing: border-box; background-image: url('https://api.qrserver.com/v1/create-qr-code/?size=64x64&data={{ $qrData }}'); background-size: cover;"></div>
+
+            <div class="stamp-overlay" style="position: absolute; left: 45%; margin-left: -40px; bottom: 0; width: 65px; height: 65px; opacity: 0.95; z-index: 5; pointer-events: none;">
+                @php $svgId = isset($loop_index) ? $loop_index . '-' . $student->id : $student->id; @endphp
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="48" fill="none" stroke="var(--stamp-blue)" stroke-width="2"/>
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="var(--stamp-blue)" stroke-width="1"/>
+                    <circle cx="50" cy="50" r="28" fill="none" stroke="var(--stamp-blue)" stroke-width="1" stroke-dasharray="2,2"/>
+                    
+                    <path id="txt-top-{{ $svgId }}" d="M 18 50 A 32 32 0 0 1 82 50" fill="none"/>
+                    
+                    <!-- FIXED: Bottom Arc draws Right to Left to keep text Upright -->
+                    <path id="txt-bot-{{ $svgId }}" d="M 82 50 A 32 32 0 0 1 18 50" fill="none"/>
+                    
+                    <text fill="var(--stamp-blue)" font-size="11" font-weight="bold" font-family="Arial" letter-spacing="2">
+                        <textPath href="#txt-top-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ __('reports.bulletin_title') }}</textPath>
+                    </text>
+                    
+                    <text fill="var(--stamp-blue)" font-size="8.5" font-weight="bold" font-family="Arial" letter-spacing="1">
+                        <textPath href="#txt-bot-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ strtoupper(\Illuminate\Support\Str::limit($student->institution->name ?? 'DIRECTION', 18, '')) }}</textPath>
+                    </text>
+
+                    <circle cx="12" cy="50" r="2" fill="var(--stamp-blue)"/>
+                    <circle cx="88" cy="50" r="2" fill="var(--stamp-blue)"/>
+                    <text x="50" y="38" fill="var(--stamp-blue)" font-size="10" text-anchor="middle">★★★</text>
+                    
+                    <!-- FIXED: Prominent School Logo safely positioned in the center of the stamp -->
+                    @if(isset($student->institution->logo) && $student->institution->logo)
+                        <image href="{{ asset('storage/' . $student->institution->logo) }}" x="36" y="36" height="28" width="28" preserveAspectRatio="xMidYMid meet"/>
+                    @else
+                        <circle cx="50" cy="50" r="8" fill="#c49a45"/>
+                    @endif
+                    <text x="50" y="70" fill="var(--stamp-blue)" font-size="10" text-anchor="middle">★★</text>
+                </svg>
+            </div>
+
+            <div class="signature-block" style="position: absolute; right: 0; bottom: 0; text-align: center; font-size: 8px; font-weight: bold; line-height: 1.5; color: #000;">
+                <div>{{ __('reports.made_in') }} {{ $student->institution->city ?? 'Kinshasa' }}, {{ __('reports.on_date') }} {{ date('d/m/Y') }}</div>
+                <div style="margin: 3px 0;">{{ __('reports.principal') }}</div>
+                <div>{{ strtoupper($principalName) }}</div>
+            </div>
+        </div>
+    </div> <!-- Close Column -->
+
+@if(!isset($is_bulk) || !$is_bulk)
+    </div> <!-- Close Responsive Centered Wrapper -->
 </body>
 </html>
+@endif

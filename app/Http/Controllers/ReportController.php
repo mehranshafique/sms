@@ -18,16 +18,45 @@ use App\Models\ExamSchedule; // Added for Schedules
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
-use App\Services\LmdCalculationService; // NEW Injection
+use App\Services\LmdCalculationService; 
+use App\Models\Invoice;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends BaseController
 {
     protected $lmdService;
+    
     public function __construct(LmdCalculationService $lmdService)
     {
         $this->middleware('auth');
         $this->setPageTitle(__('reports.page_title'));
         $this->lmdService = $lmdService;
+    }
+
+    /**
+     * Centralized check for outstanding fees to restrict report access
+     */
+    public function checkFinancialClearance($studentId, $institutionId, $abort = true)
+    {
+        if (!$studentId || !$institutionId) return true;
+
+        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
+                        ->where('key', 'block_reports_on_debt')
+                        ->value('value');
+                        
+        if ($isBlocked == '1') {
+            $unpaid = Invoice::where('student_id', $studentId)
+                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                ->sum(DB::raw('total_amount - paid_amount'));
+                
+            if ($unpaid > 0) {
+                if ($abort) {
+                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance of ' . \App\Enums\CurrencySymbol::default() . ' ' . number_format($unpaid, 2) . '. Please settle the account to access academic reports.');
+                }
+                return false; 
+            }
+        }
+        return true;
     }
 
     /**
@@ -39,19 +68,14 @@ class ReportController extends BaseController
         $institution = Institution::find($institutionId);
         $institutionType = $institution->type ?? 'mixed'; 
 
-        // Fetch Exams
-        $exams = Exam::where('institution_id', $institutionId)
-            ->latest()
-            ->get();
+        $exams = Exam::where('institution_id', $institutionId)->latest()->get();
 
-        // Fetch Students (Active)
         $students = Student::where('institution_id', $institutionId)
             ->where('status', 'active')
             ->select('id', 'first_name', 'last_name', 'admission_number')
             ->orderBy('first_name')
             ->get();
 
-        // Fetch Classes for Bulk Printing
         $classes = ClassSection::with('gradeLevel')
             ->where('institution_id', $institutionId)
             ->where('is_active', true)
@@ -62,7 +86,6 @@ class ReportController extends BaseController
 
     /**
      * Generate Student Bulletin (Term Report Card).
-     * Supports Single Student OR Whole Class (Bulk)
      */
     public function bulletin(Request $request)
     {
@@ -117,6 +140,9 @@ class ReportController extends BaseController
         } else {
             $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
             if ($student->institution_id != $institutionId) abort(403);
+
+            // Restrict report access if the student has unpaid fees
+            $this->checkFinancialClearance($student->id, $institutionId, true);
 
             $enrollment = $student->enrollments()->latest()->first();
             if (!$enrollment) {
@@ -204,24 +230,24 @@ class ReportController extends BaseController
             return back()->with('error', __('reports.no_records_found'));
         }
 
-        // 4. Generate PDF
+        // 4. Generate HTML View
         if (count($bulkData) === 1) {
             $data = $bulkData[0];
-            $pdf = Pdf::loadView($viewName, $data); 
-            return $pdf->stream('Bulletin_'.$data['student']->admission_number.'.pdf');
+            // FIXED: Return the standard HTML View instead of forcing a DOMPDF stream
+            // This prevents the browser from loading the "PDF viewer/print dialog" immediately
+            return view($viewName, $data);
         } else {
-            // Use the new bulk_print view
-            $pdf = Pdf::loadView('reports.bulk_print', [
+            // Use the bulk_print view
+            return view('reports.bulk_print', [
                 'reports' => $bulkData, 
                 'viewName' => $viewName,
                 'classSection' => $classSection
             ]);
-            return $pdf->stream('Class_Bulletin_'.$classSection->name.'.pdf');
         }
     }
+
     /**
      * Generate Academic Transcript (Cumulative History)
-     * Handles both Standard and LMD formats based on student's grade cycle.
      */
     public function transcript(Request $request)
     {
@@ -236,24 +262,20 @@ class ReportController extends BaseController
             abort(403, 'Unauthorized access.');
         }
 
+        $this->checkFinancialClearance($student->id, $institutionId, true);
+
         // Determine Cycle (LMD vs Standard)
-        // Check if education_cycle is an Enum object or string
         $cycle = $student->gradeLevel->education_cycle ?? 'primary';
         $cycleValue = is_object($cycle) ? $cycle->value : $cycle;
         
         $isLmd = in_array($cycleValue, ['university', 'lmd', 'mixed']);
 
         if ($isLmd) {
-            // --- LMD LOGIC ---
             $history = [];
-            
-            // Loop through all enrollments to build semester history
             foreach($student->enrollments as $enrol) {
                 $sessionId = $enrol->academic_session_id;
                 $sessionName = $enrol->academicSession->name;
 
-                // Calculate for Sem 1 & 2
-                // Ideally we should detect which semesters apply to this grade, but 1 & 2 is standard
                 $sem1 = $this->lmdService->calculateSemesterResults($student, $sessionId, 1);
                 if ($sem1) $history[$sessionName]['Semester 1'] = $sem1;
 
@@ -266,14 +288,10 @@ class ReportController extends BaseController
                 return response()->json(['status' => 'success']);
             }
 
-            // Load LMD specific view
-            // NOTE: Using 'reports.transcript_lmd' which corresponds to the file updated above
             $pdf = Pdf::loadView('reports.transcript_lmd', compact('student', 'history'));
             return $pdf->stream('LMD_Transcript_' . $student->admission_number . '.pdf');
 
         } else {
-            // --- STANDARD LOGIC (Primary/Secondary) ---
-            // (Same logic as previously provided for standard schools)
             $records = ExamRecord::with(['exam.academicSession', 'subject'])
                 ->where('student_id', $student->id)
                 ->get();
@@ -283,7 +301,6 @@ class ReportController extends BaseController
                 return back()->with('error', __('reports.no_records_found'));
             }
 
-            // Calculate Max Marks Logic... (omitted for brevity, same as existing)
             $schedules = ExamSchedule::whereIn('exam_id', $records->pluck('exam_id'))
                 ->whereIn('subject_id', $records->pluck('subject_id'))
                 ->whereIn('class_section_id', $records->pluck('class_section_id'))
@@ -312,7 +329,6 @@ class ReportController extends BaseController
     }
 
     // --- HELPERS ---
-    // (Rest of the helpers remain the same as previous file...)
 
     private function hasMarks($reportData) {
         if (!isset($reportData['data'])) return false;
@@ -320,7 +336,6 @@ class ReportController extends BaseController
             if (isset($row['has_marks']) && $row['has_marks']) return true; 
             if (isset($row['obtained']) && is_numeric($row['obtained'])) return true;
             if (isset($row['exam_score']) && is_numeric($row['exam_score'])) return true;
-            
             if (isset($row['p1_score']) && is_numeric($row['p1_score'])) return true;
         }
         return false;
@@ -389,6 +404,7 @@ class ReportController extends BaseController
             ->get();
 
         $studentIds = $gradeEnrollments->pluck('student_id');
+        $students = Student::whereIn('id', $studentIds)->get()->keyBy('id'); 
 
         $marks = ExamRecord::whereIn('student_id', $studentIds)
             ->whereHas('exam', function($q) use ($categories) {
@@ -398,14 +414,26 @@ class ReportController extends BaseController
             ->get();
 
         $studentScores = [];
+        foreach ($studentIds as $id) {
+            $studentScores[$id] = 0;
+        }
+
         foreach ($marks as $mark) {
-            if (!isset($studentScores[$mark->student_id])) {
-                $studentScores[$mark->student_id] = 0;
-            }
             $studentScores[$mark->student_id] += $mark->marks_obtained;
         }
 
-        arsort($studentScores); 
+        uksort($studentScores, function($idA, $idB) use ($studentScores, $students) {
+            $scoreA = $studentScores[$idA];
+            $scoreB = $studentScores[$idB];
+            
+            if (abs($scoreA - $scoreB) > 0.001) {
+                return $scoreB <=> $scoreA; 
+            }
+            
+            $nameA = isset($students[$idA]) ? strtolower($students[$idA]->first_name . ' ' . $students[$idA]->last_name) : '';
+            $nameB = isset($students[$idB]) ? strtolower($students[$idB]->first_name . ' ' . $students[$idB]->last_name) : '';
+            return strcmp($nameA, $nameB);
+        }); 
 
         $gradeRanks = [];
         $rank = 1;
@@ -413,7 +441,7 @@ class ReportController extends BaseController
         $displayRank = 1;
         
         foreach ($studentScores as $sId => $score) {
-            if ($score != $prevScore) {
+            if (abs($score - $prevScore) > 0.001) {
                 $rank = $displayRank;
             }
             $gradeRanks[$sId] = $rank;
@@ -434,14 +462,24 @@ class ReportController extends BaseController
         $totalGradeStudents = count($studentScores);
 
         foreach ($sectionScores as $secId => $scores) {
-            arsort($scores);
+            uksort($scores, function($idA, $idB) use ($scores, $students) {
+                $scoreA = $scores[$idA];
+                $scoreB = $scores[$idB];
+                if (abs($scoreA - $scoreB) > 0.001) {
+                    return $scoreB <=> $scoreA;
+                }
+                $nameA = isset($students[$idA]) ? strtolower($students[$idA]->first_name . ' ' . $students[$idA]->last_name) : '';
+                $nameB = isset($students[$idB]) ? strtolower($students[$idB]->first_name . ' ' . $students[$idB]->last_name) : '';
+                return strcmp($nameA, $nameB);
+            });
+            
             $sRank = 1;
             $sPrevScore = -1;
             $sDisplayRank = 1;
             $totalInSection = count($scores);
 
             foreach ($scores as $sId => $score) {
-                if ($score != $sPrevScore) {
+                if (abs($score - $sPrevScore) > 0.001) {
                     $sRank = $sDisplayRank;
                 }
                 
@@ -479,12 +517,10 @@ class ReportController extends BaseController
         );
 
         $data = [];
-        $hasData = false;
 
         foreach($subjects as $subject) {
             $rec = $records->get($subject->id);
-            $obtained = $rec ? $rec->marks_obtained : '-';
-            if ($rec) $hasData = true;
+            $obtained = $rec ? $rec->marks_obtained : 0; 
 
             $defaultMax = $subject->total_marks ?? 20;
             $configuredMax = $scheduleMap[$period][$subject->id] ?? $defaultMax;
@@ -494,11 +530,9 @@ class ReportController extends BaseController
                 'obtained' => $obtained,
                 'max' => $configuredMax,
                 'percentage' => $rec ? ($rec->marks_obtained / $configuredMax) * 100 : 0,
-                'has_marks' => ($rec !== null)
+                'has_marks' => true 
             ];
         }
-
-        if (!$hasData) return null;
 
         return ['period' => $period, 'data' => $data];
     }
@@ -519,8 +553,6 @@ class ReportController extends BaseController
                   ->whereIn('category', [$pA, $pB, $examCat]);
             })->get();
 
-        if ($records->isEmpty()) return null;
-
         $scheduleMap = $this->getExamScheduleMaxMarks(
             $enrollment->class_section_id, 
             $enrollment->academic_session_id, 
@@ -528,6 +560,7 @@ class ReportController extends BaseController
         );
 
         $data = [];
+        
         foreach ($subjects as $subject) {
             $defaultMax = $subject->total_marks ?? 20;
             
@@ -539,19 +572,18 @@ class ReportController extends BaseController
 
             $data[$subject->id] = [
                 'subject' => $subject,
-                'p1_score' => '-', 
-                'p2_score' => '-', 
-                'exam_score' => '-',
+                'p1_score' => 0, 
+                'p2_score' => 0, 
+                'exam_score' => 0,
                 'p_max' => $display_p_max,
                 'exam_max' => $exam_max,
-                'has_marks' => false
+                'has_marks' => true
             ];
         }
 
         foreach ($records as $r) {
             $subId = $r->subject_id;
             if (isset($data[$subId])) {
-                $data[$subId]['has_marks'] = true;
                 if ($r->exam->category == $pA) $data[$subId]['p1_score'] = $r->marks_obtained;
                 elseif ($r->exam->category == $pB) $data[$subId]['p2_score'] = $r->marks_obtained;
                 elseif ($r->exam->category == $examCat) $data[$subId]['exam_score'] = $r->marks_obtained;
@@ -578,8 +610,6 @@ class ReportController extends BaseController
                   ->whereIn('category', [$pA, $pB, $examCat]);
             })->get();
 
-        if ($records->isEmpty()) return null;
-
         $scheduleMap = $this->getExamScheduleMaxMarks(
             $enrollment->class_section_id, 
             $enrollment->academic_session_id, 
@@ -587,7 +617,6 @@ class ReportController extends BaseController
         );
 
         $data = [];
-        $hasAnyMarks = false;
         
         foreach($subjects as $subject) {
             $defaultMax = $subject->total_marks ?? 20;
@@ -601,14 +630,14 @@ class ReportController extends BaseController
 
             $data[$subject->id] = [
                 'subject' => $subject,
-                'p1_score' => '-',
-                'p2_score' => '-',
-                'exam_score' => '-',
+                'p1_score' => 0,
+                'p2_score' => 0,
+                'exam_score' => 0,
                 'p_max' => $display_p_max,
                 'exam_max' => $exam_max, 
                 'total_score' => 0,
                 'total_max' => $total_max, 
-                'has_marks' => false
+                'has_marks' => true
             ];
         }
 
@@ -616,23 +645,17 @@ class ReportController extends BaseController
             $subId = $r->subject_id;
             if (isset($data[$subId])) {
                 $cat = $r->exam->category;
-                if ($cat == $pA) { $data[$subId]['p1_score'] = $r->marks_obtained; $data[$subId]['has_marks'] = true; $hasAnyMarks = true; }
-                elseif ($cat == $pB) { $data[$subId]['p2_score'] = $r->marks_obtained; $data[$subId]['has_marks'] = true; $hasAnyMarks = true; }
-                elseif ($cat == $examCat) { $data[$subId]['exam_score'] = $r->marks_obtained; $data[$subId]['has_marks'] = true; $hasAnyMarks = true; }
+                if ($cat == $pA) { $data[$subId]['p1_score'] = $r->marks_obtained; }
+                elseif ($cat == $pB) { $data[$subId]['p2_score'] = $r->marks_obtained; }
+                elseif ($cat == $examCat) { $data[$subId]['exam_score'] = $r->marks_obtained; }
             }
         }
-
-        if (!$hasAnyMarks) return null;
 
         foreach($data as $id => &$row) {
             $s1 = is_numeric($row['p1_score']) ? $row['p1_score'] : 0;
             $s2 = is_numeric($row['p2_score']) ? $row['p2_score'] : 0;
             $ex = is_numeric($row['exam_score']) ? $row['exam_score'] : 0;
-            if($row['has_marks']) {
-                $row['total_score'] = $s1 + $s2 + $ex;
-            } else {
-                $row['total_score'] = '-';
-            }
+            $row['total_score'] = $s1 + $s2 + $ex;
         }
 
         return ['data' => $data, 'semester' => $semester];

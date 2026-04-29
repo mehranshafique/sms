@@ -1,25 +1,38 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ app()->getLocale() }}">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>Bulk Report Generation</title>
-    <style>
-        body { margin: 0; padding: 0; }
-        .page-break { page-break-after: always; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ __('reports.bulletin_title') }} - {{ __('reports.whole_class') }}</title>
+    @include('reports.partials.bulletin_css')
 </head>
 <body>
-    @foreach($reports as $index => $report)
-        <div class="report-wrapper">
-            {{-- Include the specific view for the report type (Primary/Secondary/Period) --}}
-            {{-- We pass the $report array which contains 'student', 'data', 'settings', etc. --}}
-            @include($viewName, $report)
+    
+    <!-- Floating Print Button (Hides automatically during actual print) -->
+    <div class="print-controls">
+        <button onclick="window.print()" class="print-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Imprimer
+        </button>
+    </div>
+
+    @foreach (collect($reports)->chunk(4) as $chunkIndex => $chunk)
+        <div class="a4-landscape">
+            
+            @foreach ($chunk as $index => $reportData)
+                @include($viewName, array_merge($reportData, ['is_bulk' => true, 'loop_index' => $chunkIndex . '-' . $index]))
+            @endforeach
+
+            {{-- Fill empty columns to maintain the precise flex layout if the chunk has fewer than 4 students --}}
+            @for ($i = $chunk->count(); $i < 4; $i++)
+                <div class="student-column" style="visibility: hidden; border: none;"></div>
+            @endfor
+
         </div>
-        
-        {{-- Add page break unless it's the last student --}}
-        @if(!$loop->last)
-            <div class="page-break"></div>
-        @endif
     @endforeach
 </body>
 </html>

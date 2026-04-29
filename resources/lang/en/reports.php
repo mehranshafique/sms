@@ -35,7 +35,8 @@ return [
     'error_period_inactive' => 'The selected period (:period) is not currently active. Reports cannot be generated.',
     'no_students_in_class' => 'No active students found in the selected class.',
     'error_occurred'   => 'An error occurred while generating the report.',
-    // NEW: Bulk & Validation
+    
+    // Bulk & Validation
     'generation_mode' => 'Generation Mode',
     'single_student' => 'Single Student',
     'whole_class' => 'Whole Class',
@@ -44,29 +45,34 @@ return [
     'bulletin_title' => 'BULLETIN',
     'subject' => 'Branches',
     'marks_obtained' => 'Marks',
+    'cotes' => 'Cotes',
     'max_marks' => 'Max',
     'grade' => 'Grade',
     'average' => 'Average',
     'mention' => 'Mention',
     'totals' => 'TOTALS',
     
+    // Footer Stats Keys
     'max_general' => 'MAXIMUM GENERAL',
-    'total_obtained' => 'TOTAL OBTAINED',
-    'percentage' => 'PERCENTAGE',
-    'conduct' => 'CONDUCT',
+    'maximum_general' => 'MAXIMUM GENERAL',
+    'total_obtained' => 'TOTAL OBTENU',
+    'percentage' => 'POURCENTAGE',
+    'conduct' => 'CONDUITE',
     'application' => 'APPLICATION',
     'place_eff' => 'PLACE - EFF', 
+    'rank_eff' => 'PLACE - EFF',
+    'made_in' => 'Fait à',
+    'on_date' => 'le',
     
     'session' => 'Session',
     'date' => 'Date',
 
     // LMD Specific Keys
     'matieres' => 'SUBJECTS',
-    'cotes' => 'Scores',
     'credit' => 'Credit',
     'credit_valide' => 'Credit Validated',
     'financial_restriction_msg' => 'Note: This student has an outstanding fee balance. Academic reports are blocked until the balance is cleared.',
-    'principal' => 'Principal / Head of Establishment',
+    'principal' => 'Chef d\'établissement',
     'class_teacher' => 'Class Teacher',
     'parent_signature' => 'Parent Signature',
     'principal_signature' => 'Principal Signature',

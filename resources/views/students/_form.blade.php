@@ -2,7 +2,9 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.4/build/css/intlTelInput.css">
 <style>
     .iti { width: 100%; display: block; }
-    .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid var(--primary); color: var(--primary); }
+    .nav-tabs .nav-link { pointer-events: none; opacity: 0.7; } /* Disabled direct clicking to enforce wizard flow */
+    .nav-tabs .nav-link.active { font-weight: bold; border-bottom: 3px solid var(--primary); color: var(--primary); opacity: 1; pointer-events: auto; }
+    .nav-tabs .nav-link.completed { opacity: 1; pointer-events: auto; color: #28a745; border-bottom-color: #28a745; }
     .scan-btn { cursor: pointer; }
     .auto-filled { background-color: #e8f0fe !important; border-color: #4285f4; transition: background-color 0.5s; }
     .parent-status-msg { font-size: 0.85rem; margin-top: 5px; font-weight: 500; }
@@ -23,25 +25,25 @@
         </div>
         <div class="card-body">
             
-            {{-- TABS --}}
+            {{-- WIZARD TABS --}}
             <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
                 <li class="nav-item">
-                    <button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab"><i class="fa fa-user me-2"></i> {{ __('student.personal_details') }}</button>
+                    <button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab"><i class="fa fa-user me-2"></i> 1. {{ __('student.personal_details') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button" role="tab"><i class="fa fa-building me-2"></i> {{ __('student.official_details') }}</button>
+                    <button class="nav-link" id="official-tab" data-bs-toggle="tab" data-bs-target="#official" type="button" role="tab"><i class="fa fa-building me-2"></i> 2. {{ __('student.official_details') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab"><i class="fa fa-users me-2"></i> {{ __('student.parents_guardian') }}</button>
+                    <button class="nav-link" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parents" type="button" role="tab"><i class="fa fa-users me-2"></i> 3. {{ __('student.parents_guardian') }}</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" id="identity-tab" data-bs-toggle="tab" data-bs-target="#identity" type="button" role="tab"><i class="fa fa-id-card me-2"></i> {{ __('student.identity_access') }}</button>
+                    <button class="nav-link" id="identity-tab" data-bs-toggle="tab" data-bs-target="#identity" type="button" role="tab"><i class="fa fa-id-card me-2"></i> 4. {{ __('student.identity_access') }}</button>
                 </li>
             </ul>
 
             <div class="tab-content" id="myTabContent">
                 
-                <!-- Tab 1: Personal Details -->
+                <!-- STEP 1: Personal Details -->
                 <div class="tab-pane fade show active" id="personal" role="tabpanel">
                     <div class="row">
                         {{-- Photo Upload --}}
@@ -67,46 +69,36 @@
                         </div>
 
                         {{-- Personal Identifiers --}}
-                        <!-- 1. First Name -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.first_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="first_name" class="form-control" value="{{ old('first_name', $student->first_name ?? '') }}" required>
-                            <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
                         </div>
-                        <!-- 2. Last Name -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.last_name') }} <span class="text-danger">*</span></label>
                             <input type="text" name="last_name" class="form-control" value="{{ old('last_name', $student->last_name ?? '') }}" required>
-                            <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
                         </div>
-                        <!-- 3. Post Name -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.post_name') }}</label>
                             <input type="text" name="post_name" class="form-control" value="{{ old('post_name', $student->post_name ?? '') }}">
                         </div>
 
-                        <!-- 4. Place of Birth -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.place_of_birth') }}</label>
                             <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}">
                         </div>
-                        <!-- 5. Date of Birth -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.dob') }} <span class="text-danger">*</span></label>
                             <input type="text" name="dob" class="datepicker form-control" value="{{ old('dob', isset($student) ? $student->dob->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
-                            <div class="invalid-feedback">{{ __('student.validation_error') }}</div>
                         </div>
-                        <!-- 6. Gender -->
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.gender') }} <span class="text-danger">*</span></label>
                             <select name="gender" class="form-control default-select" required>
+                                <option value="">{{ __('student.select_option') }}</option>
                                 <option value="male" {{ (old('gender', $student->gender ?? '') == 'male') ? 'selected' : '' }}>{{ __('student.male') ?? 'Male' }}</option>
                                 <option value="female" {{ (old('gender', $student->gender ?? '') == 'female') ? 'selected' : '' }}>{{ __('student.female') ?? 'Female' }}</option>
                             </select>
                         </div>
 
-                        {{-- Additional Details --}}
-                        <!-- 7. Blood Group -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.blood_group') }}</label>
                             <select name="blood_group" class="form-control default-select">
@@ -116,7 +108,6 @@
                                 @endforeach
                             </select>
                         </div>
-                        <!-- 8. Religion -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.religion') }}</label>
                             <select name="religion" class="form-control default-select">
@@ -127,10 +118,8 @@
                             </select>
                         </div>
 
-                        {{-- Contact --}}
                         <div class="col-md-12"><hr class="my-3"></div>
                         
-                        <!-- 9. Mobile Number -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.mobile_no') }}</label>
                             <div class="input-group">
@@ -138,13 +127,11 @@
                                 <input type="tel" id="mobile_number_input" class="form-control phone-input" value="{{ old('mobile_number', $student->mobile_number ?? '') }}">
                             </div>
                         </div>
-                        <!-- 10. Email -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('student.email') }}</label>
                             <input type="email" name="email" class="form-control" value="{{ old('email', $student->email ?? '') }}" placeholder="student@example.com">
                         </div>
 
-                        {{-- Address --}}
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.country') }}</label>
                             <select name="country" id="countrySelect" class="form-control default-select">
@@ -167,10 +154,17 @@
                             <label class="form-label">{{ __('student.avenue_address') }}</label>
                             <input type="text" name="avenue" class="form-control" value="{{ old('avenue', $student->avenue ?? '') }}" placeholder="Street address, Apt, etc.">
                         </div>
+                        
+                        {{-- Step 1 Buttons --}}
+                        <div class="col-12 mt-4 text-end">
+                            <button type="button" class="btn btn-primary btn-next shadow" data-next="#official">
+                                Next: {{ __('student.official_details') }} <i class="fa fa-arrow-right ms-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tab 2: Official Details -->
+                <!-- STEP 2: Official Details -->
                 <div class="tab-pane fade" id="official" role="tabpanel">
                     <div class="row">
                         @php
@@ -281,10 +275,20 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        {{-- Step 2 Buttons --}}
+                        <div class="col-12 mt-4 d-flex justify-content-between">
+                            <button type="button" class="btn btn-light btn-prev shadow-sm" data-prev="#personal">
+                                <i class="fa fa-arrow-left me-2"></i> Previous
+                            </button>
+                            <button type="button" class="btn btn-primary btn-next shadow" data-next="#parents">
+                                Next: {{ __('student.parents_guardian') }} <i class="fa fa-arrow-right ms-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tab 3: Parents/Guardian -->
+                <!-- STEP 3: Parents/Guardian -->
                 <div class="tab-pane fade" id="parents" role="tabpanel">
                     <div class="row">
                         <div class="col-md-12 mb-4">
@@ -345,15 +349,26 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
                             <select name="primary_guardian" class="form-control default-select" required>
+                                <option value="">{{ __('student.select_option') }}</option>
                                 <option value="father" {{ (old('primary_guardian') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
                                 <option value="mother" {{ (old('primary_guardian') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
                                 <option value="guardian" {{ (old('primary_guardian') == 'guardian') ? 'selected' : '' }}>{{ __('student.guardian_name') }}</option>
                             </select>
                         </div>
+                        
+                        {{-- Step 3 Buttons --}}
+                        <div class="col-12 mt-4 d-flex justify-content-between">
+                            <button type="button" class="btn btn-light btn-prev shadow-sm" data-prev="#official">
+                                <i class="fa fa-arrow-left me-2"></i> Previous
+                            </button>
+                            <button type="button" class="btn btn-primary btn-next shadow" data-next="#identity">
+                                Next: {{ __('student.identity_access') }} <i class="fa fa-arrow-right ms-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tab 4: Identity -->
+                <!-- STEP 4: Identity -->
                 <div class="tab-pane fade" id="identity" role="tabpanel">
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -374,17 +389,19 @@
                                 <button class="btn btn-outline-primary" type="button" onclick="generateQR()"><i class="fa fa-refresh me-1"></i> Generate</button>
                             </div>
                         </div>
+                        
+                        {{-- Final Submit Buttons --}}
+                        <div class="col-12 mt-5 pt-3 border-top d-flex justify-content-between">
+                            <button type="button" class="btn btn-light btn-lg btn-prev shadow-sm" data-prev="#parents">
+                                <i class="fa fa-arrow-left me-2"></i> Previous
+                            </button>
+                            <button type="submit" class="btn btn-success btn-lg shadow btn-submit">
+                                <i class="fa fa-save me-2"></i> {{ isset($student) ? __('student.update_student') : __('student.save_student') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-            </div>
-
-            <div class="row mt-4">
-                <div class="col-12 text-end">
-                    <button type="submit" class="btn btn-primary btn-lg shadow">
-                        <i class="fa fa-save me-2"></i> {{ isset($student) ? __('student.update_student') : __('student.save_student') }}
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -395,8 +412,7 @@
 <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.4/build/js/intlTelInput.min.js"></script>
 
 <script>
-    // --- LOCALIZED CONSTANTS (Safely escaped via json to prevent Syntax Errors)
-   
+    // --- LOCALIZED CONSTANTS
      const LANG = {
         loading: @json(__('student.loading')),
         selectOption: @json(__('student.select_option')),
@@ -417,12 +433,12 @@
         selectState: @json(__('student.select_state')),
         selectCity: @json(__('student.select_city')),
         validationError: @json(__('student.validation_error')),
+        fillRequiredFields: @json(__('student.fill_required_fields') ?? 'Please fill in all required fields before proceeding.'),
         checkForm: @json(__('student.messages.check_form')),
         errorOccurred: @json(__('student.error_occurred')),
         somethingWentWrong: @json(__('student.something_went_wrong'))
     };
 
-    // --- HELPER FUNCTIONS ---
     function generateQR() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let result = '';
@@ -433,9 +449,51 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         
-        // --- 0. Tab Switching for HTML5 Validation ---
-        // If a required field is empty in a hidden tab, the browser triggers 'invalid'.
-        // We catch it and switch to that tab so the user can see what's missing.
+        // --- 0. WIZARD NAVIGATION LOGIC ---
+        $('.btn-next').on('click', function() {
+            let currentPane = $(this).closest('.tab-pane');
+            let nextPaneId = $(this).data('next');
+            let isValid = true;
+
+            // HTML5 Validation on current pane's visible elements
+            currentPane.find('input[required], select[required]').each(function() {
+                if (!this.checkValidity()) {
+                    isValid = false;
+                    $(this).addClass('is-invalid');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+
+            if (isValid) {
+                // Clear any existing error highlights
+                currentPane.find('.is-invalid').removeClass('is-invalid');
+                
+                // Mark top nav as completed visually
+                let currentTabId = currentPane.attr('id');
+                $(`[data-bs-target="#${currentTabId}"]`).addClass('completed');
+                
+                // Proceed to next tab
+                let nextTab = document.querySelector(`[data-bs-target="${nextPaneId}"]`);
+                new bootstrap.Tab(nextTab).show();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                Swal.fire({
+                    icon: 'warning',
+                    title: LANG.validationError,
+                    text: LANG.fillRequiredFields
+                });
+            }
+        });
+
+        $('.btn-prev').on('click', function() {
+            let prevPaneId = $(this).data('prev');
+            let prevTab = document.querySelector(`[data-bs-target="${prevPaneId}"]`);
+            new bootstrap.Tab(prevTab).show();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // HTML5 global catch-all (in case someone forces submit)
         document.getElementById('studentForm').addEventListener('invalid', function(e) {
             let invalidInput = e.target;
             let pane = invalidInput.closest('.tab-pane');
@@ -443,21 +501,20 @@
                 let tabId = pane.id;
                 let tabButton = document.querySelector(`[data-bs-target="#${tabId}"]`);
                 if (tabButton && !tabButton.classList.contains('active')) {
-                    tabButton.click(); // Switch to the specific tab
-                    
-                    // Small delay to allow the tab transition before focusing
+                    new bootstrap.Tab(tabButton).show();
                     setTimeout(() => invalidInput.focus(), 100);
                 }
             }
-        }, true); // Capture phase is required because 'invalid' events do not bubble up natively
+        }, true); 
+
 
         // --- 1. Phone Input Setup ---
         const phoneOptions = {
             utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.4/build/js/utils.js",
             initialCountry: "cd",
             separateDialCode: true,
-            showSelectedDialCode: true, // Specific for v20+ compatibility
-            countrySearch: true, // Automatically provides the search field inside the dropdown
+            showSelectedDialCode: true, 
+            countrySearch: true, 
             preferredCountries: ['cd', 'us', 'fr'],
         };
 
@@ -471,9 +528,8 @@
         inputs.forEach(item => {
             if (item.input) {
                 const iti = window.intlTelInput(item.input, phoneOptions);
-                item.instance = iti; // Store instance for later use
+                item.instance = iti; 
                 
-                // Update on blur (Legacy fallback)
                 item.input.addEventListener('blur', function() {
                     if (iti.isValidNumber()) {
                         const number = iti.getNumber();
@@ -780,14 +836,13 @@
                     if (item.instance.isValidNumber()) {
                         item.hidden.value = item.instance.getNumber();
                     } else {
-                         // Fallback to raw value if invalid or empty to let server validate
                          item.hidden.value = item.instance.getNumber() || item.input.value;
                     }
                 }
             });
 
             let formData = new FormData(form);
-            let btn = $(form).find('button[type="submit"]');
+            let btn = $(form).find('.btn-submit');
             let originalBtnHtml = btn.html();
 
             $('.invalid-feedback').remove();
@@ -832,7 +887,6 @@
                         $.each(errors, function(field, messages) {
                             let input = $('[name="' + field + '"]');
                             if(input.length) {
-                                // Track the very first error encountered to snap to that tab
                                 if(!firstErrorInput) firstErrorInput = input;
                                 
                                 input.addClass('is-invalid');
@@ -842,14 +896,13 @@
                             }
                         });
                         
-                        // Switch to the tab containing the server-side validation error
                         if(firstErrorInput) {
                             let pane = firstErrorInput.closest('.tab-pane');
                             if (pane && pane.length) {
                                 let tabId = pane.attr('id');
                                 let tabButton = document.querySelector(`[data-bs-target="#${tabId}"]`);
                                 if (tabButton && !tabButton.classList.contains('active')) {
-                                    tabButton.click();
+                                    new bootstrap.Tab(tabButton).show();
                                 }
                                 setTimeout(() => firstErrorInput.focus(), 100);
                             }
