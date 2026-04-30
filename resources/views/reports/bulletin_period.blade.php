@@ -3,7 +3,7 @@
 <html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
-    <title>{{ __('reports.bulletin_title') }}</title>
+    <title>{{ __('reports.bulletin_title') ?? 'BULLETIN' }}</title>
     @include('reports.partials.bulletin_css') 
 </head>
 <body>
@@ -27,7 +27,7 @@
 @endif
 
     @php
-        $principalName = 'DIRECTION';
+        $principalName = __('reports.direction') ?? 'DIRECTION';
         if (isset($student->institution_id)) {
             $adminUser = \App\Models\User::where('institute_id', $student->institution_id)
                             ->where(function($q) {
@@ -47,7 +47,7 @@
                 @if(isset($student->institution->logo) && $student->institution->logo)
                     <img src="{{ asset('storage/' . $student->institution->logo) }}" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                 @else
-                    @php $instNameParts = explode(' ', $student->institution->name ?? 'COLLEGE SAINT GABRIEL', 2); @endphp
+                    @php $instNameParts = explode(' ', $student->institution->name ?? __('reports.direction') ?? 'DIRECTION', 2); @endphp
                     <span style="text-align:center;">{{ strtoupper(substr($instNameParts[0], 0, 10)) }}<br>...</span>
                 @endif
             </div>
@@ -55,7 +55,7 @@
             <div class="student-name">{{ strtoupper($student->first_name . ' ' . $student->last_name) }}</div>
             <div class="class-name">{{ $enrollment->classSection->gradeLevel->name ?? '' }} - {{ $enrollment->classSection->name ?? '' }}</div>
             <div class="barcode"></div>
-            <div class="term-title">{{ __('reports.bulletin_title') }} {{ strtoupper($period) }}</div>
+            <div class="term-title">{{ __('reports.bulletin_title') ?? 'BULLETIN' }} {{ strtoupper($period) }}</div>
         </div>
         
         <div class="divider-thick"></div>
@@ -64,9 +64,9 @@
         <table>
             <thead>
                 <tr>
-                    <th class="left-align">{{ __('reports.subject') }}</th>
-                    <th>{{ __('reports.cotes') }}</th>
-                    <th>{{ __('reports.max_marks') }}</th>
+                    <th class="left-align">{{ __('reports.subject') ?? 'Branches' }}</th>
+                    <th>{{ __('reports.cotes') ?? 'Cotes' }}</th>
+                    <th>{{ __('reports.max_marks') ?? 'MAX' }}</th>
                 </tr>
             </thead>
         </table>
@@ -81,19 +81,22 @@
                 @endphp
 
                 @foreach($data as $row)
-                    @php
-                        $val = is_numeric($row['obtained']) ? $row['obtained'] : 0;
-                        $max = $row['subject']->total_marks ?? 100;
-                        
-                        $totalObtained += $val;
-                        $totalMax += $max;
-                        $isFail = ($max > 0 && $val < ($max / 2));
-                    @endphp
-                    <tr>
-                        <td class="left-align" style="width: 60%;">{{ $row['subject']->name }}</td>
-                        <td class="{{ $isFail ? 'fail-grade' : '' }}" style="width: 20%;">{{ $val }}</td>
-                        <td style="width: 20%;">{{ $max }}</td>
-                    </tr>
+                    @if($row['has_marks'])
+                        @php
+                            $val = is_numeric($row['obtained']) ? (float)$row['obtained'] : '-';
+                            $max = $row['max'] ?? 0;
+                            
+                            $val_calc = is_numeric($val) ? $val : 0;
+                            $totalObtained += $val_calc;
+                            $totalMax += $max;
+                            $isFail = ($max > 0 && $val_calc < ($max / 2));
+                        @endphp
+                        <tr>
+                            <td class="left-align" style="width: 60%;">{{ $row['subject']->name }}</td>
+                            <td class="{{ $isFail ? 'fail-grade' : '' }}" style="width: 20%;">{{ $val }}</td>
+                            <td style="width: 20%;">{{ $max > 0 ? $max : '-' }}</td>
+                        </tr>
+                    @endif
                 @endforeach
             </tbody>
         </table>
@@ -111,32 +114,32 @@
 
         <div class="summary-container">
             <div class="summary-row">
-                <span class="label">{{ __('reports.maximum_general') }}</span>
+                <span class="label">{{ __('reports.maximum_general') ?? 'MAXIMUM GENERAL' }}</span>
                 <span class="val">{{ $totalMax }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.total_obtained') }}</span>
+                <span class="label">{{ __('reports.total_obtained') ?? 'TOTAL OBTENU' }}</span>
                 <span class="val">{{ $totalObtained }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.percentage') }}</span>
+                <span class="label">{{ __('reports.percentage') ?? 'POURCENTAGE' }}</span>
                 <span class="val">{{ number_format($percentage, 2) }}%</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.conduct') }}</span>
+                <span class="label">{{ __('reports.conduct') ?? 'CONDUITE' }}</span>
                 <span class="val">{{ $conduct }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.application') }}</span>
+                <span class="label">{{ __('reports.application') ?? 'APPLICATION' }}</span>
                 <span class="val">{{ $application }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.place_eff') }}</span>
+                <span class="label">{{ __('reports.place_eff') ?? 'PLACE - EFF' }}</span>
                 @php
-                    $grRank = $ranks['grade_rank'] ?? '-';
-                    $grTotal = $ranks['grade_total'] ?? '-';
+                    $secRank = $ranks['section_rank'] ?? '-';
+                    $secTotal = $ranks['section_total'] ?? '-';
                 @endphp
-                <span class="val">{{ $grRank }}{{ is_numeric($grRank) ? 'e' : '' }} | {{ $grTotal }}</span>
+                <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
             </div>
         </div>
 
@@ -153,14 +156,13 @@
                     
                     <path id="txt-top-{{ $svgId }}" d="M 17 50 A 33 33 0 0 1 83 50" fill="none"/>
                     
-                    <!-- FIXED: Bottom Arc draws Right to Left to keep text Upright -->
                     <path id="txt-bot-{{ $svgId }}" d="M 83 50 A 33 33 0 0 1 17 50" fill="none"/>
                     
                     <text fill="var(--stamp-blue)" font-size="11.5" font-weight="bold" font-family="Arial" letter-spacing="1">
-                        <textPath href="#txt-top-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ __('reports.bulletin_title') }}</textPath>
+                        <textPath href="#txt-top-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ __('reports.bulletin_title') ?? 'BULLETIN' }}</textPath>
                     </text>
                     <text fill="var(--stamp-blue)" font-size="8.5" font-weight="bold" font-family="Arial" letter-spacing="1.5">
-                        <textPath href="#txt-bot-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ strtoupper(\Illuminate\Support\Str::limit($student->institution->name ?? 'DIRECTION', 18, '')) }}</textPath>
+                        <textPath href="#txt-bot-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ strtoupper(\Illuminate\Support\Str::limit($student->institution->name ?? __('reports.direction') ?? 'DIRECTION', 18, '')) }}</textPath>
                     </text>
                     
                     <rect x="36" y="32" width="28" height="36" rx="2" fill="white" opacity="0.8"/>
@@ -168,7 +170,6 @@
                     
                     <text x="50" y="42" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★★</text>
                     
-                    <!-- FIXED: Prominent School Logo safely positioned in the center of the stamp -->
                     @if(isset($student->institution->logo) && $student->institution->logo)
                         <image href="{{ asset('storage/' . $student->institution->logo) }}" x="36" y="36" height="28" width="28" preserveAspectRatio="xMidYMid meet"/>
                     @else
@@ -180,15 +181,15 @@
             </div>
 
             <div class="signature-block">
-                <div>{{ __('reports.made_in') }} {{ $student->institution->city ?? 'Kinshasa' }}, {{ __('reports.on_date') }} {{ date('d/m/Y') }}</div>
-                <div style="margin: 3px 0;">{{ __('reports.principal') }}</div>
+                <div>{{ __('reports.made_in') ?? 'Fait à' }} {{ $student->institution->city ?? 'Kinshasa' }}, {{ __('reports.on_date') ?? 'le' }} {{ date('d/m/Y') }}</div>
+                <div style="margin: 3px 0;">{{ __('reports.principal') ?? 'Chef d\'établissement' }}</div>
                 <div>{{ strtoupper($principalName) }}</div>
             </div>
         </div>
-    </div> <!-- Close Column -->
+    </div> 
 
 @if(!isset($is_bulk) || !$is_bulk)
-    </div> <!-- Close Responsive Centered Wrapper -->
+    </div>
 </body>
 </html>
 @endif

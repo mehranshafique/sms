@@ -28,7 +28,7 @@
 @endif
 
     @php
-        $principalName = 'DIRECTION';
+        $principalName = __('reports.direction') ?? 'DIRECTION';
         if (isset($student->institution_id)) {
             $adminUser = \App\Models\User::where('institute_id', $student->institution_id)
                             ->where(function($q) {
@@ -48,7 +48,7 @@
                 @if(isset($student->institution->logo) && $student->institution->logo)
                     <img src="{{ asset('storage/' . $student->institution->logo) }}" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                 @else
-                    @php $instNameParts = explode(' ', $student->institution->name ?? 'COLLEGE SAINT GABRIEL', 2); @endphp
+                    @php $instNameParts = explode(' ', $student->institution->name ?? __('reports.direction'), 2); @endphp
                     <span style="text-align:center;">{{ strtoupper(substr($instNameParts[0], 0, 10)) }}<br>...</span>
                 @endif
             </div>
@@ -65,11 +65,14 @@
         <table>
             <thead>
                 <tr>
-                    <th class="left-align" style="width: 40%;">{{ __('reports.subject') }}</th>
-                    <th style="width: 15%;">P1</th>
-                    <th style="width: 15%;">P2</th>
-                    <th style="width: 15%;">EXAM</th>
-                    <th style="width: 15%;">TOTAL</th>
+                    <th class="left-align" style="width: 30%;">{{ __('reports.subject') ?? 'Branches' }}</th>
+                    <th style="width: 8%;">P1</th>
+                    <th style="width: 8%;">P2</th>
+                    <th style="width: 10%;">{{ __('reports.max_marks') ?? 'MAX' }}</th>
+                    <th style="width: 10%;">{{ __('reports.exam') ?? 'EXAM' }}</th>
+                    <th style="width: 10%;">{{ __('reports.max_marks') ?? 'MAX' }}</th>
+                    <th style="width: 12%;">{{ __('reports.total') ?? 'TOTAL' }}</th>
+                    <th style="width: 12%;">{{ __('reports.t_max') ?? 'T. MAX' }}</th>
                 </tr>
             </thead>
         </table>
@@ -79,103 +82,110 @@
         <table>
             <tbody>
                 @php
-                    $totalObtained = 0;
-                    $totalMax = 0;
+                    $sum_p_obt = 0;
+                    $sum_tot_obt = 0;
+                    
+                    $sum_p_max_actual = 0;
+                    $sum_tot_max = 0;
                 @endphp
 
                 @foreach($data as $row)
-                    @php
-                        // Safely check for array keys using ?? null to prevent undefined key crashes
-                        $p1 = is_numeric($row['p1_score'] ?? null) ? $row['p1_score'] : '-';
-                        $p2 = is_numeric($row['p2_score'] ?? null) ? $row['p2_score'] : '-';
-                        $ex = is_numeric($row['exam_score'] ?? null) ? $row['exam_score'] : '-';
-                        
-                        $p1_val = is_numeric($p1) ? $p1 : 0;
-                        $p2_val = is_numeric($p2) ? $p2 : 0;
-                        $ex_val = is_numeric($ex) ? $ex : 0;
-                        
-                        // Safely grab total_score if pre-calculated, otherwise sum it up natively
-                        $tot = isset($row['total_score']) && is_numeric($row['total_score']) 
-                               ? $row['total_score'] 
-                               : ($p1_val + $p2_val + $ex_val);
-                        
-                        $p_max = $row['p_max'] ?? 20;
-                        $ex_max = $row['exam_max'] ?? 40;
-                        $tot_max = $row['total_max'] ?? ($row['subject']->total_marks ?? 100);
-                        
-                        $totalObtained += $tot;
-                        $totalMax += $tot_max;
-                        
-                        $isP1Fail = (is_numeric($p1) && $p_max > 0 && $p1 < ($p_max / 2));
-                        $isP2Fail = (is_numeric($p2) && $p_max > 0 && $p2 < ($p_max / 2));
-                        $isExFail = (is_numeric($ex) && $ex_max > 0 && $ex < ($ex_max / 2));
-                        $isTotFail = (is_numeric($tot) && $tot_max > 0 && $tot < ($tot_max / 2));
-                    @endphp
-                    <tr>
-                        <td class="left-align" style="width: 40%;">{{ $row['subject']->name }}</td>
-                        <td class="{{ $isP1Fail ? 'fail-grade' : '' }}" style="width: 15%;">
-                            {{ $p1 }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $p_max }}</span>
-                        </td>
-                        <td class="{{ $isP2Fail ? 'fail-grade' : '' }}" style="width: 15%;">
-                            {{ $p2 }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $p_max }}</span>
-                        </td>
-                        <td class="{{ $isExFail ? 'fail-grade' : '' }}" style="width: 15%;">
-                            {{ $ex }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $ex_max }}</span>
-                        </td>
-                        <td class="{{ $isTotFail ? 'fail-grade' : '' }}" style="width: 15%;">
-                            {{ $tot }} <span style="font-size:7px; font-weight:normal; color:#555;">/{{ $tot_max }}</span>
-                        </td>
-                    </tr>
+                    @if($row['has_marks'])
+                        @php
+                            // Cast directly to (float) to completely remove .00 and decimal artifacts
+                            $p1 = is_numeric($row['p1_score'] ?? null) ? (float)$row['p1_score'] : '-';
+                            $p2 = is_numeric($row['p2_score'] ?? null) ? (float)$row['p2_score'] : '-';
+                            $ex = is_numeric($row['exam_score'] ?? null) ? (float)$row['exam_score'] : '-';
+                            
+                            $p1_val = is_numeric($p1) ? $p1 : 0;
+                            $p2_val = is_numeric($p2) ? $p2 : 0;
+                            $ex_val = is_numeric($ex) ? $ex : 0;
+                            
+                            $tot = isset($row['total_score']) && is_numeric($row['total_score']) 
+                                ? (float)$row['total_score'] 
+                                : ($p1_val + $p2_val + $ex_val);
+                            
+                            $p1_max = $row['p1_max'] ?? 0;
+                            $p2_max = $row['p2_max'] ?? 0;
+                            $p_max_display = max($p1_max, $p2_max); 
+                            $ex_max = $row['exam_max'] ?? 0;
+                            
+                            // T.MAX is strictly P1+P2+Exam maximums from database
+                            $tot_max = $row['total_max'] ?? 0;
+                            
+                            $sum_p_obt += ($p1_val + $p2_val);
+                            $sum_tot_obt += $tot;
+                            
+                            $sum_p_max_actual += ($p1_max + $p2_max);
+                            $sum_tot_max += $tot_max;
+                            
+                            $isP1Fail = (is_numeric($p1) && $p1_max > 0 && $p1 < ($p1_max / 2));
+                            $isP2Fail = (is_numeric($p2) && $p2_max > 0 && $p2 < ($p2_max / 2));
+                            $isExFail = (is_numeric($ex) && $ex_max > 0 && $ex < ($ex_max / 2));
+                            $isTotFail = (is_numeric($tot) && $tot_max > 0 && $tot < ($tot_max / 2));
+                        @endphp
+                        <tr>
+                            <td class="left-align" style="width: 30%;">{{ $row['subject']->name }}</td>
+                            <td class="{{ $isP1Fail ? 'fail-grade' : '' }}" style="width: 8%;">{{ $p1 }}</td>
+                            <td class="{{ $isP2Fail ? 'fail-grade' : '' }}" style="width: 8%;">{{ $p2 }}</td>
+                            <td style="width: 10%;">{{ $p_max_display > 0 ? $p_max_display : '-' }}</td>
+                            <td class="{{ $isExFail ? 'fail-grade' : '' }}" style="width: 10%;">{{ $ex }}</td>
+                            <td style="width: 10%;">{{ $ex_max > 0 ? $ex_max : '-' }}</td>
+                            <td class="{{ $isTotFail ? 'fail-grade' : '' }}" style="width: 12%;">{{ $tot }}</td>
+                            <td style="width: 12%;">{{ $tot_max > 0 ? $tot_max : '-' }}</td>
+                        </tr>
+                    @endif
                 @endforeach
             </tbody>
         </table>
 
         @php
-            $percentage = $totalMax > 0 ? ($totalObtained / $totalMax) * 100 : 0;
+            $percentagePeriod = $sum_p_max_actual > 0 ? ($sum_p_obt / $sum_p_max_actual) * 100 : 0;
+            $percentageTotal = $sum_tot_max > 0 ? ($sum_tot_obt / $sum_tot_max) * 100 : 0;
+            
             $application = 'F';
-            if ($percentage >= 80) $application = 'E';
-            elseif ($percentage >= 70) $application = 'TB';
-            elseif ($percentage >= 60) $application = 'B';
-            elseif ($percentage >= 50) $application = 'AB';
+            if ($percentageTotal >= 80) $application = 'E';
+            elseif ($percentageTotal >= 70) $application = 'TB';
+            elseif ($percentageTotal >= 60) $application = 'B';
+            elseif ($percentageTotal >= 50) $application = 'AB';
             
             $conduct = !empty($student->conduct) ? $student->conduct : '-';
         @endphp
 
         <div class="summary-container">
             <div class="summary-row">
-                <span class="label">{{ __('reports.maximum_general') }}</span>
-                <span class="val">{{ $totalMax }}</span>
-                <span class="val">{{ $totalMax }}</span>
+                <span class="label">{{ __('reports.maximum_general') ?? 'MAXIMUM GENERAL' }}</span>
+                <span class="val">{{ $sum_p_max_actual > 0 ? $sum_p_max_actual : 0 }}</span>
+                <span class="val">{{ $sum_tot_max > 0 ? $sum_tot_max : 0 }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.total_obtained') }}</span>
-                <span class="val">{{ $ranks['total_score'] ?? $totalObtained }}</span>
-                <span class="val">{{ $totalObtained }}</span>
+                <span class="label">{{ __('reports.total_obtained') ?? 'TOTAL OBTENU' }}</span>
+                <span class="val">{{ $sum_p_obt }}</span>
+                <span class="val">{{ $sum_tot_obt }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.percentage') }}</span>
-                <span class="val">{{ number_format($percentage, 2) }}%</span>
-                <span class="val">{{ number_format($percentage, 2) }}%</span>
+                <span class="label">{{ __('reports.percentage') ?? 'POURCENTAGE' }}</span>
+                <span class="val">{{ number_format($percentagePeriod, 2) }}%</span>
+                <span class="val">{{ number_format($percentageTotal, 2) }}%</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.conduct') }}</span>
+                <span class="label">{{ __('reports.conduct') ?? 'CONDUITE' }}</span>
                 <span class="val">{{ $conduct }}</span>
                 <span class="val">{{ $conduct }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.application') }}</span>
+                <span class="label">{{ __('reports.application') ?? 'APPLICATION' }}</span>
                 <span class="val">{{ $application }}</span>
                 <span class="val">{{ $application }}</span>
             </div>
             <div class="summary-row">
-                <span class="label">{{ __('reports.place_eff') }}</span>
+                <span class="label">{{ __('reports.place_eff') ?? 'PLACE - EFF' }}</span>
                 @php
-                    $grRank = $ranks['grade_rank'] ?? '-';
-                    $grTotal = $ranks['grade_total'] ?? '-';
+                    // Display specific Section Rank and Total for exact class size matching
                     $secRank = $ranks['section_rank'] ?? '-';
                     $secTotal = $ranks['section_total'] ?? '-';
                 @endphp
-                <span class="val">{{ $grRank }}{{ is_numeric($grRank) ? 'e' : '' }} | {{ $grTotal }}</span>
+                <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
                 <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
             </div>
         </div>
@@ -193,10 +203,7 @@
                     <circle cx="50" cy="50" r="45" fill="none" stroke="var(--stamp-blue)" stroke-width="1"/>
                     <circle cx="50" cy="50" r="28" fill="none" stroke="var(--stamp-blue)" stroke-width="1" stroke-dasharray="2,2"/>
                     
-                    <!-- Top Arc draws Left to Right natively -->
                     <path id="txt-top-{{ $svgId }}" d="M 18 50 A 32 32 0 0 1 82 50" fill="none"/>
-                    
-                    <!-- FIXED: Bottom Arc draws Right to Left to keep text Upright -->
                     <path id="txt-bot-{{ $svgId }}" d="M 12 50 A 38 38 0 0 0 88 50" fill="none"/>
                     
                     <text fill="var(--stamp-blue)" font-size="11" font-weight="bold" font-family="Arial" letter-spacing="2">
@@ -204,7 +211,7 @@
                     </text>
                     
                     <text fill="var(--stamp-blue)" font-size="10" font-weight="bold" font-family="Arial" letter-spacing="1">
-                        <textPath href="#txt-bot-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ strtoupper(\Illuminate\Support\Str::limit($student->institution->name ?? 'DIRECTION', 18, '')) }}</textPath>
+                        <textPath href="#txt-bot-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ strtoupper(\Illuminate\Support\Str::limit($student->institution->name ?? __('reports.direction'), 18, '')) }}</textPath>
                     </text>
 
                     <circle cx="12" cy="50" r="2" fill="var(--stamp-blue)"/>
@@ -226,10 +233,10 @@
                 <div>{{ strtoupper($principalName) }}</div>
             </div>
         </div>
-    </div> <!-- Close Column -->
+    </div> 
 
 @if(!isset($is_bulk) || !$is_bulk)
-    </div> <!-- Close Responsive Centered Wrapper -->
+    </div>
 </body>
 </html>
 @endif

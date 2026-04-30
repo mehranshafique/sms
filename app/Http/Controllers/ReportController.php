@@ -14,7 +14,7 @@ use App\Models\Institution;
 use App\Enums\AcademicType; 
 use App\Models\Subject; 
 use App\Models\ClassSubject; 
-use App\Models\ExamSchedule; // Added for Schedules
+use App\Models\ExamSchedule; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
@@ -33,9 +33,6 @@ class ReportController extends BaseController
         $this->lmdService = $lmdService;
     }
 
-    /**
-     * Centralized check for outstanding fees to restrict report access
-     */
     public function checkFinancialClearance($studentId, $institutionId, $abort = true)
     {
         if (!$studentId || !$institutionId) return true;
@@ -51,7 +48,7 @@ class ReportController extends BaseController
                 
             if ($unpaid > 0) {
                 if ($abort) {
-                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance of ' . \App\Enums\CurrencySymbol::default() . ' ' . number_format($unpaid, 2) . '. Please settle the account to access academic reports.');
+                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance. Please settle the account to access academic reports.');
                 }
                 return false; 
             }
@@ -59,9 +56,6 @@ class ReportController extends BaseController
         return true;
     }
 
-    /**
-     * Show the main reports dashboard/index page.
-     */
     public function index()
     {
         $institutionId = $this->getInstitutionId();
@@ -84,9 +78,6 @@ class ReportController extends BaseController
         return view('reports.index', compact('exams', 'students', 'classes', 'institutionType'));
     }
 
-    /**
-     * Generate Student Bulletin (Term Report Card).
-     */
     public function bulletin(Request $request)
     {
         $request->validate([
@@ -100,7 +91,6 @@ class ReportController extends BaseController
 
         $institutionId = $this->getInstitutionId();
 
-        // 1. Validate Active Period
         if (!Auth::user()->hasRole('Super Admin')) {
             $activePeriodsJson = InstitutionSetting::get($institutionId, 'active_periods', '[]');
             $activePeriods = json_decode($activePeriodsJson, true) ?? [];
@@ -117,7 +107,6 @@ class ReportController extends BaseController
             }
         }
 
-        // 2. Identify Target Students
         $targetStudents = collect();
         $classSection = null;
 
@@ -141,7 +130,6 @@ class ReportController extends BaseController
             $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
             if ($student->institution_id != $institutionId) abort(403);
 
-            // Restrict report access if the student has unpaid fees
             $this->checkFinancialClearance($student->id, $institutionId, true);
 
             $enrollment = $student->enrollments()->latest()->first();
@@ -155,14 +143,12 @@ class ReportController extends BaseController
             $targetStudents = collect([$enrollment]);
         }
 
-        // 3. Prepare Data
         $bulkData = [];
         $settings = [
             'threshold' => InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50),
             'gradingScale' => json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true)
         ];
 
-        // --- RANKING CALCULATION ---
         $rankings = $this->calculateRankings($classSection, $request, $institutionId);
 
         foreach ($targetStudents as $enrollment) {
@@ -186,7 +172,6 @@ class ReportController extends BaseController
                 }
             } 
             else {
-                // Primary
                 $viewName = 'reports.bulletin_primary';
                 if ($request->type === 'period') {
                     $viewName = 'reports.bulletin_period';
@@ -196,10 +181,7 @@ class ReportController extends BaseController
                 }
             }
 
-            // Only add if data exists (marks)
             if ($reportData && $this->hasMarks($reportData)) {
-                
-                // Attach Ranking Data
                 $studentRank = $rankings[$student->id] ?? null;
                 $reportData['ranks'] = [
                     'section_rank' => $studentRank['section_rank'] ?? '-',
@@ -218,7 +200,6 @@ class ReportController extends BaseController
             }
         }
 
-        // --- AJAX CHECK RESPONSE ---
         if ($request->check_only) {
             if (empty($bulkData)) {
                 return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
@@ -230,14 +211,10 @@ class ReportController extends BaseController
             return back()->with('error', __('reports.no_records_found'));
         }
 
-        // 4. Generate HTML View
         if (count($bulkData) === 1) {
             $data = $bulkData[0];
-            // FIXED: Return the standard HTML View instead of forcing a DOMPDF stream
-            // This prevents the browser from loading the "PDF viewer/print dialog" immediately
             return view($viewName, $data);
         } else {
-            // Use the bulk_print view
             return view('reports.bulk_print', [
                 'reports' => $bulkData, 
                 'viewName' => $viewName,
@@ -246,9 +223,6 @@ class ReportController extends BaseController
         }
     }
 
-    /**
-     * Generate Academic Transcript (Cumulative History)
-     */
     public function transcript(Request $request)
     {
         $request->validate([
@@ -264,7 +238,6 @@ class ReportController extends BaseController
 
         $this->checkFinancialClearance($student->id, $institutionId, true);
 
-        // Determine Cycle (LMD vs Standard)
         $cycle = $student->gradeLevel->education_cycle ?? 'primary';
         $cycleValue = is_object($cycle) ? $cycle->value : $cycle;
         
@@ -450,7 +423,6 @@ class ReportController extends BaseController
         }
         
         $sectionScores = [];
-        $sectionTotals = []; 
 
         foreach ($gradeEnrollments as $enr) {
             if (isset($studentScores[$enr->student_id])) {
@@ -520,17 +492,17 @@ class ReportController extends BaseController
 
         foreach($subjects as $subject) {
             $rec = $records->get($subject->id);
-            $obtained = $rec ? $rec->marks_obtained : 0; 
+            $obtained = $rec ? $rec->marks_obtained : null; 
 
-            $defaultMax = $subject->total_marks ?? 20;
-            $configuredMax = $scheduleMap[$period][$subject->id] ?? $defaultMax;
+            // STRICT MATH: Exclusively use Database limits. No hardcoded 20 or 100 assumptions.
+            $configuredMax = $scheduleMap[$period][$subject->id] ?? 0;
 
             $data[] = [
                 'subject' => $subject,
                 'obtained' => $obtained,
                 'max' => $configuredMax,
-                'percentage' => $rec ? ($rec->marks_obtained / $configuredMax) * 100 : 0,
-                'has_marks' => true 
+                'percentage' => ($configuredMax > 0 && is_numeric($obtained)) ? ($obtained / $configuredMax) * 100 : 0,
+                'has_marks' => !is_null($obtained) 
             ];
         }
 
@@ -560,34 +532,44 @@ class ReportController extends BaseController
         );
 
         $data = [];
-        
         foreach ($subjects as $subject) {
-            $defaultMax = $subject->total_marks ?? 20;
-            
-            $p1_max = $scheduleMap[$pA][$subject->id] ?? $defaultMax;
-            $p2_max = $scheduleMap[$pB][$subject->id] ?? $defaultMax;
-            $exam_max = $scheduleMap[$examCat][$subject->id] ?? ($defaultMax * 2);
+            // STRICT MATH: Exact schedule values only. No fallback multipliers.
+            $p1_max = $scheduleMap[$pA][$subject->id] ?? 0;
+            $p2_max = $scheduleMap[$pB][$subject->id] ?? 0;
+            $exam_max = $scheduleMap[$examCat][$subject->id] ?? 0;
 
-            $display_p_max = max($p1_max, $p2_max);
+            // Strict Mathematical Rule: T. Max = P1 Max + P2 Max + Exam Max
+            $total_max = $p1_max + $p2_max + $exam_max;
 
             $data[$subject->id] = [
                 'subject' => $subject,
-                'p1_score' => 0, 
-                'p2_score' => 0, 
-                'exam_score' => 0,
-                'p_max' => $display_p_max,
+                'p1_score' => null, 
+                'p2_score' => null, 
+                'exam_score' => null,
+                'p1_max' => $p1_max,
+                'p2_max' => $p2_max,
                 'exam_max' => $exam_max,
-                'has_marks' => true
+                'total_max' => $total_max, 
+                'total_score' => 0,
+                'has_marks' => false
             ];
         }
 
         foreach ($records as $r) {
             $subId = $r->subject_id;
             if (isset($data[$subId])) {
+                $data[$subId]['has_marks'] = true;
                 if ($r->exam->category == $pA) $data[$subId]['p1_score'] = $r->marks_obtained;
                 elseif ($r->exam->category == $pB) $data[$subId]['p2_score'] = $r->marks_obtained;
                 elseif ($r->exam->category == $examCat) $data[$subId]['exam_score'] = $r->marks_obtained;
             }
+        }
+
+        foreach($data as $id => &$row) {
+            $s1 = is_numeric($row['p1_score']) ? (float)$row['p1_score'] : 0;
+            $s2 = is_numeric($row['p2_score']) ? (float)$row['p2_score'] : 0;
+            $ex = is_numeric($row['exam_score']) ? (float)$row['exam_score'] : 0;
+            $row['total_score'] = $s1 + $s2 + $ex;
         }
 
         return ['data' => $data, 'trimester' => $trimester];
@@ -619,31 +601,32 @@ class ReportController extends BaseController
         $data = [];
         
         foreach($subjects as $subject) {
-            $defaultMax = $subject->total_marks ?? 20;
+            // STRICT MATH: Exact schedule values only. No fallback multipliers.
+            $p1_max = $scheduleMap[$pA][$subject->id] ?? 0;
+            $p2_max = $scheduleMap[$pB][$subject->id] ?? 0;
+            $exam_max = $scheduleMap[$examCat][$subject->id] ?? 0;
 
-            $p1_max = $scheduleMap[$pA][$subject->id] ?? $defaultMax;
-            $p2_max = $scheduleMap[$pB][$subject->id] ?? $defaultMax;
-            $exam_max = $scheduleMap[$examCat][$subject->id] ?? ($defaultMax * 2);
-
-            $display_p_max = max($p1_max, $p2_max);
+            // Strict Mathematical Rule: T. Max = P1 Max + P2 Max + Exam Max
             $total_max = $p1_max + $p2_max + $exam_max;
 
             $data[$subject->id] = [
                 'subject' => $subject,
-                'p1_score' => 0,
-                'p2_score' => 0,
-                'exam_score' => 0,
-                'p_max' => $display_p_max,
+                'p1_score' => null,
+                'p2_score' => null,
+                'exam_score' => null,
+                'p1_max' => $p1_max,
+                'p2_max' => $p2_max,
                 'exam_max' => $exam_max, 
-                'total_score' => 0,
                 'total_max' => $total_max, 
-                'has_marks' => true
+                'total_score' => 0,
+                'has_marks' => false
             ];
         }
 
         foreach ($records as $r) {
             $subId = $r->subject_id;
             if (isset($data[$subId])) {
+                $data[$subId]['has_marks'] = true;
                 $cat = $r->exam->category;
                 if ($cat == $pA) { $data[$subId]['p1_score'] = $r->marks_obtained; }
                 elseif ($cat == $pB) { $data[$subId]['p2_score'] = $r->marks_obtained; }
@@ -652,9 +635,9 @@ class ReportController extends BaseController
         }
 
         foreach($data as $id => &$row) {
-            $s1 = is_numeric($row['p1_score']) ? $row['p1_score'] : 0;
-            $s2 = is_numeric($row['p2_score']) ? $row['p2_score'] : 0;
-            $ex = is_numeric($row['exam_score']) ? $row['exam_score'] : 0;
+            $s1 = is_numeric($row['p1_score']) ? (float)$row['p1_score'] : 0;
+            $s2 = is_numeric($row['p2_score']) ? (float)$row['p2_score'] : 0;
+            $ex = is_numeric($row['exam_score']) ? (float)$row['exam_score'] : 0;
             $row['total_score'] = $s1 + $s2 + $ex;
         }
 
