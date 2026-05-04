@@ -26,7 +26,7 @@ return [
     'new_comers' => 'New Comers',
     'this_session' => 'This Session',
     
-    // Enrollment-Based Finance Keys (NEW)
+    // Enrollment-Based Finance Keys
     'paid_students' => 'Paid Students',
     'fully_settled' => 'Fully Settled',
     'unpaid_students' => 'Unpaid Students',
@@ -61,6 +61,37 @@ return [
     'paid' => 'Paid',
     'rest' => 'Rest',
     'spend' => 'Spend',
+
+    // Accountant Specific
+    'accountant_dashboard' => 'Accountant Dashboard',
+    'no_active_session' => 'No Active Session',
+    'quick_actions' => 'Quick Actions',
+    'create_invoice' => 'Create Invoice',
+    'record_payment' => 'Record Payment',
+    'student_balances' => 'Student Balances',
+    'class_reports' => 'Class Reports',
+    'fund_requests' => 'Fund Requests',
+    'financial_forecast' => 'Expected Revenue',
+    'based_on_active_students' => 'Based on :count active students',
+    'percent_collected' => '% Collected',
+    'to_be_collected' => 'To be collected',
+    'installments_tranches' => 'Installments Overview (Tranches)',
+    'tranche_installment' => 'Tranche / Installment',
+    'no_installments_found' => 'No installment configurations found for this session.',
+    'budget_overview' => 'Budget Overview',
+    'manage_budget' => 'Manage Budget',
+    'total_allocated' => 'Total Allocated',
+    'total_spent' => 'Total Spent',
+    'budget_utilization' => 'Budget Utilization',
+    'remaining_budget' => 'Remaining Budget',
+    'recent_transactions' => 'Recent Transactions',
+    'date' => 'Date',
+    'student' => 'Student',
+    'payment_ref' => 'Payment Ref',
+    'method' => 'Method',
+    'amount' => 'Amount',
+    'unknown_student' => 'Unknown Student',
+    'no_recent_payments' => 'No recent payments found.',
     
     // Teacher Dashboard
     'teacher_dashboard' => 'Teacher Dashboard',
@@ -77,6 +108,7 @@ return [
     'room' => 'Room',
     'action' => 'Action',
     'staff' => 'Staff',
+    
     // Student Dashboard
     'student_dashboard' => 'Student Dashboard',
     'my_fees' => 'My Fees',
@@ -87,6 +119,7 @@ return [
     'present' => 'Present',
     'teacher' => 'Teacher',
 
+    // Global
     'switched_global_view' => 'Switched to Global View successfully.',
     'context_switched_success' => 'School context switched successfully.',
     'unauthorized_access' => 'Unauthorized access.',

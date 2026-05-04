@@ -10,17 +10,18 @@ use App\Models\User;
 use App\Models\Campus;
 use App\Models\AcademicSession;
 use App\Models\StudentAttendance;
-use App\Models\Invoice; // School Invoices
-use App\Models\PlatformInvoice; // Super Admin Billing
+use App\Models\Invoice; 
+use App\Models\PlatformInvoice; 
 use App\Models\Subscription;
 use App\Models\Timetable;
 use App\Models\Subject;
 use App\Models\Exam;
 use App\Models\StudentEnrollment;
-use App\Models\Payment; // Added Payment Model
-use App\Models\FeeStructure; // Added FeeStructure
+use App\Models\Payment; 
+use App\Models\FeeStructure; 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class DashboardController extends BaseController
@@ -32,32 +33,27 @@ class DashboardController extends BaseController
 
     public function index()
     {
-        $this->setPageTitle(__('dashboard.page_title'));
+        $this->setPageTitle(__('dashboard.page_title') ?? 'Dashboard');
         $user = Auth::user();
         
-        // Get Active Context from Session
         $activeInstId = session('active_institution_id');
 
         // 1. MAIN ADMIN (PLATFORM OWNER) CHECK
         if ($user->hasRole('Super Admin')) {
-            // If Super Admin switched to a specific school
             if ($activeInstId && $activeInstId !== 'global') {
                 return $this->schoolAdminDashboard($activeInstId);
             }
-            // Otherwise, show the Global Platform Dashboard
             return $this->platformAdminDashboard();
         }
 
         // 2. School Admin (Head Officer)
         if ($user->hasRole('Head Officer') || $user->hasRole('School Admin')) {
-            $myInstitutes = $user->institutes; // Assuming relationship exists
+            $myInstitutes = $user->institutes; 
             
-            // Check if Head Officer has multiple institutions AND is in Global Mode
-            if ($myInstitutes->count() > 1 && ($activeInstId === 'global' || !$activeInstId)) {
+            if ($myInstitutes && $myInstitutes->count() > 1 && ($activeInstId === 'global' || !$activeInstId)) {
                 return $this->multiSchoolDashboard($user, $myInstitutes);
             }
 
-            // Otherwise, determine the specific school ID
             $institutionId = ($activeInstId && $activeInstId !== 'global') 
                 ? $activeInstId 
                 : ($myInstitutes->first()->id ?? $user->institute_id);
@@ -65,15 +61,23 @@ class DashboardController extends BaseController
             return $this->schoolAdminDashboard($institutionId);
         }
 
-        // 3. Teacher/Staff
+        // 3. NEW: ACCOUNTANT DASHBOARD
+        if ($user->hasRole('Accountant') || $user->hasRole('accountant')) {
+            $institutionId = ($activeInstId && $activeInstId !== 'global') 
+                ? $activeInstId 
+                : $user->institute_id;
+            return $this->accountantDashboard($user, $institutionId);
+        }
+
+        // 4. Teacher/Staff
         if ($user->hasRole(['Teacher', 'Staff']) || $user->user_type == 4) {
-            $institutionId = $this->getInstitutionId(); // Fallback to helper
+            $institutionId = $this->getInstitutionId(); 
             return $this->teacherDashboard($user, $institutionId);
         }
 
-        // 4. Student
+        // 5. Student
         if ($user->hasRole('Student')) {
-            $institutionId = $this->getInstitutionId(); // Fallback to helper
+            $institutionId = $this->getInstitutionId(); 
             return $this->studentDashboard($user, $institutionId);
         }
 
@@ -81,36 +85,131 @@ class DashboardController extends BaseController
     }
 
     /**
-     * NEW: Multi-School Dashboard for Head Officers
-     * Aggregates stats across all assigned schools.
+     * NEW: Accountant Dashboard
+     * Focuses on Forecasts, Installments, and Budgets
      */
+    private function accountantDashboard($user, $institutionId)
+    {
+        $currentSession = AcademicSession::where('institution_id', $institutionId)
+            ->where('is_current', true)
+            ->first();
+
+        $expectedTotal = 0;
+        $collectedTotal = 0;
+        $remainingToCollect = 0;
+        $installmentStats = [];
+        
+        $totalBudget = 0;
+        $budgetSpent = 0;
+        $activeStudentsCount = 0;
+
+        if ($currentSession) {
+            // 1. Core Enrollment Data
+            $enrollments = StudentEnrollment::where('academic_session_id', $currentSession->id)
+                ->where('institution_id', $institutionId)
+                ->where('status', 'active')
+                ->get();
+            
+            $activeStudentsCount = $enrollments->count();
+            $studentsByGrade = $enrollments->groupBy('grade_level_id');
+
+            $feeStructures = FeeStructure::where('institution_id', $institutionId)
+                ->where('academic_session_id', $currentSession->id)
+                ->get();
+
+            // 2. FINANCIAL FORECAST (Expected Revenue)
+            foreach ($studentsByGrade as $gradeId => $gradeEnrollments) {
+                $globalFee = $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'global')->first();
+                
+                if ($globalFee) {
+                    $gradeFeeTotal = $globalFee->amount;
+                } else {
+                    $gradeFeeTotal = $feeStructures->where('grade_level_id', $gradeId)
+                        ->where('payment_mode', 'installment')
+                        ->sum('amount');
+                }
+                $expectedTotal += ($gradeFeeTotal * $gradeEnrollments->count());
+            }
+
+            // 3. COLLECTED REVENUE (Actuals)
+            $collectedTotal = Payment::where('institution_id', $institutionId)
+                ->whereHas('invoice', function($q) use ($currentSession) {
+                    $q->where('academic_session_id', $currentSession->id);
+                })->sum('amount');
+
+            $remainingToCollect = $expectedTotal - $collectedTotal;
+
+            // 4. INSTALLMENT VISIBILITY (Tranches)
+            $installmentFees = $feeStructures->where('payment_mode', 'installment')
+                ->groupBy('installment_order')
+                ->sortKeys();
+
+            foreach ($installmentFees as $order => $fees) {
+                $instExpected = 0;
+                foreach ($fees as $fee) {
+                    $count = isset($studentsByGrade[$fee->grade_level_id]) ? $studentsByGrade[$fee->grade_level_id]->count() : 0;
+                    $instExpected += ($fee->amount * $count);
+                }
+                $installmentStats[] = [
+                    'label' => $fees->first()->name ?? "Installment $order",
+                    'expected' => $instExpected,
+                    'order' => $order
+                ];
+            }
+
+            // 5. BUDGET OVERVIEW
+            // Dynamically safely fetches budget limits (adjust column names if your schema differs)
+            try {
+                if (Schema::hasTable('budgets')) {
+                    $totalBudget = DB::table('budgets')
+                        ->where('institution_id', $institutionId)
+                        ->where('academic_session_id', $currentSession->id)
+                        ->sum('amount'); // or 'allocated_amount'
+                        
+                    $budgetSpent = DB::table('budgets')
+                        ->where('institution_id', $institutionId)
+                        ->where('academic_session_id', $currentSession->id)
+                        ->sum('spent_amount'); // or 'used_amount'
+                }
+            } catch (\Exception $e) {
+                // Failsafe if columns don't match exactly yet
+            }
+        }
+
+        // 6. RECENT TRANSACTIONS
+        $recentPayments = Payment::with(['invoice.student'])
+            ->where('institution_id', $institutionId)
+            ->orderBy('created_at', 'desc')
+            ->take(6)
+            ->get();
+
+        return view('dashboard.accountant', compact(
+            'currentSession', 'expectedTotal', 'collectedTotal', 'remainingToCollect',
+            'installmentStats', 'totalBudget', 'budgetSpent', 'recentPayments', 'activeStudentsCount'
+        ));
+    }
+
     private function multiSchoolDashboard($user, $institutes)
     {
         $instituteIds = $institutes->pluck('id');
 
-        // 1. Aggregated Counts
         $totalSchools = $institutes->count();
         $activeSchools = $institutes->where('is_active', true)->count();
         
         $totalStudents = Student::whereIn('institution_id', $instituteIds)->count();
         $totalStaff = Staff::whereIn('institution_id', $instituteIds)->count();
 
-        // 2. Aggregated Finances (School Invoices)
         $invoiceQuery = Invoice::whereIn('institution_id', $instituteIds);
         $totalRevenue = $invoiceQuery->sum('total_amount');
         $collectedRevenue = $invoiceQuery->sum('paid_amount');
         $pendingRevenue = $totalRevenue - $collectedRevenue;
 
-        // 3. School List with Mini-Stats
-        // We attach student count to each institute object for the table
         $institutes->map(function($inst) {
             $inst->student_count = Student::where('institution_id', $inst->id)->count();
             $inst->staff_count = Staff::where('institution_id', $inst->id)->count();
             return $inst;
         });
 
-        // 4. Recent Activity (Audit Logs filtered by these schools)
-        // Assuming AuditLog has 'institution_id'
         $auditLogCount = \App\Models\AuditLog::whereIn('institution_id', $instituteIds)
             ->where('created_at', '>=', now()->subDay())
             ->count();
@@ -122,25 +221,18 @@ class DashboardController extends BaseController
         ));
     }
 
-    /**
-     * MAIN ADMIN DASHBOARD (Platform Level)
-     * Calculates real platform-wide statistics.
-     */
     private function platformAdminDashboard()
     {
-        // --- 1. Reporting & Stats ---
         $totalInstitutions = Institution::count();
-        $totalStudents = Student::count(); // Global Count
+        $totalStudents = Student::count(); 
         $totalStaff = Staff::count(); 
         
         $newInstitutionsCount = Institution::where('created_at', '>=', now()->subDays(30))->count();
         $activeInstitutionsCount = Institution::where('is_active', true)->count();
 
-        // --- 2. Finance / Billing ---
         $pendingFunds = PlatformInvoice::where('status', 'unpaid')->orWhere('status', 'overdue')->sum('total_amount');
         $validatedFunds = PlatformInvoice::where('status', 'paid')->sum('total_amount');
 
-        // --- 3. Statistics (Student by Year) ---
         $startDate = Carbon::now()->subMonths(11)->startOfMonth();
         $endDate = Carbon::now()->endOfMonth();
         
@@ -178,12 +270,8 @@ class DashboardController extends BaseController
         ));
     }
 
-    /**
-     * School Admin View (Head Officer) - OVERHAULED FINANCIALS
-     */
     private function schoolAdminDashboard($institutionId)
     {
-        // Core Counts (Scoped to Institution)
         $studentsQuery = Student::where('institution_id', $institutionId);
         $staffQuery = Staff::where('institution_id', $institutionId);
         
@@ -193,12 +281,10 @@ class DashboardController extends BaseController
         $totalCampuses = Campus::where('institution_id', $institutionId)->count();
         $totalInstitutes = 1;
 
-        // Current Session
         $currentSession = AcademicSession::where('institution_id', $institutionId)
             ->where('is_current', true)
             ->first();
 
-        // --- ENROLLMENT-BASED FINANCIAL LOGIC ---
         $expectedTotal = 0;
         $collectedTotal = 0;
         $remainingToCollect = 0;
@@ -209,7 +295,6 @@ class DashboardController extends BaseController
         $totalEnrollment = 0;
         $newComers = 0;
         
-        // Other Stats
         $budgetSpend = 0; 
         $budgetRest = 0;  
         $totalCourses = Subject::where('institution_id', $institutionId)->count();
@@ -218,7 +303,6 @@ class DashboardController extends BaseController
         $totalCommunication = 0; 
 
         if ($currentSession) {
-            // 1. Enrollment Counts
             $enrollments = StudentEnrollment::where('academic_session_id', $currentSession->id)
                 ->where('institution_id', $institutionId)
                 ->where('status', 'active')
@@ -229,24 +313,16 @@ class DashboardController extends BaseController
             $newComers = Student::where('institution_id', $institutionId)
                 ->whereBetween('admission_date', [$currentSession->start_date, $currentSession->end_date])
                 ->count();
-
-            // 2. EXPECTED REVENUE CALCULATION
-            // Formula: Sum of (Student Grade's Fee Amount) for all active students
-            // We need to fetch fee structures for the current session
             
             $feeStructures = FeeStructure::where('institution_id', $institutionId)
                 ->where('academic_session_id', $currentSession->id)
                 ->get();
 
-            // Calculate Expected Revenue per Student
-            // Optimized: Group students by Grade Level
             $studentsByGrade = $enrollments->groupBy('grade_level_id');
 
             foreach ($studentsByGrade as $gradeId => $gradeEnrollments) {
-                // Get fees applicable to this grade
                 $gradeFeeTotal = 0;
                 
-                // Check if a GLOBAL fee structure exists for this grade
                 $globalFee = $feeStructures->where('grade_level_id', $gradeId)
                     ->where('payment_mode', 'global')
                     ->first();
@@ -254,7 +330,6 @@ class DashboardController extends BaseController
                 if ($globalFee) {
                     $gradeFeeTotal = $globalFee->amount;
                 } else {
-                    // Sum installments if no global fee defined
                     $gradeFeeTotal = $feeStructures->where('grade_level_id', $gradeId)
                         ->where('payment_mode', 'installment')
                         ->sum('amount');
@@ -263,8 +338,6 @@ class DashboardController extends BaseController
                 $expectedTotal += ($gradeFeeTotal * $gradeEnrollments->count());
             }
 
-            // 3. COLLECTED REVENUE (Real Payments)
-            // Sum payments linked to invoices for this session
             $collectedTotal = Payment::where('institution_id', $institutionId)
                 ->whereHas('invoice', function($q) use ($currentSession) {
                     $q->where('academic_session_id', $currentSession->id);
@@ -272,12 +345,7 @@ class DashboardController extends BaseController
                 ->sum('amount');
 
             $remainingToCollect = $expectedTotal - $collectedTotal;
-
-            // 4. PAID vs UNPAID STUDENTS COUNT
-            // A student is "Paid" if their total payments >= their grade's expected fee
             
-            // Get total paid per student for this session
-            // FIX: Qualified column names to prevent ambiguity error
             $studentPayments = Payment::where('payments.institution_id', $institutionId)
                 ->whereHas('invoice', function($q) use ($currentSession) {
                     $q->where('academic_session_id', $currentSession->id);
@@ -291,14 +359,11 @@ class DashboardController extends BaseController
                 $studentId = $enrollment->student_id;
                 $gradeId = $enrollment->grade_level_id;
                 
-                // Determine expected fee for this student
                 $globalFee = $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'global')->first();
                 $expected = $globalFee ? $globalFee->amount : $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'installment')->sum('amount');
                 
-                // Get actual paid
                 $paid = $studentPayments[$studentId] ?? 0;
 
-                // Threshold: 99% paid counts as Paid (to handle rounding errors)
                 if ($expected > 0 && $paid >= ($expected * 0.99)) {
                     $paidCount++;
                 } else {
@@ -306,8 +371,6 @@ class DashboardController extends BaseController
                 }
             }
 
-            // 5. INSTALLMENT BREAKDOWN
-            // Calculate progress for TR1, TR2, etc.
             $installmentFees = $feeStructures->where('payment_mode', 'installment')
                 ->groupBy('installment_order')
                 ->sortKeys();
@@ -316,7 +379,6 @@ class DashboardController extends BaseController
                 $instExpected = 0;
                 
                 foreach ($fees as $fee) {
-                    // How many students in this grade?
                     $count = isset($studentsByGrade[$fee->grade_level_id]) ? $studentsByGrade[$fee->grade_level_id]->count() : 0;
                     $instExpected += ($fee->amount * $count);
                 }
@@ -336,7 +398,6 @@ class DashboardController extends BaseController
                 ->where('institution_id', $institutionId)->count();
         }
 
-        // Attendance Snippet (Same as before)
         $today = Carbon::today();
         $todaysAttendance = StudentAttendance::where('institution_id', $institutionId)
             ->whereDate('attendance_date', $today);
@@ -344,7 +405,6 @@ class DashboardController extends BaseController
         $absentCount = (clone $todaysAttendance)->where('status', 'absent')->count();
         $lateCount = (clone $todaysAttendance)->where('status', 'late')->count();
 
-        // Chart Data (Same as before)
         $startDate = Carbon::now()->subDays(6);
         $endDate = Carbon::now();
         
@@ -365,7 +425,6 @@ class DashboardController extends BaseController
             $chartValues[] = $record ? $record->count : 0;
         }
 
-        // Pass new financial variables
         return view('dashboard.super_admin', compact(
             'totalStudents', 'totalTeachers', 'totalStaff', 'totalCampuses', 'totalInstitutes', 
             'chartLabels', 'chartValues', 'currentSession',

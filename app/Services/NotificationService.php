@@ -126,29 +126,24 @@ class NotificationService
         $date = \Carbon\Carbon::parse($payment->payment_date)->format('d M Y');
         $transactionId = $payment->transaction_id;
 
-        // Extract NEW Context Data (Session & Class)
+        // Extract Context Data
         $sessionName = $invoice->academicSession->name ?? 'N/A';
-        
-        // Find enrollment specifically linked to the invoice's session to ensure accuracy
         $enrollment = $student->enrollments()->where('academic_session_id', $invoice->academic_session_id)->first() 
                     ?? $student->enrollments()->latest()->first();
         $className = $enrollment && $enrollment->classSection ? $enrollment->classSection->name : 'N/A';
 
-        // Extract Payment Reason (Concatenate descriptions of paid invoice items)
+        // Extract Payment Reason
         $reason = $invoice->items->pluck('description')->filter()->implode(', ');
         
-        // Fallback: If no explicit description is added, use the Fee Structure Name
         if (empty($reason)) {
             $reason = $invoice->items->map(function($item) {
                 return $item->feeStructure->name ?? '';
             })->filter()->implode(', ');
         }
-        // Final fallback
         if (empty($reason)) {
             $reason = 'School Fees';
         }
 
-        // Map and Replace Tags
         $search = [
             '$StudentName', 
             '$Amount', 
@@ -181,7 +176,6 @@ class NotificationService
 
         if (empty($phone)) return;
 
-        // Dispatch over enabled channels
         if ($sendSms) {
             $this->dispatchMessage($phone, $message, $institutionId, 'sms');
         }
@@ -266,12 +260,8 @@ class NotificationService
         }
     }
 
-    /**
-     * Alias method to handle Head Officer creation securely without crashing.
-     */
     public function sendHeadOfficerCredentials(User $user, $plainPassword)
     {
-        // Re-use the existing logic by passing the Head Officer role
         return $this->sendUserCredentials($user, $plainPassword, \App\Enums\RoleEnum::HEAD_OFFICER->value);
     }
 
@@ -342,7 +332,6 @@ class NotificationService
         return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel);
     }
 
-    // --- MAIN SEND METHOD ---
     public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms') 
     {
         $institution = Institution::find($institutionId);
@@ -400,10 +389,8 @@ class NotificationService
         }
     }
     
-    // --- OTP (SMS ONLY) ---
     public function sendOtpNotification(Student $student, $otp)
     {
-        // Try Parent Phone first
         $phone = $student->parent->father_phone 
               ?? $student->parent->mother_phone 
               ?? $student->parent->guardian_phone 
@@ -415,13 +402,9 @@ class NotificationService
         }
 
         $message = __('chatbot.otp_sms_message', ['otp' => $otp]);
-        // Force SMS channel
         $this->performSend($phone, $message, $student->institution_id, true, 'sms');
     }
 
-    /**
-     * Send File (PDF) via WhatsApp
-     */
     public function performSendFile($to, $fileUrl, $caption, $filename, $institutionId)
     {
         $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'system');
@@ -436,7 +419,6 @@ class NotificationService
             if (method_exists($gateway, 'sendWhatsAppFile')) {
                 return $gateway->sendWhatsAppFile($to, $fileUrl, $caption, $filename);
             }
-            // Fallback
             return $gateway->sendWhatsApp($to, $caption . " " . $fileUrl);
 
         } catch (\Exception $e) {
@@ -445,9 +427,6 @@ class NotificationService
         }
     }
 
-    /**
-     * Send Image (JPG/PNG) via WhatsApp
-     */
     public function performSendImage($to, $imageUrl, $caption, $institutionId)
     {
         $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'system');
@@ -462,7 +441,6 @@ class NotificationService
             if (method_exists($gateway, 'sendWhatsAppImage')) {
                 return $gateway->sendWhatsAppImage($to, $imageUrl, $caption);
             }
-            // Fallback
             return $gateway->sendWhatsApp($to, $caption . " " . $imageUrl);
 
         } catch (\Exception $e) {
@@ -471,9 +449,6 @@ class NotificationService
         }
     }
 
-    /**
-     * Send confirmation for Fund Request Submission to the Initiator
-     */
     public function sendFundRequestConfirmation($fundRequest, $phone, $name, $institutionId)
     {
         $providerName = InstitutionSetting::get($institutionId, 'sms_provider', 'system');
@@ -486,13 +461,68 @@ class NotificationService
             $currency = \App\Enums\CurrencySymbol::default();
             $amount = $currency . ' ' . number_format($fundRequest->amount, 2);
             
-            // Personalized message with Ticket Reference
             $message = "Hello {$name}, your fund request (Ticket: {$fundRequest->ticket_number}) for {$amount} has been successfully submitted and is pending approval.";
             
-            // Dispatch via SMS
             $gateway->sendSms($phone, $message);
         } catch (\Exception $e) {
             Log::error("Fund Request Notification Error: " . $e->getMessage());
+        }
+    }
+
+    // --- NEW: EVENT LISTENER METHOD (APPROVED / REJECTED) ---
+    public function sendFundRequestProcessedNotification($fundRequest, $institutionId)
+    {
+        // Must load relationships to access data
+        $fundRequest->loadMissing(['requester', 'budget.category']);
+        $requester = $fundRequest->requester;
+        $budget = $fundRequest->budget;
+
+        if (!$requester || !$budget) return;
+
+        $phone = $requester->staff->phone ?? $requester->phone ?? null;
+        $email = $requester->email ?? null;
+
+        $currency = \App\Enums\CurrencySymbol::default();
+        $amount = $currency . ' ' . number_format($fundRequest->amount, 2);
+        
+        // Calculate remaining balance
+        $remaining = $currency . ' ' . number_format(max(0, $budget->allocated_amount - $budget->spent_amount), 2);
+        $categoryName = $budget->category->name ?? 'General';
+
+        if ($fundRequest->status === 'approved') {
+            $message = "Hello {$requester->name}, your fund request ({$fundRequest->ticket_number}) for {$amount} from the '{$categoryName}' budget has been APPROVED and deducted. Remaining budget balance is now {$remaining}.";
+        } elseif ($fundRequest->status === 'rejected') {
+            $message = "Hello {$requester->name}, your fund request ({$fundRequest->ticket_number}) for {$amount} was REJECTED. Reason: {$fundRequest->rejection_reason}";
+        } else {
+            return; // Ignore pending
+        }
+
+        // 1. Dispatch via SMS
+        $providerName = InstitutionSetting::get($institutionId, 'sms_provider', 'system');
+        if ($providerName === 'system') {
+            $providerName = InstitutionSetting::get(null, 'sms_provider', 'system');
+        }
+
+        try {
+            $gateway = GatewayFactory::create($providerName, $institutionId);
+            if ($phone) {
+                $gateway->sendSms($phone, $message);
+            }
+        } catch (\Exception $e) {
+            Log::error("Fund Request Processed SMS Error: " . $e->getMessage());
+        }
+
+        // 2. Dispatch via Email (Raw Mail Dispatch)
+        // If email notifications are enabled globally or locally for 'system_alert'
+        if ($email && $this->isChannelEnabled($institutionId, 'system_alert', 'email')) {
+             try {
+                 Mail::raw($message, function($msg) use ($email, $fundRequest) {
+                     $msg->to($email)
+                         ->subject("Budget Update: Fund Request {$fundRequest->ticket_number}");
+                 });
+             } catch (\Exception $e) {
+                 Log::error("Fund Request Processed Email Error: " . $e->getMessage());
+             }
         }
     }
 }

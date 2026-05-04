@@ -11,6 +11,12 @@
 	<meta name="robots" content="index, follow">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon.png') }}">
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#002b80">
+    <link rel="apple-touch-icon" href="{{ asset('images/favicon.png') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
 	<!-- STYLESHEETS -->
 	<link rel="stylesheet" href="{{ asset('vendor/jqvmap/css/jqvmap.min.css') }}">
@@ -233,8 +239,8 @@
                                                 if ($count > 0) {
                                                     $notifications->push([
                                                         'icon' => 'fa-money-bill text-warning',
-                                                        'title' => 'Pending Fund Requests',
-                                                        'desc' => "{$count} pending fund requests to review.",
+                                                        'title' => __('header.pending_fund_requests') ?? 'Pending Fund Requests',
+                                                        'desc' => __('header.pending_fund_requests_desc', ['count' => $count]) ?? "{$count} pending fund requests to review.",
                                                         'link' => route('budgets.requests')
                                                     ]);
                                                     $unreadCount += $count;
@@ -248,8 +254,8 @@
                                                 if ($count > 0) {
                                                     $notifications->push([
                                                         'icon' => 'fa-envelope text-primary',
-                                                        'title' => 'Pending Requests/Leaves',
-                                                        'desc' => "{$count} new requests require your approval.",
+                                                        'title' => __('header.pending_requests_leaves') ?? 'Pending Requests/Leaves',
+                                                        'desc' => __('header.pending_requests_desc', ['count' => $count]) ?? "{$count} new requests require your approval.",
                                                         'link' => route('requests.index')
                                                     ]);
                                                     $unreadCount += $count;
@@ -268,8 +274,8 @@
                                                 if ($unpaid > 0) {
                                                     $notifications->push([
                                                         'icon' => 'fa-file-invoice text-danger',
-                                                        'title' => 'Unpaid Fees',
-                                                        'desc' => "You have {$unpaid} pending fee invoices.",
+                                                        'title' => __('header.unpaid_fees') ?? 'Unpaid Fees',
+                                                        'desc' => __('header.unpaid_fees_desc', ['count' => $unpaid]) ?? "You have {$unpaid} pending fee invoices.",
                                                         'link' => route('dashboard')
                                                     ]);
                                                     $unreadCount += $unpaid;
@@ -282,8 +288,8 @@
                                                 if ($elections > 0) {
                                                     $notifications->push([
                                                         'icon' => 'fa-vote-yea text-success',
-                                                        'title' => 'Active Elections',
-                                                        'desc' => "{$elections} elections are open for voting.",
+                                                        'title' => __('header.active_elections') ?? 'Active Elections',
+                                                        'desc' => __('header.active_elections_desc', ['count' => $elections]) ?? "{$elections} elections are open for voting.",
                                                         'link' => route('student.elections.index')
                                                     ]);
                                                     $unreadCount += $elections;
@@ -298,8 +304,8 @@
                                                 if ($notices > 0) {
                                                     $notifications->push([
                                                         'icon' => 'fa-bullhorn text-info',
-                                                        'title' => 'New Announcements',
-                                                        'desc' => "{$notices} new notices posted recently.",
+                                                        'title' => __('header.new_announcements') ?? 'New Announcements',
+                                                        'desc' => __('header.new_announcements_desc', ['count' => $notices]) ?? "{$notices} new notices posted recently.",
                                                         'link' => route('student.notices.index')
                                                     ]);
                                                     $unreadCount += $notices;
@@ -320,8 +326,8 @@
                                             if ($notices > 0) {
                                                 $notifications->push([
                                                     'icon' => 'fa-bullhorn text-info',
-                                                    'title' => 'New Staff Announcements',
-                                                    'desc' => "{$notices} new notices posted.",
+                                                    'title' => __('header.new_staff_announcements') ?? 'New Staff Announcements',
+                                                    'desc' => __('header.new_staff_announcements_desc', ['count' => $notices]) ?? "{$notices} new notices posted.",
                                                     'link' => route('notices.index')
                                                 ]);
                                                 $unreadCount += $notices;
@@ -333,14 +339,41 @@
                                             if ($reqs > 0) {
                                                  $notifications->push([
                                                     'icon' => 'fa-check-circle text-success',
-                                                    'title' => 'Request Updated',
-                                                    'desc' => "{$reqs} of your requests have been reviewed.",
+                                                    'title' => __('header.request_updated') ?? 'Request Updated',
+                                                    'desc' => __('header.request_updated_desc', ['count' => $reqs]) ?? "{$reqs} of your requests have been reviewed.",
                                                     'link' => route('requests.index')
                                                 ]);
                                                 $unreadCount += $reqs;
                                             }
                                         } catch (\Exception $e) {}
                                     }
+
+                                    // D. User Specific Action Notifications (Like Fund Requests Processed)
+                                    try {
+                                        if (\Illuminate\Support\Facades\Schema::hasTable('fund_requests')) {
+                                            $myFundReqs = \App\Models\FundRequest::where('requested_by', $user->id)
+                                                ->whereIn('status', ['approved', 'rejected'])
+                                                ->where('updated_at', '>=', now()->subDays(7)) // Look at recent decisions
+                                                ->get();
+
+                                            foreach($myFundReqs as $req) {
+                                                // Check Cache to see if user has already marked this notification as read
+                                                if (!\Illuminate\Support\Facades\Cache::has('fund_req_read_'.$user->id.'_'.$req->id)) {
+                                                    $statusText = ucfirst($req->status);
+                                                    $icon = $req->status == 'approved' ? 'fa-check-circle text-success' : 'fa-times-circle text-danger';
+                                                    
+                                                    $notifications->push([
+                                                        'icon' => $icon,
+                                                        'title' => __('header.fund_request_status', ['status' => $statusText]) ?? "Fund Request {$statusText}",
+                                                        'desc' => __('header.fund_request_desc', ['ticket' => $req->ticket_number, 'status' => $statusText]) ?? "Your request {$req->ticket_number} was {$req->status}.",
+                                                        'link' => route('budgets.requests.mark_read', $req->id)
+                                                    ]);
+                                                    $unreadCount++;
+                                                }
+                                            }
+                                        }
+                                    } catch (\Exception $e) {}
+
                                 }
                             @endphp
 
@@ -355,7 +388,7 @@
 
                             {{-- DYNAMIC NOTIFICATION BELL --}}
                             <li class="nav-item dropdown notification_dropdown">
-                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" title="Notifications">
+                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" title="{{ __('header.notifications') ?? 'Notifications' }}">
                                     <i class="fa fa-bell"></i>
                                     @if($unreadCount > 0)
                                         <div class="pulse-css"></div>
@@ -364,8 +397,8 @@
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end p-0" style="min-width: 320px;">
                                     <div class="p-3 border-bottom bg-light rounded-top d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0 text-black fw-bold">Notifications</h6>
-                                        <span class="badge bg-primary text-white">{{ $unreadCount }} New</span>
+                                        <h6 class="mb-0 text-black fw-bold">{{ __('header.notifications') ?? 'Notifications' }}</h6>
+                                        <span class="badge bg-primary text-white">{{ $unreadCount }} {{ __('header.new') ?? 'New' }}</span>
                                     </div>
                                     <div id="DZ_W_Notification1" class="widget-media dz-scroll p-3" style="height:auto; max-height:380px; overflow-y:auto;">
                                         <ul class="timeline">
@@ -386,7 +419,7 @@
                                             @empty
                                                 <li class="text-center text-muted py-4">
                                                     <i class="fa fa-bell-slash fs-24 mb-2 d-block opacity-50"></i>
-                                                    No new notifications
+                                                    {{ __('header.no_new_notifications') ?? 'No new notifications' }}
                                                 </li>
                                             @endforelse
                                         </ul>
@@ -394,7 +427,7 @@
                                 </div>
                             </li>
 
-                            {{-- Institution Context Switcher --}}
+                            {{-- Institution Context Switcher (Updated with Text on Desktop) --}}
                             @if($showSwitcher)
                             <li class="nav-item dropdown notification_dropdown">
                                 <a class="nav-link {{ $isActiveGlobal ? 'bg-dark text-white' : 'bg-primary text-white' }} rounded d-flex align-items-center justify-content-center" href="#" role="button" data-bs-toggle="dropdown" title="{{ $activeInstitutionName }}" style="min-width: 40px; height: 40px; padding: 0 15px;">
@@ -553,6 +586,18 @@
                     });
                 }
             });
+        </script>
+        <script>
+            // PWA Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    }, function(err) {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+                });
+            }
         </script>
 </body>
 </html>

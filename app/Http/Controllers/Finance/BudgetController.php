@@ -11,14 +11,17 @@ use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str; // Added for Ticket Number
-use App\Services\NotificationService; // Added
-use App\Enums\RoleEnum; // Added
-use App\Models\Institution; // Added
+use Illuminate\Support\Str; 
+use App\Services\NotificationService; 
+use App\Enums\RoleEnum; 
+use App\Models\Institution; 
+use App\Events\BudgetDeducted;
+use Illuminate\Support\Facades\Cache;
 
 class BudgetController extends BaseController
 {
     protected $notificationService;
+    
     public function __construct(NotificationService $notificationService)
     {
         $this->middleware('auth');
@@ -123,102 +126,6 @@ class BudgetController extends BaseController
         return view('finance.budgets.index', compact('categories', 'session', 'globalStats'));
     }
 
-     // --- FUND REQUESTS ---
-    public function fundRequests(Request $request)
-    {
-        $user = Auth::user();
-        $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value) || $user->hasRole(RoleEnum::SUPER_ADMIN->value);
-        $institutionId = $this->getInstitutionId();
-
-        // Scope institutions based on hierarchy
-        $allowedInstitutionIds = [];
-        if ($isHeadOfficer && $user->institutes) {
-            $allowedInstitutionIds = $user->institutes->pluck('id')->toArray();
-        } elseif ($institutionId) {
-            $allowedInstitutionIds = [$institutionId];
-        }
-
-        if ($request->ajax()) {
-            $query = FundRequest::with(['budget.category', 'requester', 'institution'])
-                ->select('fund_requests.*')->latest();
-
-            if (!empty($allowedInstitutionIds)) {
-                $query->whereIn('fund_requests.institution_id', $allowedInstitutionIds);
-            }
-
-            return DataTables::of($query)
-                ->addColumn('ticket_number', fn($row) => '<span class="text-primary fw-bold">'.$row->ticket_number.'</span>')
-                ->addColumn('branch', fn($row) => $row->institution->name ?? 'N/A')
-                ->editColumn('created_at', fn($row) => $row->created_at->format('d M, Y H:i'))
-                ->addColumn('request_title', fn($row) => $row->title)
-                ->addColumn('category', fn($row) => $row->budget->category->name ?? 'N/A')
-                ->editColumn('amount', fn($row) => number_format($row->amount, 2))
-                ->addColumn('requested_by', fn($row) => $row->requester->name ?? 'N/A')
-                ->editColumn('status', function($row){
-                    $badges = ['pending' => 'badge-warning', 'approved' => 'badge-success', 'rejected' => 'badge-danger'];
-                    return '<span class="badge '.($badges[$row->status] ?? 'badge-secondary').'">'.ucfirst($row->status).'</span>';
-                })
-                ->addColumn('action', function($row) use ($user) {
-                    if ($row->status == 'pending' && $user->can('budget.approve_funds')) {
-                        return '<div class="d-flex justify-content-end">
-                            <button class="btn btn-success btn-xs shadow approve-btn me-1" data-id="'.$row->id.'" title="Approve"><i class="fa fa-check"></i></button>
-                            <button class="btn btn-danger btn-xs shadow reject-btn" data-id="'.$row->id.'" title="Reject"><i class="fa fa-times"></i></button>
-                        </div>';
-                    }
-                    return '';
-                })
-                ->rawColumns(['ticket_number', 'status', 'action'])
-                ->make(true);
-        }
-
-        // Summary Metrics for HeadOff & Admins
-        $statsQuery = FundRequest::query();
-        if (!empty($allowedInstitutionIds)) {
-            $statsQuery->whereIn('institution_id', $allowedInstitutionIds);
-        }
-
-        $totalPending = (clone $statsQuery)->where('status', 'pending')->count();
-        $totalProcessed = (clone $statsQuery)->whereIn('status', ['approved', 'rejected'])->count();
-        $totalRequestedAmt = (clone $statsQuery)->sum('amount');
-        $totalApprovedAmt = (clone $statsQuery)->where('status', 'approved')->sum('amount');
-        
-        return view('finance.budgets.requests', compact('totalPending', 'totalProcessed', 'totalRequestedAmt', 'totalApprovedAmt', 'isHeadOfficer'));
-    }
-
-     public function storeRequest(Request $request)
-    {
-        $request->validate([
-            'budget_id' => 'required|exists:budgets,id',
-            'title' => 'required|string|max:255',
-            'amount' => 'required|numeric|min:0.01',
-            'description' => 'nullable|string'
-        ]);
-
-        $budget = Budget::findOrFail($request->budget_id);
-        $institutionId = $budget->institution_id;
-        $ticketNumber = 'REQ-' . strtoupper(Str::random(8));
-
-        $fundRequest = FundRequest::create([
-            'budget_id' => $budget->id,
-            'institution_id' => $institutionId,
-            'ticket_number' => $ticketNumber,
-            'title' => $request->title,
-            'amount' => $request->amount,
-            'description' => $request->description,
-            'status' => 'pending',
-            'requested_by' => Auth::id()
-        ]);
-
-        // Send Notification to Initiator
-        $user = Auth::user();
-        $phone = $user->staff->phone ?? $user->phone ?? null; 
-        if ($phone) {
-            $this->notificationService->sendFundRequestConfirmation($fundRequest, $phone, $user->name, $institutionId);
-        }
-
-        return redirect()->back()->with('success', __('budget.success_request_submitted'));
-    }
-
     public function store(Request $request)
     {
         $institutionId = $this->getInstitutionId();
@@ -290,26 +197,93 @@ class BudgetController extends BaseController
     }
 
     // --- FUND REQUESTS ---
+    public function fundRequests(Request $request)
+    {
+        $user = Auth::user();
+        $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value) || $user->hasRole(RoleEnum::SUPER_ADMIN->value);
+        $institutionId = $this->getInstitutionId();
+
+        // Scope institutions based on hierarchy
+        $allowedInstitutionIds = [];
+        if ($isHeadOfficer && $user->institutes) {
+            $allowedInstitutionIds = $user->institutes->pluck('id')->toArray();
+        } elseif ($institutionId) {
+            $allowedInstitutionIds = [$institutionId];
+        }
+
+        if ($request->ajax()) {
+            $query = FundRequest::with(['budget.category', 'requester', 'institution'])
+                ->select('fund_requests.*')->latest();
+
+            if (!empty($allowedInstitutionIds)) {
+                $query->whereIn('fund_requests.institution_id', $allowedInstitutionIds);
+            }
+
+            return DataTables::of($query)
+                ->addColumn('ticket_number', fn($row) => '<span class="text-primary fw-bold">REQ-'.str_pad($row->id, 6, '0', STR_PAD_LEFT).'</span>')
+                ->addColumn('branch', fn($row) => $row->institution->name ?? 'N/A')
+                ->editColumn('created_at', fn($row) => $row->created_at->format('d M, Y H:i'))
+                ->addColumn('request_title', fn($row) => $row->title)
+                ->addColumn('category', fn($row) => $row->budget->category->name ?? 'N/A')
+                ->editColumn('amount', fn($row) => number_format($row->amount, 2))
+                ->addColumn('requested_by', fn($row) => $row->requester->name ?? 'N/A')
+                ->editColumn('status', function($row){
+                    $badges = ['pending' => 'badge-warning', 'approved' => 'badge-success', 'rejected' => 'badge-danger'];
+                    return '<span class="badge '.($badges[$row->status] ?? 'badge-secondary').'">'.ucfirst($row->status).'</span>';
+                })
+                ->addColumn('action', function($row) use ($user) {
+                    if ($row->status == 'pending' && $user->can('budget.approve_funds')) {
+                        return '<div class="d-flex justify-content-end">
+                            <button class="btn btn-success btn-xs shadow approve-btn me-1" data-id="'.$row->id.'" title="Approve"><i class="fa fa-check"></i></button>
+                            <button class="btn btn-danger btn-xs shadow reject-btn" data-id="'.$row->id.'" title="Reject"><i class="fa fa-times"></i></button>
+                        </div>';
+                    }
+                    return '';
+                })
+                ->rawColumns(['ticket_number', 'status', 'action'])
+                ->make(true);
+        }
+
+        // Summary Metrics for HeadOff & Admins
+        $statsQuery = FundRequest::query();
+        if (!empty($allowedInstitutionIds)) {
+            $statsQuery->whereIn('institution_id', $allowedInstitutionIds);
+        }
+
+        $totalPending = (clone $statsQuery)->where('status', 'pending')->count();
+        $totalProcessed = (clone $statsQuery)->whereIn('status', ['approved', 'rejected'])->count();
+        $totalRequestedAmt = (clone $statsQuery)->sum('amount');
+        $totalApprovedAmt = (clone $statsQuery)->where('status', 'approved')->sum('amount');
+        
+        return view('finance.budgets.requests', compact('totalPending', 'totalProcessed', 'totalRequestedAmt', 'totalApprovedAmt', 'isHeadOfficer'));
+    }
+
     public function storeFundRequest(Request $request)
     {
         $this->authorize('create', FundRequest::class);
 
         $request->validate([
             'budget_id' => 'required|exists:budgets,id',
-            'amount' => 'required|numeric|min:1',
+            'amount' => 'required|numeric|min:0.01',
             'title' => 'required|string|max:255',
+            'description' => 'nullable|string'
         ]);
 
         $budget = Budget::findOrFail($request->budget_id);
+        $institutionId = $budget->institution_id;
         
         // Check Balance
         $remaining = $budget->allocated_amount - $budget->spent_amount;
         if ($request->amount > $remaining) {
-            return response()->json(['message' => __('budget.insufficient_funds')], 422);
+            // Support both AJAX JSON response and standard form redirects
+            if($request->ajax() || $request->wantsJson()) {
+                return response()->json(['message' => __('budget.insufficient_funds')], 422);
+            }
+            return redirect()->back()->with('error', __('budget.insufficient_funds'));
         }
 
-        FundRequest::create([
-            'institution_id' => $this->getInstitutionId(),
+        $fundRequest = FundRequest::create([
+            'institution_id' => $institutionId,
             'budget_id' => $budget->id,
             'requested_by' => Auth::id(),
             'amount' => $request->amount,
@@ -318,53 +292,23 @@ class BudgetController extends BaseController
             'status' => 'pending'
         ]);
 
-        return response()->json(['message' => __('budget.success_request_submitted')]);
+        // Generate dynamic ticket number for the notification
+        $fundRequest->ticket_number = 'REQ-' . str_pad($fundRequest->id, 6, '0', STR_PAD_LEFT);
+
+        // Send Initial Notification to the Requester
+        $user = Auth::user();
+        $phone = $user->staff->phone ?? $user->phone ?? null; 
+        if ($phone) {
+            $this->notificationService->sendFundRequestConfirmation($fundRequest, $phone, $user->name, $institutionId);
+        }
+
+        if($request->ajax() || $request->wantsJson()) {
+            return response()->json(['message' => __('budget.success_request_submitted')]);
+        }
+        
+        return redirect()->back()->with('success', __('budget.success_request_submitted'));
     }
 
-    // public function fundRequests(Request $request)
-    // {
-    //     $this->authorize('viewAny', Budget::class);
-    //     $institutionId = $this->getInstitutionId();
-        
-    //     if ($request->ajax()) {
-    //         $data = FundRequest::with(['budget.category', 'requester'])
-    //             ->where('institution_id', $institutionId)
-    //             ->latest();
-
-    //         return DataTables::of($data)
-    //             ->editColumn('status', function($row){
-    //                 $badges = ['pending'=>'warning', 'approved'=>'success', 'rejected'=>'danger'];
-    //                 $statusKey = 'budget.' . $row->status;
-    //                 return '<span class="badge badge-'.$badges[$row->status].'">'.__($statusKey).'</span>';
-    //             })
-    //             ->addColumn('requester_name', function($row){
-    //                 return $row->requester->name ?? 'Unknown';
-    //             })
-    //             ->addColumn('category_name', function($row){
-    //                 return $row->budget->category->name ?? '-';
-    //             })
-    //             ->addColumn('period', function($row){
-    //                 return $row->budget->period_label;
-    //             })
-    //             ->editColumn('created_at', function($row){
-    //                 return $row->created_at->format('d M, Y');
-    //             })
-    //             ->addColumn('action', function($row){
-    //                 if($row->status == 'pending' && Auth::user()->can('budget.approve_funds')) {
-    //                     return '
-    //                     <div class="d-flex">
-    //                         <button class="btn btn-success btn-xs me-1 approve-btn" data-id="'.$row->id.'"><i class="fa fa-check"></i></button>
-    //                         <button class="btn btn-danger btn-xs reject-btn" data-id="'.$row->id.'"><i class="fa fa-times"></i></button>
-    //                     </div>';
-    //                 }
-    //                 return '';
-    //             })
-    //             ->rawColumns(['status', 'action'])
-    //             ->make(true);
-    //     }
-        
-    //     return view('finance.budgets.requests');
-    // }
     // --- FINANCE OVERVIEW (HEADOFF DASHBOARD) ---
     public function financeOverview()
     {
@@ -422,7 +366,7 @@ class BudgetController extends BaseController
         }
 
         $fundRequest = FundRequest::findOrFail($id);
-        if($fundRequest->status != 'pending') abort(403, 'Request already processed');
+        if($fundRequest->status != 'pending') abort(403, __('budget.request_already_processed') ?? 'Request already processed');
 
         DB::transaction(function() use ($fundRequest, $request) {
             $fundRequest->update([
@@ -438,7 +382,36 @@ class BudgetController extends BaseController
             }
         });
 
+        // Dynamically assign ticket number for the notification AFTER the update
+        // This ensures Laravel's save() doesn't try to persist the virtual column 'ticket_number' to the database
+        $fundRequest->ticket_number = 'REQ-' . str_pad($fundRequest->id, 6, '0', STR_PAD_LEFT);
+
+        // Prepare and trigger the Notification explicitly in the controller as requested
+        try {
+            $this->notificationService->sendFundRequestProcessedNotification($fundRequest, $fundRequest->institution_id);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Budget Notification Error: " . $e->getMessage());
+        }
+
+        // Keep the event dispatch for broader system reactivity
+        BudgetDeducted::dispatch($fundRequest);
+
         $msg = $request->status == 'approved' ? __('budget.success_approved') : __('budget.success_rejected');
         return response()->json(['message' => $msg]);
+    }
+
+    /**
+     * Mark a Fund Request Notification as Read and clear it from the dashboard counter
+     */
+    public function markRequestAsRead($id)
+    {
+        $fundRequest = FundRequest::findOrFail($id);
+        
+        if ($fundRequest->requested_by == Auth::id()) {
+            // Cache the "read" state for 30 days to avoid modifying DB schema
+            Cache::put('fund_req_read_'.Auth::id().'_'.$id, true, now()->addDays(30));
+        }
+
+        return redirect()->route('budgets.requests');
     }
 }

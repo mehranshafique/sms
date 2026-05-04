@@ -396,7 +396,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Categories
         Route::get('budgets/categories', [BudgetController::class, 'categories'])->name('budgets.categories');
         Route::post('budgets/categories', [BudgetController::class, 'storeCategory'])->name('budgets.categories.store');
-        
+        Route::get('budgets/requests/mark-read/{id}', [\App\Http\Controllers\Finance\BudgetController::class, 'markRequestAsRead'])->name('budgets.requests.mark_read');
+
         Route::get('/overview', [BudgetController::class, 'financeOverview'])->name('finance.overview');
         // Allocations & Index
         Route::get('budgets', [BudgetController::class, 'index'])->name('budgets.index');

@@ -7,7 +7,7 @@
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
                     <h4>{{ __('payment.record_payment') }}</h4>
-                    <p class="mb-0">{{ __('payment.invoice_no') }} #{{ $invoice->invoice_number }}</p>
+                    <p class="mb-0">{{ __('payment.invoice_no') }} #{{ isset($invoice->invoice_number) ? $invoice->invoice_number : 'N/A' }}</p>
                 </div>
             </div>
         </div>
@@ -21,21 +21,21 @@
                     <div class="card-body">
                         <form action="{{ route('payments.store') }}" method="POST" id="paymentForm">
                             @csrf
-                            <input type="hidden" name="invoice_id" value="{{ $invoice->id }}">
+                            <input type="hidden" name="invoice_id" value="{{ isset($invoice->id) ? $invoice->id : '' }}">
                             
                             <div class="mb-3">
                                 <label class="form-label">{{ __('payment.student_name') }}</label>
-                                <input type="text" class="form-control" id="studentName" value="{{ $invoice->student->full_name }}" readonly disabled>
+                                <input type="text" class="form-control" id="studentName" value="{{ isset($invoice->student->full_name) ? $invoice->student->full_name : 'N/A' }}" readonly disabled>
                             </div>
 
                             <div class="row">
                                 <div class="col-6 mb-3">
                                     <label class="form-label">{{ __('payment.total_amount') }}</label>
-                                    <input type="text" class="form-control" value="{{ number_format($invoice->total_amount, 2) }}" readonly disabled>
+                                    <input type="text" class="form-control" value="{{ isset($invoice->total_amount) ? number_format($invoice->total_amount, 2) : 'N/A' }}" readonly disabled>
                                 </div>
                                 <div class="col-6 mb-3">
                                     <label class="form-label text-danger">{{ __('payment.remaining_balance') }}</label>
-                                    <input type="text" class="form-control text-danger fw-bold" value="{{ number_format($invoice->total_amount - $invoice->paid_amount, 2) }}" readonly disabled>
+                                    <input type="text" class="form-control text-danger fw-bold" value="{{ isset($invoice->total_amount) && isset($invoice->paid_amount) ? number_format($invoice->total_amount - $invoice->paid_amount, 2) : 'N/A' }}" readonly disabled>
                                 </div>
                             </div>
 
