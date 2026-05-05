@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Offline | Digitex Management</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon.png">
+    
+    <style>
+        /* Standalone CSS to perfectly mimic your Auth layout without external files */
+        body {
+            background-color: #f5f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .auth-container {
+            width: 100%;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            width: 100%;
+            max-width: 450px;
+            padding: 40px 30px;
+            box-sizing: border-box;
+        }
+        .logo-container {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .logo {
+            max-width: 150px;
+        }
+        h4 {
+            color: #333;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+        .offline-alert {
+            background-color: #ffe5e5;
+            color: #d32f2f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            border: 1px solid #ffcdd2;
+            line-height: 1.4;
+        }
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #333;
+            font-weight: 600;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e1e1e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            background-color: #f8f9fa;
+            color: #999;
+            cursor: not-allowed;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: #002B80;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px;
+            width: 100%;
+            font-size: 15px;
+            font-weight: 500;
+            opacity: 0.6;
+            cursor: not-allowed;
+            margin-top: 10px;
+        }
+        .spinner {
+            display: none;
+            margin: 20px auto 0;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(0,43,128,0.2);
+            border-radius: 50%;
+            border-top-color: #002B80;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="auth-container">
+        <div class="card">
+            <div class="logo-container">
+                <!-- Uses cached favicon as fallback if main logo fails to load -->
+                <img src="https://e-digitex.com/public/images/smsslogonew.png" alt="Digitex" class="logo" onerror="this.src='/images/favicon.png'">
+            </div>
+            
+            <h4>Welcome Back</h4>
+            
+            <div class="offline-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M10.6 19.3a3.7 3.7 0 0 1-5.3 0 3.7 3.7 0 0 1 0-5.3l1.4-1.4"></path><path d="M14.8 14.8l1.4-1.4a3.7 3.7 0 0 0-5.3-5.3l-1.4 1.4"></path><line x1="8.5" y1="15.5" x2="15.5" y2="8.5"></line><line x1="2" y1="2" x2="22" y2="22"></line></svg>
+                <div>
+                    <strong>You are offline.</strong><br>
+                    Internet connection is required to access the platform.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email / Username</label>
+                <input type="text" class="form-control" disabled value="Offline Mode">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-control" disabled value="********">
+            </div>
+
+            <button type="button" class="btn-primary" disabled>Sign Me In</button>
+            
+            <div class="spinner" id="reconnectSpinner"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Listen for the connection to come back online
+        window.addEventListener('online', () => {
+            document.querySelector('.offline-alert').style.display = 'none';
+            document.getElementById('reconnectSpinner').style.display = 'block';
+            document.querySelector('h4').innerText = 'Reconnecting...';
+            
+            // Automatically reload the page to get them back to their requested route
+            setTimeout(() => {
+                window.location.reload();
+            }, 800);
+        });
+    </script>
+</body>
+</html>

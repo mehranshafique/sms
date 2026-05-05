@@ -587,7 +587,7 @@
                 }
             });
         </script>
-        <script>
+         <script>
             // PWA Service Worker Registration
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
@@ -598,6 +598,41 @@
                     });
                 });
             }
+
+            // GLOBAL IN-APP OFFLINE LISTENER
+            window.addEventListener('offline', function() {
+                if (document.getElementById('global-offline-toast')) return;
+                
+                const toast = document.createElement('div');
+                toast.id = 'global-offline-toast';
+                toast.style.cssText = `
+                    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
+                    background-color: #ff4c4c; color: #ffffff; padding: 12px 24px; 
+                    border-radius: 8px; z-index: 999999; box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+                    font-family: 'Poppins', sans-serif; font-size: 14px; display: flex; 
+                    align-items: center; gap: 10px; animation: slideDown 0.3s ease-out;
+                `;
+                
+                toast.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 19.3a3.7 3.7 0 0 1-5.3 0 3.7 3.7 0 0 1 0-5.3l1.4-1.4"></path><path d="M14.8 14.8l1.4-1.4a3.7 3.7 0 0 0-5.3-5.3l-1.4 1.4"></path><line x1="8.5" y1="15.5" x2="15.5" y2="8.5"></line><line x1="2" y1="2" x2="22" y2="22"></line></svg> 
+                    Internet connection lost. You are currently offline.
+                `;
+                
+                // Add keyframes if not exists
+                if (!document.getElementById('offline-toast-keyframes')) {
+                    const style = document.createElement('style');
+                    style.id = 'offline-toast-keyframes';
+                    style.innerHTML = `@keyframes slideDown { from { top: -50px; opacity: 0; } to { top: 20px; opacity: 1; } }`;
+                    document.head.appendChild(style);
+                }
+
+                document.body.appendChild(toast);
+            });
+
+            window.addEventListener('online', function() {
+                const toast = document.getElementById('global-offline-toast');
+                if (toast) toast.remove();
+            });
         </script>
 </body>
 </html>
