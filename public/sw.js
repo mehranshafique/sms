@@ -1,12 +1,10 @@
-const CACHE_NAME = 'digitex-pwa-cache-v4';
+const CACHE_NAME = 'digitex-pwa-cache-v5';
 const OFFLINE_URL = '/offline.html';
 
+// Keep this list local and minimal! If one file fails, the cache aborts.
 const urlsToCache = [
     OFFLINE_URL,
-    '/images/favicon.png',
-    '/images/icon-192.png',
-    '/images/icon-512.png',
-    'https://e-digitex.com/public/images/smsslogonew.png' // Pre-cache the logo for the offline page
+    '/images/favicon.png'
 ];
 
 // Install the service worker and cache core assets
@@ -16,28 +14,22 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Opened cache and saving offline UI');
+                console.log('Caching offline fallback...');
                 return cache.addAll(urlsToCache);
             })
+            .catch(error => console.error('Cache install error:', error))
     );
 });
 
-// Cache and return requests
+// Intercept requests
 self.addEventListener('fetch', event => {
-    // We only want to intercept page navigations (HTML requests)
-    if (event.request.mode === 'navigate') {
-        event.respondWith(
-            fetch(event.request).catch(error => {
-                // If the network request fails (user is offline), serve the static offline UI
-                console.log('Network failed, serving offline page.');
-                return caches.match(OFFLINE_URL);
-            })
-        );
-    } else {
-        // For other requests (CSS, JS), try network first, fallback to cache
+    // Only intercept HTML page requests (Navigations)
+    if (event.request.mode === 'navigate' || (event.request.method === 'GET' && event.request.headers.get('accept').includes('text/html'))) {
         event.respondWith(
             fetch(event.request).catch(() => {
-                return caches.match(event.request);
+                // Network failed, return the offline page from cache
+                console.log('Serving offline.html fallback');
+                return caches.match(OFFLINE_URL);
             })
         );
     }
@@ -47,12 +39,12 @@ self.addEventListener('fetch', event => {
 self.addEventListener('activate', event => {
     event.waitUntil(clients.claim()); 
     
-    const cacheWhitelist = [CACHE_NAME];
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
-                    if (cacheWhitelist.indexOf(cacheName) === -1) {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
