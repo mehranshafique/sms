@@ -136,4 +136,9 @@ return [
     'unauthorized' => "⛔ Unauthorized access.",
     'attempt_count' => "(Attempt :count/3)",
     'error_occurred' => "⚠️ An error occurred. Please try again.",
+    // In your resources/lang/en/chatbot.php
+    'financial_restriction_msg' => 'Access denied. You have an outstanding fee balance of :amount. Please settle your account to download academic results.',
+    'no_results_found' => 'No exam marks have been published for you yet in the current academic session.',
+    'keywords_not_found' => 'No keywords configured yet. Please contact administration.',
+    'student_id_invalid ' => 'The provided Student ID is invalid. Please try again.',
 ];

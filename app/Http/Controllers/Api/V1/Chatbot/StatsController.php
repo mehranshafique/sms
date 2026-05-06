@@ -7,8 +7,10 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\AcademicSession;
 use App\Models\ExamRecord;
+use App\Models\InstitutionSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\DB;
 
 class StatsController extends ChatbotBaseController
 {
@@ -71,6 +73,26 @@ class StatsController extends ChatbotBaseController
 
         if (!$student) return $this->sendError(__('chatbot.student_not_found'), 404);
 
+        // --- 1. FINANCIAL RESTRICTION CHECK ---
+        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
+                        ->where('key', 'block_reports_on_debt')
+                        ->value('value');
+                        
+        if ($isBlocked == '1') {
+            $unpaid = Invoice::where('student_id', $student->id)
+                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                ->sum(DB::raw('total_amount - paid_amount'));
+                
+            if ($unpaid > 0) {
+                // Return 200 so the chatbot parses the error gracefully as a text reply instead of a system crash
+                $currency = config('app.currency_symbol', '$');
+                $formattedDebt = $currency . ' ' . number_format($unpaid, 2);
+                
+                return $this->sendError(__('chatbot.financial_restriction_msg', ['amount' => $formattedDebt]), 200);
+            }
+        }
+
+        // --- 2. SESSION & EMPTY BULLETIN CHECK ---
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         if (!$currentSession) return $this->sendError(__('chatbot.no_session'), 200);
 
@@ -78,9 +100,10 @@ class StatsController extends ChatbotBaseController
             ->whereHas('exam', fn($q) => $q->where('academic_session_id', $currentSession->id))
             ->exists();
 
-        // Return 200 with error message if logic valid but data empty
         if (!$hasMarks) return $this->sendError(__('chatbot.no_results_found'), 200);
 
+        // --- 3. URL GENERATION ---
+        // Generates the exact same PDF view used in the web dashboard, ensuring perfect symmetry.
         $downloadUrl = URL::signedRoute('reports.bulletin', [
             'student_id' => $student->id,
             'mode' => 'single',
