@@ -66,8 +66,10 @@ class ChatbotWebhookController extends Controller
      */
     private function validateAndFormat($from, $to, $body, $provider)
     {
-        // 1. Validate Content
-        if (empty(trim($body ?? ''))) {
+         // 1. Validate Content
+        // CRITICAL FIX: Do not use empty(), because empty('0') evaluates to true in PHP!
+        $cleanBody = trim($body ?? '');
+        if ($cleanBody === '') {
             Log::warning("[$provider] Validation Failed: Empty message body.");
             return null;
         }

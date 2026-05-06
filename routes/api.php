@@ -58,7 +58,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 // Public Chatbot Webhook (No Auth Middleware, as providers call this)
-Route::post('/v1/chatbot/webhook/{provider}', [ChatbotWebhookController::class, 'handle']);
+// Route::post('/v1/chatbot/webhook/{provider}', [ChatbotWebhookController::class, 'handle']);
+Route::prefix('v1/chatbot/webhook')->group(function () {
+    // Universal Webhook Endpoint handling Infobip, Twilio, Meta, Mobishastra
+    // Target URL for config: https://account.digitexvx.com/api/v1/chatbot/webhook/infobip
+    Route::post('{provider}', [ChatbotWebhookController::class, 'handle']);
+});
+
 Route::get('/v1/chatbot/webhook/{provider}', [ChatbotWebhookController::class, 'handle']); // Fallback for GET-based webhooks (Mobishastra)
 
 Route::post('/v1/chatbot/webhook', [ChatbotInteractionController::class, 'handleWebhook']);
