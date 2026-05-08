@@ -79,7 +79,7 @@ class RolePermissionSeeder extends Seeder
             
             // Security & Config
             'Audit Logs' => ['view'],
-            'Settings' => ['manage'],
+            'Settings' => ['view', 'manage'],
             'Subscriptions' => ['view', 'create', 'update', 'delete'],
             'Packages' => ['view', 'create', 'update', 'delete'],
             'Sms Templates' => ['view', 'update'],

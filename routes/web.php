@@ -491,13 +491,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- CHATBOT SETTINGS ---
     // Accessible by Super Admin, Head Officer, and School Admin
-    Route::middleware(['auth', RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->prefix('chatbot')->name('chatbot.')->group(function () {
-        Route::get('/settings', [ChatbotSettingController::class, 'index'])->name('settings.index');
-        Route::post('/config', [ChatbotSettingController::class, 'updateConfig'])->name('config.update');
-        Route::post('/keywords', [ChatbotSettingController::class, 'storeKeyword'])->name('keywords.store');
-        Route::put('/keywords/{id}', [ChatbotSettingController::class, 'updateKeyword'])->name('keywords.update');
-        Route::delete('/keywords/{id}', [ChatbotSettingController::class, 'destroyKeyword'])->name('keywords.destroy');
-    });
+    // Route::middleware(['auth', RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->prefix('chatbot')->name('chatbot.')->group(function () {
+    //     Route::get('/settings', [ChatbotSettingController::class, 'index'])->name('settings.index');
+    //     Route::post('/config', [ChatbotSettingController::class, 'updateConfig'])->name('config.update');
+    //     Route::post('/keywords', [ChatbotSettingController::class, 'storeKeyword'])->name('keywords.store');
+    //     Route::put('/keywords/{id}', [ChatbotSettingController::class, 'updateKeyword'])->name('keywords.update');
+    //     Route::delete('/keywords/{id}', [ChatbotSettingController::class, 'destroyKeyword'])->name('keywords.destroy');
+    // });
+
+
+     // ----------------------------------------------------
+    // CHATBOT SETTINGS & SESSIONS (NEW)
+    // ----------------------------------------------------
+    Route::group(['prefix' => 'chatbot'], function() {
+        // Settings & Configurations
+        Route::get('/settings', [ChatbotSettingController::class, 'index'])->name('chatbot.settings.index');
+        Route::post('/settings/config', [ChatbotSettingController::class, 'storeConfig'])->name('chatbot.settings.store_config');
+        
+        // Keywords Management
+        Route::post('/keywords', [ChatbotSettingController::class, 'storeKeyword'])->name('chatbot.keywords.store');
+        Route::put('/keywords/{id}', [ChatbotSettingController::class, 'updateKeyword'])->name('chatbot.keywords.update');
+        Route::delete('/keywords/{id}', [ChatbotSettingController::class, 'destroyKeyword'])->name('chatbot.keywords.destroy');
+        
+        // Chat Sessions Management (Datatables and Action)
+        Route::get('/sessions/data', [ChatbotSettingController::class, 'getSessions'])->name('chatbot.sessions.data');
+        Route::delete('/sessions/{id}', [ChatbotSettingController::class, 'destroySession'])->name('chatbot.sessions.destroy');
+        Route::delete('/sessions/bulk-delete', [ChatbotSettingController::class, 'bulkDestroySession'])->name('chatbot.sessions.bulk_destroy');
+        
+        });
+
     // =========================================================================
     // 7. VOTING & ELECTIONS MODULE
     // =========================================================================
@@ -560,6 +582,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('/recharge', [ConfigurationController::class, 'recharge'])->name('configuration.recharge');
             });
         });
+
+    
 
 }); // End Auth Middleware Group
 
