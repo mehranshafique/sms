@@ -61,6 +61,8 @@ return [
     ],
     'my_elections' => 'My Elections',
 
+    'attendance_analytics' => 'Attendance Analytics',
+    'children_attendance' => 'Children Attendance',
     // School Admin Keys
     'academics' => 'Academics',
     'sessions' => [

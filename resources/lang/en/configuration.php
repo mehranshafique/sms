@@ -128,4 +128,12 @@ return [
     'success' => 'Success',
     'error' => 'Error',
     'saving' => 'Saving...',
+    'saving_changes' => 'Saving changes...',
+    'chatbot_free_interactions' => 'Chatbot Free Interactions',
+    'chatbot_free_help' => 'If enabled, this institution will not be charged SMS/WhatsApp credits for automated chatbot interactions, report deliveries, or hardware notifications.',
+    'attendance_hardware' => 'Attendance Hardware',
+    'late_margin_time' => 'Late Margin Time (minutes)',
+    'late_margin_help' => 'Grace period after school start time before marking as late.',
+    'double_tap_wait_time' => 'Double Tap Wait Time (minutes)',
+    'double_tap_help' => 'Minimum minutes between check-in and check-out to prevent accidental double taps.',
 ];

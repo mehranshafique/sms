@@ -44,6 +44,7 @@ use App\Http\Controllers\StaffLeaveController;
 use App\Http\Controllers\StudentPromotionController;
 use App\Http\Controllers\TransferController; 
 use App\Http\Controllers\StudentRequestController;
+use App\Http\Controllers\AttendanceReportController;
 // --- Controllers: Examinations ---
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMarkController;
@@ -81,6 +82,7 @@ use App\Http\Middleware\CheckModuleAccess;
 // =========================================================================
 
 Route::redirect('/', '/login');
+
 
 Route::get('/change-language', function (\Illuminate\Http\Request $request) {
     $locale = $request->query('language');
@@ -290,6 +292,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/pickup/generate', [PickupWebController::class, 'generateParentQr'])->name('pickups.generate_parent');
     });
 
+    // --- Unified Attendance Analytics Flow ---
+    Route::get('/attendance/analytics', [AttendanceReportController::class, 'index'])->name('attendance.analytics.index');
+    Route::get('/attendance/analytics/student/{id?}', [AttendanceReportController::class, 'studentReport'])->name('attendance.analytics.show');
+    
     // HR / Staff Management
     Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);

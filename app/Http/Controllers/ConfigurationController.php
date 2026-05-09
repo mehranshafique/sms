@@ -51,8 +51,14 @@ class ConfigurationController extends BaseController
             'end_date' => $settings['academic_end_date'] ?? date('Y-07-01'),
             'start_time' => $settings['school_start_time'] ?? '08:00',
             'end_time' => $settings['school_end_time'] ?? '15:00',
+            'late_margin_time' => $settings['late_margin_time'] ?? '0',
+            'double_tap_wait_time' => $settings['double_tap_wait_time'] ?? '15',
         ];
         
+        $billingSettings = [
+            'chatbot_free_interactions' => $settings['chatbot_free_interactions'] ?? '0',
+        ];
+
         $institution = $institutionId ? Institution::find($institutionId) : Auth::user(); 
         $allModules = Module::all();
         $enabledModules = isset($settings['enabled_modules']) ? json_decode($settings['enabled_modules'], true) : [];
@@ -70,7 +76,7 @@ class ConfigurationController extends BaseController
         return view('configuration.index', compact(
             'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 
             'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
-            'allowedSms', 'allowedWa', 'isSuperAdmin', 'events'
+            'allowedSms', 'allowedWa', 'isSuperAdmin', 'events', 'billingSettings'
         ));
     }
 
@@ -189,6 +195,10 @@ class ConfigurationController extends BaseController
             }
         }
 
+        // ADDED: Super Admin Billing Privileges
+        if (Auth::user()->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value)) {
+            $this->saveSetting($institutionId, 'chatbot_free_interactions', $request->chatbot_free_interactions ?? '0');
+        }
         return response()->json(['message' => __('configuration.sms_settings_updated')]);
     }
 
@@ -244,7 +254,7 @@ class ConfigurationController extends BaseController
     public function updateSchoolYear(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        $keys = ['academic_start_date', 'academic_end_date', 'school_start_time', 'school_end_time'];
+        $keys = ['academic_start_date', 'academic_end_date', 'school_start_time', 'school_end_time', 'late_margin_time', 'double_tap_wait_time'];
         
         foreach($keys as $key) {
             $this->saveSetting($institutionId, $key, $request->input($key), 'academics');
@@ -260,6 +270,26 @@ class ConfigurationController extends BaseController
         
         $this->saveSetting($institutionId, 'enabled_modules', json_encode($modules), 'system');
         return response()->json(['message' => __('configuration.settings_saved')]);
+    }
+
+    public function updateYear(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        
+        $this->saveSetting($institutionId, 'academic_start_date', $request->academic_start_date);
+        $this->saveSetting($institutionId, 'academic_end_date', $request->academic_end_date);
+        $this->saveSetting($institutionId, 'school_start_time', $request->school_start_time);
+        $this->saveSetting($institutionId, 'school_end_time', $request->school_end_time);
+        
+        // ADDED: Hardware and Attendance Timings
+        if ($request->has('late_margin_time')) {
+            $this->saveSetting($institutionId, 'late_margin_time', $request->late_margin_time);
+        }
+        if ($request->has('double_tap_wait_time')) {
+            $this->saveSetting($institutionId, 'double_tap_wait_time', $request->double_tap_wait_time);
+        }
+
+        return response()->json(['message' => __('configuration.success_saved') ?? 'Saved successfully']);
     }
 
     /**

@@ -260,6 +260,10 @@
                                 <li><a class="{{ request()->routeIs('attendance.*') ? 'mm-active' : '' }}" href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.title') }}</a></li>
                             @endif
 
+                            @if($user->can('student_attendance.view'))
+                                <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">{{ __('sidebar.attendance_analytics') ?? 'Analytics & Reports' }}</a></li>
+                            @endif
+
                             @if($hasModule('student_promotion') && $user->can('student_promotion.create'))
                                 <li><a class="{{ request()->routeIs('promotions.*') ? 'mm-active' : '' }}" href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
                             @endif
@@ -480,6 +484,13 @@
                     <li><a class="ai-icon {{ request()->routeIs('assignments.*') ? 'mm-active' : '' }}" href="{{ route('assignments.index') }}"><i class="la la-tasks"></i><span class="nav-text">{{ __('sidebar.assignments.my_assignments') }}</span></a></li>
                 @endif
 
+                <!-- 2. For STUDENTS: Place this in the Student Section (Part 4) -->
+                @if($isStudent)
+                    <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.show') }}">
+                        <i class="la la-chart-pie"></i>
+                        <span class="nav-text">{{ __('sidebar.my_attendance_analytics') ?? 'My Attendance Analytics' }}</span>
+                    </a></li>
+                @endif
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('marks.my_marks') ? 'mm-active' : '' }}" href="{{ route('marks.my_marks') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
                 
@@ -501,6 +512,13 @@
             {{-- ============================================================= --}}
             @if($isGuardian)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
+                <!-- 3. For PARENTS: Place this in the Guardian Section (Part 5) -->
+                @if($isGuardian)
+                    <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">
+                        <i class="la la-chart-pie"></i>
+                        <span class="nav-text">{{ __('sidebar.children_attendance') ?? 'Children Attendance' }}</span>
+                    </a></li>
+                @endif
                 <li><a class="ai-icon {{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
             @endif
 

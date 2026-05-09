@@ -10,18 +10,23 @@ class StudentAttendance extends Model
     use HasFactory;
 
     protected $fillable = [
-        'institution_id',
+         'institution_id',
         'academic_session_id',
         'class_section_id',
         'student_id',
         'attendance_date',
         'status',
         'remarks',
-        'marked_by'
+        'marked_by',
+        'check_in',
+        'check_out',
+        'method'
     ];
 
     protected $casts = [
         'attendance_date' => 'date',
+        'check_in' => 'datetime',
+        'check_out' => 'datetime',
     ];
 
     public function student()

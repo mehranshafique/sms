@@ -121,6 +121,22 @@ class SmsTemplateSeeder extends Seeder
                 'available_tags' => '$ParentName, $StudentName, $ClassName, $ExamDetails, $SchoolName',
                 'is_active' => true,
             ],
+
+             // --- RFID Access Control Templates ---
+            [
+                'event_key' => 'student_arrival',
+                'name' => 'RFID Gate: Student Arrival',
+                'body' => 'Dear $ParentName, your child $StudentName has securely arrived at $SchoolName at $Time on $Date.',
+                'available_tags' => '$ParentName, $StudentName, $Time, $Date, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'student_departure',
+                'name' => 'RFID Gate: Student Departure',
+                'body' => 'Dear $ParentName, your child $StudentName has safely exited $SchoolName at $Time on $Date.',
+                'available_tags' => '$ParentName, $StudentName, $Time, $Date, $SchoolName',
+                'is_active' => true,
+            ],
         ];
 
         

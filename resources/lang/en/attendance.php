@@ -84,4 +84,45 @@ return [
     'error_occurred' => 'Error Occurred',
     'validation_error' => 'Validation Error',
     'success' => 'Success!',
+
+    // Analytics & Reporting
+    'analytics_title' => 'Attendance Analytics',
+    'select_student_subtitle' => 'Select a student to view their comparative attendance performance.',
+    'student_list' => 'Student List',
+    'admission_no' => 'Admission No.',
+    'student_name' => 'Student Name',
+    'class' => 'Class',
+    'action' => 'Action',
+    'not_assigned' => 'Not Assigned',
+    'view_analytics' => 'View Analytics',
+    'back_to_list' => 'Back to List',
+    'comparative_report' => 'Comparative Report',
+    
+    // Periods
+    'this_week' => 'This Week',
+    'this_month' => 'This Month',
+    'this_quarter' => 'This Quarter',
+    'this_semester' => 'This Semester',
+    'this_year' => 'This Year',
+    'period_week' => 'Week',
+    'period_month' => 'Month',
+    'period_quarter' => 'Quarter',
+    'period_semester' => 'Semester',
+    'period_year' => 'Year',
+
+    // Dashboard Cards
+    'average_arrival_time' => 'Average Arrival Time',
+    'punctuality_score' => 'Punctuality Score',
+    'participation_frequency' => 'Participation Frequency',
+    
+    // Logs Table
+    'detailed_logs' => 'Detailed Scan Logs',
+    'date' => 'Date',
+    'status' => 'Status',
+    'check_in_hardware' => 'Check In (Hardware)',
+    'check_out_hardware' => 'Check Out (Hardware)',
+    'on_time' => 'On Time',
+    'late' => 'Late',
+    'absent' => 'Absent',
+    'no_hardware_logs' => 'No hardware/scan logs found for this period.',
 ];

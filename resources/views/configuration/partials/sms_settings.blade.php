@@ -53,9 +53,21 @@
                             </div>
                         </div>
                     </div>
+                    
                 </div>
             @endif
-
+            @if(auth()->user()->hasRole('Super Admin'))
+                    <div class="row">
+                        <div class="col-md-12 mb-3 border-bottom pb-3">
+                            <div class="form-check form-switch custom-switch">
+                                <input type="hidden" name="chatbot_free_interactions" value="0">
+                                <input class="form-check-input" style="width: 3.5em; height: 1.75em; cursor: pointer;" type="checkbox" name="chatbot_free_interactions" id="chatbot_free_interactions" value="1" {{ (isset($billingSettings['chatbot_free_interactions']) && $billingSettings['chatbot_free_interactions'] == '1') ? 'checked' : '' }}>
+                                <label class="form-check-label fw-bold ms-2 mt-1 text-dark" style="cursor: pointer;" for="chatbot_free_interactions">{{ __('configuration.chatbot_free_interactions') ?? 'Enable Unlimited Free Chatbot/Messaging (Bypass Billing)' }}</label>
+                            </div>
+                            <small class="text-muted d-block mt-2 ms-5">{{ __('configuration.chatbot_free_help') ?? 'If enabled, this institution will not be charged SMS/WhatsApp credits for automated chatbot interactions, report deliveries, or hardware notifications.' }}</small>
+                        </div>
+                    </div>
+                    @endif
             {{-- SECTION 2: ACTIVE PROVIDER SELECTION --}}
             <div class="row mb-4 p-3 bg-light rounded mx-0 border">
                 <div class="col-md-6">

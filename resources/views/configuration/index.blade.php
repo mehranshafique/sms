@@ -20,16 +20,6 @@
 @endsection
 
 @section('content')
-
-@php
-    // Safe fallback to resolve undefined variable $institution 
-    // This ensures $institution->name doesn't crash the header
-    if (!isset($institution) || !$institution) {
-        $instId = session('active_institution_id') === 'global' ? null : (session('active_institution_id') ?: auth()->user()->institute_id);
-        $institution = $instId ? \App\Models\Institution::find($instId) : auth()->user();
-    }
-@endphp
-
 <div class="content-body">
     <div class="container-fluid">
         
@@ -237,6 +227,21 @@
                                         <div class="col-md-6 mb-3"><label class="form-label">{{ __('configuration.school_start_time') }}</label><div class="input-group clockpicker"><input type="text" name="school_start_time" class="form-control" value="{{ $schoolYear['start_time'] }}" required><span class="input-group-text"><i class="far fa-clock"></i></span></div></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">{{ __('configuration.school_end_time') }}</label><div class="input-group clockpicker"><input type="text" name="school_end_time" class="form-control" value="{{ $schoolYear['end_time'] }}" required><span class="input-group-text"><i class="far fa-clock"></i></span></div></div>
                                     </div>
+                                    
+                                    <h5 class="text-primary mb-3 mt-2"><i class="fa fa-fingerprint me-2"></i>{{ __('configuration.attendance_hardware') ?? 'Attendance & Hardware Settings' }}</h5>
+                                    <div class="row mb-4">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">{{ __('configuration.late_margin_time') ?? 'Late Margin Time (Minutes)' }}</label>
+                                            <input type="number" name="late_margin_time" class="form-control" value="{{ $schoolYear['late_margin_time'] }}" min="0" required>
+                                            <small class="text-muted">{{ __('configuration.late_margin_help') ?? 'Grace period after start time before marking a student as Late.' }}</small>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">{{ __('configuration.double_tap_wait_time') ?? 'Double-Tap Cooldown (Minutes)' }}</label>
+                                            <input type="number" name="double_tap_wait_time" class="form-control" value="{{ $schoolYear['double_tap_wait_time'] }}" min="1" required>
+                                            <small class="text-muted">{{ __('configuration.double_tap_help') ?? 'Wait time required before a check-out scan is accepted.' }}</small>
+                                        </div>
+                                    </div>
+                                    
                                     <button type="submit" class="btn btn-primary submit-btn">{{ __('configuration.save_changes') }}</button>
                                 </form>
                             </div>

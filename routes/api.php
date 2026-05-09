@@ -2,7 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AttendanceApiController;
+use App\Http\Controllers\Api\V1\AttendanceApiController;
 use App\Http\Controllers\Api\StudentApiController;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\V1\Chatbot\VerificationController;
@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\V1\Chatbot\ChatbotInteractionController;
 | Secure endpoints for Terminals (QR/NFC) and Chatbots.
 |
 */
+
+
 
 // Public / Auth
 // Route::post('/login', [AuthApiController::class, 'login']);
@@ -97,5 +99,16 @@ Route::prefix('v1')->group(function () {
     Route::prefix('pickup')->middleware(['auth:sanctum', 'tenant.api'])->group(function () {
         Route::post('/scan', [PickupScanController::class, 'scan']);
     });
+
+    
+    /*
+|--------------------------------------------------------------------------
+| Public Hardware / Access Control Endpoints (V1 API)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('hardware')->group(function () {
+    // Universal endpoint for RFID Gates, NFC Readers, and POS QR Scanners
+    Route::post('/attendance/scan', [AttendanceApiController::class, 'store']);
+});
 
 });

@@ -54,6 +54,14 @@ class ChatbotLogicService
     }
 
     /**
+     * Sanitizes dynamic strings to prevent WhatsApp API Markdown crashes
+     */
+    protected function sanitizeMarkdown($text) {
+        if (empty($text)) return '';
+        return str_replace(['*', '_', '~', '`', '[', ']'], ' ', $text);
+    }
+
+    /**
      * Main Processor & Router
      */
     public function processMessage(array $data)
@@ -67,7 +75,6 @@ class ChatbotLogicService
 
             $session = ChatSession::where('phone_number', $phone)->first();
 
-            // 1. Session Expiry Check
             if ($session && now()->gt($session->expires_at)) {
                 Log::info("Chatbot Lifecycle: Session Expired", ['phone' => $phone, 'expired_at' => $session->expires_at]);
                 $session->delete();
@@ -76,17 +83,14 @@ class ChatbotLogicService
                 return $this->reply($phone, $msg, null);
             }
 
-            // 2. No Session -> Initialize
             if (!$session) {
                 Log::info("Chatbot Lifecycle: No active session. Triggering handleNewSession.");
                 return $this->handleNewSession($phone, $text);
             }
 
-            // 3. Keep-Alive & Locale
             $session->update(['last_interaction_at' => now(), 'expires_at' => now()->addMinutes(30)]);
             if ($session->locale) app()->setLocale($session->locale);
 
-            // Strict Command Cleaner (Removes hidden spaces, emojis, or formatting from keyboards)
             $cmd = preg_replace('/[^a-z0-9]/', '', strtolower($text));
 
             Log::info("Chatbot Lifecycle: Active Session Found", [
@@ -95,7 +99,6 @@ class ChatbotLogicService
                 'cleaned_command' => $cmd
             ]);
 
-            // 4. Global Interceptor for "0" (Return to Menu) & "99" (Language)
             if ($session->status !== 'AWAITING_ID' && $session->status !== 'AWAITING_OTP' && $session->status !== 'CHILD_SELECT') {
                 if ($cmd === '0' || $cmd === '00' || $cmd === 'menu') {
                     Log::info("Chatbot Lifecycle: User triggered return to Main Menu.");
@@ -114,7 +117,6 @@ class ChatbotLogicService
                 }
             }
 
-            // 5. State Machine Router
             switch ($session->status) {
                 case 'AWAITING_ID':
                     return $this->processIdentity($session, $text);
@@ -128,7 +130,6 @@ class ChatbotLogicService
                 case 'ACTIVE':
                     return $this->processActiveMenu($session, $cmd);
                     
-                // --- STUDENT SUB-FLOWS ---
                 case 'PAYMENT_METHOD_SELECT':
                     return $this->processPaymentMethod($session, $cmd);
                 case 'DEROGATION_DURATION_SELECT':
@@ -144,13 +145,11 @@ class ChatbotLogicService
                 case 'STUDENT_SCHEDULE_SELECT':
                     return $this->processStudentScheduleSelect($session, $cmd);
                 
-                // --- LMD SUB-FLOWS ---
                 case 'LMD_FEES_SELECT':
                     return $this->processLmdFees($session, $cmd);
                 case 'LMD_RESULTS_SELECT':
                     return $this->processLmdResults($session, $cmd);
 
-                // --- STAFF/HR SUB-FLOWS ---
                 case 'TEACHER_ATTENDANCE_OTP':
                     return $this->processTeacherAttendanceOtp($session, $text);
                 case 'TEACHER_SALARY_ADVANCE_PERCENTAGE':
@@ -160,7 +159,6 @@ class ChatbotLogicService
                 case 'TEACHER_LEAVE_TYPE':
                     return $this->processTeacherLeaveType($session, $cmd);
 
-                // --- HEADOFF / ADMIN SUB-FLOWS ---
                 case 'HEADOFF_EFFECTIF_SELECT':
                     return $this->processHeadOffEffectif($session, $cmd);
                 case 'HEADOFF_FINANCE_SELECT':
@@ -179,11 +177,9 @@ class ChatbotLogicService
             }
 
         } catch (\Throwable $e) {
-            // GLOBAL CRASH FALLBACK MESSAGE
             Log::error("Chatbot Critical Error: " . $e->getMessage(), [
                 'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
+                'line' => $e->getLine()
             ]);
             
             if (isset($data['from'])) {
@@ -205,9 +201,7 @@ class ChatbotLogicService
         
         Log::info("Chatbot Flow: New Session Initiated", ['text_received' => $textLower]);
 
-        // 1. Staff Global Wakeup Keywords
         if (in_array($textLower, ['admin', 'agent', 'staff', 'digitex'])) {
-            Log::info("Chatbot Flow: Admin wake-up keyword detected.");
             ChatSession::create([
                 'phone_number' => $phone,
                 'status' => 'AWAITING_ID',
@@ -220,15 +214,9 @@ class ChatbotLogicService
             return $this->reply($phone, "Bienvenue, veuillez entrer votre identifiant (Shortcode).", null);
         }
 
-        // 2. Strict Check for Admin-Saved Configurations & Keywords
         $keyword = ChatbotKeyword::whereRaw('LOWER(keyword) = ?', [$textLower])->first();
         
         if ($keyword) {
-            Log::info("Chatbot Flow: Custom Keyword Matched", [
-                'keyword' => $keyword->keyword, 
-                'institution_id' => $keyword->institution_id
-            ]);
-
             $locale = $keyword->language ?? 'fr'; 
             app()->setLocale($locale);
 
@@ -243,14 +231,11 @@ class ChatbotLogicService
                 'user_type' => 'student'
             ]);
 
-            // Strictly enforce the custom welcome message defined by the admin
             $msg = $keyword->welcome_message ?? ($locale === 'en' ? "Welcome! Please enter your Admission Number (Student) or Phone Number (Parent)." : "Bienvenue! Veuillez entrer votre Matricule (Elève) ou votre numéro de téléphone (Parent).");
             return $this->reply($phone, $msg, $keyword->institution_id);
         }
 
-        // 3. System Global Fallback Keywords
         if (in_array($textLower, ['bonjour', 'hello', 'menu', 'start', 'salut', 'hi', 'portail'])) {
-            Log::info("Chatbot Flow: Global fallback keyword detected.");
             $locale = in_array($textLower, ['hello', 'hi', 'start']) ? 'en' : 'fr'; 
             app()->setLocale($locale);
 
@@ -269,7 +254,6 @@ class ChatbotLogicService
             return $this->reply($phone, $msg, null);
         }
 
-        // 4. Ultimate Fallback (Command Unknown)
         Log::warning("Chatbot Flow: Keyword totally unrecognized", ['text' => $textLower]);
         $fallbackMsg = "👋 Mot clé introuvable. Envoyez le mot-clé de votre école (ou 'Bonjour' / 'Hello') pour commencer.\n\nKeyword not found. Send your school's keyword (or 'Hello') to begin.";
         return $this->reply($phone, $fallbackMsg, null);
@@ -280,7 +264,6 @@ class ChatbotLogicService
         $isEn = $session->locale === 'en';
         Log::info("Chatbot Auth: Processing Identity", ['input' => $input, 'user_type' => $session->user_type]);
 
-        // --- 1. STAFF AUTHENTICATION ---
         if ($session->user_type === 'staff') {
             $user = User::where('username', $input)->orWhere('shortcode', $input)->first();
             
@@ -291,15 +274,12 @@ class ChatbotLogicService
                 elseif ($user->hasRole(RoleEnum::SCHOOL_ADMIN->value)) $role = 'school_admin';
                 elseif ($user->hasRole(RoleEnum::TEACHER->value)) $role = 'teacher';
 
-                Log::info("Chatbot Auth: Staff Member Found", ['user_id' => $user->id, 'mapped_role' => $role]);
                 $session->update(['user_type' => $role]);
                 return $this->sendOtp($session, $user, 'staff');
             }
-            Log::warning("Chatbot Auth: Staff Identity Failed", ['input' => $input]);
             return $this->incrementAttempts($session, $isEn ? "Invalid ID." : "Identifiant invalide.");
         }
 
-        // --- 2. PARENT AUTHENTICATION ---
         $cleanInput = preg_replace('/[^0-9]/', '', $input);
         
         if (strlen($cleanInput) >= 8) { 
@@ -309,19 +289,15 @@ class ChatbotLogicService
                 ->first();
 
             if ($parent) {
-                Log::info("Chatbot Auth: Parent Found via Phone", ['parent_id' => $parent->id]);
                 return $this->sendOtp($session, $parent, 'parent');
             }
         }
 
-        // --- 3. SINGLE STUDENT AUTHENTICATION ---
         $student = Student::with('parent')->where('admission_number', $input)->first();
         if ($student) {
-            Log::info("Chatbot Auth: Student Found via Admission Number", ['student_id' => $student->id]);
             return $this->sendOtp($session, $student, 'student');
         }
 
-        Log::warning("Chatbot Auth: Parent/Student Identity Failed", ['input' => $input]);
         return $this->incrementAttempts($session, $isEn ? "ID or Phone Number not found." : "Matricule ou Numéro de téléphone introuvable.");
     }
 
@@ -331,7 +307,6 @@ class ChatbotLogicService
         $phone = null;
         $isEn = $session->locale === 'en';
         
-        // Safe null-checks applied to prevent Attempt to read property on null crash
         if ($type === 'student') {
             $parent = $model->parent;
             $phone = $parent ? ($parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone) : null;
@@ -343,7 +318,6 @@ class ChatbotLogicService
         }
 
         if (!$phone) {
-            Log::error("Chatbot Auth Error: No target phone number exists to deliver OTP.", ['model_id' => $model->id, 'type' => $type]);
             return $this->reply($session->phone_number, $isEn ? "No registered phone found for OTP." : "Aucun téléphone enregistré pour l'envoi de l'OTP.", $session->institution_id);
         }
         
@@ -358,7 +332,11 @@ class ChatbotLogicService
             'identifier_input' => $type 
         ]);
 
-        Log::info("Chatbot Auth: Dispatching OTP", ['target_phone' => $cleanPhone, 'otp' => $otp]);
+        // --- NEW: Scalable OTP SMS Billing Rule ---
+        if (!$this->authorizeChatbotInteraction($session->institution_id, 'sms')) {
+            Log::error("Chatbot Auth Error: Insufficient SMS credits to send OTP.");
+            return $this->reply($session->phone_number, $isEn ? "⚠️ Service unavailable: Insufficient school messaging credits." : "⚠️ Service indisponible: crédits de l'école épuisés.", $session->institution_id);
+        }
 
         $otpMsg = $isEn ? "Your Digitex OTP code is: $otp" : "Votre code OTP Digitex est: $otp";
         $this->notificationService->performSend($cleanPhone, $otpMsg, $session->institution_id, true, 'sms');
@@ -370,13 +348,9 @@ class ChatbotLogicService
 
     protected function processOtp($session, $input)
     {
-        // Strict mathematical cleaner for OTP verification (removes keyboard artifacts and spaces)
         $cleanInput = preg_replace('/[^0-9]/', '', $input);
-        Log::info("Chatbot Auth: Verifying OTP", ['received_raw' => $input, 'cleaned' => $cleanInput, 'expected' => $session->otp]);
-
+        
         if ($cleanInput === (string)$session->otp) {
-            Log::info("Chatbot Auth: OTP Verified Successfully.");
-
             if ($session->user_type === 'parent') {
                 $session->update(['status' => 'CHILD_SELECT', 'otp' => null]);
                 return $this->processChildSelection($session, null);
@@ -385,7 +359,6 @@ class ChatbotLogicService
             return $this->routeToMainMenu($session);
         }
 
-        Log::warning("Chatbot Auth: OTP Verification Failed.", ['session_id' => $session->id]);
         $isEn = $session->locale === 'en';
         return $this->incrementAttempts($session, $isEn ? "Invalid OTP code." : "Code OTP invalide.");
     }
@@ -400,7 +373,6 @@ class ChatbotLogicService
         $parent = StudentParent::with('students.institution')->find($session->user_id);
         
         if (!$parent || $parent->students->isEmpty()) {
-            Log::error("Chatbot Flow Error: Parent has no linked children.", ['parent_id' => $session->user_id]);
             $session->delete();
             return $this->reply($session->phone_number, $isEn ? "Error: No children linked to this parent account." : "Erreur: Aucun enfant n'est lié à ce compte parent.", $session->institution_id);
         }
@@ -410,8 +382,9 @@ class ChatbotLogicService
         if (is_null($text)) {
             $msg = $isEn ? "👨‍👩‍👧 *My Children*\n\nPlease select a student profile by replying with the corresponding number:\n\n" : "👨‍👩‍👧 *Mes Enfants*\n\nVeuillez sélectionner le dossier d'un élève en répondant par le numéro correspondant:\n\n";
             foreach ($children as $index => $child) {
-                $school = optional($child->institution)->name ?? 'School';
-                $msg .= ($index + 1) . "️⃣ " . $child->full_name . " (" . $school . ")\n";
+                $school = $this->sanitizeMarkdown(optional($child->institution)->name ?? 'School');
+                $name = $this->sanitizeMarkdown($child->full_name);
+                $msg .= ($index + 1) . "️⃣ " . $name . " (" . $school . ")\n";
             }
             return $this->reply($session->phone_number, $msg, $session->institution_id);
         }
@@ -421,8 +394,6 @@ class ChatbotLogicService
         
         if (isset($children[$selectedIndex])) {
             $selectedChild = $children[$selectedIndex];
-            Log::info("Chatbot Flow: Parent selected child", ['child_id' => $selectedChild->id]);
-
             $session->update([
                 'user_id' => $selectedChild->id,
                 'user_type' => 'student',
@@ -441,22 +412,13 @@ class ChatbotLogicService
 
     protected function routeToMainMenu($session)
     {
-        Log::info("Chatbot Route: Determining Main Menu", ['user_type' => $session->user_type, 'user_id' => $session->user_id]);
-
         if ($session->user_type === 'student') {
             $student = Student::with('institution')->find($session->user_id);
-            
-            if (!$student) {
-                Log::error("Chatbot Route Error: Student profile vanished.", ['user_id' => $session->user_id]);
-                return $this->reply($session->phone_number, "⚠️ Profile Error. Please type 'Menu' to restart.", $session->institution_id);
-            }
+            if (!$student) return $this->reply($session->phone_number, "⚠️ Profile Error. Please type 'Menu' to restart.", $session->institution_id);
 
-            // CRITICAL FIX: Safe Enum extraction to prevent PHP 8.1 silent crash
             $type = optional($student->institution)->type ?? 'primary';
             $typeValue = ($type instanceof InstitutionType) ? $type->value : (is_object($type) ? $type->value : $type);
             
-            Log::info("Chatbot Route: Student Institution Type identified", ['type' => $typeValue]);
-
             if (in_array($typeValue, ['university', 'lmd'])) {
                 return $this->sendLmdMenu($session);
             }
@@ -471,7 +433,6 @@ class ChatbotLogicService
         $isEn = $session->locale === 'en';
 
         if (in_array($cmd, ['logout', 'quitter', 'exit'])) {
-            Log::info("Chatbot Flow: User invoked logout command.");
             $session->delete();
             return $this->reply($session->phone_number, $isEn ? "👋 Session closed." : "👋 Session fermée.", $session->institution_id);
         }
@@ -480,7 +441,6 @@ class ChatbotLogicService
             $student = Student::with('institution')->find($session->user_id);
             if (!$student) return $this->reply($session->phone_number, "⚠️ Profile Error.", $session->institution_id);
             
-            // Safe Enum extraction
             $type = optional($student->institution)->type ?? 'primary';
             $typeValue = ($type instanceof InstitutionType) ? $type->value : (is_object($type) ? $type->value : $type);
 
@@ -505,16 +465,12 @@ class ChatbotLogicService
     protected function getMenuText($session) {
         try {
             $student = Student::find($session->user_id);
-            if (!$student) {
-                Log::error("Chatbot Menu Error: Student not found.", ['user_id' => $session->user_id]);
-                return "⚠️ Error: Profile missing.";
-            }
+            if (!$student) return "⚠️ Error: Profile missing.";
             
             $enrollment = $student->enrollments()->latest()->first();
             $info = "";
             $year = date('Y');
             
-            // Crash Prevention: Null safe chaining 
             if ($enrollment) {
                 $className = optional($enrollment->classSection)->name ?? '';
                 $gradeName = optional(optional($enrollment->classSection)->gradeLevel)->name ?? '';
@@ -524,11 +480,12 @@ class ChatbotLogicService
 
             $isEn = $session->locale === 'en';
             
-            $school = optional($student->institution)->name ?? 'School';
-            $name = $student->full_name;
+            $school = $this->sanitizeMarkdown(optional($student->institution)->name ?? 'School');
+            $name = $this->sanitizeMarkdown($student->full_name);
+            $infoStr = $this->sanitizeMarkdown($info);
 
             if ($isEn) {
-                $menu = "🎓 *Student / Parent Portal*\n🏫 {$school}\n👤 {$name}\n📘 {$info} ({$year})\n\n";
+                $menu = "🎓 *Student / Parent Portal*\n🏫 {$school}\n👤 {$name}\n📘 {$infoStr} ({$year})\n\n";
                 $menu .= "Please choose an option:\n\n";
                 $menu .= "1️⃣ Homework & Assignments\n";
                 $menu .= "2️⃣ Check Fee Balance\n";
@@ -541,7 +498,7 @@ class ChatbotLogicService
                 $menu .= "9️⃣ Generate Pickup QR Code\n";
                 $menu .= "\n9️⃣9️⃣ 🌐 Changer de langue (FR)\n🚪 Send *logout* to quit";
             } else {
-                $menu = "🎓 *Portail Parents / Élèves*\n🏫 {$school}\n👤 {$name}\n📘 {$info} ({$year})\n\n";
+                $menu = "🎓 *Portail Parents / Élèves*\n🏫 {$school}\n👤 {$name}\n📘 {$infoStr} ({$year})\n\n";
                 $menu .= "Veuillez choisir une option:\n\n";
                 $menu .= "1️⃣ e-TD / e-Devoir\n";
                 $menu .= "2️⃣ Connaitre les frais (Balance)\n";
@@ -557,7 +514,6 @@ class ChatbotLogicService
 
             return $menu;
         } catch (\Exception $e) {
-            Log::error("Chatbot getMenuText Crash: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return "⚠️ Erreur lors du chargement du menu. Envoyez '0' pour recommencer.";
         }
     }
@@ -597,7 +553,6 @@ class ChatbotLogicService
                 $msg = $isEn ? "🔐 *Generate Pickup QR*\n1️⃣ Request OTP Code" : "🔐 *Générer un QR Code de Retrait*\n1️⃣ Demander un code de sécurité OTP";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
             default: 
-                Log::warning("Chatbot Flow: Unhandled Primary Student Menu Command", ['cmd' => $cmd]);
                 $msg = $isEn ? "Invalid option. Please check the menu and try again." : "Option invalide. Veuillez vérifier le menu et réessayer.";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
         }
@@ -605,8 +560,6 @@ class ChatbotLogicService
 
     protected function processStudentScheduleSelect($session, $cmd) {
         $student = Student::find($session->user_id);
-        if (!$student) return $this->reply($session->phone_number, "Error: Profile missing.", $session->institution_id);
-        
         $isEn = $session->locale === 'en';
 
         if ($cmd == '1') {
@@ -627,8 +580,8 @@ class ChatbotLogicService
             $student = Student::find($session->user_id);
             if (!$student) return "⚠️ Error: Profile missing.";
             
-            $school = optional($student->institution)->name ?? 'Université';
-            $name = $student->full_name;
+            $school = $this->sanitizeMarkdown(optional($student->institution)->name ?? 'Université');
+            $name = $this->sanitizeMarkdown($student->full_name);
             $isEn = $session->locale === 'en';
 
             if ($isEn) {
@@ -651,7 +604,6 @@ class ChatbotLogicService
 
             return $menu;
         } catch (\Exception $e) {
-            Log::error("Chatbot getLmdMenuText Crash: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return "⚠️ Erreur lors du chargement du menu. Envoyez '0' pour recommencer.";
         }
     }
@@ -683,15 +635,12 @@ class ChatbotLogicService
             case '4': 
                 return $this->getHomework($session, $student);
             default: 
-                Log::warning("Chatbot Flow: Unhandled LMD Menu Command", ['cmd' => $cmd]);
                 return $this->reply($session->phone_number, ($isEn ? "Invalid option. Please check the menu and try again." : "Option invalide. Veuillez vérifier le menu et réessayer.") . $this->getReturnPrompt($session), $session->institution_id);
         }
     }
 
     protected function processLmdFees($session, $cmd) {
         $student = Student::find($session->user_id);
-        if (!$student) return $this->reply($session->phone_number, "Error: Profile missing.", $session->institution_id);
-        
         $isEn = $session->locale === 'en';
 
         if ($cmd == '1' || $cmd == '2' || $cmd == '3') {
@@ -702,11 +651,8 @@ class ChatbotLogicService
         return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
     }
 
-    // --- REPAIRED NATIVE LMD TRANSCRIPT DOWNLOAD ---
     protected function processLmdResults($session, $cmd) {
         $student = Student::find($session->user_id);
-        if (!$student) return $this->reply($session->phone_number, "Error: Profile missing.", $session->institution_id);
-        
         $institutionId = $session->institution_id;
         $isEn = $session->locale === 'en';
         
@@ -722,8 +668,6 @@ class ChatbotLogicService
         }
 
         try {
-            Log::info("Chatbot LMD Transcript: Financial Block Passed");
-            
             $originalUser = Auth::user();
             $originalSession = session('active_institution_id');
             
@@ -742,28 +686,19 @@ class ChatbotLogicService
                 return $this->reply($session->phone_number, ($isEn ? "No records found." : "Aucun enregistrement trouvé."), $institutionId);
             }
 
-            Log::info("Chatbot LMD Transcript: PDF Generated");
-
             $pdfContent = $response->getContent();
-
             $filename = "Transcript_{$student->admission_number}_" . time() . ".pdf";
             $path = "temp/{$filename}";
             
-            if (!Storage::disk('public')->exists('temp')) {
-                Storage::disk('public')->makeDirectory('temp');
-            }
+            if (!Storage::disk('public')->exists('temp')) Storage::disk('public')->makeDirectory('temp');
             Storage::disk('public')->put($path, $pdfContent);
             
             $downloadUrl = asset('storage/' . $path);
-
             $caption = $isEn ? "Here is your LMD Transcript." : "Voici votre relevé LMD.";
-            $caption .= $this->getReturnPrompt($session);
             
-            $this->notificationService->performSendFile($session->phone_number, $downloadUrl, $caption, $filename, $institutionId);
-            return response()->json(['status' => 'success']);
+            return $this->replyWithFile($session->phone_number, $downloadUrl, $caption . $this->getReturnPrompt($session), $filename, $institutionId);
 
         } catch (\Exception $e) {
-            Log::error("Chatbot Transcript Generation Error: " . $e->getMessage());
             if (isset($originalUser) && $originalUser) Auth::login($originalUser);
             if (isset($originalSession)) session(['active_institution_id' => $originalSession]);
             
@@ -785,7 +720,8 @@ class ChatbotLogicService
             $role = $session->user_type; 
             $isEn = $session->locale === 'en';
             
-            $menu = $isEn ? "👤 *Welcome, " . $user->name . "*\n\n" : "👤 *Bienvenue, " . $user->name . "*\n\n";
+            $name = $this->sanitizeMarkdown($user->name);
+            $menu = $isEn ? "👤 *Welcome, " . $name . "*\n\n" : "👤 *Bienvenue, " . $name . "*\n\n";
 
             if ($role === 'super_admin') {
                 $menu .= $isEn ? "🛠 *Super Admin Menu*\n\n1️⃣ Global Finance\n2️⃣ Subscriptions\n3️⃣ Schools\n4️⃣ SMS/WhatsApp Credits"
@@ -808,7 +744,6 @@ class ChatbotLogicService
                            : "\n\n9️⃣9️⃣ 🌐 Change Language (EN)\n🚪 Envoyer *logout* pour quitter";
             return $menu;
         } catch (\Exception $e) {
-            Log::error("Chatbot getStaffMenuText Error: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return "⚠️ Erreur lors du chargement du menu. Envoyez '0' pour recommencer.";
         }
     }
@@ -825,7 +760,6 @@ class ChatbotLogicService
         
         $isEn = $session->locale === 'en';
 
-        // --- SUPER ADMIN LOGIC ---
         if ($role === 'super_admin') {
             switch($cmd) {
                 case '1': 
@@ -848,12 +782,10 @@ class ChatbotLogicService
                     $msg = $isEn ? "📲 *Credits*\nSMS Allocated: $sms\nWhatsApp Allocated: $wa" : "📲 *Crédits*\nSMS Alloués: $sms\nWhatsApp Alloués: $wa";
                     return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
                 default: 
-                    Log::warning("Chatbot Flow: Unhandled Super Admin Command", ['cmd' => $cmd]);
                     return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
             }
         }
 
-        // --- HEAD OFFICER V2 LOGIC ---
         elseif ($role === 'head_officer') {
             switch($cmd) {
                 case '1': 
@@ -874,12 +806,10 @@ class ChatbotLogicService
                     $msg = $isEn ? "🏆 *Rankings*\n1️⃣ By Enrollment\n2️⃣ By Revenue" : "🏆 *Classements*\n1️⃣ Par Effectif\n2️⃣ Par Paiements";
                     return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
                 default: 
-                    Log::warning("Chatbot Flow: Unhandled Head Officer Command", ['cmd' => $cmd]);
                     return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
             }
         }
         
-        // --- DIRECTEUR V2 LOGIC ---
         elseif ($role === 'school_admin') {
             switch($cmd) {
                 case '1': 
@@ -900,12 +830,10 @@ class ChatbotLogicService
                     $msg = $isEn ? "✅ *Today's Attendance*\nPresent students: $present" : "✅ *Présences du Jour*\nElèves présents aujourd'hui: $present";
                     return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
                 default: 
-                    Log::warning("Chatbot Flow: Unhandled Director Command", ['cmd' => $cmd]);
                     return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
             }
         }
         
-        // --- TEACHER V2 LOGIC ---
         elseif ($role === 'teacher') {
             $staffId = optional($user->staff)->id;
             if (!$staffId) {
@@ -916,6 +844,11 @@ class ChatbotLogicService
                 case '1': 
                     $otp = rand(100000, 999999);
                     $session->update(['status' => 'TEACHER_ATTENDANCE_OTP', 'otp' => $otp]);
+                    
+                    if (!$this->authorizeChatbotInteraction($session->institution_id, 'sms')) {
+                        return $this->reply($session->phone_number, $isEn ? "⚠️ Cannot send OTP: Insufficient SMS credits." : "⚠️ Envoi impossible: crédits SMS épuisés.", $session->institution_id);
+                    }
+
                     $otpMsg = $isEn ? "Your OTP to mark attendance is: $otp" : "Votre code OTP pour pointer la présence est : $otp";
                     $this->notificationService->performSend($user->phone ?? $session->phone_number, $otpMsg, $session->institution_id, true, 'sms');
                     
@@ -925,7 +858,7 @@ class ChatbotLogicService
                     $today = strtolower(now()->format('l'));
                     $tt = Timetable::with(['subject', 'classSection'])->where('teacher_id', $staffId)->where('day_of_week', $today)->orderBy('start_time')->get();
                     $msg = $isEn ? "📅 *My Timetable (Today)*\n\n" : "📅 *Mes Horaires (Aujourd'hui)*\n\n";
-                    $msg .= $tt->isEmpty() ? ($isEn ? "No classes scheduled." : "Aucun cours.") : $tt->map(fn($t) => "🕒 {$t->start_time->format('H:i')} - {$t->end_time->format('H:i')}\n📖 {$t->subject->name} ({$t->classSection->name})")->join("\n\n");
+                    $msg .= $tt->isEmpty() ? ($isEn ? "No classes scheduled." : "Aucun cours.") : $tt->map(fn($t) => "🕒 {$t->start_time->format('H:i')} - " . optional($t->subject)->name)->join("\n\n");
                     return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
                 case '3': 
                     return $this->getTeacherExams($session, $staffId);
@@ -938,12 +871,10 @@ class ChatbotLogicService
                     $msg = $isEn ? "💸 *Salary Advance*\nChoose percentage:\n1️⃣ 50%\n2️⃣ 30%\n3️⃣ 20%\n4️⃣ 10%" : "💸 *Avance sur salaire*\nChoisissez le pourcentage:\n1️⃣ 50%\n2️⃣ 30%\n3️⃣ 20%\n4️⃣ 10%";
                     return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
                 default: 
-                    Log::warning("Chatbot Flow: Unhandled Teacher Command", ['cmd' => $cmd]);
                     return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
             }
         }
 
-        Log::warning("Chatbot Flow: Unknown Command fallback triggered globally.");
         $fallback = $isEn ? "Unknown command. Please reply with a valid number from the menu." : "Commande inconnue. Veuillez répondre avec un numéro valide du menu.";
         return $this->reply($session->phone_number, $fallback . $this->getReturnPrompt($session), $session->institution_id);
     }
@@ -1035,9 +966,9 @@ class ChatbotLogicService
             $studentIds = StudentEnrollment::where('class_section_id', $class->id)->where('status', 'active')->pluck('student_id');
             if($studentIds->isEmpty()) continue;
             
-            if ($t == '2') { // Payments
+            if ($t == '2') { 
                 $val = Payment::where('institution_id', $institutionId)->whereHas('invoice', fn($q) => $q->whereIn('student_id', $studentIds))->sum('amount');
-            } else { // Effectif (1)
+            } else { 
                 $val = $studentIds->count();
             }
             $ranking[] = ['name' => $class->name, 'val' => $val];
@@ -1119,6 +1050,10 @@ class ChatbotLogicService
         
         $session->update(['status' => 'TEACHER_SALARY_ADVANCE_OTP', 'identifier_input' => $percentages[$cmd], 'otp' => $otp]);
         
+        if (!$this->authorizeChatbotInteraction($session->institution_id, 'sms')) {
+            return $this->reply($session->phone_number, $isEn ? "⚠️ Cannot send OTP: Insufficient SMS credits." : "⚠️ Envoi impossible: crédits SMS épuisés.", $session->institution_id);
+        }
+
         $otpMsg = $isEn ? "Your OTP for the salary advance is: $otp" : "Votre code OTP pour l'avance sur salaire est : $otp";
         $this->notificationService->performSend($user->phone ?? $session->phone_number, $otpMsg, $session->institution_id, true, 'sms');
         
@@ -1315,7 +1250,6 @@ class ChatbotLogicService
         return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
     }
 
-    // --- REPAIRED NATIVE BULLETIN DOWNLOAD ---
     protected function getReportCard($session, $student) {
         $institutionId = $session->institution_id;
         $isEn = $session->locale === 'en';
@@ -1336,26 +1270,20 @@ class ChatbotLogicService
                 }
             }
 
-            Log::info("Chatbot Report Card Flow: Passed Financial Restriction Check", ['student_id' => $student->id, 'institution_id' => $institutionId]);
-
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
-            Log::info("Chatbot Report Card Flow: Enrollment Check", ['found' => $enrollment ? true : false]);
             if(!$enrollment) return $this->reply($session->phone_number, ($isEn ? "Not enrolled." : "Non inscrit.") . $this->getReturnPrompt($session), $institutionId);
 
             $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
-            Log::info("Chatbot Report Card Flow: Academic Session Check", ['session_id' => optional($currentSession)->id ?? null]);
             if (!$currentSession) return $this->reply($session->phone_number, ($isEn ? "No active session." : "Aucune session active.") . $this->getReturnPrompt($session), $institutionId);
 
             $hasMarks = ExamRecord::where('student_id', $student->id)
                 ->whereHas('exam', fn($q) => $q->where('academic_session_id', $currentSession->id))->exists();
-            Log::info("Chatbot Report Card Flow: Marks Check", ['has_marks' => $hasMarks]);
 
             if (!$hasMarks) {
                 $msg = $isEn ? "📭 No exam results are available for this session yet." : "📭 Aucun résultat n'est encore disponible pour cette session.";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
             }
 
-            // Generate PDF natively and save to public temp folder
             $originalUser = Auth::user();
             $originalSession = session('active_institution_id');
             
@@ -1363,9 +1291,6 @@ class ChatbotLogicService
             if ($superAdmin) Auth::login($superAdmin);
             session(['active_institution_id' => $institutionId]);
 
-            $cycle = optional(optional($student->classSection)->gradeLevel)->education_cycle ?? 'primary';
-            $cycleValue = is_object($cycle) ? $cycle->value : $cycle;
-            
             $reportRequest = \Illuminate\Http\Request::create('/dummy', 'GET', [
                 'student_id' => $student->id,
                 'mode' => 'single',
@@ -1376,7 +1301,6 @@ class ChatbotLogicService
             $controller = app(\App\Http\Controllers\ReportController::class);
             $response = $controller->bulletin($reportRequest);
             
-            // Restore Auth & Session immediately
             if ($originalUser) Auth::login($originalUser); else Auth::logout();
             session(['active_institution_id' => $originalSession]);
 
@@ -1384,26 +1308,17 @@ class ChatbotLogicService
                 return $this->reply($session->phone_number, ($isEn ? "Report not available yet." : "Le bulletin n'est pas encore disponible."), $institutionId);
             }
 
-            Log::info("Chatbot Report Card Flow: Natively Generating PDF.");
-
             $html = $response->render();
-            
-            // 1. Strip the print button to clean up the PDF
             $html = preg_replace('/<div class="print-controls".*?<\/div>/s', '', $html);
 
-            // 2. CONVERT FLEXBOX SUMMARY INTO A STRICT HTML TABLE
-            // DOMPDF utterly fails at Flexbox. We mathematically rewrite the divs into table tags.
-            $html = str_replace('<div class="summary-container">', '<table style="width: 100%; margin-top: 10px; border-top: 1.5px solid #000; border-collapse: collapse; page-break-inside: avoid;"><tbody>', $html);
-            $html = str_replace('<div class="summary-row">', '<tr>', $html);
-            $html = preg_replace('/<span class="label">(.*?)<\/span>/s', '<td style="width: 60%; text-align: left; font-weight: bold; padding: 4px 0; border-bottom: 1px solid #ddd; font-size: 10px; color: #444;">$1</td>', $html);
-            $html = preg_replace('/<span class="val">(.*?)<\/span>/s', '<td style="width: 20%; text-align: center; font-weight: bold; border-bottom: 1px solid #ddd; font-size: 11px; color: #000;">$1</td>', $html);
-            $html = preg_replace('/<\/td>\s*<\/div>/s', '</td></tr>', $html);
-            $html = preg_replace('/<\/tr>\s*<\/div>\s*<div class="footer-wrapper"/s', '</tr></tbody></table><div class="footer-wrapper"', $html);
-
-            // 3. INJECT DOMPDF COMPATIBILITY CSS
             $dompdfStyles = '
             <style>
                 table { table-layout: fixed !important; width: 100% !important; }
+                .summary-container { display: table !important; width: 100% !important; margin-top: 10px; border-top: 1.5px solid #000; border-collapse: collapse; page-break-inside: avoid; }
+                .summary-row { display: table-row !important; width: 100% !important; }
+                .summary-row .label, .summary-row .val { display: table-cell !important; padding: 4px 0 !important; vertical-align: middle !important; border-bottom: 1px solid #ddd; }
+                .summary-row .label { width: 60% !important; text-align: left !important; font-weight: bold; color: #444; font-size: 10px; }
+                .summary-row .val { width: 20% !important; text-align: center !important; font-weight: bold; font-size: 11px; color: #000; }
                 .footer-wrapper { position: relative; height: 90px; margin-top: 25px; width: 100%; display: block; clear: both; page-break-inside: avoid; }
                 .qr-code { position: absolute; left: 0; bottom: 0; width: 60px; height: 60px; }
                 .signature-block { position: absolute; right: 0; bottom: 0; width: 150px; text-align: center; font-size: 10px; }
@@ -1411,11 +1326,8 @@ class ChatbotLogicService
             </style>
             ';
             $html = str_replace('</head>', $dompdfStyles . '</head>', $html);
-            
-            // 4. MERGE TABLES FOR STRICT COLUMN ALIGNMENT
             $html = preg_replace('/<\/table>\s*<div class="divider-bottom"><\/div>\s*<table>\s*<tbody>/i', '<tbody>', $html);
 
-            // 5. FIX SVG STAMP FOR DOMPDF
             $schoolName = strtoupper(\Illuminate\Support\Str::limit(optional($student->institution)->name ?? __('reports.direction') ?? 'DIRECTION', 14, ''));
             $fallbackStamp = '<div style="position: absolute; left: 50%; margin-left: -35px; bottom: 0px; width: 70px; height: 70px; border: 2px solid #2585c9; border-radius: 35px; text-align: center; color: #2585c9; font-family: Helvetica, Arial, sans-serif; z-index: 5; background-color: rgba(255,255,255,0.7); box-sizing: border-box;">
                 <div style="margin-top: 18px; font-size: 11px; font-weight: bold; letter-spacing: 1px;">BULLETIN</div>
@@ -1433,23 +1345,15 @@ class ChatbotLogicService
             $filename = "Bulletin_{$student->admission_number}_" . time() . ".pdf";
             $path = "temp/{$filename}";
             
-            if (!Storage::disk('public')->exists('temp')) {
-                Storage::disk('public')->makeDirectory('temp');
-            }
+            if (!Storage::disk('public')->exists('temp')) Storage::disk('public')->makeDirectory('temp');
             Storage::disk('public')->put($path, $pdfContent);
             
             $downloadUrl = asset('storage/' . $path);
-
             $caption = $isEn ? "Here is your report card." : "Voici votre bulletin de notes.";
-            $caption .= $this->getReturnPrompt($session);
             
-            Log::info("Chatbot Report Card Flow: File delivery triggered via notification service. URL: " . $downloadUrl);
-            $this->notificationService->performSendFile($session->phone_number, $downloadUrl, $caption, $filename, $institutionId);
-            return response()->json(['status' => 'success']);
+            return $this->replyWithFile($session->phone_number, $downloadUrl, $caption . $this->getReturnPrompt($session), $filename, $institutionId);
 
         } catch (\Exception $e) {
-            Log::error("Chatbot Report Card Generation Error: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            // Failsafe restore
             if (isset($originalUser) && $originalUser) Auth::login($originalUser);
             if (isset($originalSession)) session(['active_institution_id' => $originalSession]);
             
@@ -1490,7 +1394,6 @@ class ChatbotLogicService
         return $this->reply($session->phone_number, ($isEn ? "📋 *Miscellaneous Fees:*\n" : "📋 *Frais Connexes:*\n") . $list . $this->getReturnPrompt($session), $session->institution_id);
     }
     
-    // QR Code Logic
     protected function processQrOtpConfirm($session, $cmd) {
         $isEn = $session->locale === 'en';
         if ($cmd == '1') {
@@ -1498,8 +1401,12 @@ class ChatbotLogicService
             $session->update(['otp' => $otp, 'status' => 'QR_OTP_INPUT']);
             
             $student = Student::find($session->user_id);
-            $this->notificationService->sendOtpNotification($student, $otp);
             
+            if (!$this->authorizeChatbotInteraction($session->institution_id, 'sms')) {
+                return $this->reply($session->phone_number, $isEn ? "⚠️ Cannot send OTP: Insufficient SMS credits." : "⚠️ Envoi impossible: crédits SMS épuisés.", $session->institution_id);
+            }
+            
+            $this->notificationService->sendOtpNotification($student, $otp);
             return $this->reply($session->phone_number, $isEn ? "An OTP has been sent." : "Un code a été envoyé.", $session->institution_id);
         }
         return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
@@ -1523,16 +1430,9 @@ class ChatbotLogicService
 
             $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($token);
             $caption = ($isEn ? "Pickup QR for " : "QR de retrait pour ") . $student->first_name;
-            
-            $this->notificationService->performSendImage(
-                $session->phone_number, 
-                $qrUrl, 
-                $caption . $this->getReturnPrompt($session), 
-                $session->institution_id
-            );
-            
             $session->update(['status' => 'ACTIVE', 'otp' => null]);
-            return response()->json(['status' => 'success']);
+            
+            return $this->replyWithImage($session->phone_number, $qrUrl, $caption . $this->getReturnPrompt($session), $session->institution_id);
         }
         return $this->reply($session->phone_number, ($isEn ? "❌ Invalid OTP." : "❌ OTP invalide.") . $this->getReturnPrompt($session), $session->institution_id);
     }
@@ -1612,8 +1512,63 @@ class ChatbotLogicService
     }
 
     // =================================================================================
-    // --- 8. BASE UTILS ---
+    // --- 8. BASE UTILS & SCALABLE BILLING ENGINE ---
     // =================================================================================
+
+    /**
+     * Future-proof billing authorization for chatbot interactions.
+     * Evaluates custom gateways, free tiers, subscriptions, and credit balances.
+     */
+    protected function authorizeChatbotInteraction($institutionId, $channel = 'whatsapp')
+    {
+        if (!$institutionId) {
+            return true; 
+        }
+
+        $institution = Institution::find($institutionId);
+        if (!$institution) return true;
+
+        // RULE 1: Custom Third-Party Providers (BYO-Account)
+        $hasCustomKey = InstitutionSetting::get($institutionId, "{$channel}_api_key") 
+                     || InstitutionSetting::get($institutionId, "{$channel}_token");
+        $gatewayMode = InstitutionSetting::get($institutionId, "{$channel}_gateway_mode", 'system');
+
+        if ($hasCustomKey || strtolower($gatewayMode) === 'custom') {
+            Log::info("Chatbot Billing: Bypassed. Institution uses their own {$channel} provider.");
+            return true;
+        }
+
+        // RULE 2: Free Chatbot Tier / Waivers
+        $isFree = InstitutionSetting::get($institutionId, 'chatbot_free_interactions', 0);
+        if ($isFree == 1) {
+            Log::info("Chatbot Billing: Bypassed. Institution has a free chatbot waiver.");
+            return true;
+        }
+
+        // RULE 3: Separate Chatbot Quota (Future Evolution hook)
+        $dedicatedChatbotCredits = InstitutionSetting::get($institutionId, 'chatbot_dedicated_credits');
+        if ($dedicatedChatbotCredits !== null && is_numeric($dedicatedChatbotCredits)) {
+            if ($dedicatedChatbotCredits > 0) {
+                InstitutionSetting::set($institutionId, 'chatbot_dedicated_credits', $dedicatedChatbotCredits - 1);
+                Log::info("Chatbot Billing: Deducted 1 Dedicated Credit. Remaining: " . ($dedicatedChatbotCredits - 1));
+                return true;
+            }
+            Log::warning("Chatbot Billing: Out of Dedicated Chatbot Credits.", ['institution_id' => $institutionId]);
+            return false;
+        }
+
+        // RULE 4: Standard Message Credit Deduction (Current System)
+        $creditField = ($channel === 'sms') ? 'sms_credits' : 'whatsapp_credits';
+        
+        if ($institution->$creditField > 0) {
+            $institution->decrement($creditField);
+            Log::info("Chatbot Billing: Deducted 1 {$channel} credit. Remaining: " . ($institution->$creditField));
+            return true;
+        }
+
+        Log::warning("Chatbot Billing: Institution out of {$channel} credits.", ['institution_id' => $institutionId]);
+        return false;
+    }
 
     protected function incrementAttempts($session, $msg)
     {
@@ -1627,15 +1582,61 @@ class ChatbotLogicService
         return $this->reply($session->phone_number, $msg . " (" . $session->attempts . "/3)", $session->institution_id);
     }
 
-    protected function reply($to, $message, $institutionId)
+    protected function reply($to, $message, $institutionId, $channel = 'whatsapp')
     {
         try {
-            Log::info("Chatbot Webhook Target Reached - Sending Reply", ['to' => $to, 'message' => $message]);
-            $this->notificationService->performSend($to, $message, $institutionId, false, 'whatsapp');
+            if (!$this->authorizeChatbotInteraction($institutionId, $channel)) {
+                Log::error("Chatbot Delivery Aborted: Institution #{$institutionId} has exhausted their message credits.");
+                return response()->json(['status' => 'error', 'message' => 'Insufficient credits']);
+            }
+
+            Log::info("Chatbot Webhook Target Reached - Sending Reply", ['to' => $to, 'institution_id' => $institutionId]);
+            $this->notificationService->performSend($to, $message, $institutionId, false, $channel);
+            
             return response()->json(['status' => 'success']);
         } catch (\Exception $e) {
-            Log::error("Chatbot Reply Delivery Error: " . $e->getMessage());
+            Log::error("Chatbot Reply Delivery Error (Primary Attempt): " . $e->getMessage());
+            
+            if ($institutionId !== null) {
+                try {
+                    Log::warning("Chatbot Fallback: Attempting to send via Global Gateway.");
+                    $this->notificationService->performSend($to, $message, null, false, $channel);
+                    return response()->json(['status' => 'success', 'note' => 'Sent via global fallback']);
+                } catch (\Exception $fallback_e) {
+                    Log::error("Chatbot Reply Delivery Error (Fallback Attempt): " . $fallback_e->getMessage());
+                }
+            }
             return response()->json(['status' => 'error', 'message' => 'Failed to send reply']);
+        }
+    }
+
+    protected function replyWithFile($to, $fileUrl, $caption, $filename, $institutionId, $channel = 'whatsapp') 
+    {
+        try {
+            if (!$this->authorizeChatbotInteraction($institutionId, $channel)) {
+                Log::error("Chatbot Delivery Aborted: Institution #{$institutionId} has exhausted their credits.");
+                return response()->json(['status' => 'error', 'message' => 'Insufficient credits']);
+            }
+            $this->notificationService->performSendFile($to, $fileUrl, $caption, $filename, $institutionId);
+            return response()->json(['status' => 'success']);
+        } catch (\Exception $e) {
+             Log::error("Chatbot File Delivery Error: " . $e->getMessage());
+             return response()->json(['status' => 'error']);
+        }
+    }
+
+    protected function replyWithImage($to, $imageUrl, $caption, $institutionId, $channel = 'whatsapp') 
+    {
+        try {
+            if (!$this->authorizeChatbotInteraction($institutionId, $channel)) {
+                Log::error("Chatbot Delivery Aborted: Institution #{$institutionId} has exhausted their credits.");
+                return response()->json(['status' => 'error', 'message' => 'Insufficient credits']);
+            }
+            $this->notificationService->performSendImage($to, $imageUrl, $caption, $institutionId);
+            return response()->json(['status' => 'success']);
+        } catch (\Exception $e) {
+             Log::error("Chatbot Image Delivery Error: " . $e->getMessage());
+             return response()->json(['status' => 'error']);
         }
     }
 }
