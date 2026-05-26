@@ -12,7 +12,6 @@ return [
     'success_generated' => 'Invoices generated successfully.',
     'success_generated_count' => ':count Invoices generated successfully.',
     
-    // Table Headers
     'invoice_list' => 'Invoice List',
     'invoice_number' => 'Invoice #',
     'student' => 'Student',
@@ -23,81 +22,74 @@ return [
     'status' => 'Status',
     'action' => 'Action',
     
-    // Form Labels
-    'configuration' => 'Configuration', // Added
+    'configuration' => 'Configuration',
     'target_grade' => 'Target Grade Level', 
     'target_section' => 'Target Section',
     'select_grade' => 'Select Grade',
     'select_section' => 'Select Section',
     'select_grade_first' => 'Select Grade First',
     
-    'select_students' => 'Select Students', // Added
-    'select_all' => 'Select All', // Added
-    'search_student' => 'Search student name...', // Added
-    'select_class_first_msg' => 'Please select a class section above.', // Added
-    'students_selected_count' => ':count students selected', // Added
-    'students_selected_suffix' => 'students selected', // Added for dynamic JS update
+    'select_students' => 'Select Students',
+    'select_all' => 'Select All',
+    'search_student' => 'Search student name...',
+    'select_class_first_msg' => 'Please select a class section above.',
+    'students_selected_count' => ':count students selected',
+    'students_selected_suffix' => 'students selected',
     
     'select_fees' => 'Select Fees',
-    'search_fees' => 'Search fees...', // Added
-    'fees_will_load' => 'Fees will load here.', // Added
-    'fee_bundle_help' => 'Check multiple items to bundle fees.', // Added
+    'search_fees' => 'Search fees...',
+    'fees_will_load' => 'Fees will load here.',
+    'fee_bundle_help' => 'Check multiple items to bundle fees.',
     'fee_help' => 'Invoices will be generated for all active students in the selected section.',
     
-    // Fee Reference Table
-    'class_fee_overview' => 'Class Fee Overview (Reference)', // Added
-    'fee_name' => 'Fee Name', // Added
-    'fee_type' => 'Type', // Added
+    'class_fee_overview' => 'Class Fee Overview (Reference)',
+    'fee_name' => 'Fee Name',
+    'fee_type' => 'Type',
     'amount' => 'Amount',
-    'mode' => 'Mode', // Added
-    'order' => 'Order', // Added
-    'frequency' => 'Frequency', // Added
+    'mode' => 'Mode',
+    'order' => 'Order',
+    'frequency' => 'Frequency',
 
-    // Statuses
     'status_unpaid' => 'Unpaid',
     'status_partial' => 'Partial',
     'status_paid' => 'Paid',
     'status_overdue' => 'Overdue',
     
-    // Buttons
     'generate_btn' => 'Generate Invoices',
     'processing' => 'Processing...',
-    'checking' => 'Checking...', // Added
+    'checking' => 'Checking...',
     'pay' => 'Pay',
     'view' => 'View',
     'delete' => 'Delete',
     'print' => 'Print',
     'download_pdf' => 'Download PDF',
     'pay_now' => 'Pay Now',
-    'yes_generate' => 'Yes, generate anyway', // Added
+    'yes_generate' => 'Yes, generate anyway',
     
-    // Messages & Alerts
     'no_fees_found' => 'No fee structures available. Please create fees first.',
-    'no_sections_found' => 'No sections found', // Added
-    'no_active_students' => 'No active students found in this class.', // Added
+    'no_sections_found' => 'No sections found',
+    'no_active_students' => 'No active students found in this class.',
     'success_deleted' => 'Invoice deleted successfully.',
     'error_delete_paid' => 'Cannot delete an invoice that has payments attached. Please delete payments first.',
     'success' => 'Success',
     'error' => 'Error',
-    'warning' => 'Warning', // Added
+    'warning' => 'Warning',
     'error_occurred' => 'An error occurred.',
-    'unexpected_error' => 'An unexpected error occurred.', // Added
+    'unexpected_error' => 'An unexpected error occurred.',
     'loading' => 'Loading...',
     'error_loading' => 'Error loading data',
-    'error_loading_students' => 'Error loading students', // Added
-    'error_loading_fees' => 'Error loading fees', // Added
-    'select_student_warning' => 'Please select at least one student.', // Added
-    'select_fee_warning' => 'Please select at least one fee structure.', // Added
+    'error_loading_students' => 'Error loading students',
+    'error_loading_fees' => 'Error loading fees',
+    'select_student_warning' => 'Please select at least one student.',
+    'select_fee_warning' => 'Please select at least one fee structure.',
     'duplicate_warning' => 'Warning: :count duplicate invoices detected.',
-    'duplicate_warning_title' => 'Duplicate Warning', // Added
+    'duplicate_warning_title' => 'Duplicate Warning',
     'no_invoices_generated_error' => 'No invoices were generated. :count students were skipped.',
     'skipped_count_msg' => '(:count skipped)',
     'deselect_all' => 'Deselect All',
-    // Discount
     'discount_scholarship' => 'Discount / Scholarship',
     'fixed' => 'Fixed',
     
-    // PDF Labels
     'bill_to' => 'Bill To',
     'from' => 'From',
     'to' => 'To',
@@ -118,4 +110,34 @@ return [
     'method' => 'Method',
     'recorded_by' => 'Recorded By',
     'no_payments_found' => 'No payments recorded yet.',
+
+    // Print & Show Layout Keys
+    'invoice' => 'Invoice',
+    'payment_receipt' => 'Payment Receipt',
+    'receipt_no' => 'Receipt No.',
+    'payment_date' => 'Payment Date',
+    'status_tranche' => 'Status / Tranche',
+    'received_for' => 'Received For',
+    'student_name' => 'Student\'s Name',
+    'student_id' => 'Student ID',
+    'class' => 'Class',
+    'school_year' => 'School Year',
+    'no' => 'No.',
+    'designation' => 'Designation',
+    'amount_paid' => 'Amount Paid',
+    'payment_due' => 'Payment Due',
+
+    // Missing Keys from Blade Views
+    'are_you_sure' => 'Are you sure?',
+    'delete_warning' => 'You won\'t be able to revert this!',
+    'yes_delete' => 'Yes, delete it!',
+    'deleted' => 'Deleted!',
+    'back' => 'Back',
+    'print_web_view' => 'Print / Web View',
+    'receipt' => 'Receipt',
+    'from_institution' => 'From (Institution)',
+    'billed_to' => 'Billed To (Student)',
+    'admission_no' => 'Admission No',
+    'academic_year' => 'Academic Year',
+    'make_payment' => 'Make Payment',
 ];

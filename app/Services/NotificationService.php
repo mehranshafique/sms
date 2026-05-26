@@ -204,6 +204,72 @@ class NotificationService
         }
     }
 
+    public function sendRequestUpdatedNotification(\App\Models\StudentRequest $request)
+    {
+        $student = $request->student;
+        if (!$student) return;
+
+        $parent = $student->parent;
+        $institutionId = $request->institution_id;
+
+        // Retrieve Parent or Student Phone
+        $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
+        $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone ?? $student->mobile_number;
+
+        if (empty($phone)) return;
+
+        $eventKey = 'request_updated';
+
+        // Check School Notification Preferences
+        $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
+        $sendWa = $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp');
+
+        if (!$sendSms && !$sendWa) return;
+
+        // Safely Translate
+        $statusText = __('requests.status_' . $request->status);
+        if ($statusText === 'requests.status_' . $request->status) {
+            $statusText = ucfirst(str_replace('_', ' ', $request->status));
+        }
+
+        $typeText = __('requests.type_' . $request->type);
+        if ($typeText === 'requests.type_' . $request->type) {
+            $typeText = ucfirst(str_replace('_', ' ', $request->type));
+        }
+
+        // Prepare Dynamic Fields for Template
+        $schoolName = $student->institution->name ?? config('app.name');
+        
+        $approvedDaysText = '';
+        if ($request->status === 'partially_approved' && $request->start_date && $request->end_date) {
+            $days = \Carbon\Carbon::parse($request->start_date)->diffInDays(\Carbon\Carbon::parse($request->end_date));
+            $approvedDaysText = "Approved for: {$days} days";
+        }
+
+        $adminNoteText = $request->admin_note ? "Admin Note: {$request->admin_note}" : "";
+
+        $data = [
+            'StudentName' => $student->first_name,
+            'TicketNumber' => $request->ticket_number,
+            'Type' => $typeText,                     // Fallback for older templates
+            'RequestType' => $typeText,              // Matches $RequestType
+            'Status' => $statusText,
+            'Note' => $request->admin_note ?? 'N/A', // Fallback for older templates
+            'AdminNote' => $adminNoteText,           // Matches $AdminNote
+            'ApprovedDays' => $approvedDaysText,     // Matches $ApprovedDays
+            'SchoolName' => $schoolName,             // Matches $SchoolName
+        ];
+
+        // Send over authorized channels using Database Templates
+        if ($sendSms) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
+        }
+
+        if ($sendWa) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
+        }
+    }
+
     public function sendUserCredentials(User $user, $plainPassword, $roleEnumVal)
     {
         $schoolName = $user->institute ? $user->institute->name : config('app.name');

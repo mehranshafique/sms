@@ -474,7 +474,8 @@ class InvoiceController extends BaseController
     public function print($id)
     {
         $invoice = Invoice::with(['student', 'items', 'institution', 'academicSession', 'payments'])->findOrFail($id);
-        return view('finance.invoices.print', compact('invoice'));
+        $isPdf = false;
+        return view('finance.invoices.print', compact('invoice', 'isPdf'));
     }
 
     public function downloadPdf($id)
@@ -482,7 +483,8 @@ class InvoiceController extends BaseController
         $invoice = Invoice::with(['student', 'items', 'institution', 'academicSession', 'payments'])->findOrFail($id);
         
         if (class_exists('PDF')) {
-            $pdf = \PDF::loadView('finance.invoices.print', compact('invoice'));
+            $isPdf = true; // Tell the view to use the DOMPDF-safe CSS layout
+            $pdf = \PDF::loadView('finance.invoices.print', compact('invoice', 'isPdf'));
             return $pdf->download('Invoice-'.$invoice->invoice_number.'.pdf');
         } else {
             return redirect()->route('invoices.print', $id);

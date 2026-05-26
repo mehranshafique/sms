@@ -244,7 +244,7 @@ class AttendanceApiController extends Controller
         if (!$parent) return;
 
         $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
-        echo $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+        $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
 
         if (!$phone) return;
 

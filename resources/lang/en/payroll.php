@@ -85,6 +85,14 @@ return [
     'days_short' => 'Days',
     'no_records' => 'No payroll records found. Generate one above.',
     
+    // Payslip Document Missing Keys
+    'attendance' => 'Attendance',
+    'days_attended' => 'days attended',
+    'amount_in_words' => 'Amount in words',
+    'only' => 'only',
+    'employee_signature' => 'Employee Signature',
+    'generated_on' => 'Generated on',
+    
     // Buttons
     'save_structure' => 'Save Structure',
     'save_changes' => 'Save Changes',

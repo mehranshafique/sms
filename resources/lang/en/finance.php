@@ -7,7 +7,6 @@ return [
     'manage_subtitle' => 'Manage fees, invoices and payments',
     'manage_types_subtitle' => 'Define types of fees (Tuition, Bus, Lab)',
     
-    // Fee Structures
     'fee_list' => 'Fee Structure List',
     'add_fee' => 'Add Fee Structure',
     'fee_name' => 'Fee Name',
@@ -20,7 +19,6 @@ return [
     'mode' => 'Payment Mode',
     'parent_fee_name' => 'Parent Fee Name',
     
-    // Fee Types
     'fee_type_list' => 'Fee Type List',
     'add_type' => 'Add Fee Type',
     'edit_type' => 'Edit Fee Type',
@@ -28,13 +26,11 @@ return [
     'description' => 'Description',
     'status' => 'Status',
     
-    // Frequencies
     'one_time' => 'One Time',
     'monthly' => 'Monthly',
     'termly' => 'Termly',
     'yearly' => 'Yearly',
 
-    // Messages
     'success_create' => 'Fee structure created successfully.',
     'success_create_type' => 'Fee type created successfully.',
     'success_update_type' => 'Fee type updated successfully.',
@@ -47,12 +43,10 @@ return [
     'error_occurred' => 'Error occurred',
     'unexpected_error' => 'An unexpected error occurred.',
     
-    // NEW SAFETY MESSAGES
     'global_amount_too_low' => 'Cannot reduce Global Fee below the sum of existing installments (:total).',
     'cannot_delete_global_with_installments' => 'Cannot delete Global Fee because active installments exist. Please delete installments first.',
     'duplicate_global_config_error' => 'This class/grade already has a Global Fee configuration for this Fee Type. Please edit the existing structure instead of creating a duplicate.',
 
-    // Buttons & Actions
     'save' => 'Save',
     'cancel' => 'Cancel',
     'action' => 'Action',
@@ -61,14 +55,12 @@ return [
     'close' => 'Close',
     'yes_delete' => 'Yes, delete it!',
     
-    // Alerts & Confirmations
     'are_you_sure' => 'Are you sure?',
     'delete_warning' => 'This action cannot be undone!',
     'error' => 'Error',
     'success' => 'Success',
     'deleted' => 'Deleted!',
     
-    // Class Financial Report
     'class_financial_report' => 'Class Financial Report',
     'report_subtitle' => 'Detailed financial overview per class',
     'select_class_filter' => 'Select Class to Generate Report',
@@ -95,7 +87,6 @@ return [
     'sequence_order_hint' => 'Sequence number (1 for first installment, etc.)',
     'no_financial_records_found' => 'No financial records found for the selected class.',
 
-    // Student Finance Dashboard & General Keys
     'student_finance_dashboard' => 'Student Finance Dashboard',
     'back_to_profile' => 'Back to Profile',
     'fee_management' => 'Fee Management',
@@ -120,16 +111,19 @@ return [
     'student_not_enrolled' => 'Student not enrolled in any class.',
     'installment_prefix' => 'Installment',
 
-    // Payment History Table
+    // Blade Views Missing Keys (show.blade.php)
+    'payment_date' => 'Payment Date',
+    'payment_method' => 'Payment Method',
+    'system' => 'System',
+
     'payment_history' => 'Payment History',
     'date' => 'Date',
     'transaction_id' => 'Transaction ID',
     'method' => 'Method',
     'recorded_by' => 'Recorded By',
-    'no_payments_found' => 'No payments recorded yet.',
+    'no_payments_found' => 'No payments have been recorded for this invoice yet.',
     'fixed' => 'Fixed',
 
-    // New Balance Overview Keys
     'student_balances' => 'Student Balances',
     'balance_overview' => 'Balance Overview',
     'class_wise_breakdown' => 'Class-wise financial breakdown',
@@ -151,7 +145,7 @@ return [
     'status_unpaid' => 'Unpaid',
     'status_overdue' => 'Overdue',
     'outstanding' => 'Outstanding',
-    // NEW KEYS FOR STATEMENT & MISC
+    
     'student_statement' => 'Student Financial Statement',
     'transaction_history' => 'Transaction History',
     'misc_fees' => 'Miscellaneous Fees',
@@ -164,13 +158,12 @@ return [
     'export_pdf' => 'Export PDF',
     'type' => 'Type',
     'description' => 'Description',
-    // TAB DESCRIPTIONS
+    
     'tab_info_global' => 'Students with "Global" payment mode (Lump-sum payers).',
     'tab_info_installment' => 'Students with "Installment" payment mode.',
     'summary' => 'Total Summary',
     'tab_info_summary' => 'Cumulative financial summary for all students in this class.',
 
-    // REPORT VISUALIZATION (Added)
     'fee_collection_analysis' => 'Fee Collection Analysis',
     'pending_vs_collected' => 'Pending vs Collected',
 ];

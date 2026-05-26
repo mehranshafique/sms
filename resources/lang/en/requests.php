@@ -19,18 +19,23 @@ return [
     'role' => 'Role',
     'date_submitted' => 'Date Submitted',
     'ticket_number' => 'Ticket #',
+    'action' => 'Action',
     
     // Types
     'type_absence' => 'Absence',
     'type_late' => 'Late Arrival',
     'type_sick' => 'Sick Leave',
     'type_early_exit' => 'Early Exit',
+    'type_leave' => 'Staff Leave',
     'type_other' => 'Other',
     
     // Statuses
     'status_pending' => 'Pending',
+    'status_pending_only' => 'Pending Only',
     'status_approved' => 'Approved',
+    'status_partially_approved' => 'Partially Approved',
     'status_rejected' => 'Rejected',
+    'status_all' => 'All Tickets',
     
     // Actions
     'approve' => 'Approve',
@@ -39,8 +44,10 @@ return [
     'save' => 'Submit Request',
     'back' => 'Back to List',
     'download_attachment' => 'Download Attachment',
+    'process_ticket' => 'Process Ticket',
+    'save_notify' => 'Save & Notify Parent',
     
-    // Messages
+    // JS Alerts & Messages
     'success_create' => 'Request submitted successfully.',
     'success_update' => 'Request status updated.',
     'success_delete' => 'Request deleted.',
@@ -48,6 +55,35 @@ return [
     'confirm_reject' => 'Reject this request?',
     'no_records_found' => 'No requests found.',
     'unauthorized_action' => 'You are not authorized to perform this action.',
+    'unauthorized_teacher' => 'Teachers cannot create generic requests.',
+    'processing' => 'Processing...',
+    'processed' => 'Processed!',
+    'error' => 'Error',
+    'error_occurred' => 'An error occurred',
+    'are_you_sure' => 'Are you sure?',
+    'cannot_revert' => 'You won\'t be able to revert this!',
+    'yes_delete' => 'Yes, delete it!',
+    'deleted' => 'Deleted!',
+    'success' => 'Success!',
+    'no_reason_provided' => 'No reason provided.',
+    
+    // Admin Processing Modal
+    'student' => 'Student',
+    'parent_reason' => 'Parent\'s Reason / Explanation',
+    'admin_decision' => 'Admin Decision',
+    'select_decision' => '-- Select Decision --',
+    'approve_fully' => 'Approve Request Fully',
+    'partially_approve' => 'Partially Approve (Reduce Days)',
+    'reject_request' => 'Reject Request',
+    'approved_duration' => 'Approved Duration (Days)',
+    'approved_duration_help' => 'How many days are you actually granting?',
+    'admin_note' => 'Admin Note (Sent to Parent)',
+    'admin_note_placeholder' => 'Explain your decision to the parent... (Required)',
+    
+    // Create view
+    'request_for' => 'Request For (Student)',
+    'myself_staff_leave' => '-- Myself (Staff Leave) --',
+    'request_for_help' => 'Select a student to create a request on their behalf, or leave empty for your own leave request.',
     
     // Chatbot Specific
     'chatbot_submitted' => '✅ Request submitted successfully. Ticket: :ticket',

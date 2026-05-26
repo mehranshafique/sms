@@ -68,7 +68,6 @@
             columns: [
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
                 { data: 'invoice_number', name: 'invoice_number' },
-                // CHANGED: Use student_name as the internal 'name' property to map to the new backend flexible search filter.
                 { data: 'student_name', name: 'student_name' }, 
                 { data: 'fee_name', name: 'fee_name', orderable: false, searchable: false },
                 { data: 'issue_date', name: 'issue_date' },
@@ -87,13 +86,13 @@
             url = url.replace(':id', id);
 
             Swal.fire({
-                title: 'Are you sure?',
-                text: "You won't be able to revert this!",
+                title: '{{ __("invoice.are_you_sure") }}',
+                text: '{{ __("invoice.delete_warning") }}',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
                 cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!'
+                confirmButtonText: '{{ __("invoice.yes_delete") }}'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -104,16 +103,16 @@
                         },
                         success: function(response) {
                             Swal.fire(
-                                'Deleted!',
+                                '{{ __("invoice.deleted") }}',
                                 response.message,
                                 'success'
                             );
                             table.ajax.reload();
                         },
                         error: function(xhr) {
-                            let msg = xhr.responseJSON.message || 'Error occurred';
+                            let msg = xhr.responseJSON.message || '{{ __("invoice.error_occurred") }}';
                             Swal.fire(
-                                'Error!',
+                                '{{ __("invoice.error") }}',
                                 msg,
                                 'error'
                             );

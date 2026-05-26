@@ -80,6 +80,14 @@ return [
     'days_short' => 'Jrs',
     'no_records' => 'Aucun enregistrement trouvé. Générez-en un ci-dessus.',
     
+    // Payslip Document Missing Keys
+    'attendance' => 'Présence',
+    'days_attended' => 'jours de présence',
+    'amount_in_words' => 'Montant en lettres',
+    'only' => 'seulement',
+    'employee_signature' => 'Signature de l\'employé',
+    'generated_on' => 'Généré le',
+    
     'save_structure' => 'Enregistrer la structure',
     'save_changes' => 'Enregistrer les modifications',
 

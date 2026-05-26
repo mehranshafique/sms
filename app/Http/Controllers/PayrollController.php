@@ -18,7 +18,6 @@ class PayrollController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
-        // FIX: Secure the controller
         $this->authorizeResource(Payroll::class, 'payroll');
         $this->setPageTitle(__('payroll.page_title'));
     }
@@ -40,7 +39,6 @@ class PayrollController extends BaseController
      */
     public function generate(Request $request)
     {
-        // FIX: Explicitly check for create/generate permission
         $this->authorize('create', Payroll::class);
 
         $request->validate([
@@ -51,9 +49,8 @@ class PayrollController extends BaseController
         $institutionId = $this->getInstitutionId();
         $startDate = Carbon::createFromDate($request->year, $request->month, 1);
         $endDate = $startDate->copy()->endOfMonth();
-        $daysInMonth = $startDate->daysInMonth; // Or working days logic
+        $daysInMonth = $startDate->daysInMonth; 
 
-        // Fetch Eligible Staff with Salary Structure
         $staffMembers = Staff::with('salaryStructure')
             ->where('institution_id', $institutionId)
             ->where('status', 'active')
@@ -66,28 +63,53 @@ class PayrollController extends BaseController
             $structure = $staff->salaryStructure;
             if (!$structure) continue;
 
-            // 1. Calculate Attendance Stats
             $attendance = StaffAttendance::where('staff_id', $staff->id)
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->get();
 
             $present = $attendance->whereIn('status', ['present', 'late', 'half_day'])->count();
-            // Simplified logic (ignoring weekends/holidays for now)
             $explicitAbsent = $attendance->where('status', 'absent')->count();
 
-            // 2. Calculate Pay
             $basePay = $structure->base_salary;
-            $allowances = array_sum($structure->allowances ?? []);
-            $deductions = array_sum($structure->deductions ?? []);
+            
+            // FIX: Safely parse and sum Allowances (Bulletproof against JSON objects/arrays/strings)
+            $allowancesData = $structure->allowances;
+            if (is_string($allowancesData)) {
+                $allowancesData = json_decode($allowancesData, true);
+                if (is_string($allowancesData)) $allowancesData = json_decode($allowancesData, true); // Catch double-encoding
+            }
+            $allowances = 0;
+            if (is_iterable($allowancesData)) {
+                foreach ($allowancesData as $item) {
+                    if (is_array($item)) $allowances += (float)($item['amount'] ?? 0);
+                    elseif (is_object($item)) $allowances += (float)($item->amount ?? 0);
+                    elseif (is_numeric($item)) $allowances += (float)$item;
+                }
+            }
 
-            // LOP Calculation (Example: Base / 30 * absent days)
-            $perDayPay = $basePay / 30; // Standard 30 days
+            // FIX: Safely parse and sum Deductions (Bulletproof)
+            $deductionsData = $structure->deductions;
+            if (is_string($deductionsData)) {
+                $deductionsData = json_decode($deductionsData, true);
+                if (is_string($deductionsData)) $deductionsData = json_decode($deductionsData, true);
+            }
+            $deductions = 0;
+            if (is_iterable($deductionsData)) {
+                foreach ($deductionsData as $item) {
+                    if (is_array($item)) $deductions += (float)($item['amount'] ?? 0);
+                    elseif (is_object($item)) $deductions += (float)($item->amount ?? 0);
+                    elseif (is_numeric($item)) $deductions += (float)$item;
+                }
+            }
+
+            // LOP Calculation
+            $perDayPay = $basePay / 30; 
             $lopDeduction = $perDayPay * $explicitAbsent;
 
             $totalDeduction = $deductions + $lopDeduction;
             $netSalary = ($basePay + $allowances) - $totalDeduction;
 
-            // 3. Create/Update Payroll Record
+            // 3. Create/Update Payroll Record with Corrected Math!
             Payroll::updateOrCreate(
                 [
                     'institution_id' => $institutionId,
@@ -116,22 +138,17 @@ class PayrollController extends BaseController
     {
         $this->authorize('view', $payroll); 
         
-        // Eager load necessary relationships
         $payroll->load(['staff.user', 'staff.salaryStructure', 'staff.institution']);
 
         $format = $request->query('format', 'a4'); 
         $view = 'payroll.payslip';
         $paper = 'a4'; 
         
-        // Define Custom Paper Sizes for Thermal Printers (in points)
-        // 1mm = 2.83465 points
         if ($format === 'pos80') {
             $view = 'payroll.payslip_receipt';
-            // 80mm width = ~226pt. Height set to 800pt (auto-cut usually handles length)
             $paper = [0, 0, 226.77, 800]; 
         } elseif ($format === 'pos58') {
             $view = 'payroll.payslip_receipt';
-            // 58mm width = ~164pt.
             $paper = [0, 0, 164.41, 800];
         }
 
@@ -143,7 +160,6 @@ class PayrollController extends BaseController
             $pdf->setPaper($paper, 'portrait');
         }
 
-        // Use DomPDF options to ensure images/fonts load
         $pdf->setOptions(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
         
         $filename = 'Payslip_'.$payroll->staff->id.'_'.$format.'.pdf';

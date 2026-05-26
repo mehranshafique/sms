@@ -176,7 +176,7 @@
         // --- Helper: Reset UI Lists ---
         function resetLists() {
             studentList.innerHTML = '<div class="col-12 text-center text-muted mt-5 pt-5"><i class="fa fa-users fa-2x mb-2"></i><br>{{ __("invoice.select_class_first_msg") }}</div>';
-            feeList.innerHTML = '<div class="text-center text-muted mt-5 pt-5"><i class="fa fa-money fa-2x mb-2"></i><br>{{ __("invoice.select_class_first_msg") }}</div>';
+            feeList.innerHTML = '<div class="text-center text-muted mt-5 pt-5"><i class="fa fa-money fa-2x mb-2"></i><br>{{ __("invoice.fees_will_load") }}</div>';
             
             [studentSearch, feeSearch, selectAllStudents].forEach(el => {
                 el.disabled = true;

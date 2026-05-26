@@ -137,6 +137,21 @@ class SmsTemplateSeeder extends Seeder
                 'available_tags' => '$ParentName, $StudentName, $Time, $Date, $SchoolName',
                 'is_active' => true,
             ],
+            // --- Automated Request / Ticket Processing ---
+            [
+                'event_key' => 'request_updated',
+                'name' => 'Student Ticket/Request Processed',
+                'body' => '🎫 TICKET UPDATE
+Ticket: $TicketNumber
+Student: $StudentName
+Type: $RequestType
+Status: $Status 
+$ApprovedDays
+$AdminNote
+Thank you, $SchoolName.',
+                'available_tags' => '$TicketNumber, $StudentName, $RequestType, $Status, $ApprovedDays, $AdminNote, $SchoolName',
+                'is_active' => true,
+            ],
         ];
 
         

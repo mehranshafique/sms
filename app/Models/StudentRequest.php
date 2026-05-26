@@ -15,9 +15,10 @@ class StudentRequest extends Model
         'academic_session_id',
         'type',             // absence, late, sick, early_exit
         'reason',
+        'admin_note',       // NEW: Admin's response/reason sent to parent
         'start_date',
         'end_date',
-        'status',           // pending, approved, rejected
+        'status',           // pending, approved, partially_approved, rejected
         'ticket_number',
         'created_by',       // User ID of creator (Student or Admin)
         'approved_by',      // User ID of approver

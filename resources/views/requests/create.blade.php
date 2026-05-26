@@ -18,7 +18,7 @@
 
         <div class="row justify-content-center">
             <div class="col-xl-8">
-                <div class="card">
+                <div class="card shadow-sm border-0">
                     <div class="card-body">
                         <form action="{{ route('requests.store') }}" method="POST" enctype="multipart/form-data">
                             @csrf
@@ -26,14 +26,14 @@
                             {{-- ADMIN: Select Student --}}
                             @if($isAdmin && isset($students))
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Request For (Student)</label>
+                                    <label class="form-label fw-bold">{{ __('requests.request_for') }}</label>
                                     <select name="student_id" class="form-control default-select" data-live-search="true">
-                                        <option value="">-- Myself (Staff Leave) --</option>
+                                        <option value="">{{ __('requests.myself_staff_leave') }}</option>
                                         @foreach($students as $id => $name)
                                             <option value="{{ $id }}">{{ $name }}</option>
                                         @endforeach
                                     </select>
-                                    <small class="text-muted">Select a student to create a request on their behalf, or leave empty for your own leave request.</small>
+                                    <small class="text-muted">{{ __('requests.request_for_help') }}</small>
                                 </div>
                             @endif
 
@@ -47,7 +47,7 @@
                                     
                                     {{-- Show 'Leave' option only for Staff/Admin --}}
                                     @if($isStaff || $isAdmin)
-                                        <option value="leave">Staff Leave</option>
+                                        <option value="leave">{{ __('requests.type_leave') }}</option>
                                     @endif
                                     
                                     <option value="other">{{ __('requests.type_other') }}</option>

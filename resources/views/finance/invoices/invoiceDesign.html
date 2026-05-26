@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reçu - Complexe Scolaire Sainte Augustin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Print-specific styles to ensure the invoice looks perfect on paper */
+        @media print {
+            body {
+                background-color: white !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-shadow-none {
+                box-shadow: none !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 20px !important;
+                border: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-700 min-h-screen flex items-center justify-center py-10 px-4 font-sans text-gray-900">
+
+    <!-- Action Buttons (Hidden on Print) -->
+    <div class="fixed top-4 right-4 flex gap-3 no-print z-10">
+        <button onclick="window.print()" class="bg-blue-800 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-lg font-medium transition flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Imprimer
+        </button>
+    </div>
+
+    <!-- Main Invoice Container -->
+    <div class="bg-white shadow-2xl print-shadow-none w-full max-w-[850px] p-8 sm:p-10 relative">
+        
+        <!-- Header Section -->
+        <header class="flex flex-col sm:flex-row justify-between items-start mb-6">
+            <div class="flex items-center gap-4">
+                <!-- School Logo SVG -->
+                <div class="w-[110px] h-[130px] flex-shrink-0">
+                    <svg viewBox="0 0 120 140" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Laurel Wreath Background -->
+                        <path d="M 20,90 Q 5,60 15,30 Q 15,60 25,80 Z" fill="#d97706"/>
+                        <path d="M 100,90 Q 115,60 105,30 Q 105,60 95,80 Z" fill="#d97706"/>
+                        <!-- Additional Wreath Leaves -->
+                        <path d="M 25,80 Q 5,50 18,20 Q 18,50 30,70 Z" fill="#fbbf24"/>
+                        <path d="M 95,80 Q 115,50 102,20 Q 102,50 90,70 Z" fill="#fbbf24"/>
+                        
+                        <!-- Shield Base -->
+                        <path d="M 25,15 L 95,15 L 95,70 C 95,100 60,120 60,120 C 60,120 25,100 25,70 Z" fill="#083366" stroke="#fbbf24" stroke-width="3"/>
+                        <!-- Inner Gold Trim -->
+                        <path d="M 30,20 L 90,20 L 90,68 C 90,92 60,112 60,112 C 60,112 30,92 30,68 Z" fill="none" stroke="#fbbf24" stroke-width="1.5"/>
+                        
+                        <!-- Stars -->
+                        <polygon points="38,25 40,30 45,30 41,33 43,38 38,35 33,38 35,33 31,30 36,30" fill="#fbbf24"/>
+                        <polygon points="82,25 84,30 89,30 85,33 87,38 82,35 77,38 79,33 75,30 80,30" fill="#fbbf24"/>
+                        
+                        <!-- Open Book -->
+                        <path d="M 40,65 L 60,70 L 80,65 L 80,40 L 60,45 L 40,40 Z" fill="#ffffff" stroke="#fbbf24" stroke-width="1.5"/>
+                        <path d="M 60,45 L 60,70" fill="none" stroke="#fbbf24" stroke-width="1.5"/>
+                        
+                        <!-- Cross -->
+                        <rect x="58" y="78" width="4" height="22" fill="#fbbf24"/>
+                        <rect x="52" y="84" width="16" height="4" fill="#fbbf24"/>
+                        
+                        <!-- Ribbon Background -->
+                        <path d="M 5,125 Q 60,140 115,125 L 110,115 Q 60,130 10,115 Z" fill="#083366"/>
+                        <!-- Ribbon Text (Simulated) -->
+                        <text x="60" y="128" fill="white" font-size="6" font-family="sans-serif" font-weight="bold" text-anchor="middle" letter-spacing="0.5">DISCIPLINE - TRAVAIL - RÉUSSITE</text>
+                    </svg>
+                </div>
+                
+                <div class="mt-1">
+                    <h1 class="text-2xl font-bold text-[#083366] leading-tight">COMPLEXE SCOLAIRE<br>SAINTE AUGUSTIN</h1>
+                    <div class="text-xs text-[#083366] font-semibold mt-3 space-y-1.5">
+                        <p class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-[#083366]"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                            01, Wagenia,<br><span class="ml-5">Gombe/Kinshasa</span>
+                        </p>
+                        <p class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#083366]"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            +243 827 806 161
+                        </p>
+                        <p class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-[#083366]"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                            contact@cssa.com
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-end pt-2">
+                <!-- Simulated Barcode -->
+                <div class="mb-5 h-12 w-64 overflow-hidden">
+                    <svg width="100%" height="100%" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Dense pattern of lines simulating a barcode -->
+                        <rect x="0" y="0" width="3" height="48" fill="black"/><rect x="5" y="0" width="1" height="48" fill="black"/><rect x="8" y="0" width="4" height="48" fill="black"/><rect x="14" y="0" width="2" height="48" fill="black"/><rect x="18" y="0" width="1" height="48" fill="black"/><rect x="22" y="0" width="5" height="48" fill="black"/><rect x="29" y="0" width="2" height="48" fill="black"/><rect x="33" y="0" width="4" height="48" fill="black"/><rect x="39" y="0" width="1" height="48" fill="black"/><rect x="42" y="0" width="3" height="48" fill="black"/><rect x="47" y="0" width="5" height="48" fill="black"/><rect x="54" y="0" width="2" height="48" fill="black"/><rect x="58" y="0" width="1" height="48" fill="black"/><rect x="62" y="0" width="4" height="48" fill="black"/><rect x="68" y="0" width="3" height="48" fill="black"/><rect x="73" y="0" width="1" height="48" fill="black"/><rect x="76" y="0" width="5" height="48" fill="black"/><rect x="83" y="0" width="2" height="48" fill="black"/><rect x="87" y="0" width="3" height="48" fill="black"/><rect x="92" y="0" width="1" height="48" fill="black"/><rect x="96" y="0" width="4" height="48" fill="black"/><rect x="102" y="0" width="2" height="48" fill="black"/><rect x="106" y="0" width="1" height="48" fill="black"/><rect x="110" y="0" width="5" height="48" fill="black"/><rect x="117" y="0" width="3" height="48" fill="black"/><rect x="122" y="0" width="1" height="48" fill="black"/><rect x="125" y="0" width="4" height="48" fill="black"/><rect x="131" y="0" width="2" height="48" fill="black"/><rect x="135" y="0" width="3" height="48" fill="black"/><rect x="140" y="0" width="1" height="48" fill="black"/><rect x="144" y="0" width="5" height="48" fill="black"/><rect x="151" y="0" width="2" height="48" fill="black"/><rect x="155" y="0" width="1" height="48" fill="black"/><rect x="158" y="0" width="4" height="48" fill="black"/><rect x="164" y="0" width="3" height="48" fill="black"/><rect x="169" y="0" width="1" height="48" fill="black"/><rect x="172" y="0" width="5" height="48" fill="black"/><rect x="179" y="0" width="2" height="48" fill="black"/><rect x="183" y="0" width="3" height="48" fill="black"/><rect x="188" y="0" width="1" height="48" fill="black"/><rect x="192" y="0" width="4" height="48" fill="black"/><rect x="198" y="0" width="2" height="48" fill="black"/><rect x="202" y="0" width="1" height="48" fill="black"/><rect x="205" y="0" width="5" height="48" fill="black"/><rect x="212" y="0" width="3" height="48" fill="black"/><rect x="217" y="0" width="1" height="48" fill="black"/><rect x="220" y="0" width="4" height="48" fill="black"/><rect x="226" y="0" width="2" height="48" fill="black"/><rect x="230" y="0" width="3" height="48" fill="black"/><rect x="235" y="0" width="1" height="48" fill="black"/><rect x="238" y="0" width="5" height="48" fill="black"/><rect x="245" y="0" width="2" height="48" fill="black"/><rect x="249" y="0" width="3" height="48" fill="black"/>
+                    </svg>
+                </div>
+                <!-- Box title -->
+                <div class="bg-[#083366] text-white px-8 py-2 rounded-md font-bold text-xl uppercase tracking-wider">
+                    REÇU DE PAIEMENT
+                </div>
+            </div>
+        </header>
+
+        <!-- Divider Line -->
+        <div class="w-full border-t-2 border-[#083366] mb-6"></div>
+
+        <!-- Information Columns -->
+        <div class="flex flex-col sm:flex-row justify-between mb-8 gap-8">
+            
+            <!-- Left Column: Student Info -->
+            <div class="w-full sm:w-1/2">
+                <!-- Reçu Pour Badge -->
+                <div class="mb-4 relative">
+                    <span class="inline-block bg-[#083366] text-white px-4 py-1 rounded text-sm font-semibold relative z-10 uppercase">
+                        REÇU POUR
+                    </span>
+                    <div class="absolute bottom-0 left-0 w-full border-b border-gray-300 pb-2"></div>
+                </div>
+                
+                <div class="space-y-2 mt-4 text-sm text-gray-800">
+                    <div class="flex">
+                        <span class="w-32">Nom de l'élève</span>
+                        <span class="w-4">:</span>
+                        <span class="font-bold">Lydia Lonoh</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-32">ID élève</span>
+                        <span class="w-4">:</span>
+                        <span>72691209</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-32">Classe</span>
+                        <span class="w-4">:</span>
+                        <span>1º A</span>
+                    </div>
+                    <div class="flex">
+                        <span class="w-32">Année scolaire</span>
+                        <span class="w-4">:</span>
+                        <span>2025-2026</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Receipt Details -->
+            <div class="w-full sm:w-[45%] flex flex-col justify-end">
+                <div class="space-y-4 text-sm text-gray-800 mt-8">
+                    <div class="flex items-center">
+                        <span class="w-36 font-bold">N° REÇU</span>
+                        <span class="w-4 font-bold">:</span>
+                        <span class="border border-gray-400 rounded-full px-3 py-1 bg-white">ORD-2025-2026/026</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-36 font-bold">Date de paiement</span>
+                        <span class="w-4 font-bold">:</span>
+                        <span class="px-3">11/05/2026</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-36 font-bold">Statut / Tranche</span>
+                        <span class="w-4 font-bold">:</span>
+                        <span class="bg-[#083366] text-white rounded px-3 py-1 font-semibold uppercase text-xs">TRANCHE 1/1</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Items Table -->
+        <table class="w-full border-collapse border border-gray-300 text-sm">
+            <thead>
+                <tr class="bg-[#083366] text-white">
+                    <th class="py-2.5 px-4 font-semibold w-16 text-center border border-gray-300">N°</th>
+                    <th class="py-2.5 px-4 font-semibold text-center border border-gray-300 uppercase">DÉSIGNATION</th>
+                    <th class="py-2.5 px-4 font-semibold text-center w-40 border border-gray-300 uppercase">Montant (USD)</th>
+                </tr>
+            </thead>
+            <tbody class="text-gray-800">
+                <tr>
+                    <td class="py-3 px-4 text-center border border-gray-300">1</td>
+                    <td class="py-3 px-4 border border-gray-300 text-left pl-6">TRANCHE 1 DES FRAIS SCOLAIRES GLOBAL 2025-2026</td>
+                    <td class="py-3 px-4 text-center border border-gray-300">400.00</td>
+                </tr>
+                <!-- Empty rows to match the screenshot space -->
+                <tr class="h-10">
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                </tr>
+                <tr class="h-10">
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                </tr>
+                <tr class="h-10">
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                </tr>
+                <tr class="h-10">
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                    <td class="border border-gray-300 border-dashed border-t-0"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Totals Section -->
+        <div class="flex justify-end mt-6">
+            <div class="w-full sm:w-[350px] text-sm text-gray-800">
+                <div class="flex justify-between items-center py-2">
+                    <span class="font-medium pr-4">Sous-total :</span>
+                    <span>$ 400.00</span>
+                </div>
+                
+                <div class="w-full border-t border-gray-300"></div>
+                
+                <div class="flex justify-between items-center py-2">
+                    <span class="font-medium pr-4">Montant payé :</span>
+                    <span>$ 150.00</span>
+                </div>
+                
+                <div class="flex justify-between items-center py-2 px-3 mt-1 bg-[#e6f0fa] border border-[#083366] font-bold text-[#083366]">
+                    <span>Reste à payer, TR1:</span>
+                    <span>$ 250.00</span>
+                </div>
+                
+                <div class="w-full border-t border-gray-300 mt-2 mb-2"></div>
+                
+                <div class="flex justify-between items-center py-2 font-bold">
+                    <span>Date de paiement :</span>
+                    <span>11/05/2026</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center relative pb-2 border-t border-gray-300 pt-4">
+            <p class="font-serif italic text-gray-700 text-[15px]">
+                Merci pour votre confiance.
+            </p>
+        </footer>
+
+    </div>
+
+</body>
+</html>

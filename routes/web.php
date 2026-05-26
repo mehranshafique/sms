@@ -273,7 +273,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Student Requests
     Route::middleware([CheckModuleAccess::class . ':student_requests'])->group(function () {
-        Route::get('requests/update-status/{id}', [StudentRequestController::class, 'updateStatus'])->name('requests.update_status');
+        Route::post('requests/update-status/{id}', [StudentRequestController::class, 'updateStatus'])->name('requests.update_status');
         Route::resource('requests', StudentRequestController::class);
     });
 
@@ -295,7 +295,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- Unified Attendance Analytics Flow ---
     Route::get('/attendance/analytics', [AttendanceReportController::class, 'index'])->name('attendance.analytics.index');
     Route::get('/attendance/analytics/student/{id?}', [AttendanceReportController::class, 'studentReport'])->name('attendance.analytics.show');
-    
+
     // HR / Staff Management
     Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);

@@ -119,13 +119,17 @@ return [
     'student_not_enrolled' => 'Élève non inscrit.',
     'installment_prefix' => 'Tranche',
 
-    // Payment History
+    // Blade Views Missing Keys (show.blade.php)
+    'payment_date' => 'Date de paiement',
+    'payment_method' => 'Mode de paiement',
+    'system' => 'Système',
+
     'payment_history' => 'Historique des paiements',
     'date' => 'Date',
     'transaction_id' => 'ID Transaction',
     'method' => 'Méthode',
     'recorded_by' => 'Enregistré par',
-    'no_payments_found' => 'Aucun paiement enregistré.',
+    'no_payments_found' => 'Aucun paiement n\'a encore été enregistré pour cette facture.',
     'fixed' => 'Fixe',
 
     // Balance Overview
