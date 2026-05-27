@@ -9,8 +9,8 @@ LISTEN_PORT = 5000
 LISTEN_HOST = '0.0.0.0' # Listens on all available network interfaces
 
 # Your Laravel Application API endpoint
-API_URL = "https://your-domain.com/api/v1/hardware/attendance/scan"
-HARDWARE_SECRET = "digitex_secure_hardware_key"
+API_URL = "https://account.digitexvx.com/api/v1/hardware/attendance/scan"
+HARDWARE_SECRET = "dgtx_live_8f72h9q8wefnjasdf" # Must match the secret in your Laravel .env
 DEVICE_ID = "CHAFON_MAIN_GATE_01"
 # ---------------------
 

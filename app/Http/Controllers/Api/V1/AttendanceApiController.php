@@ -30,8 +30,8 @@ class AttendanceApiController extends Controller
     public function store(Request $request)
     {
         // Require a valid secret key from the hardware to prevent fake attendance injections
-        if ($request->header('X-Hardware-Secret') !== config('app.hardware_secret', 'digitex_secure_hardware_key')) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized Hardware'], 401);
+        if ($request->header('X-Hardware-Secret') !== env('HARDWARE_SECRET')) {
+            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
         }
 
         $request->validate([
