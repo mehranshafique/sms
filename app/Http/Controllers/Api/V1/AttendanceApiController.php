@@ -34,21 +34,25 @@ class AttendanceApiController extends Controller
     {
         // Require a valid secret key from the hardware to prevent fake attendance injections
         if ($request->header('X-Hardware-Secret') !== env('HARDWARE_SECRET')) {
-            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized Hardware'], 401);
         }
 
         $request->validate([
             'uid' => 'required|string', 
             'device_id' => 'nullable|string',
             'timestamp' => 'nullable|date', // Allows offline POS sync later
-            'method' => 'nullable|string',
-            'purpose' => 'nullable|string' // V2 Flutter App Purpose
+            'method' => 'nullable|string|in:manual,qr,nfc,rfid,biometric,automated' 
         ]);
 
         $uid = trim($request->uid);
-        $purpose = $request->purpose ?? 'attendance'; // Safely defaults to standard attendance
+        $scanMethod = $request->input('method', 'rfid'); // Default method changed to 'rfid'
+        $scanTime = $request->timestamp ? Carbon::parse($request->timestamp) : Carbon::now();
+        $date = $scanTime->toDateString();
+        $time = $scanTime->format('H:i:s');
 
         // --- NEW FLUTTER APP ROUTING ---
+        $purpose = $request->purpose ?? 'attendance'; // Safely defaults to standard attendance
+
         if ($purpose === 'fee_check') {
             return $this->handleFeeCheck($uid);
         }
@@ -60,8 +64,28 @@ class AttendanceApiController extends Controller
         }
 
         // --- ORIGINAL CHAFON / HARDWARE LOGIC ---
-        // If no special purpose is sent, process exactly as it was originally built.
         return $this->handleAttendanceLogging($request, $uid);
+    }
+
+    /**
+     * NORMALIZES UIDS: Converts '22B40B55' to ['22B40B55', '22:b4:0b:55', '22b40b55', '22:B4:0B:55']
+     * Ensuring the API matches the database no matter how the hardware formats the string.
+     */
+    private function getPossibleUids($uid)
+    {
+        $uid = trim($uid);
+        $cleanUid = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $uid));
+        
+        $uids = [$uid, $cleanUid, strtoupper($cleanUid)];
+        
+        // If it's a valid hex string, generate the colon-separated version
+        if (strlen($cleanUid) > 0 && strlen($cleanUid) % 2 === 0) {
+            $colonUid = implode(':', str_split($cleanUid, 2));
+            $uids[] = $colonUid;
+            $uids[] = strtoupper($colonUid);
+        }
+        
+        return array_unique($uids);
     }
 
     // =========================================================================
@@ -75,23 +99,25 @@ class AttendanceApiController extends Controller
         $time = $scanTime->format('H:i:s');
         $method = $request->method ?? 'rfid'; // Extract method from payload or default to 'rfid'
 
-        // Check Student First (NOW CHECKS BOTH NFC AND RFID)
+        $possibleUids = $this->getPossibleUids($uid);
+
+        // Check Student First (NOW CHECKS BOTH NFC AND RFID with Fuzzy Matching)
         $student = Student::with('parent', 'institution')
-            ->where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
-            ->orWhere('qr_code_token', $uid)
-            ->orWhere('admission_number', $uid)
+            ->whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)       
+            ->orWhereIn('qr_code_token', $possibleUids)
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
 
         if ($student) {
             return $this->processStudentAttendance($student, $date, $time, $scanTime, $method);
         }
 
-        // Check Staff Second (NOW CHECKS BOTH NFC AND RFID)
+        // Check Staff Second
         $staff = Staff::with('user', 'institution')
-            ->where('nfc_uid', $uid)
-            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
-            ->orWhere('employee_id', $uid) 
+            ->whereIn('nfc_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)      
+            ->orWhereIn('employee_id', $possibleUids) 
             ->first();
 
         if ($staff) {
@@ -115,7 +141,7 @@ class AttendanceApiController extends Controller
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'No active academic session'], 400);
         }
 
-        // --- CRITICAL FIX: Fetch active enrollment to get the class_section_id ---
+        // Fetch the active enrollment to get the class_section_id
         $enrollment = StudentEnrollment::where('student_id', $student->id)
             ->where('academic_session_id', $session->id)
             ->where('status', 'active')
@@ -140,12 +166,12 @@ class AttendanceApiController extends Controller
             $attendance = StudentAttendance::create([
                 'institution_id' => $institutionId,
                 'academic_session_id' => $session->id,
-                'class_section_id' => $enrollment->class_section_id, // <-- FIX APPLIED HERE
+                'class_section_id' => $enrollment->class_section_id, 
                 'student_id' => $student->id,
                 'attendance_date' => $date,
                 'status' => $status,
                 'check_in' => $time,
-                'method' => $method, // <-- ENUM ERROR FIX APPLIED HERE
+                'method' => $method, 
             ]);
             $action = 'arrival';
         } else {
@@ -192,7 +218,7 @@ class AttendanceApiController extends Controller
                 'attendance_date' => $date,
                 'status' => $status,
                 'check_in' => $time,
-                'method' => $method, // <-- ENUM ERROR FIX APPLIED HERE
+                'method' => $method,
             ]);
             $action = 'arrival';
         } else {
@@ -212,7 +238,8 @@ class AttendanceApiController extends Controller
             'type' => 'staff',
             'name' => optional($staff->user)->name ?? 'Staff Member',
             'time' => $scanTime->format('h:i A'),
-            'punctuality' => $status
+            'punctuality' => $status,
+            'message' => "Staff attendance marked successfully!"
         ], 200);
     }
 
@@ -247,9 +274,11 @@ class AttendanceApiController extends Controller
 
     private function handleFeeCheck($uid)
     {
-        $student = Student::where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
-            ->orWhere('admission_number', $uid)
+        $possibleUids = $this->getPossibleUids($uid);
+
+        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)       
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
         
         if (!$student) {
@@ -302,10 +331,12 @@ class AttendanceApiController extends Controller
             ]);
         }
 
+        $possibleUids = $this->getPossibleUids($uid);
+
         // 2. Direct Physical NFC Tap Pickup (Parent uses their card to pickup kid)
-        $student = Student::where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
-            ->orWhere('admission_number', $uid)
+        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)      
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
 
         if ($student) {
@@ -322,9 +353,11 @@ class AttendanceApiController extends Controller
 
     private function handleReportCard($uid)
     {
-        $student = Student::where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
-            ->orWhere('admission_number', $uid)
+        $possibleUids = $this->getPossibleUids($uid);
+
+        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)       
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
 
         if (!$student) return response()->json(['success' => false, 'message' => 'Student Not Found.'], 404);
