@@ -12,10 +12,12 @@ use App\Models\StudentPickup;
 use App\Models\StudentEnrollment;
 use App\Models\AcademicSession;
 use App\Models\InstitutionSetting;
+use App\Models\ExamRecord;
 use App\Models\Invoice;
 use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceApiController extends Controller
 {
@@ -28,30 +30,24 @@ class AttendanceApiController extends Controller
 
     /**
      * Universal Scan Endpoint (Handles RFID, NFC, and QR)
-     * Payload: { "uid": "A1B2C3D4", "device_id": "GATE_1", "purpose": "pickup" }
      */
     public function store(Request $request)
     {
-        // Require a valid secret key from the hardware to prevent fake attendance injections
         if ($request->header('X-Hardware-Secret') !== env('HARDWARE_SECRET')) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthorized Hardware'], 401);
+            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
         }
 
         $request->validate([
             'uid' => 'required|string', 
             'device_id' => 'nullable|string',
-            'timestamp' => 'nullable|date', // Allows offline POS sync later
-            'method' => 'nullable|string|in:manual,qr,nfc,rfid,biometric,automated' 
+            'timestamp' => 'nullable|date',
+            'method' => 'nullable|string',
+            'purpose' => 'nullable|string'
         ]);
 
         $uid = trim($request->uid);
-        $scanMethod = $request->input('method', 'rfid'); // Default method changed to 'rfid'
-        $scanTime = $request->timestamp ? Carbon::parse($request->timestamp) : Carbon::now();
-        $date = $scanTime->toDateString();
-        $time = $scanTime->format('H:i:s');
-
-        // --- NEW FLUTTER APP ROUTING ---
-        $purpose = $request->purpose ?? 'attendance'; // Safely defaults to standard attendance
+        $purpose = $request->purpose ?? 'attendance'; 
+        $method = $request->input('method', 'rfid'); // Extract method or fallback
 
         if ($purpose === 'fee_check') {
             return $this->handleFeeCheck($uid);
@@ -63,61 +59,74 @@ class AttendanceApiController extends Controller
             return $this->handleReportCard($uid);
         }
 
-        // --- ORIGINAL CHAFON / HARDWARE LOGIC ---
-        return $this->handleAttendanceLogging($request, $uid);
+        return $this->handleAttendanceLogging($request, $uid, $method);
     }
 
     /**
-     * NORMALIZES UIDS: Converts '22B40B55' to ['22B40B55', '22:b4:0b:55', '22b40b55', '22:B4:0B:55']
-     * Ensuring the API matches the database no matter how the hardware formats the string.
+     * NEW: Fetch Today's Attendance List for the POS/Mobile App
      */
-    private function getPossibleUids($uid)
+    public function getTodayScans(Request $request)
     {
-        $uid = trim($uid);
-        $cleanUid = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $uid));
-        
-        $uids = [$uid, $cleanUid, strtoupper($cleanUid)];
-        
-        // If it's a valid hex string, generate the colon-separated version
-        if (strlen($cleanUid) > 0 && strlen($cleanUid) % 2 === 0) {
-            $colonUid = implode(':', str_split($cleanUid, 2));
-            $uids[] = $colonUid;
-            $uids[] = strtoupper($colonUid);
+        if ($request->header('X-Hardware-Secret') !== env('HARDWARE_SECRET')) {
+            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
         }
+
+        $today = Carbon::today()->toDateString();
         
-        return array_unique($uids);
+        $records = StudentAttendance::with('student:id,first_name,last_name,student_photo,admission_number')
+            ->where('attendance_date', $today)
+            ->latest('updated_at')
+            ->take(30)
+            ->get()
+            ->map(function($att) {
+                $isCheckOut = $att->check_out !== null;
+                $time = $isCheckOut ? Carbon::parse($att->check_out)->format('h:i A') : Carbon::parse($att->check_in)->format('h:i A');
+                
+                return [
+                    'id' => $att->id,
+                    'student_name' => $att->student->full_name ?? 'Unknown',
+                    'admission_no' => $att->student->admission_number ?? 'N/A',
+                    'photo' => $att->student->student_photo ? asset('storage/'.$att->student->student_photo) : null,
+                    'time' => $time,
+                    'action' => $isCheckOut ? 'Departure' : 'Arrival',
+                    'status' => ucfirst($att->status),
+                    // UI Color Codes for Flutter
+                    'status_color' => $att->status === 'late' ? '#F59E0B' : '#10B981', // Amber (Late) / Emerald (Present)
+                    'action_color' => $isCheckOut ? '#6366F1' : '#3B82F6', // Indigo (Out) / Blue (In)
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $records
+        ]);
     }
 
     // =========================================================================
-    // 100% UNTOUCHED ORIGINAL LOGIC (For Chatbot & Hardware Bridge)
+    // V1 CORE ATTENDANCE LOGIC
     // =========================================================================
     
-    private function handleAttendanceLogging(Request $request, $uid)
+    private function handleAttendanceLogging(Request $request, $uid, $method)
     {
         $scanTime = $request->timestamp ? Carbon::parse($request->timestamp) : Carbon::now();
         $date = $scanTime->toDateString();
         $time = $scanTime->format('H:i:s');
-        $method = $request->method ?? 'rfid'; // Extract method from payload or default to 'rfid'
 
-        $possibleUids = $this->getPossibleUids($uid);
-
-        // Check Student First (NOW CHECKS BOTH NFC AND RFID with Fuzzy Matching)
         $student = Student::with('parent', 'institution')
-            ->whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)       
-            ->orWhereIn('qr_code_token', $possibleUids)
-            ->orWhereIn('admission_number', $possibleUids)
+            ->where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid) 
+            ->orWhere('qr_code_token', $uid)
+            ->orWhere('admission_number', $uid)
             ->first();
 
         if ($student) {
             return $this->processStudentAttendance($student, $date, $time, $scanTime, $method);
         }
 
-        // Check Staff Second
         $staff = Staff::with('user', 'institution')
-            ->whereIn('nfc_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)      
-            ->orWhereIn('employee_id', $possibleUids) 
+            ->where('nfc_uid', $uid)
+            ->orWhere('rfid_uid', $uid)
+            ->orWhere('employee_id', $uid) 
             ->first();
 
         if ($staff) {
@@ -128,7 +137,7 @@ class AttendanceApiController extends Controller
         return response()->json(['status' => 'error', 'success' => false, 'message' => 'Unknown Tag or Card'], 404);
     }
 
-    private function processStudentAttendance($student, $date, $time, $scanTime, $method = 'rfid')
+    private function processStudentAttendance($student, $date, $time, $scanTime, $method)
     {
         if ($student->status !== 'active') {
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student account is inactive.'], 403);
@@ -141,19 +150,28 @@ class AttendanceApiController extends Controller
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'No active academic session'], 400);
         }
 
-        // Fetch the active enrollment to get the class_section_id
         $enrollment = StudentEnrollment::where('student_id', $student->id)
             ->where('academic_session_id', $session->id)
             ->where('status', 'active')
-            ->latest()
             ->first();
 
         if (!$enrollment) {
-            return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student is not actively enrolled in any class for this session.'], 400);
+            return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student is not enrolled in the active session.'], 403);
         }
 
-        $schoolStartTime = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
-        $isLate = $scanTime->format('H:i') > $schoolStartTime;
+        $schoolStartTimeStr = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
+        $lateMargin = (int) InstitutionSetting::get($institutionId, 'late_margin_time', 1); 
+        $cooldownMinutes = (int) InstitutionSetting::get($institutionId, 'double_tap_wait_time', 15); 
+
+        try {
+            $parsedStartTime = Carbon::parse($schoolStartTimeStr);
+            $expectedTime = $scanTime->copy()->setTime($parsedStartTime->hour, $parsedStartTime->minute, 0);
+            $expectedTime->addMinutes($lateMargin)->addSeconds(59);
+            $isLate = $scanTime->gt($expectedTime);
+        } catch (\Exception $e) {
+            $isLate = $scanTime->format('H:i') > '08:00'; 
+        }
+        
         $status = $isLate ? 'late' : 'present';
 
         $attendance = StudentAttendance::where('student_id', $student->id)
@@ -166,7 +184,7 @@ class AttendanceApiController extends Controller
             $attendance = StudentAttendance::create([
                 'institution_id' => $institutionId,
                 'academic_session_id' => $session->id,
-                'class_section_id' => $enrollment->class_section_id, 
+                'class_section_id' => $enrollment->class_section_id,
                 'student_id' => $student->id,
                 'attendance_date' => $date,
                 'status' => $status,
@@ -175,9 +193,15 @@ class AttendanceApiController extends Controller
             ]);
             $action = 'arrival';
         } else {
-            $checkInTime = Carbon::parse($attendance->check_in);
-            if ($scanTime->diffInMinutes($checkInTime) < 15) {
-                return response()->json(['status' => 'ignored', 'success' => true, 'message' => 'Cooldown active. Duplicate scan ignored.'], 200);
+            $cleanCheckInTime = Carbon::parse($attendance->check_in)->format('H:i:s');
+            $checkInTime = Carbon::parse($date . ' ' . $cleanCheckInTime);
+            
+            if ($scanTime->lt($checkInTime)) {
+                return response()->json(['status' => 'error', 'message' => 'Check-out time cannot be before check-in time.'], 400);
+            }
+
+            if ($scanTime->lt($checkInTime->copy()->addMinutes($cooldownMinutes))) {
+                return response()->json(['status' => 'ignored', 'message' => "Cooldown active. Please wait {$cooldownMinutes} minutes."], 200);
             }
 
             $attendance->update(['check_out' => $time]);
@@ -194,15 +218,28 @@ class AttendanceApiController extends Controller
             'name' => $student->first_name . ' ' . $student->last_name,
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
+            'ui_color' => $status === 'late' ? '#F59E0B' : '#10B981', // Send color code for the app
             'message' => ($action === 'arrival' ? 'Welcome' : 'Goodbye') . ', ' . $student->first_name . '!'
         ], 200);
     }
 
-    private function processStaffAttendance($staff, $date, $time, $scanTime, $method = 'rfid')
+    private function processStaffAttendance($staff, $date, $time, $scanTime, $method)
     {
         $institutionId = $staff->institution_id;
-        $schoolStartTime = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
-        $isLate = $scanTime->format('H:i') > $schoolStartTime;
+        
+        $schoolStartTimeStr = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
+        $lateMargin = (int) InstitutionSetting::get($institutionId, 'late_margin_time', 2); 
+        $cooldownMinutes = (int) InstitutionSetting::get($institutionId, 'double_tap_wait_time', 15);
+
+        try {
+            $parsedStartTime = Carbon::parse($schoolStartTimeStr);
+            $expectedTime = $scanTime->copy()->setTime($parsedStartTime->hour, $parsedStartTime->minute, 0);
+            $expectedTime->addMinutes($lateMargin)->addSeconds(59);
+            $isLate = $scanTime->gt($expectedTime);
+        } catch (\Exception $e) {
+            $isLate = $scanTime->format('H:i') > '08:00'; 
+        }
+        
         $status = $isLate ? 'late' : 'present';
 
         $attendance = StaffAttendance::where('staff_id', $staff->id)
@@ -222,9 +259,15 @@ class AttendanceApiController extends Controller
             ]);
             $action = 'arrival';
         } else {
-            $checkInTime = Carbon::parse($attendance->check_in);
-            if ($scanTime->diffInMinutes($checkInTime) < 15) {
-                return response()->json(['status' => 'ignored', 'success' => true, 'message' => 'Cooldown active.'], 200);
+            $cleanCheckInTime = Carbon::parse($attendance->check_in)->format('H:i:s');
+            $checkInTime = Carbon::parse($date . ' ' . $cleanCheckInTime);
+            
+            if ($scanTime->lt($checkInTime)) {
+                return response()->json(['status' => 'error', 'message' => 'Check-out time cannot be before check-in time.'], 400);
+            }
+
+            if ($scanTime->lt($checkInTime->copy()->addMinutes($cooldownMinutes))) {
+                return response()->json(['status' => 'ignored', 'message' => "Cooldown active. Please wait {$cooldownMinutes} minutes."], 200);
             }
 
             $attendance->update(['check_out' => $time]);
@@ -233,13 +276,12 @@ class AttendanceApiController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'success' => true,
             'action' => $action,
             'type' => 'staff',
             'name' => optional($staff->user)->name ?? 'Staff Member',
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
-            'message' => "Staff attendance marked successfully!"
+            'ui_color' => $status === 'late' ? '#F59E0B' : '#10B981',
         ], 200);
     }
 
@@ -263,30 +305,38 @@ class AttendanceApiController extends Controller
             'SchoolName' => optional($student->institution)->name ?? 'School'
         ];
 
-        // Safely dispatch based on school's configuration using the global NotificationService
         $this->notificationService->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
         $this->notificationService->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
     }
 
     // =========================================================================
-    // V2 NEW MODULES (App Specific: Fee Check, Pickup, Report Card)
+    // V2 NEW MODULES (Rich Data Integration)
     // =========================================================================
 
     private function handleFeeCheck($uid)
     {
-        $possibleUids = $this->getPossibleUids($uid);
-
-        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)       
-            ->orWhereIn('admission_number', $possibleUids)
+        $student = Student::where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)
+            ->orWhere('admission_number', $uid)
             ->first();
         
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student Card Not Found.'], 404);
         }
 
-        $totalDue = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])
-            ->get()->sum(fn($inv) => $inv->total_amount - $inv->paid_amount);
+        // Fetch Real Invoices
+        $invoices = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->get();
+        $totalDue = $invoices->sum(fn($inv) => $inv->total_amount - $inv->paid_amount);
+
+        // Format Invoice Breakdown for the UI
+        $invoiceBreakdown = $invoices->map(function($inv) {
+            return [
+                'invoice_number' => $inv->invoice_number,
+                'amount_due' => number_format($inv->total_amount - $inv->paid_amount, 2),
+                'due_date' => $inv->due_date->format('d M, Y'),
+                'status' => ucfirst($inv->status)
+            ];
+        });
 
         if ($totalDue > 0) {
             return response()->json([
@@ -294,7 +344,9 @@ class AttendanceApiController extends Controller
                 'message' => "Payment Threshold Not Met.",
                 'data' => [
                     'student_name' => $student->full_name,
-                    'balance' => number_format($totalDue, 2)
+                    'balance' => number_format($totalDue, 2),
+                    'invoices' => $invoiceBreakdown, // Send Real Data to the App
+                    'color' => '#dc2626' // Red
                 ]
             ]);
         }
@@ -304,7 +356,9 @@ class AttendanceApiController extends Controller
             'message' => 'Payment Threshold Met. Account Cleared.',
             'data' => [
                 'student_name' => $student->full_name,
-                'balance' => '0.00'
+                'balance' => '0.00',
+                'invoices' => [],
+                'color' => '#16a34a' // Green
             ]
         ]);
     }
@@ -316,27 +370,32 @@ class AttendanceApiController extends Controller
             $pickup = StudentPickup::with('student')->where('token', $uid)->first();
 
             if (!$pickup) return response()->json(['success' => false, 'message' => 'Invalid or Expired QR Code.'], 404);
-            if ($pickup->status !== 'pending') return response()->json(['success' => false, 'message' => "QR Code already used."], 400);
+            
+            // Allow 'scanned' or 'pending'. If it's already 'scanned' (completed), deny it.
+            if (in_array($pickup->status, ['scanned', 'completed'])) {
+                return response()->json(['success' => false, 'message' => 'QR Code already used.'], 400);
+            }
 
-            $pickup->update(['status' => 'completed', 'scanned_at' => now(), 'scanned_by_device' => $deviceId]);
+            // FIXED ENUM CRASH: Use 'scanned' instead of 'completed'
+            $pickup->update(['status' => 'scanned', 'scanned_at' => now(), 'scanned_by_device' => $deviceId]);
 
-            // Notifications
             $this->notifyParent($pickup->student, 'departure', now()->format('h:i A'), $pickup->institution_id);
             $this->notifyTeacher($pickup);
 
             return response()->json([
                 'success' => true, 
                 'message' => 'Gate Pass Validated successfully!',
-                'data' => ['student_name' => $pickup->student->full_name]
+                'data' => [
+                    'student_name' => $pickup->student->full_name,
+                    'color' => '#16a34a'
+                ]
             ]);
         }
 
-        $possibleUids = $this->getPossibleUids($uid);
-
-        // 2. Direct Physical NFC Tap Pickup (Parent uses their card to pickup kid)
-        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)      
-            ->orWhereIn('admission_number', $possibleUids)
+        // 2. Direct Physical NFC Tap Pickup
+        $student = Student::where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)
+            ->orWhere('admission_number', $uid)
             ->first();
 
         if ($student) {
@@ -344,7 +403,10 @@ class AttendanceApiController extends Controller
             return response()->json([
                 'success' => true, 
                 'message' => 'NFC Pickup Confirmed! Student released.',
-                'data' => ['student_name' => $student->full_name]
+                'data' => [
+                    'student_name' => $student->full_name,
+                    'color' => '#16a34a'
+                ]
             ]);
         }
 
@@ -353,24 +415,58 @@ class AttendanceApiController extends Controller
 
     private function handleReportCard($uid)
     {
-        $possibleUids = $this->getPossibleUids($uid);
-
-        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)       
-            ->orWhereIn('admission_number', $possibleUids)
+        $student = Student::where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)
+            ->orWhere('admission_number', $uid)
             ->first();
 
         if (!$student) return response()->json(['success' => false, 'message' => 'Student Not Found.'], 404);
 
+        $institutionId = $student->institution_id;
+        
+        // Check Financial Block
+        $isBlocked = InstitutionSetting::get($institutionId, 'block_reports_on_debt', 0);
+        if ($isBlocked) {
+            $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
+            if ($unpaid > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Financial Block: Outstanding balance of $" . number_format($unpaid, 2),
+                    'data' => [
+                        'student_name' => $student->full_name,
+                        'color' => '#dc2626'
+                    ]
+                ], 200); // 200 so the app shows the message gracefully
+            }
+        }
+
+        // Fetch Real Exam Records
+        $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        
+        $records = ExamRecord::with('subject')
+            ->where('student_id', $student->id)
+            ->whereHas('exam', fn($q) => $q->where('academic_session_id', $session->id ?? 0))
+            ->latest('updated_at')
+            ->take(6)
+            ->get()
+            ->map(function($r) {
+                return [
+                    'subject' => $r->subject->name ?? 'N/A',
+                    'marks' => $r->marks_obtained,
+                ];
+            });
+
         return response()->json([
             'success' => true, 
-            'message' => 'Report Card Digitally Signed by Parent!'
+            'message' => 'Report Card Access Granted & Digitally Signed!',
+            'data' => [
+                'student_name' => $student->full_name,
+                'recent_marks' => $records,
+                'color' => '#16a34a'
+            ]
         ]);
     }
 
-    /**
-     * Alerts the Teacher inside the classroom when a kid is picked up at the gate
-     */
     private function notifyTeacher($pickup)
     {
         $enrollment = StudentEnrollment::with(['classSection.classTeacher.user'])
@@ -382,9 +478,7 @@ class AttendanceApiController extends Controller
         if ($enrollment && $enrollment->classSection && $enrollment->classSection->classTeacher) {
             $teacher = $enrollment->classSection->classTeacher->user;
             if ($teacher && $teacher->phone) {
-                // Hardcoded secure message to teacher to bypass templates
                 $message = "🚨 Student Pickup Alert: {$pickup->student->full_name} has just been released at the gate.";
-                // We use performSend directly to avoid relying on a template for this specific internal alert
                 $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, false, 'whatsapp');
             }
         }

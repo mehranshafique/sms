@@ -26,6 +26,8 @@ Route::post('/v1/login', [AuthApiController::class, 'login']);
 Route::prefix('v1/hardware')->group(function () {
     // This single endpoint now handles Attendance, Fee Checks, Pickups, and Report Cards!
     Route::post('/attendance/scan', [AttendanceApiController::class, 'store']);
+    // NEW: Fetch live attendance list for today
+    Route::get('/attendance/today', [AttendanceApiController::class, 'getTodayScans']);
 });
 
 // --- TEACHER APP ROUTES (Requires Sanctum Token) ---
