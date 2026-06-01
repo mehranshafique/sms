@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('staff', function (Blueprint $table) {
-                $table->string('rfid_id')->nullable()->after('nfc_uid');
+                $table->string('rfid_uid')->nullable()->after('nfc_uid');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('staff', function (Blueprint $table) {
-            $table->dropColumn('rfid_id');
+            $table->dropColumn('rfid_uid');
         });
     }
 };
