@@ -18,6 +18,7 @@ class Staff extends Model
         'campus_id',
         'employee_id',
         'nfc_uid',         // Added for RFID/NFC integration
+        'rfid_uid',       // Added for long-range RFID integration
         'qr_code_token',   // Added for unified QR scanning
         'designation',
         'department',
