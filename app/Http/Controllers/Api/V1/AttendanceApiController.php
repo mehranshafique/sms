@@ -73,6 +73,7 @@ class AttendanceApiController extends Controller
         $scanTime = $request->timestamp ? Carbon::parse($request->timestamp) : Carbon::now();
         $date = $scanTime->toDateString();
         $time = $scanTime->format('H:i:s');
+        $method = $request->method ?? 'rfid'; // Extract method from payload or default to 'rfid'
 
         // Check Student First (NOW CHECKS BOTH NFC AND RFID)
         $student = Student::with('parent', 'institution')
@@ -83,7 +84,7 @@ class AttendanceApiController extends Controller
             ->first();
 
         if ($student) {
-            return $this->processStudentAttendance($student, $date, $time, $scanTime);
+            return $this->processStudentAttendance($student, $date, $time, $scanTime, $method);
         }
 
         // Check Staff Second (NOW CHECKS BOTH NFC AND RFID)
@@ -94,14 +95,14 @@ class AttendanceApiController extends Controller
             ->first();
 
         if ($staff) {
-            return $this->processStaffAttendance($staff, $date, $time, $scanTime);
+            return $this->processStaffAttendance($staff, $date, $time, $scanTime, $method);
         }
 
         Log::warning("Universal Scan Failed: Unknown UID - {$uid}");
         return response()->json(['status' => 'error', 'success' => false, 'message' => 'Unknown Tag or Card'], 404);
     }
 
-    private function processStudentAttendance($student, $date, $time, $scanTime)
+    private function processStudentAttendance($student, $date, $time, $scanTime, $method = 'rfid')
     {
         if ($student->status !== 'active') {
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student account is inactive.'], 403);
@@ -144,7 +145,7 @@ class AttendanceApiController extends Controller
                 'attendance_date' => $date,
                 'status' => $status,
                 'check_in' => $time,
-                'method' => 'automated', 
+                'method' => $method, // <-- ENUM ERROR FIX APPLIED HERE
             ]);
             $action = 'arrival';
         } else {
@@ -171,7 +172,7 @@ class AttendanceApiController extends Controller
         ], 200);
     }
 
-    private function processStaffAttendance($staff, $date, $time, $scanTime)
+    private function processStaffAttendance($staff, $date, $time, $scanTime, $method = 'rfid')
     {
         $institutionId = $staff->institution_id;
         $schoolStartTime = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
@@ -191,7 +192,7 @@ class AttendanceApiController extends Controller
                 'attendance_date' => $date,
                 'status' => $status,
                 'check_in' => $time,
-                'method' => 'automated',
+                'method' => $method, // <-- ENUM ERROR FIX APPLIED HERE
             ]);
             $action = 'arrival';
         } else {
