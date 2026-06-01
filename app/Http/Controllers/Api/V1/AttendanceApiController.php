@@ -74,9 +74,10 @@ class AttendanceApiController extends Controller
         $date = $scanTime->toDateString();
         $time = $scanTime->format('H:i:s');
 
-        // Check Student First
+        // Check Student First (NOW CHECKS BOTH NFC AND RFID)
         $student = Student::with('parent', 'institution')
             ->where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
             ->orWhere('qr_code_token', $uid)
             ->orWhere('admission_number', $uid)
             ->first();
@@ -85,9 +86,10 @@ class AttendanceApiController extends Controller
             return $this->processStudentAttendance($student, $date, $time, $scanTime);
         }
 
-        // Check Staff Second
+        // Check Staff Second (NOW CHECKS BOTH NFC AND RFID)
         $staff = Staff::with('user', 'institution')
             ->where('nfc_uid', $uid)
+            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
             ->orWhere('employee_id', $uid) 
             ->first();
 
@@ -112,6 +114,17 @@ class AttendanceApiController extends Controller
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'No active academic session'], 400);
         }
 
+        // --- CRITICAL FIX: Fetch active enrollment to get the class_section_id ---
+        $enrollment = StudentEnrollment::where('student_id', $student->id)
+            ->where('academic_session_id', $session->id)
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+
+        if (!$enrollment) {
+            return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student is not actively enrolled in any class for this session.'], 400);
+        }
+
         $schoolStartTime = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
         $isLate = $scanTime->format('H:i') > $schoolStartTime;
         $status = $isLate ? 'late' : 'present';
@@ -126,6 +139,7 @@ class AttendanceApiController extends Controller
             $attendance = StudentAttendance::create([
                 'institution_id' => $institutionId,
                 'academic_session_id' => $session->id,
+                'class_section_id' => $enrollment->class_section_id, // <-- FIX APPLIED HERE
                 'student_id' => $student->id,
                 'attendance_date' => $date,
                 'status' => $status,
@@ -233,6 +247,7 @@ class AttendanceApiController extends Controller
     private function handleFeeCheck($uid)
     {
         $student = Student::where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
             ->orWhere('admission_number', $uid)
             ->first();
         
@@ -287,7 +302,11 @@ class AttendanceApiController extends Controller
         }
 
         // 2. Direct Physical NFC Tap Pickup (Parent uses their card to pickup kid)
-        $student = Student::where('nfc_tag_uid', $uid)->orWhere('admission_number', $uid)->first();
+        $student = Student::where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
+            ->orWhere('admission_number', $uid)
+            ->first();
+
         if ($student) {
             $this->notifyParent($student, 'departure', now()->format('h:i A'), $student->institution_id);
             return response()->json([
@@ -302,7 +321,11 @@ class AttendanceApiController extends Controller
 
     private function handleReportCard($uid)
     {
-        $student = Student::where('nfc_tag_uid', $uid)->orWhere('admission_number', $uid)->first();
+        $student = Student::where('nfc_tag_uid', $uid)
+            ->orWhere('rfid_uid', $uid)       // <--- FIX ADDED HERE
+            ->orWhere('admission_number', $uid)
+            ->first();
+
         if (!$student) return response()->json(['success' => false, 'message' => 'Student Not Found.'], 404);
 
         return response()->json([
