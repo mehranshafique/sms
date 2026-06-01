@@ -111,12 +111,14 @@ class AttendanceApiController extends Controller
         $scanTime = $request->timestamp ? Carbon::parse($request->timestamp) : Carbon::now();
         $date = $scanTime->toDateString();
         $time = $scanTime->format('H:i:s');
+        
+        $possibleUids = $this->getPossibleUids($uid);
 
         $student = Student::with('parent', 'institution')
-            ->where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid) 
-            ->orWhere('qr_code_token', $uid)
-            ->orWhere('admission_number', $uid)
+            ->whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids) 
+            ->orWhereIn('qr_code_token', $possibleUids)
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
 
         if ($student) {
@@ -124,9 +126,9 @@ class AttendanceApiController extends Controller
         }
 
         $staff = Staff::with('user', 'institution')
-            ->where('nfc_uid', $uid)
-            ->orWhere('rfid_uid', $uid)
-            ->orWhere('employee_id', $uid) 
+            ->whereIn('nfc_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)
+            ->orWhereIn('employee_id', $possibleUids) 
             ->first();
 
         if ($staff) {
@@ -315,9 +317,11 @@ class AttendanceApiController extends Controller
 
     private function handleFeeCheck($uid)
     {
-        $student = Student::where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)
-            ->orWhere('admission_number', $uid)
+        $possibleUids = $this->getPossibleUids($uid);
+
+        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
         
         if (!$student) {
@@ -392,10 +396,12 @@ class AttendanceApiController extends Controller
             ]);
         }
 
+        $possibleUids = $this->getPossibleUids($uid);
+
         // 2. Direct Physical NFC Tap Pickup
-        $student = Student::where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)
-            ->orWhere('admission_number', $uid)
+        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
 
         if ($student) {
@@ -415,9 +421,11 @@ class AttendanceApiController extends Controller
 
     private function handleReportCard($uid)
     {
-        $student = Student::where('nfc_tag_uid', $uid)
-            ->orWhere('rfid_uid', $uid)
-            ->orWhere('admission_number', $uid)
+        $possibleUids = $this->getPossibleUids($uid);
+
+        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
+            ->orWhereIn('rfid_uid', $possibleUids)
+            ->orWhereIn('admission_number', $possibleUids)
             ->first();
 
         if (!$student) return response()->json(['success' => false, 'message' => 'Student Not Found.'], 404);
@@ -482,5 +490,22 @@ class AttendanceApiController extends Controller
                 $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, false, 'whatsapp');
             }
         }
+    }
+
+    /**
+     * Fuzzy match for NFC/RFID UIDs
+     * Generates colon-separated and raw hex variations for broad matching.
+     */
+    private function getPossibleUids($uid)
+    {
+        $clean = str_replace([':', ' ', '-'], '', $uid);
+        $lower = strtolower($clean);
+        $upper = strtoupper($clean);
+        
+        // Generate standard colon format (e.g. 22:b4:0b:55)
+        $withColonsLower = implode(':', str_split($lower, 2));
+        $withColonsUpper = implode(':', str_split($upper, 2));
+        
+        return array_unique([$uid, $clean, $lower, $upper, $withColonsLower, $withColonsUpper]);
     }
 }
