@@ -54,4 +54,25 @@ class AuthApiController extends Controller
             ]
         ], 200);
     }
+
+    /**
+     * Update FCM Token for Push Notifications
+     */
+    public function updateFcmToken(Request $request)
+    {
+        $request->validate([
+            'fcm_token' => 'required|string',
+        ]);
+
+        $user = $request->user();
+        
+        if ($user) {
+            $user->update(['fcm_token' => $request->fcm_token]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'FCM Token updated successfully.'
+        ]);
+    }
 }

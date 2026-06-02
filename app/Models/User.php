@@ -31,7 +31,8 @@ class User extends Authenticatable
         'address',
         'is_active',
         'language',
-        'profile_picture' // Fixed: Added profile_picture to allowed mass assignment fields
+        'profile_picture', // Fixed: Added profile_picture to allowed mass assignment fields
+        'fcm_token' // <--- ADDED FOR PUSH NOTIFICATIONS
     ];
 
     /**

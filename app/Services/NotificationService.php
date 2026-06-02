@@ -15,6 +15,7 @@ use App\Services\Sms\GatewayFactory;
 use App\Services\Sms\InfobipService; 
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class NotificationService
 {
@@ -589,6 +590,117 @@ class NotificationService
              } catch (\Exception $e) {
                  Log::error("Fund Request Processed Email Error: " . $e->getMessage());
              }
+        }
+    }
+
+    // --- NEW: FCM HTTP v1 OAUTH TOKEN GENERATOR ---
+    private function getFcmAccessToken($credentialsFilePath)
+    {
+        $jsonKey = json_decode(file_get_contents($credentialsFilePath), true);
+        $clientEmail = $jsonKey['client_email'];
+        $privateKey = $jsonKey['private_key'];
+
+        $header = json_encode(['alg' => 'RS256', 'typ' => 'JWT']);
+        $now = time();
+        $payload = json_encode([
+            'iss' => $clientEmail,
+            'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
+            'aud' => 'https://oauth2.googleapis.com/token',
+            'exp' => $now + 3600,
+            'iat' => $now
+        ]);
+
+        $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
+        $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($payload));
+
+        $signature = '';
+        openssl_sign($base64UrlHeader . "." . $base64UrlPayload, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+        $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+
+        $jwt = $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion' => $jwt
+        ]);
+
+        if ($response->successful()) {
+            return $response->json('access_token');
+        }
+
+        Log::error("Failed to generate FCM Access Token: " . $response->body());
+        return null;
+    }
+
+    // --- NEW: PUSH NOTIFICATION METHOD (HTTP v1) ---
+    public function sendPushNotification($userId, $title, $body, $data = [])
+    {
+        try {
+            $user = User::find($userId);
+            
+            if (!$user) {
+                return ['success' => false, 'message' => 'User not found'];
+            }
+
+            $deviceToken = $user->fcm_token ?? null;
+
+            if (!$deviceToken) {
+                Log::info("Push Notification Skipped: No device token for User ID {$userId}");
+                return ['success' => false, 'message' => 'No device token associated with this user.'];
+            }
+
+            $credentialsFilePath = storage_path('app/firebase-credentials.json');
+
+            if (!file_exists($credentialsFilePath)) {
+                Log::warning("Push Notification Skipped: Missing firebase-credentials.json file in storage/app/.");
+                return ['success' => false, 'message' => 'Missing Firebase V1 Credentials file.'];
+            }
+
+            $jsonKey = json_decode(file_get_contents($credentialsFilePath), true);
+            $projectId = $jsonKey['project_id'];
+
+            $accessToken = $this->getFcmAccessToken($credentialsFilePath);
+
+            if (!$accessToken) {
+                return ['success' => false, 'message' => 'Failed to authenticate with Firebase'];
+            }
+
+            // V1 requires all data payload values to be strict strings
+            $stringifiedData = [];
+            foreach ($data as $key => $value) {
+                $stringifiedData[$key] = strval($value);
+            }
+
+            // HTTP V1 Payload Structure
+            $payload = [
+                'message' => [
+                    'token' => $deviceToken,
+                    'notification' => [
+                        'title' => $title,
+                        'body' => $body,
+                    ],
+                ]
+            ];
+
+            if (!empty($stringifiedData)) {
+                $payload['message']['data'] = $stringifiedData;
+            }
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Content-Type' => 'application/json',
+            ])->post("https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send", $payload);
+
+            if ($response->successful()) {
+                return ['success' => true, 'message' => 'Push notification sent successfully via V1 API'];
+            }
+
+            Log::error("FCM API V1 Error: " . $response->body());
+            return ['success' => false, 'message' => 'Failed to send push notification via FCM V1 gateway'];
+
+        } catch (\Exception $e) {
+            Log::error("Push Notification Exception: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 }
