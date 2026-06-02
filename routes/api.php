@@ -21,21 +21,17 @@ use App\Http\Controllers\Api\AuthApiController;
 
 // --- MOBILE APP STAFF AUTHENTICATION ---
 Route::post('/v1/login', [AuthApiController::class, 'login']);
-
-// --- PUSH NOTIFICATION TOKEN UPDATE ---
-Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']);
+Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']); // NEW
 
 // --- UNIVERSAL HARDWARE & APP SCANNER (NFC, RFID, QR) ---
 Route::prefix('v1/hardware')->group(function () {
-    // This single endpoint now handles Attendance, Fee Checks, Pickups, and Report Cards!
     Route::post('/attendance/scan', [AttendanceApiController::class, 'store']);
-    // NEW: Fetch live attendance list for today
     Route::get('/attendance/today', [AttendanceApiController::class, 'getTodayScans']);
 });
 
 // --- TEACHER APP ROUTES (Requires Sanctum Token) ---
 Route::prefix('v1/pickup')->middleware(['auth:sanctum'])->group(function () {
-    Route::get('/count', [AppPickupController::class, 'getPendingCount']);
+    Route::get('/count', [AppPickupController::class, 'getPendingCount']); // NEW: NOTIFICATION COUNT
     Route::get('/pending', [AppPickupController::class, 'getPendingPickups']);
     Route::post('/approve', [AppPickupController::class, 'approvePickup']);
 });
