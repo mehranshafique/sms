@@ -610,20 +610,27 @@ class AttendanceApiController extends Controller
         $instType = $institution->type ?? 'primary';
         $isSubjectWise = in_array($instType, ['university', 'vocational']);
         
-        // Fetch ALL active sections assigned to this teacher (Class Teacher OR Timetable OR Subject Allocation)
+        // --- THE FIX: Direct relationship queries to prevent 500 crashes ---
+        $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
+        
+        $timetableIds = \App\Models\Timetable::where('teacher_id', $staffId)
+            ->where('day_of_week', $dayOfWeek)
+            ->pluck('class_section_id')->toArray();
+            
+        $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)
+            ->pluck('class_section_id')->toArray();
+
+        $allAssignedClassIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+
         $sections = \App\Models\ClassSection::where('institution_id', $user->institute_id)
             ->where('is_active', true)
-            ->where(function($q) use ($staffId, $dayOfWeek) {
-                $q->where('staff_id', $staffId) // 1. Is Class/Homeroom Teacher
-                  ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
-                      $t->where('teacher_id', $staffId)
-                        ->where('day_of_week', $dayOfWeek); // 2. Has a class in the timetable TODAY
-                  })
-                  ->orWhereHas('classSubjects', function($c) use ($staffId) {
-                      $c->where('teacher_id', $staffId); // 3. Is allocated to this class generally
-                  });
-            })
+            ->whereIn('id', $allAssignedClassIds)
             ->get();
+
+        $currentSession = \App\Models\AcademicSession::where('institution_id', $user->institute_id)
+            ->where('is_current', true)->first();
+        $sessionId = $currentSession ? $currentSession->id : null;
+        // --- END FIX ---
 
         $report = [];
 
@@ -631,6 +638,7 @@ class AttendanceApiController extends Controller
             // Get active enrollments for this specific section
             $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
                 ->where('class_section_id', $section->id)
+                ->where('academic_session_id', $sessionId)
                 ->where('status', 'active')
                 ->get();
 

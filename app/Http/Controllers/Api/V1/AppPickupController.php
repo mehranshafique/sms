@@ -33,19 +33,15 @@ class AppPickupController extends Controller
         if ($user->hasRole('Teacher')) {
             if ($user->staff) {
                 $staffId = $user->staff->id;
-                $dayOfWeek = strtolower(now()->format('l'));
+                $dayOfWeek = strtolower(now()->format('l')); // e.g., 'tuesday'
                 
-                // Fetch classes where teacher is Class Teacher OR has a Timetable today OR is Subject Allocated
-                $classIds = \App\Models\ClassSection::where('institution_id', $user->institute_id)
-                    ->where(function($q) use ($staffId, $dayOfWeek) {
-                        $q->where('staff_id', $staffId)
-                          ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
-                              $t->where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek);
-                          })
-                          ->orWhereHas('classSubjects', function($c) use ($staffId) {
-                              $c->where('teacher_id', $staffId);
-                          });
-                    })->pluck('id')->toArray();
+                // --- THE FIX: Direct relationship queries to prevent 500 crashes ---
+                $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
+                $timetableIds = \App\Models\Timetable::where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek)->pluck('class_section_id')->toArray();
+                $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)->pluck('class_section_id')->toArray();
+                
+                $classIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+                // --- END FIX ---
 
                 $query->whereHas('student.enrollments', function($q) use ($classIds) {
                     $q->whereIn('class_section_id', $classIds)->where('status', 'active');
@@ -86,16 +82,13 @@ class AppPickupController extends Controller
                 $staffId = $user->staff->id;
                 $dayOfWeek = strtolower(now()->format('l'));
                 
-                $classIds = \App\Models\ClassSection::where('institution_id', $user->institute_id)
-                    ->where(function($q) use ($staffId, $dayOfWeek) {
-                        $q->where('staff_id', $staffId)
-                          ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
-                              $t->where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek);
-                          })
-                          ->orWhereHas('classSubjects', function($c) use ($staffId) {
-                              $c->where('teacher_id', $staffId);
-                          });
-                    })->pluck('id')->toArray();
+                // --- THE FIX: Direct relationship queries to prevent 500 crashes ---
+                $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
+                $timetableIds = \App\Models\Timetable::where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek)->pluck('class_section_id')->toArray();
+                $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)->pluck('class_section_id')->toArray();
+                
+                $classIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+                // --- END FIX ---
 
                 $query->whereHas('student.enrollments', function($q) use ($classIds) {
                     $q->whereIn('class_section_id', $classIds)->where('status', 'active');
@@ -225,16 +218,13 @@ class AppPickupController extends Controller
                 $staffId = $user->staff->id;
                 $dayOfWeek = strtolower(now()->format('l'));
                 
-                $classIds = \App\Models\ClassSection::where('institution_id', $user->institute_id)
-                    ->where(function($q) use ($staffId, $dayOfWeek) {
-                        $q->where('staff_id', $staffId)
-                          ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
-                              $t->where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek);
-                          })
-                          ->orWhereHas('classSubjects', function($c) use ($staffId) {
-                              $c->where('teacher_id', $staffId);
-                          });
-                    })->pluck('id')->toArray();
+                // --- THE FIX: Direct relationship queries to prevent 500 crashes ---
+                $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
+                $timetableIds = \App\Models\Timetable::where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek)->pluck('class_section_id')->toArray();
+                $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)->pluck('class_section_id')->toArray();
+                
+                $classIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+                // --- END FIX ---
 
                 $studentEnrollment = $pickup->student->enrollments->where('status', 'active')->first();
                 
