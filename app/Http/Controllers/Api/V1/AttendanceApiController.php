@@ -594,7 +594,7 @@ class AttendanceApiController extends Controller
      */
     public function getTeacherClassAbsentees(Request $request)
     {
-        $user = Auth::user();
+        $user = \Illuminate\Support\Facades\Auth::user();
         
         // Ensure the user is a teacher and has a staff profile
         if (!$user->hasRole('Teacher') || !$user->staff) {
@@ -603,7 +603,7 @@ class AttendanceApiController extends Controller
 
         $today = \Carbon\Carbon::today()->toDateString();
         
-        // Fetch all active sections assigned to this teacher[cite: 40]
+        // Fetch all active sections assigned to this teacher
         $sections = \App\Models\ClassSection::where('staff_id', $user->staff->id)
             ->where('is_active', true)
             ->get();
@@ -637,13 +637,19 @@ class AttendanceApiController extends Controller
                 if ($attendance && in_array($attendance->status, ['present', 'late'])) {
                     $presentCount++;
                 } else {
-                    // Otherwise, they are absent. Fetch parent contact.
+                    // Otherwise, they are absent. Fetch parent contact safely using ?->
                     $parent = $student->parent;
-                    $phone = $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone ?? 'N/A';
+                    $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? 'N/A';
                     
+                    // Safely format name
+                    $firstName = $student->first_name ?? '';
+                    $lastName = $student->last_name ?? '';
+                    $admNo = $student->admission_number ?? 'N/A';
+                    $fullName = trim("{$firstName} {$lastName}");
+                    if (empty($fullName)) $fullName = 'Unknown Student';
+
                     $absenteesList[] = [
-                        // Strictly enforce Admission Number appending
-                        'student_name' => $student->first_name . ' ' . $student->last_name . ' (' . ($student->admission_number ?? 'N/A') . ')',
+                        'student_name' => "{$fullName} ({$admNo})",
                         'parent_phone' => $phone,
                     ];
                 }
@@ -652,7 +658,7 @@ class AttendanceApiController extends Controller
             // Only include sections in the report if they have enrolled students
             if ($totalClass > 0) {
                 $report[] = [
-                    'section_name' => $section->name,
+                    'section_name' => $section->name ?? 'Unknown Section',
                     'total_class' => $totalClass,
                     'total_present' => $presentCount,
                     'total_absent' => $totalClass - $presentCount,
