@@ -27,7 +27,7 @@ Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiControll
 Route::prefix('v1/hardware')->group(function () {
     Route::post('/attendance/scan', [AttendanceApiController::class, 'store']);
     Route::get('/attendance/today', [AttendanceApiController::class, 'getTodayScans']);
-    Route::get('/attendance/absentees', [AttendanceApiController::class, 'getTodayAbsentees'])->middleware('auth:sanctum'); // Task 10: Absentees
+    Route::get('/attendance/absentees', [AttendanceApiController::class, 'getTeacherClassAbsentees'])->middleware('auth:sanctum'); // Task 10: Absentees
 });
 
 // --- TEACHER APP ROUTES (Requires Sanctum Token) ---

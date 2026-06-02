@@ -589,6 +589,85 @@ class AttendanceApiController extends Controller
     }
 
     /**
+     * Fetch Absentee Report Grouped by Class Sections for the Logged-in Teacher
+     * Endpoint: GET /api/v1/attendance/absentees
+     */
+    public function getTeacherClassAbsentees(Request $request)
+    {
+        $user = Auth::user();
+        
+        // Ensure the user is a teacher and has a staff profile
+        if (!$user->hasRole('Teacher') || !$user->staff) {
+            return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
+        }
+
+        $today = \Carbon\Carbon::today()->toDateString();
+        
+        // Fetch all active sections assigned to this teacher[cite: 40]
+        $sections = \App\Models\ClassSection::where('staff_id', $user->staff->id)
+            ->where('is_active', true)
+            ->get();
+
+        $report = [];
+
+        foreach ($sections as $section) {
+            // Get active enrollments for this specific section
+            $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
+                ->where('class_section_id', $section->id)
+                ->where('status', 'active')
+                ->get();
+
+            $studentIds = $enrollments->pluck('student_id')->toArray();
+            $totalClass = count($studentIds);
+
+            // Get today's attendance records for these students
+            $attendances = \App\Models\StudentAttendance::whereIn('student_id', $studentIds)
+                ->where('attendance_date', $today)
+                ->get()
+                ->keyBy('student_id');
+
+            $presentCount = 0;
+            $absenteesList = [];
+
+            foreach ($enrollments as $enrollment) {
+                $student = $enrollment->student;
+                $attendance = $attendances->get($student->id);
+
+                // If they have a record and are present/late, count as present
+                if ($attendance && in_array($attendance->status, ['present', 'late'])) {
+                    $presentCount++;
+                } else {
+                    // Otherwise, they are absent. Fetch parent contact.
+                    $parent = $student->parent;
+                    $phone = $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone ?? 'N/A';
+                    
+                    $absenteesList[] = [
+                        // Strictly enforce Admission Number appending
+                        'student_name' => $student->first_name . ' ' . $student->last_name . ' (' . ($student->admission_number ?? 'N/A') . ')',
+                        'parent_phone' => $phone,
+                    ];
+                }
+            }
+
+            // Only include sections in the report if they have enrolled students
+            if ($totalClass > 0) {
+                $report[] = [
+                    'section_name' => $section->name,
+                    'total_class' => $totalClass,
+                    'total_present' => $presentCount,
+                    'total_absent' => $totalClass - $presentCount,
+                    'absentees' => $absenteesList,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $report
+        ]);
+    }
+
+    /**
      * Fuzzy match for NFC/RFID UIDs
      */
     private function getPossibleUids($uid)
