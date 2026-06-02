@@ -64,6 +64,8 @@ class AppPickupController extends Controller
     public function getPendingPickups(Request $request)
     {
         $user = Auth::user();
+        
+        \Illuminate\Support\Facades\Log::info('--- START getPendingPickups ---', ['user_id' => $user->id ?? 'guest']);
 
         $query = StudentPickup::with(['student.enrollments.classSection']);
 
@@ -88,12 +90,15 @@ class AppPickupController extends Controller
                 $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)->pluck('class_section_id')->toArray();
                 
                 $classIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+                
+                \Illuminate\Support\Facades\Log::info("Teacher Staff ID {$staffId} assigned class IDs: ", $classIds);
                 // --- END FIX ---
 
                 $query->whereHas('student.enrollments', function($q) use ($classIds) {
                     $q->whereIn('class_section_id', $classIds)->where('status', 'active');
                 });
             } else {
+                \Illuminate\Support\Facades\Log::warning("Teacher user {$user->id} has no staff profile attached!");
                 $query->whereRaw('1 = 0'); // Failsafe if teacher has no staff profile
             }
         }
@@ -122,6 +127,8 @@ class AppPickupController extends Controller
                 'time' => $pickup->scanned_at ? $pickup->scanned_at->format('H:i') : $pickup->created_at->format('H:i'),
             ];
         });
+        
+        \Illuminate\Support\Facades\Log::info("Found " . count($pickups) . " pending pickups.");
 
         return response()->json(['success' => true, 'data' => $pickups]);
     }

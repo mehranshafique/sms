@@ -529,7 +529,7 @@ class AttendanceApiController extends Controller
             if ($teacher && $teacher->phone) {
                 $message = __('notifications.teacher_pickup_alert', ['student_name' => $pickup->student->full_name]);
                 if ($message === 'notifications.teacher_pickup_alert') {
-                    $message = "🚨 Student Pickup Alert: {$pickup->student->full_name}'s parent is waiting at the gate.";
+                    $message = "ðŸš¨ Student Pickup Alert: {$pickup->student->full_name}'s parent is waiting at the gate.";
                 }
                 $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, false, 'whatsapp');
             }
@@ -537,7 +537,7 @@ class AttendanceApiController extends Controller
             if ($teacher && $teacher->id && method_exists($this->notificationService, 'sendPushNotification')) {
                 $title = __('notifications.parent_at_gate_title');
                 if ($title === 'notifications.parent_at_gate_title') {
-                    $title = "Parent at Gate 🚨";
+                    $title = "Parent at Gate ðŸš¨";
                 }
                 $body = __('notifications.parent_at_gate_body', ['student_first_name' => $pickup->student->first_name]);
                 if ($body === 'notifications.parent_at_gate_body') {
@@ -596,14 +596,22 @@ class AttendanceApiController extends Controller
     {
         $user = \Illuminate\Support\Facades\Auth::user();
         
-        // Ensure the user is a teacher and has a staff profile
-        if (!$user->hasRole('Teacher') || !$user->staff) {
+        \Illuminate\Support\Facades\Log::info('--- START getTeacherClassAbsentees ---', ['user_id' => $user->id ?? 'guest']);
+        
+        // Ensure the user exists, is a teacher, and has a staff profile
+        if (!$user || !$user->hasRole('Teacher') || !$user->staff) {
+            \Illuminate\Support\Facades\Log::warning('Unauthorized access attempt in getTeacherClassAbsentees', [
+                'roles' => $user ? $user->getRoleNames() : 'none', 
+                'has_staff' => $user && $user->staff
+            ]);
             return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
         }
 
         $today = \Carbon\Carbon::today()->toDateString();
         $dayOfWeek = strtolower(now()->format('l')); // e.g., 'tuesday'
         $staffId = $user->staff->id;
+        
+        \Illuminate\Support\Facades\Log::info("Teacher Staff ID: {$staffId}, Day: {$dayOfWeek}");
         
         // SMART LOGIC: Check institution type for future Subject-wise attendance
         $institution = clone $user->institute;
@@ -622,6 +630,13 @@ class AttendanceApiController extends Controller
 
         $allAssignedClassIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
 
+        \Illuminate\Support\Facades\Log::info("Class IDs Found", [
+            'homeroom' => $homeroomIds,
+            'timetable' => $timetableIds,
+            'allocated' => $allocatedIds,
+            'merged_unique' => $allAssignedClassIds
+        ]);
+
         $sections = \App\Models\ClassSection::where('institution_id', $user->institute_id)
             ->where('is_active', true)
             ->whereIn('id', $allAssignedClassIds)
@@ -635,8 +650,11 @@ class AttendanceApiController extends Controller
         $report = [];
 
         foreach ($sections as $section) {
+            \Illuminate\Support\Facades\Log::info("Processing Section ID: {$section->id} - {$section->name}");
+            
             // Get active enrollments for this specific section
             $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
+                ->whereHas('student') // FIX: Exclude orphaned enrollments where the student was deleted
                 ->where('class_section_id', $section->id)
                 ->where('academic_session_id', $sessionId)
                 ->where('status', 'active')
@@ -644,6 +662,8 @@ class AttendanceApiController extends Controller
 
             $studentIds = $enrollments->pluck('student_id')->toArray();
             $totalClass = count($studentIds);
+
+            \Illuminate\Support\Facades\Log::info("Section {$section->name} has {$totalClass} active students.");
 
             // Get today's attendance records for these students
             // NOTE: When Subject-wise attendance is implemented for University, this query will target SubjectAttendance instead.
@@ -657,6 +677,13 @@ class AttendanceApiController extends Controller
 
             foreach ($enrollments as $enrollment) {
                 $student = $enrollment->student;
+
+                // Extra failsafe against null students
+                if (!$student) {
+                    \Illuminate\Support\Facades\Log::warning("Orphaned Enrollment Skipped. Enrollment ID: {$enrollment->id}");
+                    continue;
+                }
+
                 $attendance = $attendances->get($student->id);
 
                 // If they have a record and are present/late, count as present
@@ -694,11 +721,15 @@ class AttendanceApiController extends Controller
             }
         }
 
+        \Illuminate\Support\Facades\Log::info("Final Report Count: " . count($report));
+
         return response()->json([
             'success' => true,
             'data' => $report
         ]);
     }
+
+
 
     /**
      * Fuzzy match for NFC/RFID UIDs
