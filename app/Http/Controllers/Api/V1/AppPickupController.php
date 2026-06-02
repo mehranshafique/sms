@@ -17,10 +17,6 @@ class AppPickupController extends Controller
         $this->notificationService = $notificationService;
     }
 
-    /**
-     * Fetch optimized count of pending pickups for notification badges
-     * Endpoint: GET /api/v1/pickup/count
-     */
     public function getPendingCount(Request $request)
     {
         $user = Auth::user();
@@ -36,8 +32,21 @@ class AppPickupController extends Controller
         // 2. ROLE PERMISSION: Filter by assigned class if the user is a Teacher
         if ($user->hasRole('Teacher')) {
             if ($user->staff) {
-                // ALIGNED WITH WEB CONTROLLER: Use staff_id and active enrollments
-                $classIds = \App\Models\ClassSection::where('staff_id', $user->staff->id)->pluck('id');
+                $staffId = $user->staff->id;
+                $dayOfWeek = strtolower(now()->format('l'));
+                
+                // Fetch classes where teacher is Class Teacher OR has a Timetable today OR is Subject Allocated
+                $classIds = \App\Models\ClassSection::where('institution_id', $user->institute_id)
+                    ->where(function($q) use ($staffId, $dayOfWeek) {
+                        $q->where('staff_id', $staffId)
+                          ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
+                              $t->where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek);
+                          })
+                          ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                              $c->where('teacher_id', $staffId);
+                          });
+                    })->pluck('id')->toArray();
+
                 $query->whereHas('student.enrollments', function($q) use ($classIds) {
                     $q->whereIn('class_section_id', $classIds)->where('status', 'active');
                 });
@@ -74,8 +83,20 @@ class AppPickupController extends Controller
         // 3. ROLE PERMISSION: Filter by assigned class if the user is a Teacher
         if ($user->hasRole('Teacher')) {
             if ($user->staff) {
-                // ALIGNED WITH WEB CONTROLLER: Use staff_id and active enrollments
-                $classIds = \App\Models\ClassSection::where('staff_id', $user->staff->id)->pluck('id');
+                $staffId = $user->staff->id;
+                $dayOfWeek = strtolower(now()->format('l'));
+                
+                $classIds = \App\Models\ClassSection::where('institution_id', $user->institute_id)
+                    ->where(function($q) use ($staffId, $dayOfWeek) {
+                        $q->where('staff_id', $staffId)
+                          ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
+                              $t->where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek);
+                          })
+                          ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                              $c->where('teacher_id', $staffId);
+                          });
+                    })->pluck('id')->toArray();
+
                 $query->whereHas('student.enrollments', function($q) use ($classIds) {
                     $q->whereIn('class_section_id', $classIds)->where('status', 'active');
                 });
@@ -85,7 +106,6 @@ class AppPickupController extends Controller
         }
 
         $pickups = $query->latest()->get()->map(function($pickup) {
-            // Prioritize the active enrollment for class display
             $activeEnrollment = $pickup->student->enrollments->where('status', 'active')->first() 
                                 ?? $pickup->student->enrollments->first();
                                 
@@ -98,7 +118,7 @@ class AppPickupController extends Controller
             
             return [
                 'pickup_id' => $pickup->id,
-                // Task 1 Global: Append admission number
+                // Task Global: Append admission number
                 'student_name' => $pickup->student->full_name . ' (' . $admNo . ')',
                 'admission_number' => $admNo,
                 'parent_phone' => $parentPhone,
@@ -122,7 +142,10 @@ class AppPickupController extends Controller
         $request->validate(['student_id' => 'required']);
         $user = Auth::user();
         
-        $student = \App\Models\Student::findOrFail($request->student_id);
+        // Match either DB ID or Admission Number
+        $student = \App\Models\Student::where('id', $request->student_id)
+            ->orWhere('admission_number', $request->student_id)
+            ->firstOrFail();
         
         // Generate 6 digit OTP
         $otp = rand(100000, 999999);
@@ -133,7 +156,11 @@ class AppPickupController extends Controller
         // Notify via SMS
         $this->notificationService->sendOtpNotification($student, $otp);
         
-        return response()->json(['success' => true, 'message' => 'pickup_otp_sent']);
+        return response()->json([
+            'success' => true, 
+            'message' => 'pickup_otp_sent', 
+            'student_id' => $student->id // Return actual ID for verification
+        ]);
     }
 
     /**
@@ -167,15 +194,20 @@ class AppPickupController extends Controller
         ]);
 
         // Clear cache
-        \Illuminate\Support\Facades\Cache::forget('pickup_otp_' . $student->id);
+        \Illuminate\Support\Facades\Cache::forget('pickup_otp_' . $request->student_id);
 
-        return response()->json(['success' => true, 'message' => 'pickup_wait_for_teacher']);
+        $admNo = $student->admission_number ?? 'N/A';
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'pickup_wait_for_teacher',
+            'data' => [
+                'student_name' => $student->full_name . ' (' . $admNo . ')',
+                'color' => '#F59E0B'
+            ]
+        ]);
     }
 
-    /**
-     * Manual Approval from the Teacher's Screen
-     * Endpoint: POST /api/v1/pickup/approve
-     */
     public function approvePickup(Request $request)
     {
         $request->validate(['pickup_id' => 'required']);
@@ -190,8 +222,20 @@ class AppPickupController extends Controller
             $canApprove = true; // Admins can approve anyone
         } elseif ($user->hasRole('Teacher')) {
             if ($user->staff) {
-                // ALIGNED WITH WEB CONTROLLER: Ensure student's active enrollment matches teacher's assigned class
-                $classIds = \App\Models\ClassSection::where('staff_id', $user->staff->id)->pluck('id')->toArray();
+                $staffId = $user->staff->id;
+                $dayOfWeek = strtolower(now()->format('l'));
+                
+                $classIds = \App\Models\ClassSection::where('institution_id', $user->institute_id)
+                    ->where(function($q) use ($staffId, $dayOfWeek) {
+                        $q->where('staff_id', $staffId)
+                          ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
+                              $t->where('teacher_id', $staffId)->where('day_of_week', $dayOfWeek);
+                          })
+                          ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                              $c->where('teacher_id', $staffId);
+                          });
+                    })->pluck('id')->toArray();
+
                 $studentEnrollment = $pickup->student->enrollments->where('status', 'active')->first();
                 
                 if ($studentEnrollment && in_array($studentEnrollment->class_section_id, $classIds)) {
@@ -204,22 +248,17 @@ class AppPickupController extends Controller
             return response()->json(['success' => false, 'message' => 'pickup_unauthorized'], 403);
         }
 
-        // 5. TRACKING: Record who approved the request
         $pickup->update([
             'status' => 'approved',
             'approved_by_user_id' => $user->id, 
             'approved_at' => now(),
         ]);
 
-        // 6. Notify Parent of Departure
         $this->notifyParent($pickup->student, 'departure', now()->format('h:i A'), $pickup->institution_id, $pickup->id);
 
         return response()->json(['success' => true, 'message' => 'pickup_approved_success']);
     }
 
-    /**
-     * Notify Parent of Final Release
-     */
     private function notifyParent($student, $action, $timeStr, $institutionId, $pickupId = null)
     {
         $parent = $student->parent;
@@ -243,7 +282,6 @@ class AppPickupController extends Controller
             $this->notificationService->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
         }
 
-        // NEW: Send FCM Push Notification to Parent's Mobile App
         if ($parent && isset($parent->user_id) && method_exists($this->notificationService, 'sendPushNotification')) {
             $this->notificationService->sendPushNotification(
                 $parent->user_id,

@@ -602,10 +602,27 @@ class AttendanceApiController extends Controller
         }
 
         $today = \Carbon\Carbon::today()->toDateString();
+        $dayOfWeek = strtolower(now()->format('l')); // e.g., 'tuesday'
+        $staffId = $user->staff->id;
         
-        // Fetch all active sections assigned to this teacher
-        $sections = \App\Models\ClassSection::where('staff_id', $user->staff->id)
+        // SMART LOGIC: Check institution type for future Subject-wise attendance
+        $institution = clone $user->institute;
+        $instType = $institution->type ?? 'primary';
+        $isSubjectWise = in_array($instType, ['university', 'vocational']);
+        
+        // Fetch ALL active sections assigned to this teacher (Class Teacher OR Timetable OR Subject Allocation)
+        $sections = \App\Models\ClassSection::where('institution_id', $user->institute_id)
             ->where('is_active', true)
+            ->where(function($q) use ($staffId, $dayOfWeek) {
+                $q->where('staff_id', $staffId) // 1. Is Class/Homeroom Teacher
+                  ->orWhereHas('timetables', function($t) use ($staffId, $dayOfWeek) {
+                      $t->where('teacher_id', $staffId)
+                        ->where('day_of_week', $dayOfWeek); // 2. Has a class in the timetable TODAY
+                  })
+                  ->orWhereHas('classSubjects', function($c) use ($staffId) {
+                      $c->where('teacher_id', $staffId); // 3. Is allocated to this class generally
+                  });
+            })
             ->get();
 
         $report = [];
@@ -621,6 +638,7 @@ class AttendanceApiController extends Controller
             $totalClass = count($studentIds);
 
             // Get today's attendance records for these students
+            // NOTE: When Subject-wise attendance is implemented for University, this query will target SubjectAttendance instead.
             $attendances = \App\Models\StudentAttendance::whereIn('student_id', $studentIds)
                 ->where('attendance_date', $today)
                 ->get()
@@ -663,6 +681,7 @@ class AttendanceApiController extends Controller
                     'total_present' => $presentCount,
                     'total_absent' => $totalClass - $presentCount,
                     'absentees' => $absenteesList,
+                    'attendance_type' => $isSubjectWise ? 'subject' : 'daily' // Smart Flag for Frontend
                 ];
             }
         }
