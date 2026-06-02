@@ -19,7 +19,6 @@ class AuthApiController extends Controller
             'password' => 'required|string',
         ]);
 
-        // Support login via email or username/shortcode
         $user = User::where('email', $request->email)
                     ->orWhere('username', $request->email)
                     ->orWhere('shortcode', $request->email)
@@ -39,8 +38,12 @@ class AuthApiController extends Controller
             ], 403);
         }
 
-        // Generate a new secure API token for the mobile device
         $token = $user->createToken('mobile_app_v2')->plainTextToken;
+
+        // Task 9: Fetch dynamic School Name and Logo
+        $institution = $user->institute;
+        $schoolName = $institution ? $institution->name : 'Digitex';
+        $schoolLogo = ($institution && $institution->logo) ? asset('storage/' . $institution->logo) : null;
 
         return response()->json([
             'success' => true,
@@ -50,7 +53,9 @@ class AuthApiController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->roles->pluck('name')->first() ?? 'Staff',
-                'institution_id' => $user->institute_id
+                'institution_id' => $user->institute_id,
+                'school_name' => $schoolName,
+                'school_logo' => $schoolLogo,
             ]
         ], 200);
     }

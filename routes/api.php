@@ -27,13 +27,16 @@ Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiControll
 Route::prefix('v1/hardware')->group(function () {
     Route::post('/attendance/scan', [AttendanceApiController::class, 'store']);
     Route::get('/attendance/today', [AttendanceApiController::class, 'getTodayScans']);
+    Route::get('/attendance/absentees', [AttendanceApiController::class, 'getTodayAbsentees'])->middleware('auth:sanctum'); // Task 10: Absentees
 });
 
 // --- TEACHER APP ROUTES (Requires Sanctum Token) ---
 Route::prefix('v1/pickup')->middleware(['auth:sanctum'])->group(function () {
-    Route::get('/count', [AppPickupController::class, 'getPendingCount']); // NEW: NOTIFICATION COUNT
+    Route::get('/count', [AppPickupController::class, 'getPendingCount']); 
     Route::get('/pending', [AppPickupController::class, 'getPendingPickups']);
     Route::post('/approve', [AppPickupController::class, 'approvePickup']);
+    Route::post('/generate-otp', [AppPickupController::class, 'generateOtp']); // Task 8: Generate OTP
+    Route::post('/verify-otp', [AppPickupController::class, 'verifyOtp']); // Task 8: Verify OTP
 });
 
 // --- WHATSAPP CHATBOT ROUTES ---
