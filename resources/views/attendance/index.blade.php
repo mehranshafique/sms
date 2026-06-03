@@ -21,7 +21,6 @@
                 </div>
             </div>
             <div class="col-sm-6 p-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
-                {{-- View Register Button --}}
                 <a href="{{ route('attendance.report') }}" class="btn btn-secondary btn-rounded shadow-sm fw-bold px-4 py-2">
                     <i class="fa fa-list-alt me-2"></i> {{ __('attendance.view_register') ?? 'View Register' }}
                 </a>
@@ -36,7 +35,7 @@
 
         {{-- Filters --}}
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-3 mb-2">
                 <select id="filter_class" class="form-control default-select shadow-sm">
                     <option value="">{{ __('attendance.filter_class') }}</option>
                     @foreach($classSections as $id => $name)
@@ -44,8 +43,16 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-3">
-                {{-- Fixed: Date Picker Style --}}
+            
+            @if(isset($isSubjectWise) && $isSubjectWise)
+            <div class="col-md-3 mb-2">
+                <select id="filter_subject" class="form-control default-select shadow-sm">
+                    <option value="">{{ __('attendance.select_subject') }}</option>
+                </select>
+            </div>
+            @endif
+
+            <div class="col-md-3 mb-2">
                 <input type="text" id="filter_date" class="form-control datepicker shadow-sm" value="{{ date('Y-m-d') }}" placeholder="YYYY-MM-DD">
             </div>
         </div>
@@ -66,6 +73,9 @@
                                         <th>{{ __('attendance.student') }}</th>
                                         <th>{{ __('attendance.roll_no') }}</th>
                                         <th>{{ __('attendance.class') }}</th>
+                                        @if(isset($isSubjectWise) && $isSubjectWise)
+                                        <th>{{ __('attendance.subject') }}</th>
+                                        @endif
                                         <th>{{ __('attendance.status') }}</th>
                                     </tr>
                                 </thead>
@@ -90,11 +100,57 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        
-        // Fix: Force refresh of selectpickers on load
-        if(jQuery().selectpicker) {
-            $('.default-select').selectpicker('refresh');
+        if(jQuery().selectpicker) $('.default-select').selectpicker('refresh');
+
+        const isSubjectWise = {{ isset($isSubjectWise) && $isSubjectWise ? 'true' : 'false' }};
+
+        // AJAX Load Subjects for Filter if Subject-Wise
+        $('#filter_class').on('change', function() {
+            let classId = $(this).val();
+            let subjectSelect = $('#filter_subject');
+            
+            if(isSubjectWise && subjectSelect.length > 0) {
+                subjectSelect.html('<option value="">{{ __("attendance.loading") }}</option>');
+                subjectSelect.val(''); // Cache Fix
+                if(jQuery().selectpicker) subjectSelect.selectpicker('refresh');
+                
+                if(classId) {
+                    $.ajax({
+                        url: '{{ route("attendance.get_subjects") }}',
+                        type: 'GET',
+                        data: { class_section_id: classId },
+                        success: function(response) {
+                            subjectSelect.html('<option value="">{{ __("attendance.select_subject") }}</option>');
+                            $.each(response, function(id, name) {
+                                subjectSelect.append('<option value="'+id+'">'+name+'</option>');
+                            });
+                            subjectSelect.val(''); // Cache Fix
+                            if(jQuery().selectpicker) subjectSelect.selectpicker('refresh');
+                        }
+                    });
+                } else {
+                    subjectSelect.html('<option value="">{{ __("attendance.select_subject") }}</option>');
+                    subjectSelect.val('');
+                    if(jQuery().selectpicker) subjectSelect.selectpicker('refresh');
+                }
+            }
+            table.draw();
+        });
+
+        // Initialize DataTable Columns Dynamically
+        let tableColumns = [
+            { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
+            { data: 'attendance_date', name: 'attendance_date' },
+            { data: 'student_name', name: 'student.first_name' },
+            { data: 'roll_no', name: 'student.admission_number' },
+            { data: 'class', name: 'classSection.name' }
+        ];
+
+        if (isSubjectWise) {
+            tableColumns.push({ data: 'subject', name: 'subject.name' });
         }
+        
+        tableColumns.push({ data: 'status', name: 'status' });
 
         const table = $('#attendanceTable').DataTable({
             processing: true,
@@ -104,6 +160,7 @@
                 data: function(d) {
                     d.class_section_id = $('#filter_class').val();
                     d.attendance_date = $('#filter_date').val();
+                    if(isSubjectWise) d.subject_id = $('#filter_subject').val();
                 }
             },
             dom: '<"row me-2"<"col-md-2"<"me-3"l>><"col-md-10"<"dt-action-buttons text-xl-end text-lg-start text-md-end text-start d-flex align-items-center justify-content-end flex-md-row flex-column mb-3 mb-md-0"fB>>>t<"row mx-2"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
@@ -119,17 +176,10 @@
                     ]
                 }
             ],
-            columns: [
-                { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
-                { data: 'attendance_date', name: 'attendance_date' },
-                { data: 'student_name', name: 'student.first_name' },
-                { data: 'roll_no', name: 'student.admission_number' },
-                { data: 'class', name: 'classSection.name' },
-                { data: 'status', name: 'status' },
-            ]
+            columns: tableColumns
         });
 
-        $('#filter_class, #filter_date').on('change', function() {
+        $('#filter_date, #filter_subject').on('change', function() {
             table.draw();
         });
     });

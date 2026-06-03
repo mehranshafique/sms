@@ -25,22 +25,37 @@
             <div class="col-12">
                 <div class="card shadow-sm border-0" style="border-radius: 15px;">
                     <div class="card-body p-4">
-                        <form method="GET" action="{{ route('attendance.create') }}">
+                        <form method="GET" action="{{ route('attendance.create') }}" id="selectionForm">
                             <div class="row align-items-end">
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-3 mb-3">
                                     <label class="form-label">{{ __('attendance.select_class') }} <span class="text-danger">*</span></label>
-                                    <select name="class_section_id" class="form-control default-select" required>
+                                    <select name="class_section_id" id="class_section_id" class="form-control default-select" required>
                                         <option value="">-- {{ __('attendance.select_class') }} --</option>
                                         @foreach($classSections as $id => $name)
                                             <option value="{{ $id }}" {{ (request('class_section_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-md-4 mb-3">
+
+                                @if(isset($isSubjectWise) && $isSubjectWise)
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label">{{ __('attendance.subject') }} <span class="text-danger">*</span></label>
+                                    <select name="subject_id" id="subject_id" class="form-control default-select" required>
+                                        <option value="">-- {{ __('attendance.select_subject') }} --</option>
+                                        @if(isset($subjects))
+                                            @foreach($subjects as $id => $name)
+                                                <option value="{{ $id }}" {{ (request('subject_id') == $id) ? 'selected' : '' }}>{{ $name }}</option>
+                                            @endforeach
+                                        @endif
+                                    </select>
+                                </div>
+                                @endif
+
+                                <div class="col-md-3 mb-3">
                                     <label class="form-label">{{ __('attendance.select_date') }} <span class="text-danger">*</span></label>
                                     <input type="text" name="date" class="form-control datepicker" value="{{ request('date', date('Y-m-d')) }}" required>
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-3 mb-3">
                                     <button type="submit" class="btn btn-primary w-100 shadow-sm">{{ __('attendance.load_students') }}</button>
                                 </div>
                             </div>
@@ -50,16 +65,23 @@
             </div>
         </div>
 
+        {{-- Error Messaging (e.g., Forgot to pick a subject) --}}
+        @if($errors->has('msg'))
+            <div class="alert alert-danger shadow-sm border-0 d-flex align-items-center">
+                <i class="fa fa-exclamation-triangle me-2 fs-4"></i>
+                <div>{{ $errors->first('msg') }}</div>
+            </div>
+        @endif
+
         {{-- Student List Form --}}
         @if(count($students) > 0)
         
-        {{-- Lock Alert --}}
         @if(isset($isLocked) && $isLocked)
             <div class="alert alert-danger shadow-sm border-0 d-flex align-items-center" role="alert">
                 <i class="fa fa-lock me-2 fs-4"></i>
                 <div>
                     <strong>{{ __('attendance.attendance_locked') }}</strong> 
-                    {{ __('attendance.attendance_locked_desc') }}
+                    {{ $lockReason ?? __('attendance.attendance_locked_desc') }}
                 </div>
             </div>
         @endif
@@ -68,6 +90,9 @@
             @csrf
             <input type="hidden" name="class_section_id" value="{{ request('class_section_id') }}">
             <input type="hidden" name="attendance_date" value="{{ request('date') }}">
+            @if(isset($isSubjectWise) && $isSubjectWise)
+                <input type="hidden" name="subject_id" value="{{ request('subject_id') }}">
+            @endif
 
             <div class="row">
                 <div class="col-12">
@@ -102,9 +127,7 @@
                                             @endphp
                                             <tr>
                                                 <td class="ps-4">{{ $index + 1 }}</td>
-                                                <td>
-                                                    <span class="fw-bold text-primary">{{ $student->full_name }}</span>
-                                                </td>
+                                                <td><span class="fw-bold text-primary">{{ $student->full_name }}</span></td>
                                                 <td>{{ $student->admission_number }}</td>
                                                 <td class="text-center">
                                                     <div class="d-flex justify-content-center gap-3">
@@ -156,13 +179,45 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function(){
+        if(jQuery().selectpicker) {
+            $('.default-select').selectpicker('refresh');
+        }
+
+        // AJAX Subject Loader with Cache Fix
+        $('#class_section_id').change(function() {
+            let classId = $(this).val();
+            let subjectSelect = $('#subject_id');
+            
+            if(subjectSelect.length > 0) {
+                subjectSelect.html('<option value="">{{ __("attendance.loading") }}</option>');
+                subjectSelect.val(''); // Cache Fix: Clear selection before refresh
+                if(jQuery().selectpicker) subjectSelect.selectpicker('refresh');
+                
+                if(classId) {
+                    $.ajax({
+                        url: '{{ route("attendance.get_subjects") }}',
+                        type: 'GET',
+                        data: { class_section_id: classId },
+                        success: function(response) {
+                            subjectSelect.html('<option value="">-- {{ __("attendance.select_subject") }} --</option>');
+                            $.each(response, function(id, name) {
+                                subjectSelect.append('<option value="'+id+'">'+name+'</option>');
+                            });
+                            subjectSelect.val(''); // Cache Fix: Force text reset
+                            if(jQuery().selectpicker) subjectSelect.selectpicker('refresh');
+                        }
+                    });
+                } else {
+                    subjectSelect.html('<option value="">-- {{ __("attendance.select_subject") }} --</option>');
+                    subjectSelect.val(''); 
+                    if(jQuery().selectpicker) subjectSelect.selectpicker('refresh');
+                }
+            }
+        });
+
         // Mark All Helpers
-        $('#markAllPresent').click(function(){
-            $('input[value="present"]').prop('checked', true);
-        });
-        $('#markAllAbsent').click(function(){
-            $('input[value="absent"]').prop('checked', true);
-        });
+        $('#markAllPresent').click(function(){ $('input[value="present"]').prop('checked', true); });
+        $('#markAllAbsent').click(function(){ $('input[value="absent"]').prop('checked', true); });
 
         // Submit Logic
         $('#attendanceForm').submit(function(e){
@@ -180,9 +235,7 @@
                         icon: 'success',
                         title: '{{ __("attendance.success") }}',
                         text: response.message
-                    }).then(() => {
-                        window.location.href = response.redirect;
-                    });
+                    }).then(() => { window.location.href = response.redirect; });
                 },
                 error: function(xhr){
                     let msg = '{{ __("attendance.error_occurred") }}';

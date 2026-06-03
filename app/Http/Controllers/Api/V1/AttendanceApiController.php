@@ -608,44 +608,70 @@ class AttendanceApiController extends Controller
         }
 
         $today = \Carbon\Carbon::today()->toDateString();
-        $dayOfWeek = strtolower(now()->format('l')); // e.g., 'tuesday'
-        $staffId = $user->staff->id;
-        
-        \Illuminate\Support\Facades\Log::info("Teacher Staff ID: {$staffId}, Day: {$dayOfWeek}");
+        $dayOfWeek = strtolower(now()->format('l'));
         
         // SMART LOGIC: Check institution type for future Subject-wise attendance
-        $institution = clone $user->institute;
-        $instType = $institution->type ?? 'primary';
+        // Failsafe clone to prevent null errors for Super Admins
+        $institution = $user->institute;
+        $instType = $institution ? $institution->type : 'primary';
         $isSubjectWise = in_array($instType, ['university', 'vocational']);
         
-        // --- THE FIX: Direct relationship queries to prevent 500 crashes ---
-        $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
+        $allAssignedClassIds = [];
         
-        $timetableIds = \App\Models\Timetable::where('teacher_id', $staffId)
-            ->where('day_of_week', $dayOfWeek)
-            ->pluck('class_section_id')->toArray();
+        // --- 1. ADMIN BYPASS: See all classes in their institution ---
+        if ($user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
+            $query = \App\Models\ClassSection::where('is_active', true);
             
-        $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)
-            ->pluck('class_section_id')->toArray();
+            // Filter to their school unless they are global Super Admin
+            if (!$user->hasRole('Super Admin') && $user->institute_id) {
+                $query->where('institution_id', $user->institute_id);
+            }
+            
+            $allAssignedClassIds = $query->pluck('id')->toArray();
+        } 
+        // --- 2. TEACHER LOGIC: See only assigned classes ---
+        elseif ($user->hasRole('Teacher') && $user->staff) {
+            $staffId = $user->staff->id;
+            \Illuminate\Support\Facades\Log::info("Teacher Staff ID: {$staffId}, Day: {$dayOfWeek}");
+            
+            $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
+            
+            $timetableIds = \App\Models\Timetable::where('teacher_id', $staffId)
+                ->where('day_of_week', $dayOfWeek)
+                ->pluck('class_section_id')->toArray();
+                
+            $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)
+                ->pluck('class_section_id')->toArray();
 
-        $allAssignedClassIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+            $allAssignedClassIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
+        } else {
+            // Failsafe for generic users (Students, Guardians, etc.)
+            \Illuminate\Support\Facades\Log::warning('Unauthorized access attempt in getTeacherClassAbsentees', [
+                'roles' => $user->getRoleNames(), 
+                'has_staff' => $user->staff ? true : false
+            ]);
+            return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
+        }
 
-        \Illuminate\Support\Facades\Log::info("Class IDs Found", [
-            'homeroom' => $homeroomIds,
-            'timetable' => $timetableIds,
-            'allocated' => $allocatedIds,
-            'merged_unique' => $allAssignedClassIds
-        ]);
+        \Illuminate\Support\Facades\Log::info("Class IDs Found", ['merged_unique' => $allAssignedClassIds]);
 
-        $sections = \App\Models\ClassSection::where('institution_id', $user->institute_id)
-            ->where('is_active', true)
-            ->whereIn('id', $allAssignedClassIds)
-            ->get();
+        // Get the sections
+        $sectionsQuery = \App\Models\ClassSection::where('is_active', true)
+            ->whereIn('id', $allAssignedClassIds);
+            
+        if ($user->institute_id && !$user->hasRole('Super Admin')) {
+            $sectionsQuery->where('institution_id', $user->institute_id);
+        }
+        
+        $sections = $sectionsQuery->get();
 
-        $currentSession = \App\Models\AcademicSession::where('institution_id', $user->institute_id)
-            ->where('is_current', true)->first();
-        $sessionId = $currentSession ? $currentSession->id : null;
-        // --- END FIX ---
+        // Safely fetch session
+        $currentSession = \App\Models\AcademicSession::where('is_current', true);
+        if ($user->institute_id && !$user->hasRole('Super Admin')) {
+            $currentSession->where('institution_id', $user->institute_id);
+        }
+        $session = $currentSession->first();
+        $sessionId = $session ? $session->id : null;
 
         $report = [];
 

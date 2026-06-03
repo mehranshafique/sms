@@ -31,7 +31,22 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                
+                                @if(isset($isSubjectWise) && $isSubjectWise)
                                 <div class="col-md-3 mb-3">
+                                    <label class="form-label">{{ __('attendance.subject') }}</label>
+                                    <select name="subject_id" class="form-control default-select" onchange="this.form.submit()">
+                                        <option value="">-- {{ __('attendance.select_subject') }} --</option>
+                                        @if(isset($subjects))
+                                            @foreach($subjects as $id => $name)
+                                                <option value="{{ $id }}" {{ request('subject_id') == $id ? 'selected' : '' }}>{{ $name }}</option>
+                                            @endforeach
+                                        @endif
+                                    </select>
+                                </div>
+                                @endif
+
+                                <div class="col-md-2 mb-3">
                                     <label class="form-label">{{ __('attendance.month') }}</label>
                                     <select name="month" class="form-control default-select" onchange="this.form.submit()">
                                         @for($m=1; $m<=12; $m++)
@@ -39,7 +54,7 @@
                                         @endfor
                                     </select>
                                 </div>
-                                <div class="col-md-3 mb-3">
+                                <div class="col-md-2 mb-3">
                                     <label class="form-label">{{ __('attendance.year') }}</label>
                                     <select name="year" class="form-control default-select" onchange="this.form.submit()">
                                         @for($y=date('Y'); $y>=date('Y')-5; $y--)
@@ -47,9 +62,8 @@
                                         @endfor
                                     </select>
                                 </div>
-                                <div class="col-md-3 mb-3">
-                                    {{-- UPDATED PRINT BUTTON --}}
-                                    @if(request('class_section_id'))
+                                <div class="col-md-2 mb-3">
+                                    @if(request('class_section_id') && (!isset($isSubjectWise) || !$isSubjectWise || request('subject_id')))
                                         <a href="{{ route('attendance.print_report', request()->all()) }}" target="_blank" class="btn btn-primary w-100">
                                             <i class="fa fa-print me-2"></i> {{ __('attendance.print') }}
                                         </a>
@@ -66,8 +80,16 @@
             </div>
         </div>
 
+        {{-- Error Messaging (Missing Subject) --}}
+        @if(session('warning'))
+            <div class="alert alert-warning shadow-sm border-0 d-flex align-items-center">
+                <i class="fa fa-exclamation-circle me-2 fs-4"></i>
+                <div>{{ session('warning') }}</div>
+            </div>
+        @endif
+
         {{-- Register Table --}}
-        @if(count($students) > 0)
+        @if(count($students) > 0 && (!isset($isSubjectWise) || !$isSubjectWise || request('subject_id')))
         <div class="row">
             <div class="col-12">
                 <div class="card shadow-sm border-0">
@@ -127,7 +149,7 @@
                 </div>
             </div>
         </div>
-        @elseif(request('class_section_id'))
+        @elseif(request('class_section_id') && (!isset($isSubjectWise) || !$isSubjectWise || request('subject_id')))
             <div class="alert alert-info text-center">{{ __('attendance.no_students_found_class') }}</div>
         @endif
 

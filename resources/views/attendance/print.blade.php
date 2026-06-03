@@ -43,9 +43,15 @@
     <table class="details-box" style="border: none;">
         <tr>
             <td width="15%"><strong>{{ __('attendance.class') }}:</strong></td>
-            <td width="35%">{{ ($selectedClass->gradeLevel->name ?? '') . ' ' . $selectedClass->name }}</td>
+            <td width="{{ isset($isSubjectWise) && $isSubjectWise ? '25%' : '35%' }}">{{ ($selectedClass->gradeLevel->name ?? '') . ' ' . $selectedClass->name }}</td>
+            
+            @if(isset($isSubjectWise) && $isSubjectWise && isset($selectedSubject))
+            <td width="10%"><strong>{{ __('attendance.subject') }}:</strong></td>
+            <td width="25%">{{ $selectedSubject->name }}</td>
+            @endif
+            
             <td width="15%"><strong>{{ __('attendance.total_students') }}:</strong></td>
-            <td width="35%">{{ count($students) }}</td>
+            <td width="10%">{{ count($students) }}</td>
         </tr>
     </table>
 

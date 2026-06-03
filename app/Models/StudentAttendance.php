@@ -10,9 +10,10 @@ class StudentAttendance extends Model
     use HasFactory;
 
     protected $fillable = [
-         'institution_id',
+        'institution_id',
         'academic_session_id',
         'class_section_id',
+        'subject_id', // NEW: Subject relation for University/Vocational
         'student_id',
         'attendance_date',
         'status',
@@ -42,5 +43,11 @@ class StudentAttendance extends Model
     public function academicSession()
     {
         return $this->belongsTo(AcademicSession::class);
+    }
+
+    // NEW: Subject Relationship
+    public function subject()
+    {
+        return $this->belongsTo(Subject::class);
     }
 }

@@ -16,6 +16,13 @@ return [
     'filter_date' => 'Filter Date',
     'export' => 'Export',
     
+    // NEW: Subject Keys
+    'subject' => 'Subject',
+    'select_subject' => 'Select Subject',
+    'subject_required' => 'Please select a subject to mark attendance.',
+    'select_subject_for_report' => 'Please select a subject to view the attendance report.',
+    'loading' => 'Loading...',
+    
     // Table
     'table_no' => '#',
     'student' => 'Student Name',
@@ -59,7 +66,7 @@ return [
     'back_to_list' => 'Back to List',
     'month' => 'Month',
     'year' => 'Year',
-    'print' => 'Print Register', // Updated key
+    'print' => 'Print Register', 
     'no_students_found_class' => 'No students found for this class.',
     
     // Print View Specific
@@ -73,7 +80,7 @@ return [
     'legend_l' => 'L: Late',
     'legend_e' => 'E: Excused',
     'legend_h' => 'H: Half Day',
-    'summary' => 'Summary', // Added Summary
+    'summary' => 'Summary', 
 
     // Admin Settings Errors
     'admin_blocked' => 'Attendance marking is currently blocked by administrator.',
@@ -88,14 +95,11 @@ return [
     // Analytics & Reporting
     'analytics_title' => 'Attendance Analytics',
     'select_student_subtitle' => 'Select a student to view their comparative attendance performance.',
-    'student_list' => 'Student List',
     'admission_no' => 'Admission No.',
     'student_name' => 'Student Name',
-    'class' => 'Class',
     'action' => 'Action',
     'not_assigned' => 'Not Assigned',
     'view_analytics' => 'View Analytics',
-    'back_to_list' => 'Back to List',
     'comparative_report' => 'Comparative Report',
     
     // Periods
@@ -117,12 +121,8 @@ return [
     
     // Logs Table
     'detailed_logs' => 'Detailed Scan Logs',
-    'date' => 'Date',
-    'status' => 'Status',
     'check_in_hardware' => 'Check In (Hardware)',
     'check_out_hardware' => 'Check Out (Hardware)',
     'on_time' => 'On Time',
-    'late' => 'Late',
-    'absent' => 'Absent',
     'no_hardware_logs' => 'No hardware/scan logs found for this period.',
 ];

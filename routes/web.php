@@ -269,6 +269,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');
         Route::get('attendance/report', [StudentAttendanceController::class, 'report'])->name('attendance.report');
         Route::get('attendance/print-report', [StudentAttendanceController::class, 'printReport'])->name('attendance.print_report');
+        // NEW: AJAX Route for Subject-Wise Attendance
+        Route::get('attendance/get-subjects', [StudentAttendanceController::class, 'getSubjects'])->name('attendance.get_subjects');
     });
 
     // Student Requests
@@ -295,7 +297,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- Unified Attendance Analytics Flow ---
     Route::get('/attendance/analytics', [AttendanceReportController::class, 'index'])->name('attendance.analytics.index');
     Route::get('/attendance/analytics/student/{id?}', [AttendanceReportController::class, 'studentReport'])->name('attendance.analytics.show');
-
+    // Add to your authenticated routes group
+    Route::prefix('attendance')->group(function () {
+        Route::get('/analytics/show/{id?}', [App\Http\Controllers\AttendanceReportController::class, 'studentReport'])->name('attendance.analytics.show');
+    });
     // HR / Staff Management
     Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);

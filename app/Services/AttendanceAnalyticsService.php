@@ -9,9 +9,13 @@ class AttendanceAnalyticsService
 {
     /**
      * Generate comparative statistics for a given period
+     * @param int $studentId
+     * @param int $classSectionId
      * @param string $period 'week', 'month', 'quarter', 'semester', 'year'
+     * @param bool $isSubjectWise
+     * @param int|null $subjectId
      */
-    public function getComparativeStats($studentId, $period = 'week')
+    public function getComparativeStats($studentId, $classSectionId, $period = 'week', $isSubjectWise = false, $subjectId = null)
     {
         $now = Carbon::now();
         
@@ -47,14 +51,37 @@ class AttendanceAnalyticsService
                 $previousEnd = $now->copy()->subWeek()->endOfWeek();
         }
 
-        // Fetch Data
-        $currentRecords = StudentAttendance::where('student_id', $studentId)
-            ->whereBetween('attendance_date', [$currentStart, $now])
-            ->get();
+        // Query Builder Helper for Student Records
+        $buildRecordQuery = function($start, $end) use ($studentId, $isSubjectWise, $subjectId) {
+            $query = StudentAttendance::where('student_id', $studentId)
+                ->whereBetween('attendance_date', [$start, $end]);
+            
+            if ($isSubjectWise) {
+                $query->where('subject_id', $subjectId);
+            } else {
+                $query->whereNull('subject_id');
+            }
+            return $query;
+        };
 
-        $previousRecords = StudentAttendance::where('student_id', $studentId)
-            ->whereBetween('attendance_date', [$previousStart, $previousEnd])
-            ->get();
+        $currentRecords = $buildRecordQuery($currentStart, $now)->get();
+        $previousRecords = $buildRecordQuery($previousStart, $previousEnd)->get();
+
+        // Calculate actual Expected Days/Lectures dynamically by checking distinct dates marked for the whole class
+        $getExpectedCount = function($start, $end) use ($classSectionId, $isSubjectWise, $subjectId) {
+            $query = StudentAttendance::where('class_section_id', $classSectionId)
+                ->whereBetween('attendance_date', [$start, $end]);
+            
+            if ($isSubjectWise) {
+                $query->where('subject_id', $subjectId);
+            } else {
+                $query->whereNull('subject_id');
+            }
+            
+            return $query->distinct()->count('attendance_date');
+        };
+
+        $currentExpectedDays = $getExpectedCount($currentStart, $now);
 
         $currentAvgMins = $this->calculateAverageArrivalMinutes($currentRecords);
         $previousAvgMins = $this->calculateAverageArrivalMinutes($previousRecords);
@@ -71,7 +98,7 @@ class AttendanceAnalyticsService
             'previous_punctuality' => $previousPunctuality,
             'punctuality_insight' => $this->generatePunctualityInsight($currentPunctuality, $previousPunctuality, $period),
             
-            'participation_rate' => $this->calculateParticipationRate($currentRecords, $now->diffInWeekdays($currentStart) + 1),
+            'participation_rate' => $this->calculateParticipationRate($currentRecords, $currentExpectedDays),
             'records' => $currentRecords
         ];
     }
@@ -110,7 +137,7 @@ class AttendanceAnalyticsService
     private function calculateParticipationRate($records, $expectedDays)
     {
         if ($expectedDays <= 0) return 0;
-        $attended = $records->whereNotNull('check_in')->count();
+        $attended = $records->whereIn('status', ['present', 'late', 'excused', 'half_day'])->count();
         return round(min(($attended / $expectedDays) * 100, 100));
     }
 
@@ -132,6 +159,8 @@ class AttendanceAnalyticsService
 
     private function generatePunctualityInsight($current, $previous, $period)
     {
+        if ($current == 0 && $previous == 0) return "No punctuality data available.";
+        
         $diff = $current - $previous;
         $periodTxt = $period == 'week' ? 'last week' : 'last ' . $period;
 
