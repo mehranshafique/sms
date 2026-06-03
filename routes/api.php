@@ -35,6 +35,10 @@ Route::prefix('v1/pickup')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/count', [AppPickupController::class, 'getPendingCount']);
     Route::get('/pending', [AppPickupController::class, 'getPendingPickups']);
     Route::post('/approve', [AppPickupController::class, 'approvePickup']);
+    
+    // --- ADD THESE TWO MISSING OTP ROUTES ---
+    Route::post('/generate-otp', [AppPickupController::class, 'generateOtp']);
+    Route::post('/verify-otp', [AppPickupController::class, 'verifyOtp']);
 });
 
 // --- NEW: STUDENT APP ROUTES (Requires Sanctum Token) ---

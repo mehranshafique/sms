@@ -27,4 +27,12 @@ return [
     'financial_block' => 'Financial Block: Outstanding balance of $:amount',
     'report_card_signed' => 'Report Card Access Granted & Digitally Signed!',
     'student_released' => 'Student Released successfully! Parent notified.',
+
+    'unauthorized_access' => 'Accès non autorisé. Portail personnel uniquement.',
+    'student_profile_missing' => 'Profil élève introuvable. Veuillez contacter l\'administration.',
+    'daily_attendance' => 'Présence Journalière',
+    'general' => 'Général',
+    'teacher' => 'Enseignant',
+    'request_submitted_success' => 'Requête soumise avec succès ! Ticket : :ticket',
+    'na' => 'N/D',
 ];
