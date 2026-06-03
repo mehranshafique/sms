@@ -21,6 +21,11 @@ class AppPickupController extends Controller
     {
         $user = Auth::user();
 
+        // STRICT SCOPE: Block Students & Parents from accessing this Staff API
+        if ($user->hasRole(['Student', 'Guardian'])) {
+            return response()->json(['success' => false, 'count' => 0]);
+        }
+
         $query = StudentPickup::whereIn('status', ['pending', 'scanned'])
               ->whereDate('created_at', '>=', now()->subDays(1));
 
@@ -64,6 +69,11 @@ class AppPickupController extends Controller
     public function getPendingPickups(Request $request)
     {
         $user = Auth::user();
+        
+        // STRICT SCOPE: Block Students & Parents
+        if ($user->hasRole(['Student', 'Guardian'])) {
+            return response()->json(['success' => false, 'data' => []]);
+        }
         
         \Illuminate\Support\Facades\Log::info('--- START getPendingPickups ---', ['user_id' => $user->id ?? 'guest']);
 

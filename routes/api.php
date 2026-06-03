@@ -32,11 +32,19 @@ Route::prefix('v1/hardware')->group(function () {
 
 // --- TEACHER APP ROUTES (Requires Sanctum Token) ---
 Route::prefix('v1/pickup')->middleware(['auth:sanctum'])->group(function () {
-    Route::get('/count', [AppPickupController::class, 'getPendingCount']); 
+    Route::get('/count', [AppPickupController::class, 'getPendingCount']);
     Route::get('/pending', [AppPickupController::class, 'getPendingPickups']);
     Route::post('/approve', [AppPickupController::class, 'approvePickup']);
-    Route::post('/generate-otp', [AppPickupController::class, 'generateOtp']); // Task 8: Generate OTP
-    Route::post('/verify-otp', [AppPickupController::class, 'verifyOtp']); // Task 8: Verify OTP
+});
+
+// --- NEW: STUDENT APP ROUTES (Requires Sanctum Token) ---
+Route::prefix('v1/student')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/attendance', [\App\Http\Controllers\Api\V1\StudentPortalApiController::class, 'getAttendance']);
+    Route::get('/fees', [\App\Http\Controllers\Api\V1\StudentPortalApiController::class, 'getFees']);
+    Route::get('/homework', [\App\Http\Controllers\Api\V1\StudentPortalApiController::class, 'getHomework']);
+    Route::get('/results', [\App\Http\Controllers\Api\V1\StudentPortalApiController::class, 'getResults']);
+    Route::post('/gate-pass', [\App\Http\Controllers\Api\V1\StudentPortalApiController::class, 'generateGatePass']);
+    Route::post('/requests', [\App\Http\Controllers\Api\V1\StudentPortalApiController::class, 'submitRequest']);
 });
 
 // --- WHATSAPP CHATBOT ROUTES ---

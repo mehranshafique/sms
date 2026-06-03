@@ -62,44 +62,68 @@ class AttendanceApiController extends Controller
 
     /**
      * Fetch Today's Attendance List for the POS/Mobile App
+     * SCOPED: Students only see their own. Parents see kids. Teachers see their classes.
      */
     public function getTodayScans(Request $request)
     {
-        if ($request->header('X-Hardware-Secret') !== env('HARDWARE_SECRET')) {
-            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
+        $isHardware = $request->header('X-Hardware-Secret') === env('HARDWARE_SECRET');
+
+        if (!$user && !$isHardware) {
+            return response()->json(['message' => 'Unauthorized Access'], 401);
         }
 
         $today = Carbon::today()->toDateString();
         
-        $records = StudentAttendance::with('student:id,first_name,last_name,student_photo,admission_number')
+        $query = StudentAttendance::with('student:id,first_name,last_name,student_photo,admission_number')
             ->where('attendance_date', $today)
-            ->latest('updated_at')
-            ->get()
-            ->map(function($att) {
-                $isCheckOut = $att->check_out !== null;
-                
-                // Task 4: Show Time In and Out separately
-                $timeIn = $att->check_in ? Carbon::parse($att->check_in)->format('h:i A') : '--:--';
-                $timeOut = $att->check_out ? Carbon::parse($att->check_out)->format('h:i A') : '--:--';
-                $time = $isCheckOut ? $timeOut : $timeIn; // Legacy fallback
-                
-                $admNo = $att->student->admission_number ?? 'N/A';
-                
-                return [
-                    'id' => $att->id,
-                    // Task Global: Append admission number to name
-                    'student_name' => ($att->student->full_name ?? 'Unknown') . ' (' . $admNo . ')',
-                    'admission_no' => $admNo,
-                    'photo' => $att->student->student_photo ? asset('storage/'.$att->student->student_photo) : null,
-                    'time' => $time,
-                    'time_in' => $timeIn,
-                    'time_out' => $timeOut,
-                    'action' => $isCheckOut ? 'Departure' : 'Arrival',
-                    'status' => ucfirst($att->status),
-                    'status_color' => $att->status === 'late' ? '#F59E0B' : '#10B981',
-                    'action_color' => $isCheckOut ? '#6366F1' : '#3B82F6',
-                ];
-            });
+            ->latest('updated_at');
+
+        // --- SMART SCOPING BASED ON USER ROLE ---
+        if ($user && !$isHardware) {
+            if ($user->hasRole('Student')) {
+                // Students only see themselves
+                $studentId = $user->student->id ?? 0;
+                $query->where('student_id', $studentId);
+            } elseif ($user->hasRole('Guardian')) {
+                // Parents only see their children
+                $parent = \App\Models\StudentParent::where('user_id', $user->id)->first();
+                $childIds = \App\Models\Student::where('parent_id', $parent->id ?? 0)->pluck('id');
+                $query->whereIn('student_id', $childIds);
+            } elseif ($user->hasRole('Teacher') && $user->staff) {
+                // Teachers only see their assigned classes
+                $staffId = $user->staff->id;
+                $classIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id');
+                $query->whereIn('class_section_id', $classIds);
+            } elseif (!$user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
+                // Fallback: block any rogue non-admin roles
+                $query->where('id', 0); 
+            }
+        }
+
+        $records = $query->get()->map(function($att) {
+            $isCheckOut = $att->check_out !== null;
+            
+            $timeIn = $att->check_in ? Carbon::parse($att->check_in)->format('h:i A') : '--:--';
+            $timeOut = $att->check_out ? Carbon::parse($att->check_out)->format('h:i A') : '--:--';
+            $time = $isCheckOut ? $timeOut : $timeIn; 
+            
+            $admNo = $att->student->admission_number ?? 'N/A';
+            
+            return [
+                'id' => $att->id,
+                'student_name' => ($att->student->full_name ?? 'Unknown') . ' (' . $admNo . ')',
+                'admission_no' => $admNo,
+                'photo' => $att->student->student_photo ? asset('storage/'.$att->student->student_photo) : null,
+                'time' => $time,
+                'time_in' => $timeIn,
+                'time_out' => $timeOut,
+                'action' => $isCheckOut ? 'Departure' : 'Arrival',
+                'status' => ucfirst($att->status),
+                'status_color' => $att->status === 'late' ? '#F59E0B' : '#10B981',
+                'action_color' => $isCheckOut ? '#6366F1' : '#3B82F6',
+            ];
+        });
 
         return response()->json([
             'success' => true,
@@ -220,7 +244,6 @@ class AttendanceApiController extends Controller
             'success' => true,
             'action' => $action,
             'type' => 'student',
-            // Global Task: Append Admission Number
             'name' => $student->first_name . ' ' . $student->last_name . ' (' . $admNo . ')',
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
@@ -328,21 +351,17 @@ class AttendanceApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Student Card Not Found.'], 404);
         }
 
-        // Fetch Real Invoices
         $invoices = Invoice::where('student_id', $student->id)->get();
         $unpaidInvoices = $invoices->whereIn('status', ['unpaid', 'partial', 'overdue']);
         
-        // Task 1: Comprehensive Financial Breakdown
         $totalDue = $unpaidInvoices->sum(fn($inv) => $inv->total_amount - $inv->paid_amount);
         $totalBalance = $invoices->sum('total_amount');
         $paidBalance = $invoices->sum('paid_amount');
         $remainingBalance = max(0, $totalBalance - $paidBalance);
 
-        // Fetch Last Payment
         $lastPayment = \App\Models\Payment::whereHas('invoice', fn($q) => $q->where('student_id', $student->id))
             ->latest('payment_date')->first();
 
-        // Format Invoice Breakdown for the UI
         $invoiceBreakdown = $unpaidInvoices->map(function($inv) {
             return [
                 'invoice_number' => $inv->invoice_number,
@@ -388,20 +407,16 @@ class AttendanceApiController extends Controller
     {
         $possibleUids = $this->getPossibleUids($uid);
 
-        // 1. Chatbot Generated QR Code Pickup
         if (str_starts_with($uid, 'PKUP-') || str_starts_with($uid, 'QR-')) {
             $pickup = StudentPickup::with('student')->where('token', $uid)->first();
 
             if (!$pickup) return response()->json(['success' => false, 'message' => 'pickup_invalid_qr'], 404);
             
-            // Allow 'scanned' or 'pending'. If it's already 'scanned' (completed), deny it.
             if (in_array($pickup->status, ['scanned', 'completed', 'approved'])) {
                 return response()->json(['success' => false, 'message' => 'pickup_already_used'], 400);
             }
 
-            // FIXED ENUM CRASH: Use 'scanned' instead of 'completed'
             $pickup->update(['status' => 'scanned', 'scanned_at' => now(), 'scanned_by_device' => $deviceId]);
-
             $this->notifyTeacher($pickup);
             
             $admNo = $pickup->student->admission_number ?? 'N/A';
@@ -416,7 +431,6 @@ class AttendanceApiController extends Controller
             ]);
         }
 
-        // 2. Direct Physical NFC Tap Pickup
         $student = Student::whereIn('nfc_tag_uid', $possibleUids)
             ->orWhereIn('rfid_uid', $possibleUids)
             ->orWhereIn('admission_number', $possibleUids)
@@ -463,7 +477,6 @@ class AttendanceApiController extends Controller
         $institutionId = $student->institution_id;
         $admNo = $student->admission_number ?? 'N/A';
         
-        // Check Financial Block
         $isBlocked = InstitutionSetting::get($institutionId, 'block_reports_on_debt', 0);
         if ($isBlocked) {
             $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
@@ -475,18 +488,17 @@ class AttendanceApiController extends Controller
                         'student_name' => $student->full_name . ' (' . $admNo . ')',
                         'color' => '#dc2626'
                     ]
-                ], 200); // 200 so the app shows the message gracefully
+                ], 200); 
             }
         }
 
-        // Fetch Real Exam Records
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         
         $records = ExamRecord::with(['subject', 'exam.academicSession'])
             ->where('student_id', $student->id)
             ->whereHas('exam', fn($q) => $q->where('academic_session_id', $session->id ?? 0))
             ->latest('updated_at')
-            ->get(); // Task 5: Removed ->take(6) to show all subjects
+            ->get(); 
 
         $formattedRecords = $records->map(function($r) {
             return [
@@ -495,7 +507,6 @@ class AttendanceApiController extends Controller
             ];
         });
 
-        // Task 5: Fetch rich Exam Details
         $firstRecord = $records->first();
         $examDetails = [
             'name' => $firstRecord->exam->name ?? 'N/A',
@@ -529,7 +540,7 @@ class AttendanceApiController extends Controller
             if ($teacher && $teacher->phone) {
                 $message = __('notifications.teacher_pickup_alert', ['student_name' => $pickup->student->full_name]);
                 if ($message === 'notifications.teacher_pickup_alert') {
-                    $message = "ðŸš¨ Student Pickup Alert: {$pickup->student->full_name}'s parent is waiting at the gate.";
+                    $message = "🚨 Student Pickup Alert: {$pickup->student->full_name}'s parent is waiting at the gate.";
                 }
                 $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, false, 'whatsapp');
             }
@@ -537,7 +548,7 @@ class AttendanceApiController extends Controller
             if ($teacher && $teacher->id && method_exists($this->notificationService, 'sendPushNotification')) {
                 $title = __('notifications.parent_at_gate_title');
                 if ($title === 'notifications.parent_at_gate_title') {
-                    $title = "Parent at Gate ðŸš¨";
+                    $title = "Parent at Gate 🚨";
                 }
                 $body = __('notifications.parent_at_gate_body', ['student_first_name' => $pickup->student->first_name]);
                 if ($body === 'notifications.parent_at_gate_body') {
@@ -555,32 +566,37 @@ class AttendanceApiController extends Controller
     }
 
     /**
-     * Task 10: Fetch Today's Absentees for Teacher Dashboard
+     * Fetch Today's Absentees for Teacher Dashboard
+     * SCOPED: Block Students & Parents
      */
     public function getTodayAbsentees(Request $request)
     {
-        $user = Auth::user();
-        if (!$user->hasRole('Teacher')) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
+        
+        if (!$user || $user->hasRole(['Student', 'Guardian'])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized. Staff only.'], 403);
         }
 
-        $staffId = $user->staff->id ?? null;
-        $classIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id');
-        
-        $absentees = StudentAttendance::with('student:id,first_name,last_name,student_photo,admission_number')
-            ->whereIn('class_section_id', $classIds)
+        $query = StudentAttendance::with('student:id,first_name,last_name,student_photo,admission_number')
             ->whereDate('attendance_date', Carbon::today()->toDateString())
-            ->where('status', 'absent')
-            ->get()
-            ->map(function($att) {
-                 $admNo = $att->student->admission_number ?? 'N/A';
-                 return [
-                     'id' => $att->student->id,
-                     'student_name' => ($att->student->full_name ?? 'Unknown') . ' (' . $admNo . ')',
-                     'admission_no' => $admNo,
-                     'photo' => $att->student->student_photo ? asset('storage/'.$att->student->student_photo) : null,
-                 ];
-            });
+            ->where('status', 'absent');
+
+        // Scope to teacher's classes
+        if ($user->hasRole('Teacher') && $user->staff) {
+            $staffId = $user->staff->id;
+            $classIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id');
+            $query->whereIn('class_section_id', $classIds);
+        }
+
+        $absentees = $query->get()->map(function($att) {
+            $admNo = $att->student->admission_number ?? 'N/A';
+            return [
+                'id' => $att->student->id,
+                'student_name' => ($att->student->full_name ?? 'Unknown') . ' (' . $admNo . ')',
+                'admission_no' => $admNo,
+                'photo' => $att->student->student_photo ? asset('storage/'.$att->student->student_photo) : null,
+            ];
+        });
             
         return response()->json([
             'success' => true, 
@@ -589,29 +605,26 @@ class AttendanceApiController extends Controller
     }
 
     /**
-     * Fetch Absentee Report Grouped by Class Sections for the Logged-in Teacher
-     * Endpoint: GET /api/v1/attendance/absentees
+     * Fetch Absentee Report Grouped by Class Sections
+     * SCOPED: Block Students & Parents
      */
     public function getTeacherClassAbsentees(Request $request)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
         
-        \Illuminate\Support\Facades\Log::info('--- START getTeacherClassAbsentees ---', ['user_id' => $user->id ?? 'guest']);
+        Log::info('--- START getTeacherClassAbsentees ---', ['user_id' => $user->id ?? 'guest']);
         
-        // Ensure the user exists, is a teacher, and has a staff profile
-        if (!$user || !$user->hasRole('Teacher') || !$user->staff) {
-            \Illuminate\Support\Facades\Log::warning('Unauthorized access attempt in getTeacherClassAbsentees', [
+        // Strict Guard: Prevent Students/Parents from accessing staff data
+        if (!$user || $user->hasRole(['Student', 'Guardian'])) {
+            Log::warning('Unauthorized access attempt in getTeacherClassAbsentees', [
                 'roles' => $user ? $user->getRoleNames() : 'none', 
-                'has_staff' => $user && $user->staff
             ]);
-            return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
+            return response()->json(['success' => false, 'message' => 'unauthorized_access: Staff only'], 403);
         }
 
         $today = \Carbon\Carbon::today()->toDateString();
         $dayOfWeek = strtolower(now()->format('l'));
         
-        // SMART LOGIC: Check institution type for future Subject-wise attendance
-        // Failsafe clone to prevent null errors for Super Admins
         $institution = $user->institute;
         $instType = $institution ? $institution->type : 'primary';
         $isSubjectWise = in_array($instType, ['university', 'vocational']);
@@ -622,7 +635,6 @@ class AttendanceApiController extends Controller
         if ($user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
             $query = \App\Models\ClassSection::where('is_active', true);
             
-            // Filter to their school unless they are global Super Admin
             if (!$user->hasRole('Super Admin') && $user->institute_id) {
                 $query->where('institution_id', $user->institute_id);
             }
@@ -632,7 +644,6 @@ class AttendanceApiController extends Controller
         // --- 2. TEACHER LOGIC: See only assigned classes ---
         elseif ($user->hasRole('Teacher') && $user->staff) {
             $staffId = $user->staff->id;
-            \Illuminate\Support\Facades\Log::info("Teacher Staff ID: {$staffId}, Day: {$dayOfWeek}");
             
             $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
             
@@ -645,17 +656,9 @@ class AttendanceApiController extends Controller
 
             $allAssignedClassIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
         } else {
-            // Failsafe for generic users (Students, Guardians, etc.)
-            \Illuminate\Support\Facades\Log::warning('Unauthorized access attempt in getTeacherClassAbsentees', [
-                'roles' => $user->getRoleNames(), 
-                'has_staff' => $user->staff ? true : false
-            ]);
             return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
         }
 
-        \Illuminate\Support\Facades\Log::info("Class IDs Found", ['merged_unique' => $allAssignedClassIds]);
-
-        // Get the sections
         $sectionsQuery = \App\Models\ClassSection::where('is_active', true)
             ->whereIn('id', $allAssignedClassIds);
             
@@ -665,7 +668,6 @@ class AttendanceApiController extends Controller
         
         $sections = $sectionsQuery->get();
 
-        // Safely fetch session
         $currentSession = \App\Models\AcademicSession::where('is_current', true);
         if ($user->institute_id && !$user->hasRole('Super Admin')) {
             $currentSession->where('institution_id', $user->institute_id);
@@ -676,11 +678,8 @@ class AttendanceApiController extends Controller
         $report = [];
 
         foreach ($sections as $section) {
-            \Illuminate\Support\Facades\Log::info("Processing Section ID: {$section->id} - {$section->name}");
-            
-            // Get active enrollments for this specific section
             $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
-                ->whereHas('student') // FIX: Exclude orphaned enrollments where the student was deleted
+                ->whereHas('student')
                 ->where('class_section_id', $section->id)
                 ->where('academic_session_id', $sessionId)
                 ->where('status', 'active')
@@ -689,10 +688,6 @@ class AttendanceApiController extends Controller
             $studentIds = $enrollments->pluck('student_id')->toArray();
             $totalClass = count($studentIds);
 
-            \Illuminate\Support\Facades\Log::info("Section {$section->name} has {$totalClass} active students.");
-
-            // Get today's attendance records for these students
-            // NOTE: When Subject-wise attendance is implemented for University, this query will target SubjectAttendance instead.
             $attendances = \App\Models\StudentAttendance::whereIn('student_id', $studentIds)
                 ->where('attendance_date', $today)
                 ->get()
@@ -703,24 +698,16 @@ class AttendanceApiController extends Controller
 
             foreach ($enrollments as $enrollment) {
                 $student = $enrollment->student;
-
-                // Extra failsafe against null students
-                if (!$student) {
-                    \Illuminate\Support\Facades\Log::warning("Orphaned Enrollment Skipped. Enrollment ID: {$enrollment->id}");
-                    continue;
-                }
+                if (!$student) continue;
 
                 $attendance = $attendances->get($student->id);
 
-                // If they have a record and are present/late, count as present
                 if ($attendance && in_array($attendance->status, ['present', 'late'])) {
                     $presentCount++;
                 } else {
-                    // Otherwise, they are absent. Fetch parent contact safely using ?->
                     $parent = $student->parent;
                     $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? 'N/A';
                     
-                    // Safely format name
                     $firstName = $student->first_name ?? '';
                     $lastName = $student->last_name ?? '';
                     $admNo = $student->admission_number ?? 'N/A';
@@ -734,7 +721,6 @@ class AttendanceApiController extends Controller
                 }
             }
 
-            // Only include sections in the report if they have enrolled students
             if ($totalClass > 0) {
                 $report[] = [
                     'section_name' => $section->name ?? 'Unknown Section',
@@ -742,12 +728,10 @@ class AttendanceApiController extends Controller
                     'total_present' => $presentCount,
                     'total_absent' => $totalClass - $presentCount,
                     'absentees' => $absenteesList,
-                    'attendance_type' => $isSubjectWise ? 'subject' : 'daily' // Smart Flag for Frontend
+                    'attendance_type' => $isSubjectWise ? 'subject' : 'daily'
                 ];
             }
         }
-
-        \Illuminate\Support\Facades\Log::info("Final Report Count: " . count($report));
 
         return response()->json([
             'success' => true,
@@ -755,11 +739,6 @@ class AttendanceApiController extends Controller
         ]);
     }
 
-
-
-    /**
-     * Fuzzy match for NFC/RFID UIDs
-     */
     private function getPossibleUids($uid)
     {
         $clean = str_replace([':', ' ', '-'], '', $uid);
