@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Hash;
-use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 
 class UserProfileApiController extends Controller
 {
@@ -69,58 +67,69 @@ class UserProfileApiController extends Controller
     {
         $user = Auth::user();
 
-        // 1. Define allowed fields. 
-        // We do NOT allow updating role, institute_id, shortcode, etc., here.
-        $rules = [
+        $request->validate([
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
-            // Example: Only allow changing name/email if NOT a student (or implement custom logic)
-            // For now, let's allow everyone to update their phone, address, and profile picture.
-            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ];
-        
-        // Optional: Allow changing password
-        if ($request->filled('current_password')) {
-            $rules['current_password'] = 'required|current_password';
-            $rules['new_password'] = ['required', 'confirmed', Password::min(6)]; // Customize min length
-        }
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'password' => 'nullable|string|min:8'
+        ]);
 
-        $request->validate($rules);
-
-        // 2. Perform Updates
         if ($request->hasFile('profile_picture')) {
-            if ($user->profile_picture && Storage::disk('public')->exists($user->profile_picture)) {
-                Storage::disk('public')->delete($user->profile_picture);
+            // 1. Determine exact User ID (Admission No, Employee ID, or fallback to User ID)
+            $identifier = $user->id;
+            if ($user->student && $user->student->admission_number) {
+                $identifier = $user->student->admission_number;
+            } elseif ($user->staff && $user->staff->employee_id) {
+                $identifier = $user->staff->employee_id;
             }
-            $user->profile_picture = $request->file('profile_picture')->store('profile_pictures', 'public');
+            
+            // 2. Clean identifier to prevent file path errors and format filename
+            $safeIdentifier = preg_replace('/[^A-Za-z0-9\-]/', '_', $identifier);
+            $extension = $request->file('profile_picture')->getClientOriginalExtension();
+            $filename = 'profile_' . $safeIdentifier . '.' . $extension;
+
+            // 3. Prevent storage bloat: Delete old file if it exists and has a different name
+            if ($user->profile_picture && Storage::disk('public')->exists($user->profile_picture)) {
+                if ($user->profile_picture !== 'profile_pictures/' . $filename) {
+                    Storage::disk('public')->delete($user->profile_picture);
+                }
+            }
+
+            // 4. Store the file in the public disk
+            $path = $request->file('profile_picture')->storeAs('profile_pictures', $filename, 'public');
+            
+            // 5. CRITICAL FIX: Sync the exact path across all connected tables
+            $user->profile_picture = $path;
+            
+            if ($user->student) {
+                $user->student->student_photo = $path;
+                $user->student->save();
+            }
         }
 
+        // Sync Contact Info to Student table as well
         if ($request->has('phone')) {
             $user->phone = $request->phone;
-            // Sync with related models if necessary
-            if ($user->student) $user->student->update(['mobile_number' => $request->phone]);
-            if ($user->staff) $user->staff->update(['phone' => $request->phone]);
-        }
-
-        if ($request->has('address')) {
-            $user->address = $request->address;
-             // Sync with related models if necessary
-            if ($user->student) $user->student->update(['current_address' => $request->address]);
-            if ($user->staff) $user->staff->update(['address' => $request->address]);
+            if ($user->student) {
+                $user->student->mobile_number = $request->phone;
+                $user->student->save();
+            }
         }
         
-        if ($request->filled('new_password')) {
-            $user->password = Hash::make($request->new_password);
+        if ($request->has('address')) {
+            $user->address = $request->address;
+            if ($user->student) {
+                $user->student->current_address = $request->address;
+                $user->student->save();
+            }
+        }
+
+        if ($request->password) {
+            $user->password = Hash::make($request->password);
         }
 
         $user->save();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Profile updated successfully',
-            'data' => [
-                 'profile_picture' => $user->profile_picture ? asset('storage/' . $user->profile_picture) : null,
-            ]
-        ]);
+        return response()->json(['success' => true, 'message' => __('api.profile_updated') ?? 'Profile Updated']);
     }
 }

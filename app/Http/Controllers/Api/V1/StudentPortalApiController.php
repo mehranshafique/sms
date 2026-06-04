@@ -324,17 +324,47 @@ class StudentPortalApiController extends Controller
                 Log::info("[API Results Diagnostics] Marks hidden because they belong to a different Academic Session: {$wrongSessionCount}");
             }
 
-            $mappedRecords = $records->map(function($r) {
+            // Extract comprehensive metadata
+            $firstRecord = $records->first();
+            $exam = $firstRecord ? $firstRecord->exam : null;
+            
+            $totalObtained = 0;
+            $totalMax = 0;
+
+            $mappedRecords = $records->map(function($r) use (&$totalObtained, &$totalMax) {
+                $max = $r->subject->total_marks ?? 100;
+                $obt = $r->is_absent ? 0 : $r->marks_obtained;
+                
+                $totalMax += $max;
+                $totalObtained += $obt;
+
                 return [
-                    'exam_name' => $r->exam->name ?? 'Exam',
                     'subject' => $r->subject->name ?? 'N/A',
                     'marks' => $r->marks_obtained,
+                    'max_marks' => $max,
                     'is_absent' => $r->is_absent
                 ];
             });
 
+            $admNo = $student->admission_number ?? 'N/A';
+            $classSec = $enrollment->classSection;
+            $gradeName = $classSec->gradeLevel->name ?? '';
+            $className = trim($gradeName . ' ' . ($classSec->name ?? 'N/A'));
+
+            $payload = [
+                'student_name' => $student->full_name . ' (' . $admNo . ')',
+                'class_name' => $className,
+                'session_name' => $enrollment->academicSession->name ?? 'N/A',
+                'exam_name' => $exam->name ?? 'Term Examination',
+                'exam_category' => $exam->category ? ucwords(str_replace('_', ' ', $exam->category)) : 'N/A',
+                'exam_year' => $exam->academicSession->name ?? 'N/A',
+                'total_obtained' => $totalObtained,
+                'total_max' => $totalMax,
+                'marks' => $mappedRecords
+            ];
+
             Log::info("[API Results] Successfully mapped data. Returning to app.");
-            return response()->json(['success' => true, 'data' => $mappedRecords]);
+            return response()->json(['success' => true, 'data' => $payload]);
             
         } catch (\Exception $e) {
             Log::error("[API Results Exception] Error: " . $e->getMessage() . " | Line: " . $e->getLine());
