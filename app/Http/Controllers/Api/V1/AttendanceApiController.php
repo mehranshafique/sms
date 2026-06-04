@@ -81,11 +81,12 @@ class AttendanceApiController extends Controller
 
         // --- SMART SCOPING BASED ON USER ROLE ---
         if ($user && !$isHardware) {
-            if ($user->hasRole('Student')) {
+            // STRICT CHECK: Safely checks roles AND relationships
+            if ($user->hasRole('Student') || $user->student) {
                 // Students only see themselves
                 $studentId = $user->student->id ?? 0;
                 $query->where('student_id', $studentId);
-            } elseif ($user->hasRole('Guardian')) {
+            } elseif ($user->hasRole('Guardian') || \App\Models\StudentParent::where('user_id', $user->id)->exists()) {
                 // Parents only see their children
                 $parent = \App\Models\StudentParent::where('user_id', $user->id)->first();
                 $childIds = \App\Models\Student::where('parent_id', $parent->id ?? 0)->pluck('id');
@@ -659,7 +660,8 @@ class AttendanceApiController extends Controller
             return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
         }
 
-        $sectionsQuery = \App\Models\ClassSection::where('is_active', true)
+        // ADDED: ->with('gradeLevel') to eager load the grade
+        $sectionsQuery = \App\Models\ClassSection::with('gradeLevel')->where('is_active', true)
             ->whereIn('id', $allAssignedClassIds);
             
         if ($user->institute_id && !$user->hasRole('Super Admin')) {
@@ -723,6 +725,7 @@ class AttendanceApiController extends Controller
 
             if ($totalClass > 0) {
                 $report[] = [
+                    'class_name' => $section->gradeLevel->name ?? 'N/A', // ADDED THIS LINE
                     'section_name' => $section->name ?? 'Unknown Section',
                     'total_class' => $totalClass,
                     'total_present' => $presentCount,
