@@ -43,6 +43,7 @@ class Student extends Model
         'status',
         'payment_mode',
         'nfc_tag_uid', 
+        'rfid_uid',
         'qr_code_token'
     ];
 

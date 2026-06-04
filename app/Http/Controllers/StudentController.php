@@ -40,83 +40,111 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $query = Student::leftJoin('parents', 'students.parent_id', '=', 'parents.id')
-                ->select([
-                    'students.id',
-                    'students.institution_id',
-                    'students.first_name',
-                    'students.last_name',
-                    'students.admission_number',
-                    'students.student_photo',
-                    'students.status',
-                    'students.created_at',
-                    'students.grade_level_id', 
-                    'parents.father_name as parent_father_name',
-                    'parents.mother_name as parent_mother_name',
-                    'parents.guardian_name as parent_guardian_name',
-                    'parents.father_phone as parent_father_phone',
-                    'parents.mother_phone as parent_mother_phone',
-                    'parents.guardian_phone as parent_guardian_phone'
-                ]);
+            $query = Student::with(['classSection.gradeLevel', 'parent', 'user'])
+                ->select('students.*');
 
             if ($institutionId) {
                 $query->where('students.institution_id', $institutionId);
             }
 
-            if ($request->has('grade_level_id') && $request->grade_level_id) {
-                $query->where('students.grade_level_id', $request->grade_level_id);
-            }
-
-            $query->orderBy('students.created_at', 'desc');
-
             return DataTables::of($query)
                 ->addIndexColumn()
-                ->editColumn('first_name', fn($row) => mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8'))
-                ->editColumn('last_name', fn($row) => mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8'))
-                ->editColumn('parent_father_name', fn($row) => mb_convert_encoding($row->parent_father_name ?? '', 'UTF-8', 'UTF-8'))
-                ->editColumn('parent_mother_name', fn($row) => mb_convert_encoding($row->parent_mother_name ?? '', 'UTF-8', 'UTF-8'))
-                ->editColumn('parent_guardian_name', fn($row) => mb_convert_encoding($row->parent_guardian_name ?? '', 'UTF-8', 'UTF-8'))
-                
-                ->addColumn('checkbox', function($row){
-                    return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3"><input type="checkbox" class="form-check-input single-checkbox" value="'.$row->id.'"><label class="form-check-label"></label></div>';
-                })
-                ->addColumn('details', function($row){
+                ->addColumn('details', function($row) {
                     $img = $row->student_photo ? asset('storage/' . $row->student_photo) : null;
                     
                     $nameForInitial = trim($row->first_name) ?: 'S';
                     $initial = mb_strtoupper(mb_substr($nameForInitial, 0, 1, 'UTF-8'));
                     
                     $avatarHtml = $img 
-                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">' 
+                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="" style="object-fit:cover;">' 
                         : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold; font-size: 18px;">'.$initial.'</div>';
                     
                     $fName = mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8');
                     $lName = mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8');
                     $fullName = $fName . ' ' . $lName;
                     
-                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('students.show', $row->id).'" class="text-black">'.$fullName.'</a></h6><span class="fs-13 text-muted">'.__('student.id').': '.($row->admission_number ?? '-').'</span></div></div>';
+                    return '<div class="d-flex align-items-center">
+                                '.$avatarHtml.'
+                                <div>
+                                    <h6 class="mb-0 fw-bold"><a href="'.route('students.show', $row->id).'" class="text-black">'.$fullName.'</a></h6>
+                                    <small class="text-muted">'.__('student.admission_no'). ': ' . ($row->admission_number ?? '-').'</small>
+                                </div>
+                            </div>';
                 })
-                ->addColumn('parent_info', function($row){
-                    $name = $row->parent_father_name ?? $row->parent_mother_name ?? $row->parent_guardian_name ?? 'N/A';
-                    $phone = $row->parent_father_phone ?? $row->parent_mother_phone ?? $row->parent_guardian_phone ?? 'N/A';
+                ->addColumn('contact', function($row) {
+                    return '<div class="small">
+                                <div><i class="fa fa-phone text-primary me-1"></i> '.($row->mobile_number ?? '-').'</div>
+                                <div><i class="fa fa-envelope text-primary me-1"></i> '.($row->email ?? '-').'</div>
+                            </div>';
+                })
+                ->addColumn('parent_info', function($row) {
+                    if (!$row->parent) return '<span class="text-muted">-</span>';
+                    $pName = $row->parent->father_name ?? $row->parent->mother_name ?? $row->parent->guardian_name ?? 'N/A';
+                    $pPhone = $row->parent->father_phone ?? $row->parent->mother_phone ?? $row->parent->guardian_phone ?? 'N/A';
+                    return '<div class="small">
+                                <div class="fw-bold">'.$pName.'</div>
+                                <div><i class="fa fa-phone text-muted me-1"></i> '.$pPhone.'</div>
+                            </div>';
+                })
+                ->addColumn('class', function($row) {
+                    $grade = $row->classSection->gradeLevel->name ?? '';
+                    $section = $row->classSection->name ?? '';
+                    return trim($grade . ' ' . $section) ?: '-';
+                })
+                ->addColumn('status', function($row) {
+                    $status = $row->status ?? 'active';
+                    $badges = [
+                        'active' => 'badge-success',
+                        'inactive' => 'badge-secondary',
+                        'suspended' => 'badge-danger',
+                        'transferred' => 'badge-info',
+                        'graduated' => 'badge-primary',
+                    ];
+                    $class = $badges[$status] ?? 'badge-light';
+                    return '<span class="badge badge-sm '.$class.'">'.ucfirst($status).'</span>';
+                })
+                ->addColumn('action', function($row) {
+                    $show = route('students.show', $row->id);
+                    $edit = route('students.edit', $row->id);
+                    $delete = route('students.destroy', $row->id);
                     
-                    $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
-                    
-                    return '<div><i class="fa fa-user me-1"></i> '.$name.'</div><div class="text-muted"><i class="fa fa-phone me-1"></i> '.$phone.'</div>';
+                    return '
+                    <div class="d-flex">
+                        <a href="'.$show.'" class="btn btn-info shadow btn-xs sharp me-1" title="View"><i class="fa fa-eye"></i></a>
+                        <a href="'.$edit.'" class="btn btn-primary shadow btn-xs sharp me-1" title="Edit"><i class="fa fa-pencil"></i></a>
+                        <button class="btn btn-danger shadow btn-xs sharp delete-btn" data-url="'.$delete.'" title="Delete"><i class="fa fa-trash"></i></button>
+                    </div>';
                 })
-                ->editColumn('status', function($row){
-                    $badges = ['active' => 'badge-success', 'transferred' => 'badge-warning', 'suspended' => 'badge-danger', 'graduated' => 'badge-info', 'inactive' => 'badge-secondary'];
-                    return '<span class="badge '.($badges[$row->status] ?? 'badge-secondary').'">'.ucfirst($row->status).'</span>';
+                ->filter(function ($query) use ($request) {
+                    if ($request->has('search') && !empty($request->search['value'])) {
+                        $keyword = strtolower($request->search['value']);
+                        $query->where(function($q) use ($keyword) {
+                            $q->where('students.first_name', 'LIKE', "%{$keyword}%")
+                              ->orWhere('students.last_name', 'LIKE', "%{$keyword}%")
+                              ->orWhereRaw("LOWER(CONCAT(students.first_name, ' ', students.last_name)) LIKE ?", ["%{$keyword}%"])
+                              ->orWhere('students.admission_number', 'LIKE', "%{$keyword}%")
+                              ->orWhere('students.mobile_number', 'LIKE', "%{$keyword}%")
+                              ->orWhere('students.email', 'LIKE', "%{$keyword}%")
+                              ->orWhere('students.rfid_uid', 'LIKE', "%{$keyword}%")
+                              ->orWhere('students.nfc_tag_uid', 'LIKE', "%{$keyword}%")
+                              ->orWhereHas('parent', function($pq) use ($keyword) {
+                                  $pq->where('father_name', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('mother_name', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('guardian_name', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('father_phone', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('mother_phone', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('guardian_phone', 'LIKE', "%{$keyword}%");
+                              })
+                              ->orWhereHas('classSection', function($cq) use ($keyword) {
+                                  $cq->where('name', 'LIKE', "%{$keyword}%")
+                                     ->orWhereHas('gradeLevel', function($gq) use ($keyword) {
+                                         $gq->where('name', 'LIKE', "%{$keyword}%");
+                                     });
+                              });
+                        });
+                    }
                 })
-                ->addColumn('action', function($row){
-                    $btn = '<div class="d-flex justify-content-end action-buttons">';
-                    $btn .= '<a href="'.route('students.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
-                    $btn .= '<a href="'.route('students.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
-                    $btn .= '<button class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
-                    $btn .= '</div>';
-                    return $btn;
-                })
-                ->rawColumns(['checkbox', 'details', 'parent_info', 'status', 'action'])
+                ->rawColumns(['details', 'contact', 'parent_info', 'status', 'action'])
                 ->make(true);
         }
 
@@ -217,9 +245,11 @@ class StudentController extends BaseController
             'primary_guardian' => 'required|in:father,mother,guardian',
             'guardian_email' => 'nullable|email',
             'email' => 'nullable|email|unique:users,email', 
+            'password' => 'nullable|string|min:6', // NEW: Custom password support
+            'status' => 'required|string|in:active,inactive,suspended,transferred,graduated', // NEW: Status Support
+            'rfid_uid' => 'nullable|string|max:100', // NEW: RFID Support
         ]);
 
-        // Prevent Student and Guardian from sharing the exact same email (Causes duplicate user exception)
         if ($request->filled('email') && $request->filled('guardian_email') && $request->email === $request->guardian_email) {
             return response()->json([
                 'message' => 'Validation Error',
@@ -235,7 +265,7 @@ class StudentController extends BaseController
         
         $data = $request->except(array_merge(
             $parentFields, 
-            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'primary_guardian']
+            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'primary_guardian', 'password']
         ));
 
         // Clean text fields
@@ -246,7 +276,6 @@ class StudentController extends BaseController
             }
         }
         
-        // --- FIX: Ensure mobile_number is mapped correctly from request ---
         if($request->filled('mobile_number')) {
             $data['mobile_number'] = $request->mobile_number;
         }
@@ -274,7 +303,7 @@ class StudentController extends BaseController
                         }
                     })->first();
 
-                // 2. Parent User Account & Shortcode Generation
+                // 2. Parent User Account
                 $parentUserId = $parent ? $parent->user_id : null;
                 $parentPlainPassword = null;
                 $parentUserObj = null;
@@ -288,7 +317,6 @@ class StudentController extends BaseController
                             $existingUser->assignRole('Guardian');
                         }
                         
-                        // Update parent phone if provided in current request
                         $primaryPhone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
                         if($primaryPhone && $primaryPhone !== $existingUser->phone) {
                             $existingUser->update(['phone' => $primaryPhone]);
@@ -308,7 +336,7 @@ class StudentController extends BaseController
                             'name' => $name,
                             'email' => $email,
                             'password' => Hash::make($parentPlainPassword),
-                            'phone' => $phone, // Save Phone to User table
+                            'phone' => $phone,
                             'user_type' => UserType::GUARDIAN->value,
                             'institute_id' => $institutionId,
                             'shortcode' => $parentShortcode, 
@@ -342,11 +370,11 @@ class StudentController extends BaseController
                     if (!$parent->user_id && $parentUserId) {
                         $parent->update(['user_id' => $parentUserId]);
                     }
-                    // Update parent record details if changed
                     $parent->update([
                         'father_phone' => $request->father_phone,
                         'mother_phone' => $request->mother_phone,
                         'guardian_phone' => $request->guardian_phone,
+                        'guardian_relation' => $request->primary_guardian, // Ensure updated
                     ]);
                 }
 
@@ -355,15 +383,14 @@ class StudentController extends BaseController
                 $data['institution_id'] = $institutionId;
                 $data['parent_id'] = $parent->id; 
                 $data['admission_number'] = $admissionNumber;
-                $data['primary_guardian'] = $request->primary_guardian; 
 
                 if ($request->hasFile('student_photo')) {
                     $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
                 }
 
-                // 5. Create Student USER Account (Updated Logic)
+                // 5. Create Student USER Account (Handle Custom Password)
                 $studentEmail = $request->email;
-                $studentPlainPassword = 'Student123!';
+                $studentPlainPassword = $request->filled('password') ? $request->password : 'Student123!';
                 
                 if (empty($studentEmail)) {
                     $cleanAcronym = Str::slug($institution->acronym ?? 'school');
@@ -374,15 +401,14 @@ class StudentController extends BaseController
                     'name' => $request->first_name . ' ' . $request->last_name,
                     'email' => $studentEmail,
                     'password' => Hash::make($studentPlainPassword),
-                    'phone' => $request->mobile_number, // Save Phone to User table (FIX)
+                    'phone' => $request->mobile_number,
                     'user_type' => UserType::STUDENT->value,
                     'institute_id' => $institutionId,
                     'shortcode' => $admissionNumber, 
                     'username' => $admissionNumber,  
-                    'is_active' => true,
+                    'is_active' => ($request->status === 'active'),
                 ]);
 
-                // Assign Student Role
                 $studentRole = Role::where('name', RoleEnum::STUDENT->value)
                                    ->where('institution_id', $institutionId)
                                    ->first();
@@ -404,7 +430,7 @@ class StudentController extends BaseController
                     $sectionId = $section ? $section->id : null;
                 }
                 
-                if ($sectionId) {
+                if ($sectionId && $request->status === 'active') {
                     StudentEnrollment::create([
                         'institution_id' => $institutionId,
                         'academic_session_id' => $currentSession->id,
@@ -420,10 +446,8 @@ class StudentController extends BaseController
                 }
 
                 // 8. SEND NOTIFICATIONS
-                // Send to Student
                 $this->notificationService->sendUserCredentials($studentUser, $studentPlainPassword, RoleEnum::STUDENT->value);
                 
-                // Send to Parent (if new user created or updated)
                 if ($parentUserObj && $parentPlainPassword) {
                     $this->notificationService->sendUserCredentials($parentUserObj, $parentPlainPassword, RoleEnum::GUARDIAN->value);
                 }
@@ -470,14 +494,20 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $student->institution_id != $institutionId) abort(403);
         
-        $request->validate(['first_name' => 'required', 'last_name' => 'required']);
+        $request->validate([
+            'first_name' => 'required|string|max:100', 
+            'last_name' => 'required|string|max:100',
+            'password' => 'nullable|string|min:6', // NEW: Update Custom password
+            'status' => 'required|string|in:active,inactive,suspended,transferred,graduated', // NEW: Status
+            'rfid_uid' => 'nullable|string|max:100', // NEW: RFID
+        ]);
 
         $parentFields = ['father_name', 'father_phone', 'mother_name', 'mother_phone', 'guardian_name', 'guardian_phone', 'guardian_email'];
         $parentData = $request->only($parentFields);
         
         $studentData = $request->except(array_merge(
             $parentFields, 
-            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'admission_number', 'institution_id', 'email']
+            ['_token', '_method', 'discount_amount', 'discount_type', 'scholarship_reason', 'admission_number', 'institution_id', 'email', 'primary_guardian', 'password']
         ));
         
         if($request->filled('mobile_number')) {
@@ -494,23 +524,27 @@ class StudentController extends BaseController
                 // 1. Update Student Profile
                 $student->update($studentData);
 
-                // 2. Sync Student User (Name, Email, Phone)
+                // 2. Sync Student User (Name, Email, Phone, Status, Password)
                 if ($student->user_id) {
                     $userUpdate = [];
                     if($request->filled('first_name')) $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
                     
-                    // Update Phone
                     if ($request->filled('mobile_number')) {
                         $userUpdate['phone'] = $request->mobile_number;
                     }
 
-                    // Only update email if provided and different
                     if ($request->filled('email') && $request->email !== $student->user->email) {
-                        // Check uniqueness
                         if (!User::where('email', $request->email)->where('id', '!=', $student->user_id)->exists()) {
                             $userUpdate['email'] = $request->email;
                             $student->update(['email' => $request->email]);
                         }
+                    }
+                    
+                    $userUpdate['is_active'] = ($request->status === 'active');
+
+                    // If custom password is provided, securely hash it and update
+                    if ($request->filled('password')) {
+                        $userUpdate['password'] = Hash::make($request->password);
                     }
                     
                     User::where('id', $student->user_id)->update($userUpdate);
@@ -544,7 +578,7 @@ class StudentController extends BaseController
                                 'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
                                 'email' => $parentData['guardian_email'],
                                 'password' => Hash::make($plainPassword),
-                                'phone' => $phone, // Save Phone
+                                'phone' => $phone, 
                                 'user_type' => UserType::GUARDIAN->value,
                                 'institute_id' => $student->institution_id,
                                 'shortcode' => $parentShortcode,
@@ -556,14 +590,17 @@ class StudentController extends BaseController
                             $parentUser = $newUser;
                         }
                     } elseif ($student->parent->user_id) {
-                         // Sync Parent Phone update
                          $phone = $parentData['guardian_phone'] ?? $parentData['father_phone'] ?? $parentData['mother_phone'];
                          if($phone) {
                              User::where('id', $student->parent->user_id)->update(['phone' => $phone]);
                          }
                     }
+
+                    // Pre-select Saved Value: Update guardian_relation based on selection
+                    if ($request->filled('primary_guardian')) {
+                        $student->parent->update(['guardian_relation' => $request->primary_guardian]);
+                    }
                     
-                    // NOTIFY NEW PARENT
                     if ($isNewParent && $parentUser && $plainPassword) {
                         $this->notificationService->sendUserCredentials($parentUser, $plainPassword, RoleEnum::GUARDIAN->value);
                     }

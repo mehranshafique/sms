@@ -33,13 +33,13 @@ class StaffController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
-            $data = Staff::with(['user', 'institution', 'campus'])->select('staff.*');
+            $query = Staff::with(['user', 'institution', 'campus'])->select('staff.*');
 
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $query->where('institution_id', $institutionId);
             }
 
-            return DataTables::of($data)
+            return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('checkbox', function($row){
                     if(auth()->user()->can('delete', $row)){
@@ -57,7 +57,7 @@ class StaffController extends BaseController
                     $initial = strtoupper(substr($name, 0, 1));
                     
                     $avatarHtml = $img 
-                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
+                        ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" style="object-fit:cover;" alt="">'
                         : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
 
                     return '<div class="d-flex align-items-center">
@@ -65,6 +65,7 @@ class StaffController extends BaseController
                                 <div>
                                     <h6 class="fs-16 font-w600 mb-0"><a href="'.route('staff.show', $row->id).'" class="text-black">'.$name.'</a></h6>
                                     <span class="fs-13 text-muted">'.$email.'</span>
+                                    <small class="d-block text-muted">'.$row->employee_id.'</small>
                                 </div>
                             </div>';
                 })
@@ -83,16 +84,33 @@ class StaffController extends BaseController
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
                     if(auth()->user()->can('view', $row)){
-                        $btn .= '<a href="'.route('staff.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1"><i class="fa fa-eye"></i></a>';
+                        $btn .= '<a href="'.route('staff.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1" title="View"><i class="fa fa-eye"></i></a>';
                     }
                     if(auth()->user()->can('update', $row)){
-                        $btn .= '<a href="'.route('staff.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
+                        $btn .= '<a href="'.route('staff.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="Edit"><i class="fa fa-pencil"></i></a>';
                     }
                     if(auth()->user()->can('delete', $row)){
-                        $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
+                        $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" title="Delete"><i class="fa fa-trash"></i></button>';
                     }
                     $btn .= '</div>';
                     return $btn;
+                })
+                ->filter(function ($query) use ($request) {
+                    if ($request->has('search') && !empty($request->search['value'])) {
+                        $keyword = strtolower($request->search['value']);
+                        $query->where(function($q) use ($keyword) {
+                            $q->where('staff.employee_id', 'LIKE', "%{$keyword}%")
+                              ->orWhere('staff.designation', 'LIKE', "%{$keyword}%")
+                              ->orWhere('staff.department', 'LIKE', "%{$keyword}%")
+                              ->orWhere('staff.nfc_uid', 'LIKE', "%{$keyword}%")
+                              ->orWhere('staff.rfid_uid', 'LIKE', "%{$keyword}%")
+                              ->orWhereHas('user', function($uq) use ($keyword) {
+                                  $uq->where('name', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('email', 'LIKE', "%{$keyword}%")
+                                     ->orWhere('phone', 'LIKE', "%{$keyword}%");
+                              });
+                        });
+                    }
                 })
                 ->rawColumns(['checkbox', 'details', 'role', 'status', 'action'])
                 ->make(true);
@@ -120,10 +138,8 @@ class StaffController extends BaseController
         
         $rolesQuery = Role::where('name', '!=', RoleEnum::SUPER_ADMIN->value);
 
-        // Apply filtering logic: Always check institution_id not null unless handled specifically
         $rolesQuery->whereNotNull('institution_id');
 
-        // Additionally filter by current institution context if set
         if ($institutionId) {
             $rolesQuery->where('institution_id', $institutionId);
         }
@@ -160,6 +176,8 @@ class StaffController extends BaseController
             'designation' => 'nullable|string',
             'joining_date' => 'nullable|date',
             'gender' => 'required|in:male,female,other',
+            'nfc_uid' => 'nullable|string|max:100',
+            'rfid_uid' => 'nullable|string|max:100',
         ]);
        
         DB::transaction(function () use ($request, $institutionId) {
@@ -168,8 +186,8 @@ class StaffController extends BaseController
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
-                'mobile_number' => $request->phone, // Ensure mobile_number is also set for notifications
-                'user_type' => 4, // Staff
+                'mobile_number' => $request->phone, 
+                'user_type' => 4, 
                 'is_active' => true,
                 'institute_id' => $institutionId,
             ];
@@ -178,22 +196,17 @@ class StaffController extends BaseController
                 $userData['profile_picture'] = $request->file('profile_picture')->store('profile-photos', 'public');
             }
 
-            // Create User First (without shortcode initially if we use ID-based EMP)
             $user = User::create($userData);
             
-            // Assign Role
             $user->assignRole($request->role);
 
-            // Generate Employee ID (EMP-0001)
             $empId = $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
             
-            // UPDATE: Set Shortcode & Username to Employee ID
             $user->update([
                 'shortcode' => $empId,
                 'username'  => $empId
             ]);
 
-            // Create Staff Profile
             Staff::create([
                 'user_id' => $user->id,
                 'institution_id' => $institutionId,
@@ -205,10 +218,10 @@ class StaffController extends BaseController
                 'gender' => $request->gender,
                 'address' => $request->address,
                 'status' => 'active',
+                'nfc_uid' => $request->nfc_uid,
+                'rfid_uid' => $request->rfid_uid,
             ]);
 
-            // SEND CREDENTIALS (Email + SMS + WhatsApp)
-            // Notification Service handles checking for phone availability
             $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
         });
 
@@ -235,7 +248,6 @@ class StaffController extends BaseController
         $campuses = Campus::where('institution_id', $staff->institution_id)->pluck('name', 'id');
         
         $rolesQuery = Role::where('name', '!=', RoleEnum::SUPER_ADMIN->value);
-
         $rolesQuery->whereNotNull('institution_id');
 
         $instId = $staff->institution_id;
@@ -273,6 +285,8 @@ class StaffController extends BaseController
             ],
             'profile_picture' => 'nullable|image|max:2048',
             'institution_id' => $institutionId ? 'nullable' : 'required|exists:institutions,id',
+            'nfc_uid' => 'nullable|string|max:100',
+            'rfid_uid' => 'nullable|string|max:100',
         ]);
 
         DB::transaction(function () use ($request, $staff, $user, $institutionId) {
@@ -280,7 +294,7 @@ class StaffController extends BaseController
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
-                'mobile_number' => $request->phone, // Ensure updated
+                'mobile_number' => $request->phone, 
             ];
 
             if ($request->password) {
@@ -294,7 +308,6 @@ class StaffController extends BaseController
                 $userData['profile_picture'] = $request->file('profile_picture')->store('profile-photos', 'public');
             }
 
-            // Sync shortcode if manually updating employee ID (though usually generated)
             if ($request->employee_id && $request->employee_id !== $user->shortcode) {
                 $userData['shortcode'] = $request->employee_id;
                 $userData['username'] = $request->employee_id;
@@ -313,6 +326,8 @@ class StaffController extends BaseController
                 'gender' => $request->gender,
                 'address' => $request->address,
                 'status' => $request->status ?? $staff->status,
+                'nfc_uid' => $request->nfc_uid,
+                'rfid_uid' => $request->rfid_uid,
             ]);
 
             if($request->password) {

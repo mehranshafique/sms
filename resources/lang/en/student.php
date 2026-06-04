@@ -169,4 +169,17 @@ return [
     'percentage' => 'Percentage (%)',
     'reason_remark' => 'Reason / Remark',
     'reason_placeholder' => 'e.g. Merit, Staff Child',
+    // Form & Details Additions
+    'status' => 'Status',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
+    'suspended' => 'Suspended',
+    'transferred' => 'Transferred',
+    'graduated' => 'Graduated',
+    'rfid_uid' => 'RFID UID',
+    'enter_rfid_uid' => 'Enter RFID Card Number',
+    'app_password' => 'App Password',
+    'leave_blank_keep_current' => 'Leave blank to keep current',
+    'password_instruction' => 'Used by the student to log into the mobile app.',
+    'app_access' => 'App Access',
 ];

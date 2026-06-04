@@ -489,14 +489,7 @@
                     <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.show') }}">
                         <i class="la la-chart-pie"></i>
                         <span class="nav-text">{{ __('sidebar.my_attendance_analytics') ?? 'My Attendance Analytics' }}</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.show') }}">
-                        <i class="la la-chart-line"></i>
-                        <span class="nav-text">{{ __('attendance.analytics_title') }}</span>
-                    </a>
-                </li>
+                    </a></li>
                 @endif
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('marks.my_marks') ? 'mm-active' : '' }}" href="{{ route('marks.my_marks') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>

@@ -180,9 +180,42 @@
                             <textarea name="address" class="form-control" rows="2">{{ old('address', $staff->address ?? '') }}</textarea>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Identity & Access -->
+        <div class="col-xl-12">
+            <div class="card">
+                <div class="card-header border-0 pb-0">
+                    <h4 class="card-title">{{ __('staff.identity_access') ?? 'Identity & Access' }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- NFC -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('staff.nfc_uid') ?? 'NFC UID' }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-wifi"></i></span>
+                                <input type="text" name="nfc_uid" id="nfc_input" class="form-control" value="{{ old('nfc_uid', $staff->nfc_uid ?? '') }}" placeholder="{{ __('staff.enter_nfc_uid') ?? 'Scan or enter NFC UID' }}" autocomplete="off">
+                                <button class="btn btn-secondary" type="button" id="btnScanNFC"><i class="fa fa-mobile me-1"></i> Scan</button>
+                            </div>
+                            <small class="text-muted d-block mt-1">Tap card on reader (Desktop) or click Scan (Mobile).</small>
+                            <div id="nfcStatus" class="small mt-1 text-info d-none"><i class="fa fa-spinner fa-spin"></i> Scanning... Tap card on back of phone.</div>
+                        </div>
+
+                        <!-- RFID -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('staff.rfid_uid') ?? 'RFID UID' }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-id-badge"></i></span>
+                                <input type="text" name="rfid_uid" class="form-control" value="{{ old('rfid_uid', $staff->rfid_uid ?? '') }}" placeholder="{{ __('staff.enter_rfid_uid') ?? 'Scan or enter RFID UID' }}" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
                     
-                    <div class="mt-3">
-                        <button type="submit" class="btn btn-primary">{{ isset($staff) ? __('staff.update_staff') : __('staff.save_staff') }}</button>
+                    <div class="mt-4 text-end pt-3 border-top">
+                        <button type="submit" class="btn btn-success btn-lg shadow btn-submit"><i class="fa fa-save me-2"></i> {{ isset($staff) ? __('staff.update_staff') : __('staff.save_staff') }}</button>
                     </div>
                 </div>
             </div>
@@ -213,6 +246,52 @@
                     fullPhoneInput.value = iti.getNumber();
                 } else {
                     fullPhoneInput.value = iti.getNumber(); 
+                }
+            });
+        }
+
+        // --- NFC Reader Logic ---
+        const nfcInput = document.getElementById('nfc_input');
+        const btnScanNFC = document.getElementById('btnScanNFC');
+        const nfcStatus = document.getElementById('nfcStatus');
+
+        if (nfcInput) {
+            nfcInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    e.preventDefault(); 
+                    this.blur(); 
+                }
+            });
+        }
+
+        if (btnScanNFC) {
+            btnScanNFC.addEventListener('click', async () => {
+                if (!('NDEFReader' in window)) {
+                    alert('Web NFC is not supported on this device/browser.');
+                    return;
+                }
+                try {
+                    const ndef = new NDEFReader();
+                    await ndef.scan();
+                    if(nfcStatus) nfcStatus.classList.remove('d-none');
+                    btnScanNFC.disabled = true;
+                    btnScanNFC.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+                    ndef.onreading = event => {
+                        nfcInput.value = event.serialNumber;
+                        if(nfcStatus) nfcStatus.classList.add('d-none');
+                        btnScanNFC.disabled = false;
+                        btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
+                    };
+                    ndef.onreadingerror = () => {
+                        alert('Cannot read data from the NFC tag. Try again.');
+                        if(nfcStatus) nfcStatus.classList.add('d-none');
+                        btnScanNFC.disabled = false;
+                        btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
+                    };
+                } catch (error) {
+                    alert('NFC Scan failed: ' + error);
+                    btnScanNFC.disabled = false;
+                    btnScanNFC.innerHTML = '<i class="fa fa-mobile me-1"></i> Scan';
                 }
             });
         }

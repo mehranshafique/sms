@@ -74,11 +74,30 @@ return [
     'edit' => 'Edit',
     'delete' => 'Delete',
     'cancel' => 'Cancel',
+    'export' => 'Export',
+    'bulk_delete' => 'Bulk Delete',
 
     // Alerts
     'are_you_sure' => 'Are you sure?',
     'delete_warning' => 'This will delete the user account and staff profile!',
     'yes_delete' => 'Yes, delete!',
+    'are_you_sure_bulk' => 'Delete selected staff?',
+    'bulk_delete_warning' => 'Selected staff profiles will be permanently deleted!',
+    'yes_bulk_delete' => 'Yes, delete them!',
     'success' => 'Success!',
     'error_occurred' => 'Error Occurred',
+    'something_went_wrong' => 'Something went wrong!',
+    
+    // Search
+    'search_placeholder' => 'Search Staff (Name, ID, Email, Phone)...',
+    
+    // Access & Identity
+    'identity_access' => 'Identity & Access',
+    'nfc_uid' => 'NFC UID',
+    'rfid_uid' => 'RFID UID',
+    'enter_nfc_uid' => 'Scan or enter NFC UID',
+    'enter_rfid_uid' => 'Scan or enter RFID UID',
+    'app_access' => 'App Access',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
 ];

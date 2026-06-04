@@ -77,13 +77,25 @@
                             <h5 class="text-primary mb-3">{{ __('student.identity_access') }}</h5>
                             
                             <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">{{ __('student.rfid_uid') ?? 'RFID UID' }}:</span>
+                                <span class="font-w600">{{ $student->rfid_uid ?? 'N/A' }}</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">{{ __('student.nfc_tag_uid') }}:</span>
                                 <span class="font-w600">{{ $student->nfc_tag_uid ?? 'N/A' }}</span>
                             </div>
 
-                            <div class="d-flex justify-content-between mb-3">
+                            <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">{{ __('student.qr_code_token') }}:</span>
                                 <span class="font-w600">{{ $student->qr_code_token ?? 'N/A' }}</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">{{ __('student.app_access') ?? 'App Access' }}:</span>
+                                <strong class="text-{{ $student->user ? 'success' : 'danger' }}">
+                                    {!! $student->user ? '<i class="fa fa-check-circle"></i> ' . (__('student.active') ?? 'Active') : '<i class="fa fa-times-circle"></i> ' . (__('student.inactive') ?? 'Inactive') !!}
+                                </strong>
                             </div>
 
                             {{-- Visual QR Code --}}
@@ -157,8 +169,15 @@
                                         <h5 class="f-w-500">{{ __('student.status') }} <span class="pull-right">:</span></h5>
                                     </div>
                                     <div class="col-sm-8 col-7">
-                                        <span class="badge badge-{{ $student->status == 'active' ? 'success' : 'warning' }}">
-                                            {{ ucfirst($student->status) }}
+                                        @php
+                                            $badgeClass = 'secondary';
+                                            if($student->status === 'active') $badgeClass = 'success';
+                                            elseif($student->status === 'suspended') $badgeClass = 'danger';
+                                            elseif($student->status === 'transferred') $badgeClass = 'info';
+                                            elseif($student->status === 'graduated') $badgeClass = 'primary';
+                                        @endphp
+                                        <span class="badge badge-{{ $badgeClass }}">
+                                            {{ ucfirst($student->status ?? 'Active') }}
                                         </span>
                                     </div>
                                 </div>

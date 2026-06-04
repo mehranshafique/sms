@@ -21,7 +21,13 @@ use App\Http\Controllers\Api\AuthApiController;
 
 // --- MOBILE APP STAFF AUTHENTICATION ---
 Route::post('/v1/login', [AuthApiController::class, 'login']);
-Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']); // NEW
+Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']);
+
+// --- USER PROFILE ROUTES ---
+Route::middleware('auth:sanctum')->prefix('v1/profile')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\V1\UserProfileApiController::class, 'getProfile']);
+    Route::post('/update', [\App\Http\Controllers\Api\V1\UserProfileApiController::class, 'updateProfile']);
+});
 
 // --- UNIVERSAL HARDWARE & APP SCANNER (NFC, RFID, QR) ---
 Route::prefix('v1/hardware')->group(function () {

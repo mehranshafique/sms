@@ -7,6 +7,8 @@ return [
     'dashboard' => 'Dashboard',
     'profile' => 'Profile',
     'user' => 'User',
+    'username' => 'Username',
+    'id_shortcode' => 'ID / Shortcode',
     'email' => 'Email',
     'joined' => 'Joined',
     'status' => 'Status',
@@ -20,8 +22,27 @@ return [
     'phone' => 'Phone Number',
     'address' => 'Address',
     'not_set' => 'Not Set',
+    
+    // Academic & Professional
     'academic_details' => 'Academic Details',
+    'professional_details' => 'Professional Details',
     'admission_no' => 'Admission Number',
+    'employee_id' => 'Employee ID',
+    'designation' => 'Designation',
+    'department' => 'Department',
+    'joining_date' => 'Joining Date',
+    'class_and_grade' => 'Class & Grade',
+    'dob' => 'Date of Birth',
+    'gender' => 'Gender',
+    'blood_group' => 'Blood Group',
+    
+    // Hardware Keys
+    'nfc_uid' => 'NFC UID',
+    'rfid_uid' => 'RFID UID',
+    
+    // Forms
+    'edit_personal_details' => 'Edit Personal Details',
+    'read_only' => 'Read Only',
     'update_profile' => 'Update Profile',
     'upload_hint' => 'Click the camera icon to upload. Max size 2MB.',
     'save_changes' => 'Save Changes',

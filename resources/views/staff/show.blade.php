@@ -25,7 +25,7 @@
                         <div class="text-center">
                             <div class="profile-photo">
                                 @if($staff->user->profile_picture)
-                                    <img src="{{ asset('storage/'.$staff->user->profile_picture) }}" width="100" class="img-fluid rounded-circle">
+                                    <img src="{{ asset('storage/'.$staff->user->profile_picture) }}" class="img-fluid rounded-circle" width="100" height="100" style="object-fit:cover;">
                                 @else
                                     <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" style="width: 100px; height: 100px;">
                                         <i class="fa fa-user fa-3x text-muted"></i>
@@ -41,6 +41,23 @@
                                     <i class="fa fa-pencil me-1"></i> Edit
                                 </a>
                             </div>
+
+                            <ul class="list-group list-group-flush mt-4 text-start">
+                                <li class="list-group-item d-flex justify-content-between px-0">
+                                    <span class="mb-0">{{ __('staff.rfid_uid') ?? 'RFID UID' }}:</span>
+                                    <strong class="text-dark">{{ $staff->rfid_uid ?? 'N/A' }}</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between px-0">
+                                    <span class="mb-0">{{ __('staff.nfc_uid') ?? 'NFC UID' }}:</span>
+                                    <strong class="text-dark">{{ $staff->nfc_uid ?? 'N/A' }}</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between px-0">
+                                    <span class="mb-0">{{ __('staff.app_access') ?? 'App Access' }}:</span>
+                                    <strong class="text-{{ $staff->user->is_active ? 'success' : 'danger' }}">
+                                        {!! $staff->user->is_active ? '<i class="fa fa-check-circle"></i> ' . (__('staff.active') ?? 'Active') : '<i class="fa fa-times-circle"></i> ' . (__('staff.inactive') ?? 'Inactive') !!}
+                                    </strong>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>

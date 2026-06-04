@@ -233,18 +233,30 @@
                             </select>
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.admission_date') }} <span class="text-danger">*</span></label>
                             <input type="text" name="admission_date" 
                                    value="{{ old('admission_date', (isset($student) && $student->admission_date) ? $student->admission_date->format('Y-m-d') : date('Y-m-d')) }}" 
                                    class="datepicker form-control" placeholder="YYYY-MM-DD" required>
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.payment_mode') }}</label>
                             <select name="payment_mode" class="form-control default-select">
-                                <option value="installment" {{ (old('payment_mode', $student->payment_mode ?? '') == 'installment') ? 'selected' : '' }}>{{ __('student.payment_installment') }}</option>
-                                <option value="global" {{ (old('payment_mode', $student->payment_mode ?? '') == 'global') ? 'selected' : '' }}>{{ __('student.payment_global') }}</option>
+                                <option value="installment" {{ (old('payment_mode', $student->payment_mode ?? '') == 'installment') ? 'selected' : '' }}>{{ __('student.payment_installment') ?? 'Installment' }}</option>
+                                <option value="global" {{ (old('payment_mode', $student->payment_mode ?? '') == 'global') ? 'selected' : '' }}>{{ __('student.payment_global') ?? 'Global' }}</option>
+                            </select>
+                        </div>
+
+                        <!-- NEW: Status Dropdown -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.status') }} <span class="text-danger">*</span></label>
+                            <select name="status" class="form-control default-select" required>
+                                <option value="active" {{ (old('status', $student->status ?? 'active') == 'active') ? 'selected' : '' }}>{{ __('student.active') ?? 'Active' }}</option>
+                                <option value="inactive" {{ (old('status', $student->status ?? '') == 'inactive') ? 'selected' : '' }}>{{ __('student.inactive') ?? 'Inactive' }}</option>
+                                <option value="suspended" {{ (old('status', $student->status ?? '') == 'suspended') ? 'selected' : '' }}>{{ __('student.suspended') ?? 'Suspended' }}</option>
+                                <option value="transferred" {{ (old('status', $student->status ?? '') == 'transferred') ? 'selected' : '' }}>{{ __('student.transferred') ?? 'Transferred' }}</option>
+                                <option value="graduated" {{ (old('status', $student->status ?? '') == 'graduated') ? 'selected' : '' }}>{{ __('student.graduated') ?? 'Graduated' }}</option>
                             </select>
                         </div>
 
@@ -346,13 +358,15 @@
                             </div>
                             <div id="guardian_status" class="parent-status-msg d-none"></div>
                         </div>
+
+                        <!-- UPDATED: Pre-select Primary Guardian -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
                             <select name="primary_guardian" class="form-control default-select" required>
                                 <option value="">{{ __('student.select_option') }}</option>
-                                <option value="father" {{ (old('primary_guardian') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
-                                <option value="mother" {{ (old('primary_guardian') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
-                                <option value="guardian" {{ (old('primary_guardian') == 'guardian') ? 'selected' : '' }}>{{ __('student.guardian_name') }}</option>
+                                <option value="father" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
+                                <option value="mother" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
+                                <option value="guardian" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'guardian') ? 'selected' : '' }}>{{ __('student.guardian_name') }}</option>
                             </select>
                         </div>
                         
@@ -371,23 +385,46 @@
                 <!-- STEP 4: Identity -->
                 <div class="tab-pane fade" id="identity" role="tabpanel">
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <!-- NFC -->
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.nfc_tag_uid') }}</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fa fa-wifi"></i></span>
                                 <input type="text" name="nfc_tag_uid" id="nfc_input" class="form-control" value="{{ old('nfc_tag_uid', $student->nfc_tag_uid ?? '') }}" placeholder="{{ __('student.enter_nfc_uid') }}" autocomplete="off">
-                                <button class="btn btn-secondary" type="button" id="btnScanNFC"><i class="fa fa-mobile me-1"></i> Scan</button>
+                                <button class="btn btn-secondary" type="button" id="btnScanNFC"><i class="fa fa-mobile me-1"></i></button>
                             </div>
-                            <small class="text-muted d-block mt-1">Tap card on reader (Desktop) or click Scan (Mobile).</small>
-                            <div id="nfcStatus" class="small mt-1 text-info d-none"><i class="fa fa-spinner fa-spin"></i> Scanning... Tap card on back of phone.</div>
+                            <div id="nfcStatus" class="small mt-1 text-info d-none"><i class="fa fa-spinner fa-spin"></i> Scanning... Tap card.</div>
                         </div>
-                        <div class="col-md-6 mb-3">
+
+                        <!-- NEW: RFID -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.rfid_uid') ?? 'RFID UID' }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-id-badge"></i></span>
+                                <input type="text" name="rfid_uid" class="form-control" value="{{ old('rfid_uid', $student->rfid_uid ?? '') }}" placeholder="{{ __('student.enter_rfid_uid') ?? 'Enter RFID' }}" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <!-- QR -->
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.qr_code_token') }}</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fa fa-qrcode"></i></span>
                                 <input type="text" name="qr_code_token" id="qr_token" class="form-control" value="{{ old('qr_code_token', $student->qr_code_token ?? '') }}" placeholder="{{ __('student.enter_qr_token') }}">
-                                <button class="btn btn-outline-primary" type="button" onclick="generateQR()"><i class="fa fa-refresh me-1"></i> Generate</button>
+                                <button class="btn btn-outline-primary" type="button" onclick="generateQR()"><i class="fa fa-refresh me-1"></i></button>
                             </div>
+                        </div>
+
+                        <div class="col-md-12"><hr class="my-3"></div>
+
+                        <!-- NEW: Password Override -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('student.app_password') ?? 'App Password' }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-lock"></i></span>
+                                <input type="text" name="password" class="form-control" placeholder="{{ isset($student) ? (__('student.leave_blank_keep_current') ?? 'Leave blank to keep current') : 'Default: Student123!' }}" autocomplete="new-password">
+                            </div>
+                            <small class="text-muted">{{ __('student.password_instruction') ?? 'Used for mobile app login.' }}</small>
                         </div>
                         
                         {{-- Final Submit Buttons --}}

@@ -157,28 +157,28 @@
                                 </div>
                             </div>
                             
-                            {{-- Info List (Updated Layout) --}}
+                            {{-- Info List --}}
                             <div class="info-list border-top pt-4">
                                 
                                 <div class="info-list-item">
-                                    <span class="info-label"><i class="fa fa-user info-icon"></i> Username</span>
+                                    <span class="info-label"><i class="fa fa-user info-icon"></i> {{ __('profile.username') }}</span>
                                     <span class="info-value">{{ $user->username ?? '-' }}</span>
                                 </div>
 
                                 <div class="info-list-item">
-                                    <span class="info-label"><i class="fa fa-envelope info-icon"></i> Email</span>
+                                    <span class="info-label"><i class="fa fa-envelope info-icon"></i> {{ __('profile.email') }}</span>
                                     <span class="info-value text-break">{{ $user->email }}</span>
                                 </div>
 
                                 <div class="info-list-item">
-                                    <span class="info-label"><i class="fa fa-id-badge info-icon"></i> ID / Shortcode</span>
+                                    <span class="info-label"><i class="fa fa-id-badge info-icon"></i> {{ __('profile.id_shortcode') }}</span>
                                     <span class="info-value">
                                         <span class="badge badge-light text-primary">{{ $user->shortcode ?? '-' }}</span>
                                     </span>
                                 </div>
 
                                 <div class="info-list-item">
-                                    <span class="info-label"><i class="fa fa-calendar info-icon"></i> Joined</span>
+                                    <span class="info-label"><i class="fa fa-calendar info-icon"></i> {{ __('profile.joined') }}</span>
                                     <span class="info-value">{{ $user->created_at->format('d M, Y') }}</span>
                                 </div>
 
@@ -218,11 +218,11 @@
                                                     <h5 class="text-black border-bottom pb-2">{{ $user->email }}</h5>
                                                 </div>
                                                 <div class="col-md-6 mb-4">
-                                                    <label class="form-label text-muted small text-uppercase fw-bold">Username</label>
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.username') }}</label>
                                                     <h5 class="text-black border-bottom pb-2">{{ $user->username ?? '-' }}</h5>
                                                 </div>
                                                 <div class="col-md-6 mb-4">
-                                                    <label class="form-label text-muted small text-uppercase fw-bold">Shortcode</label>
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.id_shortcode') }}</label>
                                                     <h5 class="text-black border-bottom pb-2">{{ $user->shortcode ?? '-' }}</h5>
                                                 </div>
                                                 <div class="col-md-6 mb-4">
@@ -235,16 +235,91 @@
                                                 </div>
                                             </div>
 
-                                            {{-- If linked to Student/Staff, show extra info --}}
-                                            @if($user->student)
-                                                <h5 class="text-primary mt-4 mb-3">{{ __('profile.academic_details') }}</h5>
-                                                <div class="row">
-                                                    <div class="col-md-6">
-                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.admission_no') }}</label>
-                                                        <h5 class="text-black border-bottom pb-2">{{ $user->student->admission_number }}</h5>
+                                            {{-- Dynamic Details: STAFF --}}
+                                            @if($user->staff)
+                                                <h5 class="text-primary mt-4 mb-3"><i class="fa fa-briefcase me-2"></i> {{ __('profile.professional_details') }}</h5>
+                                                <div class="row mb-4">
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.employee_id') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->staff->employee_id ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.designation') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->staff->designation ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.department') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->staff->department ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.joining_date') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->staff->joining_date ? \Carbon\Carbon::parse($user->staff->joining_date)->format('d M, Y') : '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.status') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">
+                                                            <span class="badge badge-sm badge-{{ $user->staff->status == 'active' ? 'success' : 'secondary' }}">
+                                                                {{ ucfirst($user->staff->status ?? '-') }}
+                                                            </span>
+                                                        </h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.nfc_uid') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->staff->nfc_uid ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.rfid_uid') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->staff->rfid_uid ?? '-' }}</h5>
                                                     </div>
                                                 </div>
                                             @endif
+
+                                            {{-- Dynamic Details: STUDENT --}}
+                                            @if($user->student)
+                                                <h5 class="text-primary mt-4 mb-3"><i class="fa fa-graduation-cap me-2"></i> {{ __('profile.academic_details') }}</h5>
+                                                <div class="row">
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.admission_no') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->student->admission_number ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.class_and_grade') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">
+                                                            {{ $user->student->enrollments()->latest()->first()->classSection->name ?? '-' }}
+                                                            <small class="text-muted">({{ $user->student->enrollments()->latest()->first()->classSection->gradeLevel->name ?? '-' }})</small>
+                                                        </h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.dob') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->student->dob ? \Carbon\Carbon::parse($user->student->dob)->format('d M, Y') : '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.gender') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ ucfirst($user->student->gender ?? '-') }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.blood_group') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->student->blood_group ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.status') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">
+                                                            <span class="badge badge-sm badge-{{ $user->student->status == 'active' ? 'success' : 'secondary' }}">
+                                                                {{ ucfirst($user->student->status ?? '-') }}
+                                                            </span>
+                                                        </h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.nfc_uid') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->student->nfc_tag_uid ?? '-' }}</h5>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label class="form-label text-muted small text-uppercase fw-bold">{{ __('profile.rfid_uid') }}</label>
+                                                        <h5 class="text-black border-bottom pb-2">{{ $user->student->rfid_uid ?? '-' }}</h5>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                            
                                         </div>
                                     </div>
 
@@ -255,7 +330,7 @@
                                                 @csrf
                                                 @method('PUT')
                                                 
-                                                <h5 class="text-primary mb-4">Edit Personal Details</h5>
+                                                <h5 class="text-primary mb-4">{{ __('profile.edit_personal_details') }}</h5>
 
                                                 {{-- Profile Image Edit --}}
                                                 <div class="row mb-5 justify-content-center">
@@ -293,14 +368,14 @@
 
                                                     {{-- Editable Username --}}
                                                     <div class="mb-4 col-md-6">
-                                                        <label class="form-label">Username <span class="text-danger">*</span></label>
+                                                        <label class="form-label">{{ __('profile.username') }} <span class="text-danger">*</span></label>
                                                         <input type="text" name="username" value="{{ old('username', $user->username) }}" class="form-control @error('username') is-invalid @enderror" required>
                                                         @error('username') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                                     </div>
                                                     
                                                     {{-- Read-Only Shortcode --}}
                                                     <div class="mb-4 col-md-6">
-                                                        <label class="form-label text-muted">Shortcode / ID (Read Only)</label>
+                                                        <label class="form-label text-muted">{{ __('profile.id_shortcode') }} ({{ __('profile.read_only') }})</label>
                                                         <input type="text" class="form-control bg-light" value="{{ $user->shortcode }}" readonly title="Cannot be changed">
                                                     </div>
 
