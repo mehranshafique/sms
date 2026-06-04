@@ -263,6 +263,26 @@ class StudentPortalApiController extends Controller
                 return response()->json(['success' => true, 'data' => []]);
             }
 
+            // --- FINANCIAL BLOCK LOGIC ---
+            $isBlocked = \App\Models\InstitutionSetting::where('institution_id', $student->institution_id)
+                ->where('key', 'block_reports_on_debt')
+                ->value('value');
+
+            if ($isBlocked == '1') {
+                $unpaid = \App\Models\Invoice::where('student_id', $student->id)
+                    ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                    ->sum(\Illuminate\Support\Facades\DB::raw('total_amount - paid_amount'));
+
+                if ($unpaid > 0) {
+                    $currency = config('app.currency_symbol', '$');
+                    return response()->json([
+                        'success' => false,
+                        'is_blocked' => true,
+                        'amount' => $currency . ' ' . number_format($unpaid, 2)
+                    ]);
+                }
+            }
+
             $records = ExamRecord::with(['subject', 'exam.academicSession'])
                 ->where('student_id', $student->id)
                 ->whereHas('exam', fn($q) => $q->where('academic_session_id', $enrollment->academic_session_id)->where('status', 'published'))
