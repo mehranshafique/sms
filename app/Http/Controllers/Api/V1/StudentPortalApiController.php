@@ -251,29 +251,39 @@ class StudentPortalApiController extends Controller
     }
 
     /**
-     * Fetch Exam Results
+     * Fetch Exam Results (With Deep Diagnostic Logging)
      */
     public function getResults()
     {
         try {
             $student = $this->getStudent();
+            Log::info("[API Results] Starting fetch for Student ID: {$student->id} ({$student->full_name})");
+
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
 
             if (!$enrollment) {
+                Log::warning("[API Results] No active enrollment found for Student ID: {$student->id}. Returning empty data.");
                 return response()->json(['success' => true, 'data' => []]);
             }
+            
+            Log::info("[API Results] Enrollment confirmed. Class ID: {$enrollment->class_section_id}, Session ID: {$enrollment->academic_session_id}");
 
             // --- FINANCIAL BLOCK LOGIC ---
             $isBlocked = \App\Models\InstitutionSetting::where('institution_id', $student->institution_id)
                 ->where('key', 'block_reports_on_debt')
                 ->value('value');
 
+            Log::info("[API Results] Financial Block Setting is: " . ($isBlocked ? 'Enabled (1)' : 'Disabled (0)'));
+
             if ($isBlocked == '1') {
                 $unpaid = \App\Models\Invoice::where('student_id', $student->id)
                     ->whereIn('status', ['unpaid', 'partial', 'overdue'])
                     ->sum(\Illuminate\Support\Facades\DB::raw('total_amount - paid_amount'));
 
+                Log::info("[API Results] Total unpaid debt calculated: {$unpaid}");
+
                 if ($unpaid > 0) {
+                    Log::warning("[API Results] Access Denied due to debt. Amount: {$unpaid}");
                     $currency = config('app.currency_symbol', '$');
                     return response()->json([
                         'success' => false,
@@ -283,23 +293,51 @@ class StudentPortalApiController extends Controller
                 }
             }
 
+            Log::info("[API Results] Financial clearance passed. Fetching published exam records...");
+
             $records = ExamRecord::with(['subject', 'exam.academicSession'])
                 ->where('student_id', $student->id)
-                ->whereHas('exam', fn($q) => $q->where('academic_session_id', $enrollment->academic_session_id)->where('status', 'published'))
+                ->whereHas('exam', function($q) use ($enrollment) {
+                    $q->where('academic_session_id', $enrollment->academic_session_id)
+                      ->where('status', 'published');
+                })
                 ->latest('updated_at')
-                ->get()
-                ->map(function($r) {
-                    return [
-                        'exam_name' => $r->exam->name ?? 'Exam',
-                        'subject' => $r->subject->name ?? 'N/A',
-                        'marks' => $r->marks_obtained,
-                        'is_absent' => $r->is_absent
-                    ];
-                });
+                ->get();
+                
+            Log::info("[API Results] Raw valid records fetched: " . $records->count());
 
-            return response()->json(['success' => true, 'data' => $records]);
+            // Deep Diagnostic Logging if array is empty
+            if ($records->isEmpty()) {
+                Log::info("[API Results Diagnostics] Digging deeper to find why records are empty...");
+                
+                $totalMarksInDB = ExamRecord::where('student_id', $student->id)->count();
+                Log::info("[API Results Diagnostics] Total marks in DB across ALL history: {$totalMarksInDB}");
+                
+                $unpublishedCount = ExamRecord::where('student_id', $student->id)
+                    ->whereHas('exam', fn($q) => $q->where('status', '!=', 'published'))
+                    ->count();
+                Log::info("[API Results Diagnostics] Marks hidden because Exam status is NOT published: {$unpublishedCount}");
+                
+                $wrongSessionCount = ExamRecord::where('student_id', $student->id)
+                    ->whereHas('exam', fn($q) => $q->where('academic_session_id', '!=', $enrollment->academic_session_id))
+                    ->count();
+                Log::info("[API Results Diagnostics] Marks hidden because they belong to a different Academic Session: {$wrongSessionCount}");
+            }
+
+            $mappedRecords = $records->map(function($r) {
+                return [
+                    'exam_name' => $r->exam->name ?? 'Exam',
+                    'subject' => $r->subject->name ?? 'N/A',
+                    'marks' => $r->marks_obtained,
+                    'is_absent' => $r->is_absent
+                ];
+            });
+
+            Log::info("[API Results] Successfully mapped data. Returning to app.");
+            return response()->json(['success' => true, 'data' => $mappedRecords]);
+            
         } catch (\Exception $e) {
-            Log::error("Student API Results Error: " . $e->getMessage());
+            Log::error("[API Results Exception] Error: " . $e->getMessage() . " | Line: " . $e->getLine());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
