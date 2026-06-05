@@ -25,8 +25,8 @@ class NoticeController extends BaseController
             // Scoping: Show Global Notices + Institution Specific Notices
             if ($institutionId) {
                 $query->where(function($q) use ($institutionId) {
-                    $q->where('institution_id', $institutionId)
-                      ->orWhereNull('institution_id');
+                    $q->where('notices.institution_id', $institutionId)
+                      ->orWhereNull('notices.institution_id');
                 });
             }
 

@@ -40,7 +40,9 @@ class StudentController extends BaseController
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
+            // FIX: Using the correct table name 'parents' instead of 'student_parents'
             $query = Student::with(['classSection.gradeLevel', 'parent', 'user'])
+                ->leftJoin('parents', 'students.parent_id', '=', 'parents.id')
                 ->select('students.*');
 
             if ($institutionId) {
@@ -245,9 +247,9 @@ class StudentController extends BaseController
             'primary_guardian' => 'required|in:father,mother,guardian',
             'guardian_email' => 'nullable|email',
             'email' => 'nullable|email|unique:users,email', 
-            'password' => 'nullable|string|min:6', // NEW: Custom password support
-            'status' => 'required|string|in:active,inactive,suspended,transferred,graduated', // NEW: Status Support
-            'rfid_uid' => 'nullable|string|max:100', // NEW: RFID Support
+            'password' => 'nullable|string|min:6', 
+            'status' => 'required|string|in:active,inactive,suspended,transferred,graduated', 
+            'rfid_uid' => 'nullable|string|max:100', 
         ]);
 
         if ($request->filled('email') && $request->filled('guardian_email') && $request->email === $request->guardian_email) {
@@ -374,7 +376,7 @@ class StudentController extends BaseController
                         'father_phone' => $request->father_phone,
                         'mother_phone' => $request->mother_phone,
                         'guardian_phone' => $request->guardian_phone,
-                        'guardian_relation' => $request->primary_guardian, // Ensure updated
+                        'guardian_relation' => $request->primary_guardian, 
                     ]);
                 }
 
@@ -497,9 +499,9 @@ class StudentController extends BaseController
         $request->validate([
             'first_name' => 'required|string|max:100', 
             'last_name' => 'required|string|max:100',
-            'password' => 'nullable|string|min:6', // NEW: Update Custom password
-            'status' => 'required|string|in:active,inactive,suspended,transferred,graduated', // NEW: Status
-            'rfid_uid' => 'nullable|string|max:100', // NEW: RFID
+            'password' => 'nullable|string|min:6', 
+            'status' => 'required|string|in:active,inactive,suspended,transferred,graduated',
+            'rfid_uid' => 'nullable|string|max:100', 
         ]);
 
         $parentFields = ['father_name', 'father_phone', 'mother_name', 'mother_phone', 'guardian_name', 'guardian_phone', 'guardian_email'];
@@ -524,7 +526,7 @@ class StudentController extends BaseController
                 // 1. Update Student Profile
                 $student->update($studentData);
 
-                // 2. Sync Student User (Name, Email, Phone, Status, Password)
+                // 2. Sync Student User
                 if ($student->user_id) {
                     $userUpdate = [];
                     if($request->filled('first_name')) $userUpdate['name'] = $request->first_name . ' ' . $request->last_name;
@@ -596,7 +598,6 @@ class StudentController extends BaseController
                          }
                     }
 
-                    // Pre-select Saved Value: Update guardian_relation based on selection
                     if ($request->filled('primary_guardian')) {
                         $student->parent->update(['guardian_relation' => $request->primary_guardian]);
                     }

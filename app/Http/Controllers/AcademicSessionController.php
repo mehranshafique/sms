@@ -27,7 +27,7 @@ class AcademicSessionController extends BaseController
             
             // 2. Strict Scoping
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $data->where('academic_sessions.institution_id', $institutionId);
             }
 
             return DataTables::of($data)

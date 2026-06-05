@@ -148,8 +148,9 @@ class PickupWebController extends BaseController
 
         if ($request->ajax()) {
             $query = StudentPickup::with(['student', 'scanner'])
-                ->where('institution_id', $institutionId)
-                ->whereDate('created_at', today());
+                ->select('student_pickups.*')
+                ->where('student_pickups.institution_id', $institutionId)
+                ->whereDate('student_pickups.created_at', today());
 
             // If Teacher, only show students in their classes
             if ($user->hasRole('Teacher') && $user->staff) {

@@ -103,17 +103,17 @@ class StudentAttendanceController extends BaseController
                 ->latest('student_attendances.created_at');
 
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $data->where('student_attendances.institution_id', $institutionId);
             }
 
             if ($request->filled('class_section_id')) {
-                $data->where('class_section_id', $request->class_section_id);
+                $data->where('student_attendances.class_section_id', $request->class_section_id);
             }
             if ($request->filled('attendance_date')) {
-                $data->whereDate('attendance_date', $request->attendance_date);
+                $data->whereDate('student_attendances.attendance_date', $request->attendance_date);
             }
             if ($isSubjectWise && $request->filled('subject_id')) {
-                $data->where('subject_id', $request->subject_id);
+                $data->where('student_attendances.subject_id', $request->subject_id);
             }
 
             return DataTables::of($data)

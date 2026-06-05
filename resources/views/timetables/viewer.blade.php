@@ -322,7 +322,7 @@
                                                                 @if(!request('class_section_id') && !auth()->user()->hasRole('Student'))
                                                                     <div class="slot-detail" title="Class">
                                                                         <i class="fa fa-users"></i>
-                                                                        <span class="fw-bold text-primary">{{ $slot->classSection->name ?? 'N/A' }}</span>
+                                                                        {{ trim(($slot->classSection->gradeLevel->name ?? '') . ' ' . ($slot->classSection->name ?? 'N/A')) }}
                                                                     </div>
                                                                 @endif
 

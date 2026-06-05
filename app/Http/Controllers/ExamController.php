@@ -50,9 +50,12 @@ class ExamController extends BaseController
 
         if ($request->ajax()) {
             $data = Exam::with(['academicSession', 'institution'])
-                ->whereIn('institution_id', $allowedInstitutionIds)
                 ->select('exams.*')
                 ->latest('exams.created_at'); // Rule 3: Latest First
+                
+            if (!empty($allowedInstitutionIds)) {
+                $data->whereIn('exams.institution_id', $allowedInstitutionIds);
+            }
 
             return DataTables::of($data)
                 ->addIndexColumn()

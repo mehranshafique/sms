@@ -40,7 +40,23 @@ class AuthApiController extends Controller
 
         $token = $user->createToken('mobile_app_v2')->plainTextToken;
 
-        // Task 9: Fetch dynamic School Name and Logo
+        // --- STRICT ROLE DETERMINATION (Fixes Student Dashboard Bug) ---
+        $roleName = $user->roles->pluck('name')->first();
+        
+        if (!$roleName) {
+            // Fallback checks using Eloquent Relationships
+            if ($user->student) {
+                $roleName = 'Student';
+            } elseif (\App\Models\StudentParent::where('user_id', $user->id)->exists()) {
+                $roleName = 'Guardian';
+            } elseif ($user->staff) {
+                $roleName = 'Staff'; 
+            } else {
+                $roleName = 'User';
+            }
+        }
+
+        // Fetch dynamic School Name and Logo
         $institution = $user->institute;
         $schoolName = $institution ? $institution->name : 'Digitex';
         $schoolLogo = ($institution && $institution->logo) ? asset('storage/' . $institution->logo) : null;
@@ -52,7 +68,7 @@ class AuthApiController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $user->roles->pluck('name')->first() ?? 'Staff',
+                'role' => $roleName, // Now guaranteed to say 'Student' if they are a student
                 'institution_id' => $user->institute_id,
                 'school_name' => $schoolName,
                 'school_logo' => $schoolLogo,

@@ -32,11 +32,11 @@ class SubjectController extends BaseController
                 ->select('subjects.*');
 
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $data->where('subjects.institution_id', $institutionId);
             }
 
             if ($request->has('grade_level_id') && $request->grade_level_id) {
-                $data->where('grade_level_id', $request->grade_level_id);
+                $data->where('subjects.grade_level_id', $request->grade_level_id);
             }
 
             return DataTables::of($data)

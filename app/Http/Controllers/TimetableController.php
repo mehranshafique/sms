@@ -77,6 +77,9 @@ class TimetableController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
+                ->filterColumn('day', function($query, $keyword) {
+                    $query->where('timetables.day_of_week', 'like', "%{$keyword}%");
+                })
                 ->addColumn('checkbox', function($row){
                     if(auth()->user()->can('delete', $row)){
                         return '<div class="form-check custom-checkbox checkbox-primary check-lg me-3">

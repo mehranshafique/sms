@@ -100,16 +100,27 @@ class AttendanceReportController extends BaseController
 
             if ($user->hasRole('Guardian')) {
                 $parent = StudentParent::where('user_id', $user->id)->first();
-                $query->where('parent_id', $parent ? $parent->id : 0);
+                $query->where('students.parent_id', $parent ? $parent->id : 0);
             } else {
                 $institutionId = $this->getInstitutionId();
                 if ($institutionId) {
-                    $query->where('institution_id', $institutionId);
+                    $query->where('students.institution_id', $institutionId);
                 }
             }
 
             return DataTables::of($query)
                 ->addIndexColumn()
+                ->orderColumn('classSection.name', function ($query, $order) {
+                    $query->orderBy(
+                        \App\Models\StudentEnrollment::select('class_sections.name')
+                            ->join('class_sections', 'class_sections.id', '=', 'student_enrollments.class_section_id')
+                            ->whereColumn('student_enrollments.student_id', 'students.id')
+                            ->where('student_enrollments.status', 'active')
+                            ->orderBy('student_enrollments.created_at', 'desc')
+                            ->limit(1),
+                        $order
+                    );
+                })
                 ->addColumn('name', function($row) {
                     return $row->first_name . ' ' . $row->last_name;
                 })

@@ -606,7 +606,7 @@ class AttendanceApiController extends Controller
     }
 
     /**
-     * Fetch Absentee Report Grouped by Class Sections
+     * Fetch Absentee Report Grouped by Class Sections and Dates
      * SCOPED: Block Students & Parents
      */
     public function getTeacherClassAbsentees(Request $request)
@@ -623,7 +623,6 @@ class AttendanceApiController extends Controller
             return response()->json(['success' => false, 'message' => 'unauthorized_access: Staff only'], 403);
         }
 
-        $today = \Carbon\Carbon::today()->toDateString();
         $dayOfWeek = strtolower(now()->format('l'));
         
         $institution = $user->institute;
@@ -677,61 +676,85 @@ class AttendanceApiController extends Controller
         $session = $currentSession->first();
         $sessionId = $session ? $session->id : null;
 
+        // Number of days to fetch backward
+        $daysToFetch = (int) $request->input('days', 3); 
+        $dates = [];
+        for ($i = 0; $i < $daysToFetch; $i++) {
+            $dates[] = \Carbon\Carbon::today()->subDays($i)->toDateString();
+        }
+
         $report = [];
 
-        foreach ($sections as $section) {
-            $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
-                ->whereHas('student')
-                ->where('class_section_id', $section->id)
-                ->where('academic_session_id', $sessionId)
-                ->where('status', 'active')
-                ->get();
+        foreach ($dates as $date) {
+            $dateObj = \Carbon\Carbon::parse($date);
+            $isToday = $dateObj->isToday();
+            $dateLabel = $isToday ? 'Today (' . $dateObj->format('d M') . ')' : $dateObj->format('l, d M');
+            $daySections = [];
 
-            $studentIds = $enrollments->pluck('student_id')->toArray();
-            $totalClass = count($studentIds);
+            foreach ($sections as $section) {
+                $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
+                    ->whereHas('student')
+                    ->where('class_section_id', $section->id)
+                    ->where('academic_session_id', $sessionId)
+                    ->where('status', 'active')
+                    ->get();
 
-            $attendances = \App\Models\StudentAttendance::whereIn('student_id', $studentIds)
-                ->where('attendance_date', $today)
-                ->get()
-                ->keyBy('student_id');
+                $studentIds = $enrollments->pluck('student_id')->toArray();
+                $totalClass = count($studentIds);
 
-            $presentCount = 0;
-            $absenteesList = [];
+                $attendances = \App\Models\StudentAttendance::whereIn('student_id', $studentIds)
+                    ->where('attendance_date', $date)
+                    ->get()
+                    ->keyBy('student_id');
 
-            foreach ($enrollments as $enrollment) {
-                $student = $enrollment->student;
-                if (!$student) continue;
+                $presentCount = 0;
+                $absenteesList = [];
 
-                $attendance = $attendances->get($student->id);
+                foreach ($enrollments as $enrollment) {
+                    $student = $enrollment->student;
+                    if (!$student) continue;
 
-                if ($attendance && in_array($attendance->status, ['present', 'late'])) {
-                    $presentCount++;
-                } else {
-                    $parent = $student->parent;
-                    $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? 'N/A';
-                    
-                    $firstName = $student->first_name ?? '';
-                    $lastName = $student->last_name ?? '';
-                    $admNo = $student->admission_number ?? 'N/A';
-                    $fullName = trim("{$firstName} {$lastName}");
-                    if (empty($fullName)) $fullName = 'Unknown Student';
+                    $attendance = $attendances->get($student->id);
 
-                    $absenteesList[] = [
-                        'student_name' => "{$fullName} ({$admNo})",
-                        'parent_phone' => $phone,
+                    if ($attendance && in_array($attendance->status, ['present', 'late'])) {
+                        $presentCount++;
+                    } else {
+                        $parent = $student->parent;
+                        $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? 'N/A';
+                        
+                        $firstName = $student->first_name ?? '';
+                        $lastName = $student->last_name ?? '';
+                        $admNo = $student->admission_number ?? 'N/A';
+                        $fullName = trim("{$firstName} {$lastName}");
+                        if (empty($fullName)) $fullName = 'Unknown Student';
+
+                        $absenteesList[] = [
+                            'student_name' => "{$fullName} ({$admNo})",
+                            'parent_phone' => $phone,
+                        ];
+                    }
+                }
+
+                // Append if there are absentees, or if it is "Today" we show the overall report regardless
+                if ($totalClass > 0 && ($totalClass - $presentCount > 0 || $isToday)) {
+                    $daySections[] = [
+                        'class_name' => $section->gradeLevel->name ?? 'N/A', 
+                        'section_name' => $section->name ?? 'Unknown Section',
+                        'total_class' => $totalClass,
+                        'total_present' => $presentCount,
+                        'total_absent' => $totalClass - $presentCount,
+                        'absentees' => $absenteesList,
+                        'attendance_type' => $isSubjectWise ? 'subject' : 'daily'
                     ];
                 }
             }
 
-            if ($totalClass > 0) {
+            if (!empty($daySections)) {
                 $report[] = [
-                    'class_name' => $section->gradeLevel->name ?? 'N/A', // ADDED THIS LINE
-                    'section_name' => $section->name ?? 'Unknown Section',
-                    'total_class' => $totalClass,
-                    'total_present' => $presentCount,
-                    'total_absent' => $totalClass - $presentCount,
-                    'absentees' => $absenteesList,
-                    'attendance_type' => $isSubjectWise ? 'subject' : 'daily'
+                    'date' => $date,
+                    'label' => $dateLabel,
+                    'is_today' => $isToday,
+                    'sections' => $daySections
                 ];
             }
         }

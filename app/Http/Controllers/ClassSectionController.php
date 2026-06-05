@@ -23,7 +23,7 @@ class ClassSectionController extends BaseController
 
     public function index(Request $request)
     {
-        // 1. Get Context
+         // 1. Get Context
         $institutionId = $this->getInstitutionId();
 
         if ($request->ajax()) {
@@ -32,7 +32,7 @@ class ClassSectionController extends BaseController
 
             // 2. Strict Scoping
             if ($institutionId) {
-                $data->where('institution_id', $institutionId);
+                $data->where('class_sections.institution_id', $institutionId);
             }
 
             return DataTables::of($data)

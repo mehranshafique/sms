@@ -66,14 +66,32 @@ class BudgetController extends BaseController
     public function index(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+
+        // Fetch the current session and name it $session globally within the method 
+        // to prevent the undefined variable error later in the view or callbacks
+        $currentSessionQuery = AcademicSession::where('is_current', true);
+        if ($institutionId) {
+            $currentSessionQuery->where('institution_id', $institutionId);
+        }
+        $session = $currentSessionQuery->first();
 
         if ($request->ajax()) {
-            $data = Budget::with('category')
-                ->where('institution_id', $institutionId)
-                ->where('academic_session_id', $session->id ?? 0)
-                ->orderBy('budget_category_id')
-                ->orderByDesc('created_at');
+            // Restored relationships and added table prefixes to fix ambiguous column errors
+            $data = Budget::with(['category', 'academicSession'])->select('budgets.*');
+            
+            if ($institutionId) {
+                $data->where('budgets.institution_id', $institutionId);
+            }
+
+            // Restored the original Academic Session filter logic
+            if ($request->has('academic_session_id') && $request->filled('academic_session_id')) {
+                $data->where('budgets.academic_session_id', $request->academic_session_id);
+            } elseif ($session) {
+                // Show current active session budget if no filter is applied
+                $data->where('budgets.academic_session_id', $session->id);
+            }
+            
+            $data->latest('budgets.created_at');
 
             return DataTables::of($data)
                 ->addIndexColumn()
