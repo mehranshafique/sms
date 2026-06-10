@@ -46,7 +46,11 @@
                             <a href="#notifications" data-bs-toggle="pill" class="nav-link"><i class="fa fa-bell me-2"></i> {{ __('configuration.notification_settings') }}</a>
                             <a href="#test_msg" data-bs-toggle="pill" class="nav-link"><i class="fa fa-paper-plane me-2"></i> {{ __('configuration.test_notifications') }}</a>
                             <a href="#school_year" data-bs-toggle="pill" class="nav-link"><i class="fa fa-calendar me-2"></i> {{ __('configuration.school_year') }}</a>
-                            
+                            @if(auth()->user()->can('currency.view') || auth()->user()->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                                <a href="{{ route('currency.index') }}" class="nav-link {{ request()->routeIs('currency.*') ? 'active' : '' }}">
+                                    <i class="fa fa-coins me-2"></i> {{ __('sidebar.currency') }}
+                                </a>
+                            @endif
                             @if(auth()->user()->hasRole('Super Admin'))
                                 <a href="#modules" data-bs-toggle="pill" class="nav-link"><i class="fa fa-cubes me-2"></i> {{ __('configuration.modules') }}</a>
                                 <a href="#recharge" data-bs-toggle="pill" class="nav-link"><i class="fa fa-credit-card me-2"></i> {{ __('configuration.sms_recharge') }}</a>
@@ -109,6 +113,7 @@
                         <div class="card">
                             <div class="card-header">
                                 <h4 class="card-title">{{ __('configuration.notification_preferences') }}</h4>
+                                <p class="text-muted mb-0 fs-13">{{ __('configuration.notification_preferences_help') }}</p>
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('configuration.notifications.update') }}" method="POST" id="notificationsForm">
@@ -118,10 +123,12 @@
                                             <thead class="bg-light">
                                                 <tr>
                                                     <th>{{ __('configuration.event') ?? 'Event' }}</th>
-                                                    <th class="text-center"><i class="fa fa-comment text-primary"></i> SMS</th>
-                                                    <th class="text-center"><i class="fab fa-whatsapp text-success"></i> WhatsApp</th>
-                                                    <th class="text-center"><i class="fa fa-envelope text-warning"></i> Email</th>
-                                                    <th class="text-center"><i class="fa fa-bell text-info"></i> System</th>
+                                                    <th class="text-center"><i class="fa fa-comment text-primary"></i> {{ __('configuration.sms_channel') }}</th>
+                                                    <th class="text-center"><i class="fab fa-whatsapp text-success"></i> {{ __('configuration.whatsapp_channel') }}</th>
+                                                    <th class="text-center"><i class="fa fa-envelope text-warning"></i> {{ __('configuration.email_channel') }}</th>
+                                                    <th class="text-center" title="{{ __('configuration.system_channel_help') }}">
+                                                        <i class="fa fa-bell text-info"></i> {{ __('configuration.system_channel') }}
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>

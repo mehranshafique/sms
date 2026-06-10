@@ -102,6 +102,10 @@ class NoticeController extends BaseController
 
         $notice->save();
 
+        if ($notice->is_published) {
+            app(\App\Services\InAppNotificationService::class)->notifyNoticePublished($notice);
+        }
+
         return response()->json(['message' => __('notice.success_create'), 'redirect' => route('notices.index')]);
     }
 
@@ -120,7 +124,12 @@ class NoticeController extends BaseController
             'is_published' => 'boolean'
         ]);
 
+        $wasPublished = $notice->is_published;
         $notice->update($validated);
+
+        if ($notice->is_published && (!$wasPublished || $request->boolean('is_published'))) {
+            app(\App\Services\InAppNotificationService::class)->notifyNoticePublished($notice);
+        }
 
         return response()->json(['message' => __('notice.success_update'), 'redirect' => route('notices.index')]);
     }

@@ -5,11 +5,15 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Gate; // <--- IMPORTANT: Don't forget this!
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Auth;
+use App\Services\InAppNotificationService;
 use Illuminate\Support\Facades\File;
 use App\Policies\ResourcePolicy;
 use App\Interfaces\SmsGatewayInterface;
 use App\Services\Sms\InfobipService;
 use App\Services\Sms\MobishastraService;
+use App\Services\SystemCommunicationConfigService;
 use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,6 +32,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Schema::defaultStringLength(191);
+
+        app(SystemCommunicationConfigService::class)->applyGlobalOverrides();
+
         // --- Dynamic Policy Registration Start ---
         $modelsPath = app_path('Models');
 
@@ -51,6 +58,14 @@ class AppServiceProvider extends ServiceProvider
             }
         }
         // --- Dynamic Policy Registration End ---
+
+        View::composer('layout.header', function ($view) {
+            if (Auth::check()) {
+                $service = app(InAppNotificationService::class);
+                $view->with('inAppNotifications', $service->getRecent(Auth::id(), 12));
+                $view->with('inAppUnreadCount', $service->getUnreadCount(Auth::id()));
+            }
+        });
 
         // Bind the SMS Interface based on Config
         $this->app->bind(SmsGatewayInterface::class, function ($app) {

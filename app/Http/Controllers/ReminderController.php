@@ -12,6 +12,7 @@ use App\Models\FeeStructure;
 use App\Models\SmsTemplate;
 use App\Models\InstitutionSetting;
 use App\Models\ClassSection;
+use App\Services\NotificationPreferenceService;
 use App\Services\Sms\GatewayFactory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -21,8 +22,9 @@ use App\Enums\CurrencySymbol;
 
 class ReminderController extends BaseController
 {
-    public function __construct()
-    {
+    public function __construct(
+        protected NotificationPreferenceService $preferences
+    ) {
         $this->setPageTitle(__('reminders.page_title'));
     }
 
@@ -42,21 +44,9 @@ class ReminderController extends BaseController
         return view('reminders.index', compact('feeStructures', 'classes'));
     }
 
-    /**
-     * Check if the notification channel is enabled in Settings
-     */
-    private function checkPreferences($eventKey, $channel, $institutionId) 
+    private function checkPreferences($eventKey, $channel, $institutionId): bool
     {
-        $key = 'notify_' . $eventKey;
-        $val = InstitutionSetting::where('institution_id', $institutionId)->where('key', $key)->value('value');
-        
-        if (!$val && $institutionId) {
-             // Fallback to global setting if no local preference is defined
-             $val = InstitutionSetting::whereNull('institution_id')->where('key', $key)->value('value');
-        }
-        
-        $prefs = json_decode($val ?? '{}', true);
-        return !empty($prefs[$channel]); 
+        return $this->preferences->isChannelEnabled($institutionId, $eventKey, $channel);
     }
 
     /**

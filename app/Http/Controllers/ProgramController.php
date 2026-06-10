@@ -49,17 +49,27 @@ class ProgramController extends BaseController
             'duration_years' => 'required|integer|min:1',
         ]);
 
-        Program::updateOrCreate(
-            ['id' => $request->id],
-            [
-                'institution_id' => $this->getInstitutionId(),
+        $institutionId = $this->getInstitutionId();
+
+        if ($request->filled('id')) {
+            $program = Program::where('institution_id', $institutionId)->findOrFail($request->id);
+            $program->update([
                 'department_id' => $request->department_id,
                 'name' => $request->name,
                 'code' => $request->code,
                 'total_semesters' => $request->total_semesters,
                 'duration_years' => $request->duration_years,
-            ]
-        );
+            ]);
+        } else {
+            Program::create([
+                'institution_id' => $institutionId,
+                'department_id' => $request->department_id,
+                'name' => $request->name,
+                'code' => $request->code,
+                'total_semesters' => $request->total_semesters,
+                'duration_years' => $request->duration_years,
+            ]);
+        }
 
         return response()->json(['message' => __('lmd.program_saved')]);
     }

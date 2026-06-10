@@ -31,22 +31,24 @@ class InfobipService implements SmsGatewayInterface
             $query->where('institution_id', $institutionId);
         }
 
-        $settings = $query->whereIn('key', ['infobip_api_key', 'infobip_base_url', 'infobip_sender_id', 'infobip_whatsapp_from'])
+        $settings = $query->whereIn('key', ['infobip_api_key', 'infobip_subdomain', 'infobip_sender_id', 'infobip_whatsapp_from'])
             ->pluck('value', 'key');
+
+        if (isset($settings['infobip_subdomain']) && $settings['infobip_subdomain'] !== '') {
+            $this->baseUrl = 'https://' . $settings['infobip_subdomain'] . '.api.infobip.com';
+        }
+
+        if (isset($settings['infobip_whatsapp_from']) && $settings['infobip_whatsapp_from'] !== '') {
+            $this->whatsappSender = $settings['infobip_whatsapp_from'];
+        }
+
+        if (isset($settings['infobip_sender_id']) && $settings['infobip_sender_id'] !== '') {
+            $this->senderId = $settings['infobip_sender_id'];
+        }
 
         if (isset($settings['infobip_api_key'])) {
             try {
                 $this->apiKey = Crypt::decryptString($settings['infobip_api_key']);
-                if (isset($settings['infobip_base_url'])) {
-                    $url = $settings['infobip_base_url'];
-                    // Ensure HTTPS
-                    if (!str_starts_with($url, 'http')) {
-                        $url = "https://$url.api.infobip.com";
-                    }
-                    $this->baseUrl = $url;
-                }
-                if (isset($settings['infobip_sender_id'])) $this->senderId = $settings['infobip_sender_id'];
-                if (isset($settings['infobip_whatsapp_from'])) $this->whatsappSender = $settings['infobip_whatsapp_from'];
             } catch (\Exception $e) {
                 Log::error("Infobip Key Decryption Failed: " . $e->getMessage());
             }

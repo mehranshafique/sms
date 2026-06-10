@@ -24,6 +24,7 @@ return [
     'modules' => 'Modules',
     'recharging' => 'Rechargement',
     'sms_templates' => 'Modèles SMS',
+    'currency' => 'Devise',
     'tracking' => 'Suivi',
     'audit_log' => 'Journal d\'audit',
     'finance' => 'Finance',

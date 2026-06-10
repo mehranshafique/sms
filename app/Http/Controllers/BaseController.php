@@ -97,4 +97,36 @@ class BaseController extends LaravelController
 
         return array_unique($ids);
     }
+
+    /**
+     * Ensure the active institution context matches a model's institution (skip when global).
+     */
+    protected function assertInstitutionMatch(int $modelInstitutionId): void
+    {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && (int) $modelInstitutionId !== (int) $institutionId) {
+            abort(403);
+        }
+    }
+
+    /**
+     * Ensure a Spatie role belongs to the current institution context (or is global for Super Admin).
+     */
+    protected function checkInstitution(\Spatie\Permission\Models\Role $role): void
+    {
+        $user = Auth::user();
+        if ($user->hasRole('Super Admin')) {
+            return;
+        }
+
+        $institutionId = $this->getInstitutionId();
+
+        if ($role->institution_id === null) {
+            abort(403, __('roles.messages.cannot_edit_system'));
+        }
+
+        if ($institutionId && (int) $role->institution_id !== (int) $institutionId) {
+            abort(403);
+        }
+    }
 }

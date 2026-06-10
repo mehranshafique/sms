@@ -139,6 +139,13 @@ class SmsTemplateSeeder extends Seeder
             ],
             // --- Automated Request / Ticket Processing ---
             [
+                'event_key' => 'request_submitted',
+                'name' => 'New Student Request Submitted',
+                'body' => 'New request from $StudentName. Type: $RequestType. Ticket: $TicketNumber. Please review in the admin panel.',
+                'available_tags' => '$StudentName, $RequestType, $TicketNumber, $SchoolName',
+                'is_active' => true,
+            ],
+            [
                 'event_key' => 'request_updated',
                 'name' => 'Student Ticket/Request Processed',
                 'body' => '🎫 TICKET UPDATE
@@ -150,6 +157,64 @@ $ApprovedDays
 $AdminNote
 Thank you, $SchoolName.',
                 'available_tags' => '$TicketNumber, $StudentName, $RequestType, $Status, $ApprovedDays, $AdminNote, $SchoolName',
+                'is_active' => true,
+            ],
+
+            // --- In-App (System) Events ---
+            [
+                'event_key' => 'notice_published',
+                'name' => 'Announcement Published',
+                'body' => 'New announcement: $Title. Log in to read the full notice.',
+                'available_tags' => '$Title, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'exam_published',
+                'name' => 'Exam Results Published',
+                'body' => 'Results for $ExamName are now available. Log in to view your marks.',
+                'available_tags' => '$ExamName, $StudentName, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'pickup_scan',
+                'name' => 'Student Pickup Scan',
+                'body' => '$StudentName was scanned at the gate for pickup at $Time.',
+                'available_tags' => '$StudentName, $Time, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'pickup_status_updated',
+                'name' => 'Pickup Status Updated',
+                'body' => 'Pickup for $StudentName has been updated to $Status.',
+                'available_tags' => '$StudentName, $Status, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'staff_leave_submitted',
+                'name' => 'Staff Leave Request Submitted',
+                'body' => '$StaffName submitted a leave request. Please review and approve.',
+                'available_tags' => '$StaffName, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'staff_leave_updated',
+                'name' => 'Staff Leave Request Updated',
+                'body' => 'Your leave request status is now $Status.',
+                'available_tags' => '$StaffName, $Status, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'fund_request_submitted',
+                'name' => 'Fund Request Submitted',
+                'body' => '$Requester submitted a fund request: $Title. Amount: $Amount.',
+                'available_tags' => '$Requester, $Title, $Amount, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'fund_request_processed',
+                'name' => 'Fund Request Processed',
+                'body' => 'Your fund request "$Title" was $Status.',
+                'available_tags' => '$Title, $Status, $SchoolName',
                 'is_active' => true,
             ],
         ];

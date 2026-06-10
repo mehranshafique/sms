@@ -22,26 +22,45 @@ class StudentStatementController extends BaseController
     }
 
     /**
+     * Authorize access to a student's financial statement.
+     */
+    private function authorizeStudentStatement(Student $student): void
+    {
+        $user = Auth::user();
+        $institutionId = $this->getInstitutionId();
+
+        if ($user->hasRole('Student')) {
+            if ($user->id !== $student->user_id) {
+                abort(403);
+            }
+            return;
+        }
+
+        if ($user->hasRole('Guardian')) {
+            if (!$student->parent || $student->parent->user_id !== $user->id) {
+                abort(403);
+            }
+            return;
+        }
+
+        if ($institutionId && (int) $student->institution_id !== (int) $institutionId) {
+            abort(403);
+        }
+
+        if (!$user->can('invoice.view') && !$user->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
+            abort(403);
+        }
+    }
+
+    /**
      * Display the financial statement for a specific student.
      * Accessible by Admin (for any student) and Student/Parent (for themselves).
      */
     public function show(Request $request, $studentId)
     {
         $student = Student::with(['gradeLevel', 'classSection'])->findOrFail($studentId);
-        
-        // Authorization Check
-        $user = Auth::user();
-        $institutionId = $this->getInstitutionId();
 
-        if ($user->hasRole('Student')) {
-            if ($user->id !== $student->user_id) abort(403);
-        } elseif ($user->hasRole('Guardian')) {
-            // Check if parent links to this student
-            if (!$student->parent || $student->parent->user_id !== $user->id) abort(403);
-        } else {
-            // Admin check
-            if ($institutionId && $student->institution_id != $institutionId) abort(403);
-        }
+        $this->authorizeStudentStatement($student);
 
         if ($request->ajax()) {
             // Fetch Payments (Credits) and Invoices (Debits)
@@ -111,8 +130,7 @@ class StudentStatementController extends BaseController
     public function downloadPdf($studentId)
     {
         $student = Student::findOrFail($studentId);
-        // Authorization... (Same as show)
-        
+        $this->authorizeStudentStatement($student);
         $invoices = Invoice::where('student_id', $studentId)->get();
         $payments = Payment::whereHas('invoice', fn($q) => $q->where('student_id', $studentId))->get();
         

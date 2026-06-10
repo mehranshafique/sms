@@ -16,12 +16,15 @@ use App\Http\Controllers\CampusController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\ConfigurationController;
+use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SmsTemplateController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\PickupWebController;
+use App\Http\Controllers\GlobalSearchController;
+use App\Http\Controllers\InAppNotificationController;
 
 // --- Controllers: Academics ---
 use App\Http\Controllers\GradeLevelController;
@@ -99,6 +102,12 @@ Route::get('/change-language', function (\Illuminate\Http\Request $request) {
 Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/global-search', [GlobalSearchController::class, 'suggest'])->name('global-search.suggest');
+
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::post('/{id}/read', [InAppNotificationController::class, 'markRead'])->name('read');
+        Route::post('/read-all', [InAppNotificationController::class, 'markAllRead'])->name('read_all');
+    });
 
     // =========================================================================
     // 1. CORE SYSTEM & ADMINISTRATION
@@ -512,9 +521,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
      // ----------------------------------------------------
-    // CHATBOT SETTINGS & SESSIONS (NEW)
+    // CHATBOT SETTINGS & SESSIONS
     // ----------------------------------------------------
-    Route::group(['prefix' => 'chatbot'], function() {
+    Route::middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->prefix('chatbot')->group(function() {
         // Settings & Configurations
         Route::get('/settings', [ChatbotSettingController::class, 'index'])->name('chatbot.settings.index');
         Route::post('/settings/config', [ChatbotSettingController::class, 'storeConfig'])->name('chatbot.settings.store_config');
@@ -565,6 +574,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/update', [SettingsController::class, 'update'])->name('settings.update');
     });
+
+    // Currency (per institution)
+    Route::get('/currency', [CurrencyController::class, 'index'])->name('currency.index');
+    Route::post('/currency', [CurrencyController::class, 'update'])->name('currency.update');
     
     // Audit Logs (Super Admin)
     Route::resource('audit-logs', AuditLogController::class)->only(['index'])->middleware([RoleMiddleware::class . ':Super Admin']);

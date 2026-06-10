@@ -167,6 +167,7 @@ class PaymentController extends BaseController
 
         if ($payment) {
             $this->notificationService->sendPaymentNotification($payment);
+            app(\App\Services\InAppNotificationService::class)->notifyPaymentReceived($payment);
         }
 
         return response()->json([

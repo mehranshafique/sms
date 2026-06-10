@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'USD' => ['name' => 'US Dollar', 'symbol' => '$', 'flag' => '🇺🇸'],
+    'EUR' => ['name' => 'Euro', 'symbol' => '€', 'flag' => '🇪🇺'],
+    'GBP' => ['name' => 'British Pound', 'symbol' => '£', 'flag' => '🇬🇧'],
+    'CHF' => ['name' => 'Swiss Franc', 'symbol' => 'CHF', 'flag' => '🇨🇭'],
+    'CAD' => ['name' => 'Canadian Dollar', 'symbol' => 'CA$', 'flag' => '🇨🇦'],
+    'CDF' => ['name' => 'Congolese Franc', 'symbol' => 'FC', 'flag' => '🇨🇩'],
+    'XOF' => ['name' => 'West African CFA Franc', 'symbol' => 'CFA', 'flag' => '🌍'],
+    'XAF' => ['name' => 'Central African CFA Franc', 'symbol' => 'FCFA', 'flag' => '🌍'],
+    'NGN' => ['name' => 'Nigerian Naira', 'symbol' => '₦', 'flag' => '🇳🇬'],
+    'GHS' => ['name' => 'Ghanaian Cedi', 'symbol' => 'GH₵', 'flag' => '🇬🇭'],
+    'KES' => ['name' => 'Kenyan Shilling', 'symbol' => 'KSh', 'flag' => '🇰🇪'],
+    'TZS' => ['name' => 'Tanzanian Shilling', 'symbol' => 'TSh', 'flag' => '🇹🇿'],
+    'UGX' => ['name' => 'Ugandan Shilling', 'symbol' => 'USh', 'flag' => '🇺🇬'],
+    'ZAR' => ['name' => 'South African Rand', 'symbol' => 'R', 'flag' => '🇿🇦'],
+    'MAD' => ['name' => 'Moroccan Dirham', 'symbol' => 'MAD', 'flag' => '🇲🇦'],
+    'TND' => ['name' => 'Tunisian Dinar', 'symbol' => 'DT', 'flag' => '🇹🇳'],
+    'EGP' => ['name' => 'Egyptian Pound', 'symbol' => 'E£', 'flag' => '🇪🇬'],
+    'AED' => ['name' => 'UAE Dirham', 'symbol' => 'AED', 'flag' => '🇦🇪'],
+    'SAR' => ['name' => 'Saudi Riyal', 'symbol' => 'SR', 'flag' => '🇸🇦'],
+    'INR' => ['name' => 'Indian Rupee', 'symbol' => '₹', 'flag' => '🇮🇳'],
+    'CNY' => ['name' => 'Chinese Yuan', 'symbol' => '¥', 'flag' => '🇨🇳'],
+    'JPY' => ['name' => 'Japanese Yen', 'symbol' => '¥', 'flag' => '🇯🇵'],
+];

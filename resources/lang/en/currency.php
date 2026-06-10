@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'page_title' => 'Currency Settings',
+    'subtitle' => 'Configure how amounts are displayed across invoices, dashboards, and reports.',
+    'settings_title' => 'Display Currency',
+    'select_currency' => 'Primary Currency',
+    'select_help' => 'Choose the ISO currency used for this institution. All financial screens will use this setting.',
+    'custom_symbol' => 'Display Symbol',
+    'custom_symbol_placeholder' => 'e.g. $, FC, CFA',
+    'custom_symbol_help' => 'Override the default symbol if your school uses a custom abbreviation.',
+    'symbol_position' => 'Symbol Position',
+    'before_amount' => 'Before amount ($ 1,000)',
+    'after_amount' => 'After amount (1,000 $)',
+    'decimal_places' => 'Decimal Places',
+    'live_preview' => 'Live Preview',
+    'save' => 'Save Currency Settings',
+    'saved' => 'Currency settings updated successfully.',
+    'save_failed' => 'Could not save currency settings.',
+    'select_institution' => 'Please select a school from the header before configuring currency.',
+    'info_title' => 'Where this applies',
+    'info_invoices' => 'Invoices, payments, fee structures, and student balances',
+    'info_dashboard' => 'Dashboard totals and financial reports',
+    'info_per_school' => 'Each school can use its own currency. Switch institution in the header to configure another school.',
+];

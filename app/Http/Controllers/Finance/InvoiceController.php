@@ -449,6 +449,7 @@ class InvoiceController extends BaseController
         // Send Notifications
         foreach ($invoicesToNotify as $inv) {
             $this->notificationService->sendInvoiceNotification($inv);
+            app(\App\Services\InAppNotificationService::class)->notifyInvoiceCreated($inv);
         }
 
         if ($generatedCount === 0) {
@@ -467,21 +468,41 @@ class InvoiceController extends BaseController
 
     public function show(Invoice $invoice)
     {
+        $this->assertInstitutionMatch((int) $invoice->institution_id);
+
+        if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant', 'Student', 'Guardian'])) {
+            abort(403);
+        }
+
         $invoice->load(['student', 'items', 'academicSession', 'institution']);
         return view('finance.invoices.show', compact('invoice'));
     }
 
     public function print($id)
     {
-        $invoice = Invoice::with(['student', 'items', 'institution', 'academicSession', 'payments'])->findOrFail($id);
+        $institutionId = $this->getInstitutionId();
+        $invoice = Invoice::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->with(['student', 'items', 'institution', 'academicSession', 'payments'])
+            ->findOrFail($id);
+
+        if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
+            abort(403);
+        }
+
         $isPdf = false;
         return view('finance.invoices.print', compact('invoice', 'isPdf'));
     }
 
     public function downloadPdf($id)
     {
-        $invoice = Invoice::with(['student', 'items', 'institution', 'academicSession', 'payments'])->findOrFail($id);
-        
+        $institutionId = $this->getInstitutionId();
+        $invoice = Invoice::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->with(['student', 'items', 'institution', 'academicSession', 'payments'])
+            ->findOrFail($id);
+
+        if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
+            abort(403);
+        }
         if (class_exists('PDF')) {
             $isPdf = true; // Tell the view to use the DOMPDF-safe CSS layout
             $pdf = \PDF::loadView('finance.invoices.print', compact('invoice', 'isPdf'));

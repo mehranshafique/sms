@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'page_title' => 'Paramètres de devise',
+    'subtitle' => 'Configurez l\'affichage des montants sur les factures, tableaux de bord et rapports.',
+    'settings_title' => 'Devise d\'affichage',
+    'select_currency' => 'Devise principale',
+    'select_help' => 'Choisissez la devise ISO utilisée pour cet établissement. Tous les écrans financiers utiliseront ce paramètre.',
+    'custom_symbol' => 'Symbole affiché',
+    'custom_symbol_placeholder' => 'ex. $, FC, CFA',
+    'custom_symbol_help' => 'Remplacez le symbole par défaut si votre école utilise une abréviation personnalisée.',
+    'symbol_position' => 'Position du symbole',
+    'before_amount' => 'Avant le montant ($ 1 000)',
+    'after_amount' => 'Après le montant (1 000 $)',
+    'decimal_places' => 'Décimales',
+    'live_preview' => 'Aperçu en direct',
+    'save' => 'Enregistrer',
+    'saved' => 'Paramètres de devise mis à jour.',
+    'save_failed' => 'Impossible d\'enregistrer les paramètres de devise.',
+    'select_institution' => 'Veuillez sélectionner une école dans l\'en-tête avant de configurer la devise.',
+    'info_title' => 'Où cela s\'applique',
+    'info_invoices' => 'Factures, paiements, structures de frais et soldes élèves',
+    'info_dashboard' => 'Totaux du tableau de bord et rapports financiers',
+    'info_per_school' => 'Chaque école peut utiliser sa propre devise. Changez d\'établissement dans l\'en-tête pour en configurer une autre.',
+];

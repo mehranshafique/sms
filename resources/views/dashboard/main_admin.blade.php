@@ -3,23 +3,24 @@
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
-        
+
+        @php
+            $roleName = Auth::user()->roles->first()?->name ?? __('dashboard.default_role');
+            $currency = \App\Enums\CurrencySymbol::default();
+        @endphp
+
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <!-- <h4>{{ __('dashboard.main_admin_title') }}</h4> -->
-                     {{-- Dynamically greeting User Name and Role --}}
                     <h3 class="text-white fw-bold mb-1">
-                        Hello {{ Auth::user()->name }}, {{ Auth::user()->roles->pluck('name')->first() ?? 'School Admin' }}
+                        {{ __('dashboard.platform_greeting', ['name' => Auth::user()->name, 'role' => $roleName]) }}
                     </h3>
                     <p class="mb-0">{{ __('dashboard.platform_overview') }}</p>
                 </div>
             </div>
         </div>
 
-        {{-- ROW 1: Institution Stats --}}
         <div class="row">
-            {{-- Total Institutions --}}
             <div class="col-xl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card bg-primary text-white">
                     <div class="card-body p-4">
@@ -36,7 +37,6 @@
                 </div>
             </div>
 
-            {{-- Institution Newcomer --}}
             <div class="col-xl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card bg-warning text-white">
                     <div class="card-body p-4">
@@ -53,7 +53,6 @@
                 </div>
             </div>
 
-            {{-- Active Institutions --}}
             <div class="col-xl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card bg-success text-white">
                     <div class="card-body p-4">
@@ -70,7 +69,6 @@
                 </div>
             </div>
 
-            {{-- Total Students --}}
             <div class="col-xl-3 col-lg-6 col-sm-6">
                 <div class="widget-stat card bg-info text-white">
                     <div class="card-body p-4">
@@ -88,22 +86,20 @@
             </div>
         </div>
 
-        {{-- ROW 2: Financial & Staff --}}
         <div class="row">
-            {{-- Funds Request (Platform Finance) --}}
             <div class="col-xl-6 col-lg-12">
                 <div class="card">
                     <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.funds_request') }} (Subscriptions)</h4>
+                        <h4 class="card-title">{{ __('dashboard.funds_request_subscriptions') }}</h4>
                     </div>
                     <div class="card-body">
                         <div class="row text-center">
                             <div class="col-6">
-                                <h4 class="text-warning mb-2">${{ number_format($pendingFunds, 2) }}</h4>
+                                <h4 class="text-warning mb-2">{{ $currency }}{{ number_format($pendingFunds, 2) }}</h4>
                                 <span class="text-muted">{{ __('dashboard.pending') }}</span>
                             </div>
                             <div class="col-6">
-                                <h4 class="text-success mb-2">${{ number_format($validatedFunds, 2) }}</h4>
+                                <h4 class="text-success mb-2">{{ $currency }}{{ number_format($validatedFunds, 2) }}</h4>
                                 <span class="text-muted">{{ __('dashboard.validated') }}</span>
                             </div>
                         </div>
@@ -114,25 +110,22 @@
                 </div>
             </div>
 
-            {{-- Staff Count --}}
             <div class="col-xl-6 col-lg-12">
                 <div class="card">
                     <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.personnel') }} (Platform-wide)</h4>
+                        <h4 class="card-title">{{ __('dashboard.personnel_platform_wide') }}</h4>
                     </div>
                     <div class="card-body d-flex align-items-center justify-content-center">
                         <div class="text-center">
                             <h2 class="fs-36 text-primary">{{ $totalStaff }}</h2>
-                            <span class="fs-14">Active Personnel</span>
+                            <span class="fs-14">{{ __('dashboard.active_personnel') }}</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- ROW 3: Charts & Modules --}}
         <div class="row">
-            {{-- Chart --}}
             <div class="col-xl-8 col-lg-8">
                 <div class="card">
                     <div class="card-header border-0 pb-0">
@@ -144,11 +137,10 @@
                 </div>
             </div>
 
-            {{-- Activity & Alerts --}}
             <div class="col-xl-4 col-lg-4">
                 <div class="card">
                     <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">System Status</h4>
+                        <h4 class="card-title">{{ __('dashboard.system_status') }}</h4>
                     </div>
                     <div class="card-body">
                         <div class="widget-media">
@@ -161,8 +153,8 @@
                                             </span>
                                         </div>
                                         <div class="media-body">
-                                            <h5 class="mb-1">{{ $expiredInstitutions }} Expired</h5>
-                                            <small class="d-block">Subscriptions needing renewal</small>
+                                            <h5 class="mb-1">{{ __('dashboard.expired_subscriptions', ['count' => $expiredInstitutions]) }}</h5>
+                                            <small class="d-block">{{ __('dashboard.subscriptions_needing_renewal') }}</small>
                                         </div>
                                     </div>
                                 </li>
@@ -174,8 +166,8 @@
                                             </span>
                                         </div>
                                         <div class="media-body">
-                                            <h5 class="mb-1">{{ $auditLogCount }} Logs</h5>
-                                            <small class="d-block">System activities (24h)</small>
+                                            <h5 class="mb-1">{{ __('dashboard.audit_logs_count', ['count' => $auditLogCount]) }}</h5>
+                                            <small class="d-block">{{ __('dashboard.system_activities_24h') }}</small>
                                         </div>
                                     </div>
                                 </li>
@@ -186,24 +178,23 @@
                 </div>
             </div>
         </div>
-        
-        {{-- Recent Institutions Table --}}
+
         <div class="row">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">Recent Institutions</h4>
+                        <h4 class="card-title">{{ __('dashboard.recent_institutions') }}</h4>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-responsive-sm">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Code</th>
-                                        <th>City</th>
-                                        <th>Status</th>
-                                        <th>Date</th>
+                                        <th>{{ __('dashboard.name') }}</th>
+                                        <th>{{ __('dashboard.code') }}</th>
+                                        <th>{{ __('dashboard.city') }}</th>
+                                        <th>{{ __('dashboard.status') }}</th>
+                                        <th>{{ __('dashboard.date') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -214,7 +205,7 @@
                                         <td>{{ $inst->city }}</td>
                                         <td>
                                             <span class="badge badge-{{ $inst->is_active ? 'success' : 'danger' }}">
-                                                {{ $inst->is_active ? 'Active' : 'Inactive' }}
+                                                {{ $inst->is_active ? __('dashboard.active') : __('dashboard.inactive') }}
                                             </span>
                                         </td>
                                         <td>{{ $inst->created_at->format('d M, Y') }}</td>
@@ -243,7 +234,7 @@
             data: {
                 labels: {!! json_encode($chartLabels) !!},
                 datasets: [{
-                    label: 'Students Joined',
+                    label: @json(__('dashboard.students_joined')),
                     data: {!! json_encode($chartValues) !!},
                     borderColor: '#4caf50',
                     borderWidth: 2,

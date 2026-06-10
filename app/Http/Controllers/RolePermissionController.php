@@ -7,6 +7,7 @@ use Spatie\Permission\Models\Role;
 use App\Models\Module;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\Auth;
+use App\Enums\RoleEnum;
 
 class RolePermissionController extends BaseController
 {
@@ -29,6 +30,12 @@ class RolePermissionController extends BaseController
     public function update(Request $request, Role $role)
     {
         $user = Auth::user();
+
+        $this->checkInstitution($role);
+
+        if (!$user->hasRole(RoleEnum::SUPER_ADMIN->value) && !$user->can('role.update')) {
+            abort(403, __('roles.messages.unauthorized_action'));
+        }
 
         // 1. Prevent updating own role permissions (unless Super Admin)
         if (!$user->hasRole('Super Admin') && $user->hasRole($role->name)) {

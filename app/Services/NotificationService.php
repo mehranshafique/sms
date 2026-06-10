@@ -19,42 +19,13 @@ use Illuminate\Support\Facades\Http;
 
 class NotificationService
 {
-    protected $unlimitedGlobalEvents = [
-        'institution_created',
-        'low_balance',
-        'subscription_expiry',
-        'subscription_expired',
-        'system_alert',
-        'user_welcome',
-        'otp_verification' 
-    ];
+    public function __construct(
+        protected NotificationPreferenceService $preferences
+    ) {}
 
-    protected function isChannelEnabled($institutionId, $eventKey, $channel)
+    protected function isChannelEnabled($institutionId, $eventKey, $channel): bool
     {
-        if (in_array($eventKey, $this->unlimitedGlobalEvents)) {
-            return true;
-        }
-
-        $eventSettingKey = 'notify_' . $eventKey;
-        
-        // Check local school preference
-        $eventPrefs = \App\Models\InstitutionSetting::where('institution_id', $institutionId)
-            ->where('key', $eventSettingKey)
-            ->value('value');
-
-        // Fallback to global preference if missing
-        if (!$eventPrefs && $institutionId) {
-            $eventPrefs = \App\Models\InstitutionSetting::whereNull('institution_id')
-                ->where('key', $eventSettingKey)
-                ->value('value');
-        }
-
-        if ($eventPrefs) {
-            $prefs = json_decode($eventPrefs, true);
-            return !empty($prefs[$channel]);
-        }
-
-        return false;
+        return $this->preferences->isChannelEnabled($institutionId, $eventKey, $channel);
     }
 
     public function sendInvoiceNotification(Invoice $invoice)
@@ -188,9 +159,12 @@ class NotificationService
 
     private function dispatchMessage($phone, $message, $institutionId, $channel)
     {
-        $providerName = \App\Models\InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
+        $providerKey = $channel . '_provider';
+        $providerName = InstitutionSetting::get($institutionId, $providerKey, 'system');
+
         if ($providerName === 'system') {
-            $providerName = \App\Models\InstitutionSetting::get(null, $channel . '_provider', 'system');
+            $providerName = InstitutionSetting::resolveSystemProvider($channel);
+            $institutionId = null;
         }
 
         try {
@@ -413,10 +387,7 @@ class NotificationService
         $shouldDeductCredits = false;
         
         if ($selectedProvider === 'system') {
-            $globalKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
-            $finalProviderName = InstitutionSetting::whereNull('institution_id')
-                ->where('key', $globalKey)
-                ->value('value') ?? 'mobishastra';
+            $finalProviderName = InstitutionSetting::resolveSystemProvider($channel);
             $credentialsContextId = null; 
             $shouldDeductCredits = true;
         } else {
@@ -475,8 +446,8 @@ class NotificationService
     public function performSendFile($to, $fileUrl, $caption, $filename, $institutionId)
     {
         $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'system');
-        if($providerName === 'system') {
-            $providerName = InstitutionSetting::get(null, 'whatsapp_provider', 'infobip');
+        if ($providerName === 'system') {
+            $providerName = InstitutionSetting::resolveSystemProvider('whatsapp');
             $institutionId = null; 
         }
         
@@ -497,8 +468,8 @@ class NotificationService
     public function performSendImage($to, $imageUrl, $caption, $institutionId)
     {
         $providerName = InstitutionSetting::get($institutionId, 'whatsapp_provider', 'system');
-        if($providerName === 'system') {
-            $providerName = InstitutionSetting::get(null, 'whatsapp_provider', 'infobip');
+        if ($providerName === 'system') {
+            $providerName = InstitutionSetting::resolveSystemProvider('whatsapp');
             $institutionId = null;
         }
 
@@ -520,7 +491,8 @@ class NotificationService
     {
         $providerName = InstitutionSetting::get($institutionId, 'sms_provider', 'system');
         if ($providerName === 'system') {
-            $providerName = InstitutionSetting::get(null, 'sms_provider', 'system');
+            $providerName = InstitutionSetting::resolveSystemProvider('sms');
+            $institutionId = null;
         }
 
         try {

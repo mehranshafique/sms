@@ -141,6 +141,9 @@
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('configuration.index') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
                         <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
+                        @if($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                            <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}"><i class="fa fa-coins me-1"></i> {{ __('sidebar.currency') }}</a></li>
+                        @endif
                     </ul>
                 </li>
             @endif
@@ -316,6 +319,9 @@
                             @if($hasModule('fee_structures') && $user->can('fee_structure.view'))
                                 <li><a class="{{ request()->routeIs('fees.*') ? 'mm-active' : '' }}" href="{{ route('fees.index') }}">{{ __('sidebar.fee_structures.title') }}</a></li>
                             @endif
+                            @if($hasModule('currency') && $user->can('currency.view'))
+                                <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}">{{ __('sidebar.currency') }}</a></li>
+                            @endif
                             
                             @if($user->can('invoice.create'))
                                 <li><a class="{{ request()->routeIs('invoices.create') ? 'mm-active' : '' }}" href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
@@ -422,13 +428,18 @@
                 @endif
 
                 {{-- CONFIGURATION --}}
-                @if($user->can('setting.manage') && !$isSuperAdmin)
+                @if($user->can('setting.manage') || $user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
-                    <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'currency.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
                         <ul aria-expanded="false">
-                            <li><a class="{{ request()->routeIs('settings.*') ? 'mm-active' : '' }}" href="{{ route('settings.index') }}">{{ __('settings.page_title') ?? 'Settings' }}</a></li>
-                            <li><a class="{{ request()->routeIs('configuration.*') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('configuration.page_title') ?? 'Configuration' }}</a></li>
+                            @if($user->can('setting.manage') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                                <li><a class="{{ request()->routeIs('settings.*') ? 'mm-active' : '' }}" href="{{ route('settings.index') }}">{{ __('settings.page_title') ?? 'Settings' }}</a></li>
+                                <li><a class="{{ request()->routeIs('configuration.*') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('configuration.page_title') ?? 'Configuration' }}</a></li>
+                            @endif
+                            @if($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                                <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}">{{ __('sidebar.currency') }}</a></li>
+                            @endif
                             <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') ?? 'SMS Templates' }}</a></li>
                             <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
                         </ul>

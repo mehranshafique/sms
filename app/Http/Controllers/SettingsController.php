@@ -61,6 +61,11 @@ class SettingsController extends BaseController
             abort(403, 'No active institution context.');
         }
 
+        $user = Auth::user();
+        if (!$user->can('setting.manage') && !$user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])) {
+            abort(403);
+        }
+
         $request->validate([
             // Attendance
             'attendance_locked' => 'sometimes|boolean',

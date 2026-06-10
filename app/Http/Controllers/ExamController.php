@@ -323,6 +323,8 @@ class ExamController extends BaseController
         $this->authorize('update', $exam);
         
         $exam->update(['finalized_at' => now(), 'status' => 'published']);
+
+        app(\App\Services\InAppNotificationService::class)->notifyExamPublished($exam);
         
         return back()->with('success', __('exam.messages.finalized_success'));
     }

@@ -53,7 +53,8 @@ class ElectionController extends BaseController
                     return $row->end_date ? $row->end_date->format('Y-m-d H:i') : '';
                 })
                 ->orderColumn('candidates_count', function ($query, $order) {
-                    $query->orderByRaw("(SELECT count(*) FROM candidates WHERE candidates.election_id = elections.id) $order");
+                    $direction = strtolower((string) $order) === 'desc' ? 'DESC' : 'ASC';
+                    $query->orderByRaw("(SELECT count(*) FROM candidates WHERE candidates.election_id = elections.id) {$direction}");
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';

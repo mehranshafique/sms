@@ -18,7 +18,8 @@ use App\Models\Subject;
 use App\Models\Exam;
 use App\Models\StudentEnrollment;
 use App\Models\Payment; 
-use App\Models\FeeStructure; 
+use App\Models\FeeStructure;
+use App\Models\Notice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -33,7 +34,7 @@ class DashboardController extends BaseController
 
     public function index()
     {
-        $this->setPageTitle(__('dashboard.page_title') ?? 'Dashboard');
+        $this->setPageTitle(__('dashboard.page_title'));
         $user = Auth::user();
         
         $activeInstId = session('active_institution_id');
@@ -151,7 +152,7 @@ class DashboardController extends BaseController
                     $instExpected += ($fee->amount * $count);
                 }
                 $installmentStats[] = [
-                    'label' => $fees->first()->name ?? "Installment $order",
+                    'label' => $fees->first()->name ?? __('dashboard.installment_number', ['order' => $order]),
                     'expected' => $instExpected,
                     'order' => $order
                 ];
@@ -272,12 +273,29 @@ class DashboardController extends BaseController
 
     private function schoolAdminDashboard($institutionId)
     {
-        $studentsQuery = Student::where('institution_id', $institutionId);
-        $staffQuery = Staff::where('institution_id', $institutionId);
-        
-        $totalStudents = $studentsQuery->count();
-        $totalStaff = $staffQuery->count();
-        $totalTeachers = $staffQuery->whereNotNull('designation')->count(); 
+        $institution = Institution::find($institutionId);
+
+        $activeStaffScope = function ($q) {
+            $q->where('status', 'active')->orWhereNull('status');
+        };
+
+        $totalStudents = Student::where('institution_id', $institutionId)
+            ->where($activeStaffScope)
+            ->count();
+
+        $totalStaff = Staff::where('institution_id', $institutionId)
+            ->where($activeStaffScope)
+            ->count();
+
+        $totalTeachers = Staff::where('institution_id', $institutionId)
+            ->where($activeStaffScope)
+            ->where(function ($q) {
+                $q->whereHas('user.roles', fn ($r) => $r->where('name', 'Teacher'))
+                    ->orWhere('designation', 'LIKE', '%teacher%')
+                    ->orWhere('designation', 'LIKE', '%enseignant%');
+            })
+            ->count();
+
         $totalCampuses = Campus::where('institution_id', $institutionId)->count();
         $totalInstitutes = 1;
 
@@ -294,26 +312,32 @@ class DashboardController extends BaseController
 
         $totalEnrollment = 0;
         $newComers = 0;
-        
-        $budgetSpend = 0; 
-        $budgetRest = 0;  
+
+        $budgetSpend = 0;
+        $budgetRest = 0;
         $totalCourses = Subject::where('institution_id', $institutionId)->count();
         $totalResults = 0;
         $totalTimetables = 0;
-        $totalCommunication = 0; 
+        $totalCommunication = Notice::where('institution_id', $institutionId)
+            ->where('is_published', true)
+            ->count();
 
         if ($currentSession) {
             $enrollments = StudentEnrollment::where('academic_session_id', $currentSession->id)
                 ->where('institution_id', $institutionId)
                 ->where('status', 'active')
                 ->get();
-            
+
             $totalEnrollment = $enrollments->count();
+
+            if ($totalEnrollment === 0) {
+                $totalEnrollment = $totalStudents;
+            }
 
             $newComers = Student::where('institution_id', $institutionId)
                 ->whereBetween('admission_date', [$currentSession->start_date, $currentSession->end_date])
                 ->count();
-            
+
             $feeStructures = FeeStructure::where('institution_id', $institutionId)
                 ->where('academic_session_id', $currentSession->id)
                 ->get();
@@ -321,33 +345,29 @@ class DashboardController extends BaseController
             $studentsByGrade = $enrollments->groupBy('grade_level_id');
 
             foreach ($studentsByGrade as $gradeId => $gradeEnrollments) {
-                $gradeFeeTotal = 0;
-                
                 $globalFee = $feeStructures->where('grade_level_id', $gradeId)
                     ->where('payment_mode', 'global')
                     ->first();
 
-                if ($globalFee) {
-                    $gradeFeeTotal = $globalFee->amount;
-                } else {
-                    $gradeFeeTotal = $feeStructures->where('grade_level_id', $gradeId)
+                $gradeFeeTotal = $globalFee
+                    ? $globalFee->amount
+                    : $feeStructures->where('grade_level_id', $gradeId)
                         ->where('payment_mode', 'installment')
                         ->sum('amount');
-                }
 
                 $expectedTotal += ($gradeFeeTotal * $gradeEnrollments->count());
             }
 
             $collectedTotal = Payment::where('institution_id', $institutionId)
-                ->whereHas('invoice', function($q) use ($currentSession) {
+                ->whereHas('invoice', function ($q) use ($currentSession) {
                     $q->where('academic_session_id', $currentSession->id);
                 })
                 ->sum('amount');
 
-            $remainingToCollect = $expectedTotal - $collectedTotal;
-            
+            $remainingToCollect = max(0, $expectedTotal - $collectedTotal);
+
             $studentPayments = Payment::where('payments.institution_id', $institutionId)
-                ->whereHas('invoice', function($q) use ($currentSession) {
+                ->whereHas('invoice', function ($q) use ($currentSession) {
                     $q->where('academic_session_id', $currentSession->id);
                 })
                 ->join('invoices', 'payments.invoice_id', '=', 'invoices.id')
@@ -358,13 +378,19 @@ class DashboardController extends BaseController
             foreach ($enrollments as $enrollment) {
                 $studentId = $enrollment->student_id;
                 $gradeId = $enrollment->grade_level_id;
-                
+
                 $globalFee = $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'global')->first();
-                $expected = $globalFee ? $globalFee->amount : $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'installment')->sum('amount');
-                
+                $expected = $globalFee
+                    ? $globalFee->amount
+                    : $feeStructures->where('grade_level_id', $gradeId)->where('payment_mode', 'installment')->sum('amount');
+
+                if ($expected <= 0) {
+                    continue;
+                }
+
                 $paid = $studentPayments[$studentId] ?? 0;
 
-                if ($expected > 0 && $paid >= ($expected * 0.99)) {
+                if ($paid >= ($expected * 0.99)) {
                     $paidCount++;
                 } else {
                     $unpaidCount++;
@@ -377,14 +403,14 @@ class DashboardController extends BaseController
 
             foreach ($installmentFees as $order => $fees) {
                 $instExpected = 0;
-                
+
                 foreach ($fees as $fee) {
                     $count = isset($studentsByGrade[$fee->grade_level_id]) ? $studentsByGrade[$fee->grade_level_id]->count() : 0;
                     $instExpected += ($fee->amount * $count);
                 }
-                
+
                 $installmentStats[] = [
-                    'label' => $fees->first()->name ?? "Installment $order",
+                    'label' => $fees->first()->name ?? __('dashboard.installment_number', ['order' => $order]),
                     'expected' => $instExpected,
                     'order' => $order
                 ];
@@ -392,10 +418,15 @@ class DashboardController extends BaseController
 
             $totalResults = Exam::where('academic_session_id', $currentSession->id)
                 ->where('institution_id', $institutionId)
-                ->where('status', 'published')->count();
+                ->where('status', 'published')
+                ->count();
 
             $totalTimetables = Timetable::where('academic_session_id', $currentSession->id)
-                ->where('institution_id', $institutionId)->count();
+                ->where('institution_id', $institutionId)
+                ->distinct('class_section_id')
+                ->count('class_section_id');
+        } else {
+            $totalEnrollment = $totalStudents;
         }
 
         $today = Carbon::today();
@@ -426,10 +457,11 @@ class DashboardController extends BaseController
         }
 
         return view('dashboard.super_admin', compact(
-            'totalStudents', 'totalTeachers', 'totalStaff', 'totalCampuses', 'totalInstitutes', 
+            'institution',
+            'totalStudents', 'totalTeachers', 'totalStaff', 'totalCampuses', 'totalInstitutes',
             'chartLabels', 'chartValues', 'currentSession',
             'presentCount', 'absentCount', 'lateCount',
-            'totalEnrollment', 'newComers', 
+            'totalEnrollment', 'newComers',
             'expectedTotal', 'collectedTotal', 'remainingToCollect', 'paidCount', 'unpaidCount', 'installmentStats',
             'budgetSpend', 'budgetRest', 'totalCourses', 'totalResults', 'totalTimetables', 'totalCommunication'
         ));
@@ -462,7 +494,9 @@ class DashboardController extends BaseController
     private function studentDashboard($user, $institutionId)
     {
         $student = $user->student;
-        if (!$student) return view('dashboard.student', ['error' => 'No Student Profile Found']);
+        if (!$student) {
+            return view('dashboard.student', ['error' => __('dashboard.no_student_profile')]);
+        }
 
         $totalDays = StudentAttendance::where('student_id', $student->id)->count();
         $presentDays = StudentAttendance::where('student_id', $student->id)->where('status', 'present')->count();

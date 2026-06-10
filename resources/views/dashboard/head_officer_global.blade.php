@@ -4,11 +4,15 @@
 <div class="content-body">
     <div class="container-fluid">
         
+        @php
+            $roleName = Auth::user()->roles->first()?->name ?? __('dashboard.default_role');
+        @endphp
+
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
                     <h3 class="text-white fw-bold mb-1">
-                                {{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}, {{ Auth::user()->roles->pluck('name')->first() ?? 'User' }}!
+                        {{ __('dashboard.welcome_greeting', ['name' => Auth::user()->name, 'role' => $roleName]) }}
                     </h3>
                     <h4>{{ __('dashboard.my_schools_overview') }}</h4>
                     <p class="mb-0">{{ __('dashboard.global_dashboard') }}</p>
@@ -103,15 +107,15 @@
                     <div class="card-body">
                         <div class="row text-center">
                             <div class="col-4 border-end">
-                                <h4 class="text-primary mb-2">${{ number_format($totalRevenue, 2) }}</h4>
+                                <h4 class="text-primary mb-2">{{ \App\Enums\CurrencySymbol::default() }}{{ number_format($totalRevenue, 2) }}</h4>
                                 <span class="text-muted">{{ __('dashboard.total_invoiced') }}</span>
                             </div>
                             <div class="col-4 border-end">
-                                <h4 class="text-success mb-2">${{ number_format($collectedRevenue, 2) }}</h4>
+                                <h4 class="text-success mb-2">{{ \App\Enums\CurrencySymbol::default() }}{{ number_format($collectedRevenue, 2) }}</h4>
                                 <span class="text-muted">{{ __('dashboard.collected') }}</span>
                             </div>
                             <div class="col-4">
-                                <h4 class="text-warning mb-2">${{ number_format($pendingRevenue, 2) }}</h4>
+                                <h4 class="text-warning mb-2">{{ \App\Enums\CurrencySymbol::default() }}{{ number_format($pendingRevenue, 2) }}</h4>
                                 <span class="text-muted">{{ __('dashboard.pending') }}</span>
                             </div>
                         </div>

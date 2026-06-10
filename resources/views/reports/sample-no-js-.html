@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulletin - 4 per Page</title>
+    <style>
+        :root {
+            --primary-blue: #002b80;
+            --header-orange: #d87b22;
+            --fail-red: #d32f2f;
+            --stamp-blue: #2585c9;
+        }
+
+        body {
+            font-family: 'Arial Narrow', Arial, sans-serif;
+            background-color: #555;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* A4 Landscape Setup */
+        .a4-landscape {
+            width: 297mm;
+            height: 210mm;
+            background-color: #fff;
+            display: flex;
+            flex-direction: row;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            overflow: hidden;
+        }
+
+        /* Individual Student Column */
+        .student-column {
+            flex: 1; 
+            height: 100%;
+            border-right: 1px dashed #ccc; 
+            box-sizing: border-box;
+            padding: 10mm 6mm;
+            position: relative;
+            
+            /* Custom Wavy Certificate Background with thicker bottom wave */
+            background-color: #fdfbf5;
+            background-image: 
+                url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23ebd5a1' stroke-width='0.5' opacity='0.7'%3E%3Cpath d='M0,60 C30,10 90,110 120,60 C150,10 210,110 240,60' /%3E%3Cpath d='M0,65 C30,15 90,115 120,65 C150,15 210,115 240,65' /%3E%3Cpath d='M0,70 C30,20 90,120 120,70 C150,20 210,120 240,70' /%3E%3Cpath d='M0,60 C30,110 90,10 120,60 C150,110 210,10 240,60' /%3E%3Cpath d='M0,65 C30,115 90,15 120,65 C150,115 210,15 240,65' /%3E%3Cpath d='M0,70 C30,120 90,20 120,70 C150,120 210,20 240,70' /%3E%3C/g%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 100 30' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,15 Q25,0 50,15 T100,15 V30 H0 Z' fill='%23ebd5a1' opacity='0.4'/%3E%3Cpath d='M0,20 Q25,5 50,20 T100,20 V30 H0 Z' fill='%23d6bd7e' opacity='0.5'/%3E%3C/svg%3E");
+            background-position: top left, bottom left;
+            background-repeat: repeat, no-repeat;
+            background-size: 120px 120px, 100% 30mm;
+        }
+
+        .student-column:last-child { border-right: none; }
+
+        /* Header Elements */
+        .header-content { text-align: center; margin-bottom: 2px; }
+        .logo-box {
+            width: 35px; height: 40px; border: 1px solid var(--primary-blue);
+            border-radius: 5px 5px 20px 20px; margin: 0 auto 6px auto;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 4px; color: var(--primary-blue); font-weight: bold;
+            background: rgba(255, 255, 255, 0.7);
+        }
+        .school-name { font-size: 12px; font-weight: bold; color: #000; margin-bottom: 2px; }
+        .student-name { font-size: 10px; font-weight: bold; margin: 4px 0 2px 0; }
+        .class-name { font-size: 10px; font-weight: bold; margin-bottom: 4px; }
+        
+        .barcode {
+            height: 20px; width: 90px; margin: 4px auto;
+            background-image: linear-gradient(to right, #000 0, #000 2px, transparent 2px, transparent 4px, #000 4px, #000 7px, transparent 7px, transparent 9px, #000 9px, #000 10px, transparent 10px, transparent 14px, #000 14px, #000 16px, transparent 16px, transparent 18px, #000 18px, #000 22px, transparent 22px, transparent 23px, #000 23px, #000 26px, transparent 26px, transparent 28px, #000 28px, #000 29px, transparent 29px, transparent 32px, #000 32px, #000 36px, transparent 36px, transparent 38px, #000 38px, #000 40px, transparent 40px, transparent 42px, #000 42px, #000 45px, transparent 45px, transparent 46px, #000 46px, #000 48px, transparent 48px, transparent 52px, #000 52px, #000 53px, transparent 53px, transparent 56px, #000 56px, #000 59px, transparent 59px, transparent 60px, #000 60px, #000 62px, transparent 62px, transparent 65px, #000 65px, #000 68px, transparent 68px, transparent 70px, #000 70px, #000 72px, transparent 72px, transparent 76px, #000 76px, #000 77px, transparent 77px, transparent 80px, #000 80px, #000 84px, transparent 84px, transparent 86px, #000 86px, #000 88px, transparent 88px, transparent 90px, #000 90px, #000 94px, transparent 94px, transparent 96px, #000 96px, #000 98px, transparent 98px, transparent 100px);
+        }
+        .term-title { font-size: 9px; font-weight: bold; margin-top: 4px; text-transform: uppercase; }
+
+        /* Divider Lines */
+        .divider-thick { height: 2px; background-color: var(--primary-blue); margin-top: 4px; }
+        .divider-thin { height: 1px; background-color: var(--primary-blue); margin-top: 1px; margin-bottom: 4px; }
+        .divider-bottom { height: 1px; background-color: var(--primary-blue); margin: 3px 0; }
+
+        /* Grades Table Styling */
+        table { width: 100%; border-collapse: collapse; font-size: 9px; }
+        th { color: var(--header-orange); font-weight: bold; text-align: center; padding-bottom: 3px; }
+        th.left-align, td.left-align { text-align: left; }
+        td { padding: 1.5px 0; text-align: center; font-weight: bold; color: #1a1a1a; }
+        .fail-grade { color: var(--fail-red); }
+
+        /* --- NEW: Summary & Footer Section --- */
+        .summary-container {
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1.5px solid #000;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 9.5px;
+            margin-bottom: 2.5px;
+        }
+
+        .summary-row .label { flex: 2; text-align: left; }
+        .summary-row .val { flex: 0.5; text-align: center; font-weight: bold; font-size: 11px;}
+
+        .footer-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 12px;
+            height: 40px;
+        }
+
+        /* SVG QR Code generator */
+        .qr-code {
+            width: 32px;
+            height: 32px;
+            background-color: white;
+            padding: 2px;
+            box-sizing: border-box;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 33 33' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2,2 h7 v7 h-7 z M3,3 h5 v5 h-5 z M4,4 h3 v3 h-3 z' fill='%23000'/%3E%3Cpath d='M24,2 h7 v7 h-7 z M25,3 h5 v5 h-5 z M26,4 h3 v3 h-3 z' fill='%23000'/%3E%3Cpath d='M2,24 h7 v7 h-7 z M3,25 h5 v5 h-5 z M4,26 h3 v3 h-3 z' fill='%23000'/%3E%3Crect x='12' y='2' width='2' height='2' fill='%23000'/%3E%3Crect x='15' y='4' width='4' height='2' fill='%23000'/%3E%3Crect x='10' y='8' width='2' height='4' fill='%23000'/%3E%3Crect x='14' y='10' width='8' height='2' fill='%23000'/%3E%3Crect x='22' y='12' width='2' height='6' fill='%23000'/%3E%3Crect x='2' y='12' width='6' height='2' fill='%23000'/%3E%3Crect x='8' y='15' width='4' height='4' fill='%23000'/%3E%3Crect x='15' y='16' width='2' height='2' fill='%23000'/%3E%3Crect x='18' y='14' width='2' height='8' fill='%23000'/%3E%3Crect x='26' y='16' width='4' height='2' fill='%23000'/%3E%3Crect x='24' y='20' width='2' height='4' fill='%23000'/%3E%3Crect x='12' y='22' width='6' height='2' fill='%23000'/%3E%3Crect x='28' y='24' width='2' height='2' fill='%23000'/%3E%3Crect x='16' y='26' width='4' height='4' fill='%23000'/%3E%3Crect x='22' y='26' width='2' height='4' fill='%23000'/%3E%3Crect x='26' y='28' width='4' height='2' fill='%23000'/%3E%3Crect x='10' y='28' width='2' height='2' fill='%23000'/%3E%3C/svg%3E");
+            background-size: cover;
+        }
+
+        /* Scalable vector stamp perfectly positioned over the footer */
+        .stamp-overlay {
+            position: absolute;
+            left: 50%;
+            bottom: -5px;
+            transform: translateX(-50%) rotate(-12deg);
+            width: 80px;
+            height: 80px;
+            pointer-events: none;
+            opacity: 0.95;
+            z-index: 5;
+        }
+
+        .signature-block {
+            font-size: 8px;
+            text-align: left;
+            line-height: 1.5;
+            font-weight: normal;
+            color: #000;
+        }
+
+        @media print {
+            @page { size: A4 landscape; margin: 0; }
+            body { background: none; padding: 0; margin: 0; }
+            .a4-landscape { box-shadow: none; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="a4-landscape">
+
+        <!-- Column 1 -->
+        <div class="student-column">
+            <div class="header-content">
+                <div class="logo-box">
+                    <span style="text-align:center;">COLLEGE<br>SAINT<br>GABRIEL</span>
+                </div>
+                <div class="school-name">SAINT GABRIEL</div>
+                <div class="student-name">MBENGA MUKEBA EL-JOUKAH</div>
+                <div class="class-name">2e A</div>
+                <div class="barcode"></div>
+                <div class="term-title">BULLETIN 1er TRIMESTRE</div>
+            </div>
+            
+            <div class="divider-thick"></div>
+            <div class="divider-thin"></div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th class="left-align">Branches</th>
+                        <th>Cotes</th>
+                        <th>Max</th>
+                    </tr>
+                </thead>
+            </table>
+            
+            <div class="divider-bottom"></div>
+
+            <table>
+                <tbody>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">19</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Ecrite</td><td class="" style="width: 20%;">16</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Vocabulaire</td><td class="" style="width: 20%;">6</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">18</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">LECT-ECRITURE EN LANGUES</td><td class="" style="width: 20%;">29</td><td style="width: 20%;">30</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Mesures des grandeurs</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Formes géométries</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Numération</td><td class="" style="width: 20%;">12</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Opérations</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Problèmes</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Sciences d'éveil</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Technologie</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed Civ. & Morale</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. Santé & Env.</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art plastique</td><td class="fail-grade" style="width: 20%;">4</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art dramatique</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. phys. & sportive</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Init. Trav. Prod</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Religion</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                </tbody>
+            </table>
+
+            <div class="summary-container">
+                <div class="summary-row"><span class="label">MAXIMUM GENERAL</span><span class="val">300</span><span class="val">300</span></div>
+                <div class="summary-row"><span class="label">TOTAL OBTENU</span><span class="val">263</span><span class="val">280</span></div>
+                <div class="summary-row"><span class="label">POURCENTAGE</span><span class="val">87.7</span><span class="val">93.3</span></div>
+                <div class="summary-row"><span class="label">CONDUITE</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">APPLICATION</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">PLACE - EFF</span><span class="val">6 è</span><span class="val">1 è</span></div>
+            </div>
+
+            <div class="footer-wrapper">
+                <div class="qr-code"></div>
+                <div class="stamp-overlay">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="var(--stamp-blue)" stroke-width="3"/>
+                        <circle cx="50" cy="50" r="41" fill="none" stroke="var(--stamp-blue)" stroke-width="1.2"/>
+                        <circle cx="50" cy="50" r="26" fill="none" stroke="var(--stamp-blue)" stroke-width="0.8" stroke-dasharray="2,2"/>
+                        <circle cx="15" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <circle cx="85" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <path id="txt-top-1" d="M 17 50 A 33 33 0 0 1 83 50" fill="none"/>
+                        <path id="txt-bot-1" d="M 83 50 A 33 33 0 0 1 17 50" fill="none"/>
+                        <text fill="var(--stamp-blue)" font-size="14.5" font-weight="bold" font-family="Arial" letter-spacing="1">
+                            <textPath href="#txt-top-1" startOffset="50%" text-anchor="middle">COLLEGE</textPath>
+                        </text>
+                        <text fill="var(--stamp-blue)" font-size="11.5" font-weight="bold" font-family="Arial" letter-spacing="1.5">
+                            <textPath href="#txt-bot-1" startOffset="50%" text-anchor="middle">SAINT GABRIEL</textPath>
+                        </text>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="white" opacity="0.8"/>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="none" stroke="var(--stamp-blue)" stroke-width="1" transform="rotate(-8 50 50)"/>
+                        <text x="50" y="42" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★★</text>
+                        <circle cx="50" cy="52" r="5" fill="#c49a45"/>
+                        <text x="50" y="65" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★</text>
+                    </svg>
+                </div>
+                <div class="signature-block">
+                    <div>Fait à Kinshasa, le 13/12/2024</div>
+                    <div style="margin: 3px 0;">Chef d'établissement</div>
+                    <div>KAYA DJASSONGO Kajos</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 2 -->
+        <div class="student-column">
+            <div class="header-content">
+                <div class="logo-box">
+                    <span style="text-align:center;">COLLEGE<br>SAINT<br>GABRIEL</span>
+                </div>
+                <div class="school-name">SAINT GABRIEL</div>
+                <div class="student-name">MBENGA MUKEBA EL-JOUKAH</div>
+                <div class="class-name">2e A</div>
+                <div class="barcode"></div>
+                <div class="term-title">BULLETIN 1er TRIMESTRE</div>
+            </div>
+            
+            <div class="divider-thick"></div>
+            <div class="divider-thin"></div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th class="left-align">Branches</th>
+                        <th>Cotes</th>
+                        <th>Max</th>
+                    </tr>
+                </thead>
+            </table>
+            
+            <div class="divider-bottom"></div>
+
+            <table>
+                <tbody>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">19</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Ecrite</td><td class="" style="width: 20%;">16</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Vocabulaire</td><td class="" style="width: 20%;">6</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">18</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">LECT-ECRITURE EN LANGUES</td><td class="" style="width: 20%;">29</td><td style="width: 20%;">30</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Mesures des grandeurs</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Formes géométries</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Numération</td><td class="" style="width: 20%;">12</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Opérations</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Problèmes</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Sciences d'éveil</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Technologie</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed Civ. & Morale</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. Santé & Env.</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art plastique</td><td class="fail-grade" style="width: 20%;">4</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art dramatique</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. phys. & sportive</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Init. Trav. Prod</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Religion</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                </tbody>
+            </table>
+
+            <div class="summary-container">
+                <div class="summary-row"><span class="label">MAXIMUM GENERAL</span><span class="val">300</span><span class="val">300</span></div>
+                <div class="summary-row"><span class="label">TOTAL OBTENU</span><span class="val">263</span><span class="val">280</span></div>
+                <div class="summary-row"><span class="label">POURCENTAGE</span><span class="val">87.7</span><span class="val">93.3</span></div>
+                <div class="summary-row"><span class="label">CONDUITE</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">APPLICATION</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">PLACE - EFF</span><span class="val">6 è</span><span class="val">1 è</span></div>
+            </div>
+
+            <div class="footer-wrapper">
+                <div class="qr-code"></div>
+                <div class="stamp-overlay">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="var(--stamp-blue)" stroke-width="3"/>
+                        <circle cx="50" cy="50" r="41" fill="none" stroke="var(--stamp-blue)" stroke-width="1.2"/>
+                        <circle cx="50" cy="50" r="26" fill="none" stroke="var(--stamp-blue)" stroke-width="0.8" stroke-dasharray="2,2"/>
+                        <circle cx="15" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <circle cx="85" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <path id="txt-top-2" d="M 17 50 A 33 33 0 0 1 83 50" fill="none"/>
+                        <path id="txt-bot-2" d="M 83 50 A 33 33 0 0 1 17 50" fill="none"/>
+                        <text fill="var(--stamp-blue)" font-size="14.5" font-weight="bold" font-family="Arial" letter-spacing="1">
+                            <textPath href="#txt-top-2" startOffset="50%" text-anchor="middle">COLLEGE</textPath>
+                        </text>
+                        <text fill="var(--stamp-blue)" font-size="11.5" font-weight="bold" font-family="Arial" letter-spacing="1.5">
+                            <textPath href="#txt-bot-2" startOffset="50%" text-anchor="middle">SAINT GABRIEL</textPath>
+                        </text>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="white" opacity="0.8"/>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="none" stroke="var(--stamp-blue)" stroke-width="1" transform="rotate(-8 50 50)"/>
+                        <text x="50" y="42" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★★</text>
+                        <circle cx="50" cy="52" r="5" fill="#c49a45"/>
+                        <text x="50" y="65" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★</text>
+                    </svg>
+                </div>
+                <div class="signature-block">
+                    <div>Fait à Kinshasa, le 13/12/2024</div>
+                    <div style="margin: 3px 0;">Chef d'établissement</div>
+                    <div>KAYA DJASSONGO Kajos</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 3 -->
+        <div class="student-column">
+            <div class="header-content">
+                <div class="logo-box">
+                    <span style="text-align:center;">COLLEGE<br>SAINT<br>GABRIEL</span>
+                </div>
+                <div class="school-name">SAINT GABRIEL</div>
+                <div class="student-name">MBENGA MUKEBA EL-JOUKAH</div>
+                <div class="class-name">2e A</div>
+                <div class="barcode"></div>
+                <div class="term-title">BULLETIN 1er TRIMESTRE</div>
+            </div>
+            
+            <div class="divider-thick"></div>
+            <div class="divider-thin"></div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th class="left-align">Branches</th>
+                        <th>Cotes</th>
+                        <th>Max</th>
+                    </tr>
+                </thead>
+            </table>
+            
+            <div class="divider-bottom"></div>
+
+            <table>
+                <tbody>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">19</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Ecrite</td><td class="" style="width: 20%;">16</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Vocabulaire</td><td class="" style="width: 20%;">6</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">18</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">LECT-ECRITURE EN LANGUES</td><td class="" style="width: 20%;">29</td><td style="width: 20%;">30</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Mesures des grandeurs</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Formes géométries</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Numération</td><td class="" style="width: 20%;">12</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Opérations</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Problèmes</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Sciences d'éveil</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Technologie</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed Civ. & Morale</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. Santé & Env.</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art plastique</td><td class="fail-grade" style="width: 20%;">4</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art dramatique</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. phys. & sportive</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Init. Trav. Prod</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Religion</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                </tbody>
+            </table>
+
+            <div class="summary-container">
+                <div class="summary-row"><span class="label">MAXIMUM GENERAL</span><span class="val">300</span><span class="val">300</span></div>
+                <div class="summary-row"><span class="label">TOTAL OBTENU</span><span class="val">263</span><span class="val">280</span></div>
+                <div class="summary-row"><span class="label">POURCENTAGE</span><span class="val">87.7</span><span class="val">93.3</span></div>
+                <div class="summary-row"><span class="label">CONDUITE</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">APPLICATION</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">PLACE - EFF</span><span class="val">6 è</span><span class="val">1 è</span></div>
+            </div>
+
+            <div class="footer-wrapper">
+                <div class="qr-code"></div>
+                <div class="stamp-overlay">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="var(--stamp-blue)" stroke-width="3"/>
+                        <circle cx="50" cy="50" r="41" fill="none" stroke="var(--stamp-blue)" stroke-width="1.2"/>
+                        <circle cx="50" cy="50" r="26" fill="none" stroke="var(--stamp-blue)" stroke-width="0.8" stroke-dasharray="2,2"/>
+                        <circle cx="15" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <circle cx="85" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <path id="txt-top-3" d="M 17 50 A 33 33 0 0 1 83 50" fill="none"/>
+                        <path id="txt-bot-3" d="M 83 50 A 33 33 0 0 1 17 50" fill="none"/>
+                        <text fill="var(--stamp-blue)" font-size="14.5" font-weight="bold" font-family="Arial" letter-spacing="1">
+                            <textPath href="#txt-top-3" startOffset="50%" text-anchor="middle">COLLEGE</textPath>
+                        </text>
+                        <text fill="var(--stamp-blue)" font-size="11.5" font-weight="bold" font-family="Arial" letter-spacing="1.5">
+                            <textPath href="#txt-bot-3" startOffset="50%" text-anchor="middle">SAINT GABRIEL</textPath>
+                        </text>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="white" opacity="0.8"/>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="none" stroke="var(--stamp-blue)" stroke-width="1" transform="rotate(-8 50 50)"/>
+                        <text x="50" y="42" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★★</text>
+                        <circle cx="50" cy="52" r="5" fill="#c49a45"/>
+                        <text x="50" y="65" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★</text>
+                    </svg>
+                </div>
+                <div class="signature-block">
+                    <div>Fait à Kinshasa, le 13/12/2024</div>
+                    <div style="margin: 3px 0;">Chef d'établissement</div>
+                    <div>KAYA DJASSONGO Kajos</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 4 -->
+        <div class="student-column">
+            <div class="header-content">
+                <div class="logo-box">
+                    <span style="text-align:center;">COLLEGE<br>SAINT<br>GABRIEL</span>
+                </div>
+                <div class="school-name">SAINT GABRIEL</div>
+                <div class="student-name">MBENGA MUKEBA EL-JOUKAH</div>
+                <div class="class-name">2e A</div>
+                <div class="barcode"></div>
+                <div class="term-title">BULLETIN 1er TRIMESTRE</div>
+            </div>
+            
+            <div class="divider-thick"></div>
+            <div class="divider-thin"></div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th class="left-align">Branches</th>
+                        <th>Cotes</th>
+                        <th>Max</th>
+                    </tr>
+                </thead>
+            </table>
+            
+            <div class="divider-bottom"></div>
+
+            <table>
+                <tbody>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">19</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Ecrite</td><td class="" style="width: 20%;">16</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Vocabulaire</td><td class="" style="width: 20%;">6</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Expression Orale</td><td class="" style="width: 20%;">18</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">LECT-ECRITURE EN LANGUES</td><td class="" style="width: 20%;">29</td><td style="width: 20%;">30</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Mesures des grandeurs</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Formes géométries</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Numération</td><td class="" style="width: 20%;">12</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Opérations</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Problèmes</td><td class="" style="width: 20%;">20</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Sciences d'éveil</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">20</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Technologie</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed Civ. & Morale</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. Santé & Env.</td><td class="" style="width: 20%;">10</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art plastique</td><td class="fail-grade" style="width: 20%;">4</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Art dramatique</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Ed. phys. & sportive</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Init. Trav. Prod</td><td class="" style="width: 20%;">8</td><td style="width: 20%;">10</td></tr>
+                    <tr><td class="left-align" style="width: 60%;">Religion</td><td class="" style="width: 20%;">9</td><td style="width: 20%;">10</td></tr>
+                </tbody>
+            </table>
+
+            <div class="summary-container">
+                <div class="summary-row"><span class="label">MAXIMUM GENERAL</span><span class="val">300</span><span class="val">300</span></div>
+                <div class="summary-row"><span class="label">TOTAL OBTENU</span><span class="val">263</span><span class="val">280</span></div>
+                <div class="summary-row"><span class="label">POURCENTAGE</span><span class="val">87.7</span><span class="val">93.3</span></div>
+                <div class="summary-row"><span class="label">CONDUITE</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">APPLICATION</span><span class="val">E</span><span class="val">E</span></div>
+                <div class="summary-row"><span class="label">PLACE - EFF</span><span class="val">6 è</span><span class="val">1 è</span></div>
+            </div>
+
+            <div class="footer-wrapper">
+                <div class="qr-code"></div>
+                <div class="stamp-overlay">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="var(--stamp-blue)" stroke-width="3"/>
+                        <circle cx="50" cy="50" r="41" fill="none" stroke="var(--stamp-blue)" stroke-width="1.2"/>
+                        <circle cx="50" cy="50" r="26" fill="none" stroke="var(--stamp-blue)" stroke-width="0.8" stroke-dasharray="2,2"/>
+                        <circle cx="15" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <circle cx="85" cy="50" r="2.5" fill="var(--stamp-blue)"/>
+                        <path id="txt-top-4" d="M 17 50 A 33 33 0 0 1 83 50" fill="none"/>
+                        <path id="txt-bot-4" d="M 83 50 A 33 33 0 0 1 17 50" fill="none"/>
+                        <text fill="var(--stamp-blue)" font-size="14.5" font-weight="bold" font-family="Arial" letter-spacing="1">
+                            <textPath href="#txt-top-4" startOffset="50%" text-anchor="middle">COLLEGE</textPath>
+                        </text>
+                        <text fill="var(--stamp-blue)" font-size="11.5" font-weight="bold" font-family="Arial" letter-spacing="1.5">
+                            <textPath href="#txt-bot-4" startOffset="50%" text-anchor="middle">SAINT GABRIEL</textPath>
+                        </text>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="white" opacity="0.8"/>
+                        <rect x="36" y="32" width="28" height="36" rx="2" fill="none" stroke="var(--stamp-blue)" stroke-width="1" transform="rotate(-8 50 50)"/>
+                        <text x="50" y="42" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★★</text>
+                        <circle cx="50" cy="52" r="5" fill="#c49a45"/>
+                        <text x="50" y="65" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★</text>
+                    </svg>
+                </div>
+                <div class="signature-block">
+                    <div>Fait à Kinshasa, le 13/12/2024</div>
+                    <div style="margin: 3px 0;">Chef d'établissement</div>
+                    <div>KAYA DJASSONGO Kajos</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -10,6 +10,7 @@
 	<meta name="author" content="dexignlabs">
 	<meta name="robots" content="index, follow">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon.png') }}">
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="{{ asset('manifest.json') }}">
@@ -95,6 +96,167 @@
         /* Notifications Tweaks */
         .notification-link { text-decoration: none; color: inherit; display: block; }
         .notification-link:hover .timeline-panel { background-color: #f8f9fa; }
+
+        /* Global Search */
+        .global-search-wrap {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+            transition: width 0.28s ease;
+        }
+        .global-search-wrap.is-expanded {
+            width: min(380px, 42vw);
+        }
+        .global-search-toggle {
+            position: absolute;
+            inset: 0;
+            border: 1px solid #e6e6e6;
+            border-radius: 50%;
+            background: #fff;
+            color: #888;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2;
+            transition: opacity 0.2s ease;
+        }
+        .global-search-wrap.is-expanded .global-search-toggle {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .global-search-field {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            height: 40px;
+            border: 1px solid #e6e6e6;
+            border-radius: 20px;
+            background: #fff;
+            padding: 0 14px 0 12px;
+            overflow: hidden;
+        }
+        .global-search-wrap.is-expanded .global-search-field {
+            display: flex;
+        }
+        .global-search-field:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0, 43, 128, 0.08);
+            background: #fff;
+        }
+        .global-search-icon-wrap {
+            flex-shrink: 0;
+            width: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            line-height: 1;
+        }
+        /* Override theme .header-left input rules (grey bg, min-height) */
+        .header-left .global-search-wrap .global-search-input {
+            flex: 1;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+            border: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            font-size: 13px;
+            background: transparent !important;
+            box-shadow: none !important;
+            line-height: 1.4;
+            color: #333;
+        }
+        .header-left .global-search-wrap .global-search-input:focus,
+        .header-left .global-search-wrap .global-search-input:active {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .header-left .global-search-wrap .global-search-input::placeholder {
+            color: #aaa !important;
+        }
+        .header-left .global-search-wrap .global-search-input:-webkit-autofill,
+        .header-left .global-search-wrap .global-search-input:-webkit-autofill:hover,
+        .header-left .global-search-wrap .global-search-input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+            box-shadow: 0 0 0 1000px #fff inset !important;
+            -webkit-text-fill-color: #333 !important;
+        }
+        .global-search-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            max-height: 360px;
+            overflow-y: auto;
+            z-index: 1050;
+        }
+        .global-search-dropdown.show { display: block; }
+        .global-search-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            text-decoration: none;
+            color: inherit;
+            border-bottom: 1px solid #f3f3f3;
+            cursor: pointer;
+        }
+        .global-search-item:last-child { border-bottom: 0; }
+        .global-search-item:hover,
+        .global-search-item.active { background: #f8f9fa; }
+        .global-search-item-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #eef2ff;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .global-search-item-body { min-width: 0; flex: 1; }
+        .global-search-item-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #222;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .global-search-item-sub {
+            font-size: 11px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .global-search-item-type {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #aaa;
+            letter-spacing: 0.5px;
+        }
+        .global-search-empty {
+            padding: 16px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+        @media (max-width: 991px) {
+            .global-search-wrap.is-expanded { width: min(280px, 55vw); }
+        }
     </style>
 </head>
 <body>
@@ -163,10 +325,29 @@
             <div class="header-content">
                 <nav class="navbar navbar-expand">
                     <div class="collapse navbar-collapse justify-content-between">
-                        <div class="header-left">
-                            <div class="dashboard_bar h4">
-								{{ $pageTitle ?? ''  }}
-							</div>
+                        <div class="header-left flex-grow-1">
+                            <div class="d-flex align-items-center gap-3 w-100">
+                                <div class="dashboard_bar h4 mb-0 text-nowrap">
+                                    {{ $pageTitle ?? ''  }}
+                                </div>
+                                <div class="global-search-wrap d-none d-md-block" id="globalSearchWrap">
+                                    <button type="button" class="global-search-toggle" id="globalSearchToggle" aria-label="{{ __('header.global_search_placeholder') }}">
+                                        <i class="fa fa-search"></i>
+                                    </button>
+                                    <div class="global-search-field">
+                                        <span class="global-search-icon-wrap" aria-hidden="true">
+                                            <i class="fa fa-search"></i>
+                                        </span>
+                                        <input type="text"
+                                               id="globalSearchInput"
+                                               class="global-search-input"
+                                               placeholder="{{ __('header.global_search_placeholder') }}"
+                                               autocomplete="off"
+                                               aria-label="{{ __('header.global_search_placeholder') }}">
+                                    </div>
+                                    <div id="globalSearchDropdown" class="global-search-dropdown"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <ul class="navbar-nav header-right">
@@ -178,14 +359,9 @@
                                 $allowedInstitutions = collect();
                                 $isActiveGlobal = session('active_institution_id') === 'global';
                                 $hasMultipleSchools = false;
-                                $currentSessionTitle = null; 
-
-                                // Notification Setup
-                                $notifications = collect();
-                                $unreadCount = 0;
+                                $currentSessionTitle = null;
 
                                 if ($user) {
-                                    // 1. Institution Switcher Logic
                                     if ($user->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value)) {
                                         $allowedInstitutions = \App\Models\Institution::select('id', 'name', 'code')->orderBy('name')->get();
                                         $showSwitcher = true;
@@ -221,159 +397,6 @@
                                     if($isActiveGlobal) {
                                         $activeInstitutionName = __('header.global_view') ?? 'Global Dashboard';
                                     }
-
-                                    // 2. Smart Notification Logic
-                                    $isAdmin = $user->hasRole([\App\Enums\RoleEnum::SUPER_ADMIN->value, \App\Enums\RoleEnum::HEAD_OFFICER->value, \App\Enums\RoleEnum::SCHOOL_ADMIN->value]);
-                                    $isStudent = $user->hasRole(\App\Enums\RoleEnum::STUDENT->value);
-                                    $isTeacher = $user->hasRole([\App\Enums\RoleEnum::TEACHER->value, \App\Enums\RoleEnum::STAFF->value]);
-                                    $contextId = $activeId === 'global' ? null : $activeId;
-
-                                    // A. Admin Notifications
-                                    if ($isAdmin) {
-                                        try {
-                                            if (\Illuminate\Support\Facades\Schema::hasTable('budget_requests') || \Illuminate\Support\Facades\Schema::hasTable('fund_requests')) {
-                                                $table = \Illuminate\Support\Facades\Schema::hasTable('budget_requests') ? 'budget_requests' : 'fund_requests';
-                                                $q = \Illuminate\Support\Facades\DB::table($table)->where('status', 'pending');
-                                                if ($contextId) $q->where('institution_id', $contextId);
-                                                $count = $q->count();
-                                                if ($count > 0) {
-                                                    $notifications->push([
-                                                        'icon' => 'fa-money-bill text-warning',
-                                                        'title' => __('header.pending_fund_requests') ?? 'Pending Fund Requests',
-                                                        'desc' => __('header.pending_fund_requests_desc', ['count' => $count]) ?? "{$count} pending fund requests to review.",
-                                                        'link' => route('budgets.requests')
-                                                    ]);
-                                                    $unreadCount += $count;
-                                                }
-                                            }
-
-                                            if (\Illuminate\Support\Facades\Schema::hasTable('student_requests')) {
-                                                $q = \App\Models\StudentRequest::where('status', 'pending');
-                                                if ($contextId) $q->where('institution_id', $contextId);
-                                                $count = $q->count();
-                                                if ($count > 0) {
-                                                    $notifications->push([
-                                                        'icon' => 'fa-envelope text-primary',
-                                                        'title' => __('header.pending_requests_leaves') ?? 'Pending Requests/Leaves',
-                                                        'desc' => __('header.pending_requests_desc', ['count' => $count]) ?? "{$count} new requests require your approval.",
-                                                        'link' => route('requests.index')
-                                                    ]);
-                                                    $unreadCount += $count;
-                                                }
-                                            }
-                                        } catch (\Exception $e) {}
-                                    }
-
-                                    // B. Student Notifications
-                                    if ($isStudent) {
-                                        try {
-                                            $studentProfile = $user->student;
-                                            if ($studentProfile) {
-                                                $unpaid = \App\Models\Invoice::where('student_id', $studentProfile->id)
-                                                    ->whereIn('status', ['unpaid', 'partial'])->count();
-                                                if ($unpaid > 0) {
-                                                    $notifications->push([
-                                                        'icon' => 'fa-file-invoice text-danger',
-                                                        'title' => __('header.unpaid_fees') ?? 'Unpaid Fees',
-                                                        'desc' => __('header.unpaid_fees_desc', ['count' => $unpaid]) ?? "You have {$unpaid} pending fee invoices.",
-                                                        'link' => route('dashboard')
-                                                    ]);
-                                                    $unreadCount += $unpaid;
-                                                }
-                                                
-                                                $elections = \App\Models\Election::where('status', 'published')
-                                                    ->where('start_date', '<=', now())
-                                                    ->where('end_date', '>=', now())
-                                                    ->where('institution_id', $studentProfile->institution_id)->count();
-                                                if ($elections > 0) {
-                                                    $notifications->push([
-                                                        'icon' => 'fa-vote-yea text-success',
-                                                        'title' => __('header.active_elections') ?? 'Active Elections',
-                                                        'desc' => __('header.active_elections_desc', ['count' => $elections]) ?? "{$elections} elections are open for voting.",
-                                                        'link' => route('student.elections.index')
-                                                    ]);
-                                                    $unreadCount += $elections;
-                                                }
-
-                                                $notices = \App\Models\Notice::whereIn('audience', ['all', 'student'])
-                                                    ->where('is_published', true)
-                                                    ->where('created_at', '>=', now()->subDays(5))
-                                                    ->where(function($q) use ($studentProfile) {
-                                                        $q->where('institution_id', $studentProfile->institution_id)->orWhereNull('institution_id');
-                                                    })->count();
-                                                if ($notices > 0) {
-                                                    $notifications->push([
-                                                        'icon' => 'fa-bullhorn text-info',
-                                                        'title' => __('header.new_announcements') ?? 'New Announcements',
-                                                        'desc' => __('header.new_announcements_desc', ['count' => $notices]) ?? "{$notices} new notices posted recently.",
-                                                        'link' => route('student.notices.index')
-                                                    ]);
-                                                    $unreadCount += $notices;
-                                                }
-                                            }
-                                        } catch (\Exception $e) {}
-                                    }
-
-                                    // C. Staff / Teacher Notifications
-                                    if ($isTeacher) {
-                                        try {
-                                            $notices = \App\Models\Notice::whereIn('audience', ['all', 'staff'])
-                                                ->where('is_published', true)
-                                                ->where('created_at', '>=', now()->subDays(5))
-                                                ->where(function($q) use ($contextId) {
-                                                    if ($contextId) $q->where('institution_id', $contextId)->orWhereNull('institution_id');
-                                                })->count();
-                                            if ($notices > 0) {
-                                                $notifications->push([
-                                                    'icon' => 'fa-bullhorn text-info',
-                                                    'title' => __('header.new_staff_announcements') ?? 'New Staff Announcements',
-                                                    'desc' => __('header.new_staff_announcements_desc', ['count' => $notices]) ?? "{$notices} new notices posted.",
-                                                    'link' => route('notices.index')
-                                                ]);
-                                                $unreadCount += $notices;
-                                            }
-
-                                            $reqs = \App\Models\StudentRequest::where('created_by', $user->id)
-                                                ->whereIn('status', ['approved', 'rejected'])
-                                                ->where('updated_at', '>=', now()->subDays(3))->count();
-                                            if ($reqs > 0) {
-                                                 $notifications->push([
-                                                    'icon' => 'fa-check-circle text-success',
-                                                    'title' => __('header.request_updated') ?? 'Request Updated',
-                                                    'desc' => __('header.request_updated_desc', ['count' => $reqs]) ?? "{$reqs} of your requests have been reviewed.",
-                                                    'link' => route('requests.index')
-                                                ]);
-                                                $unreadCount += $reqs;
-                                            }
-                                        } catch (\Exception $e) {}
-                                    }
-
-                                    // D. User Specific Action Notifications (Like Fund Requests Processed)
-                                    try {
-                                        if (\Illuminate\Support\Facades\Schema::hasTable('fund_requests')) {
-                                            $myFundReqs = \App\Models\FundRequest::where('requested_by', $user->id)
-                                                ->whereIn('status', ['approved', 'rejected'])
-                                                ->where('updated_at', '>=', now()->subDays(7)) // Look at recent decisions
-                                                ->get();
-
-                                            foreach($myFundReqs as $req) {
-                                                // Check Cache to see if user has already marked this notification as read
-                                                if (!\Illuminate\Support\Facades\Cache::has('fund_req_read_'.$user->id.'_'.$req->id)) {
-                                                    $statusText = ucfirst($req->status);
-                                                    $icon = $req->status == 'approved' ? 'fa-check-circle text-success' : 'fa-times-circle text-danger';
-                                                    
-                                                    $notifications->push([
-                                                        'icon' => $icon,
-                                                        'title' => __('header.fund_request_status', ['status' => $statusText]) ?? "Fund Request {$statusText}",
-                                                        'desc' => __('header.fund_request_desc', ['ticket' => $req->ticket_number, 'status' => $statusText]) ?? "Your request {$req->ticket_number} was {$req->status}.",
-                                                        'link' => route('budgets.requests.mark_read', $req->id)
-                                                    ]);
-                                                    $unreadCount++;
-                                                }
-                                            }
-                                        }
-                                    } catch (\Exception $e) {}
-
                                 }
                             @endphp
 
@@ -386,32 +409,40 @@
                             </li>
                             @endif
 
-                            {{-- DYNAMIC NOTIFICATION BELL --}}
+                            {{-- In-App Notifications --}}
                             <li class="nav-item dropdown notification_dropdown">
-                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" title="{{ __('header.notifications') ?? 'Notifications' }}">
+                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" title="{{ __('header.notifications') }}">
                                     <i class="fa fa-bell"></i>
-                                    @if($unreadCount > 0)
+                                    @if(($inAppUnreadCount ?? 0) > 0)
                                         <div class="pulse-css"></div>
-                                        <span class="badge bg-danger rounded-circle text-white" style="position: absolute; top: 0px; right: 0px; font-size: 10px; padding: 3px 5px;">{{ $unreadCount }}</span>
+                                        <span class="badge bg-danger rounded-circle text-white in-app-unread-badge" style="position: absolute; top: 0px; right: 0px; font-size: 10px; padding: 3px 5px;">{{ $inAppUnreadCount }}</span>
                                     @endif
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end p-0" style="min-width: 320px;">
+                                <div class="dropdown-menu dropdown-menu-end p-0" style="min-width: 340px;">
                                     <div class="p-3 border-bottom bg-light rounded-top d-flex justify-content-between align-items-center">
-                                        <h6 class="mb-0 text-black fw-bold">{{ __('header.notifications') ?? 'Notifications' }}</h6>
-                                        <span class="badge bg-primary text-white">{{ $unreadCount }} {{ __('header.new') ?? 'New' }}</span>
+                                        <h6 class="mb-0 text-black fw-bold">{{ __('header.notifications') }}</h6>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-primary text-white in-app-unread-label">{{ $inAppUnreadCount ?? 0 }} {{ __('header.new') }}</span>
+                                            @if(($inAppUnreadCount ?? 0) > 0)
+                                                <button type="button" id="markAllNotifications" class="btn btn-link btn-sm p-0 fs-11 text-primary">{{ __('header.mark_all_read') }}</button>
+                                            @endif
+                                        </div>
                                     </div>
-                                    <div id="DZ_W_Notification1" class="widget-media dz-scroll p-3" style="height:auto; max-height:380px; overflow-y:auto;">
-                                        <ul class="timeline">
-                                            @forelse($notifications as $notif)
+                                    <div class="widget-media dz-scroll p-3" style="height:auto; max-height:380px; overflow-y:auto;">
+                                        <ul class="timeline" id="inAppNotificationsList">
+                                            @forelse($inAppNotifications ?? [] as $notif)
                                                 <li>
-                                                    <a href="{{ $notif['link'] }}" class="notification-link">
-                                                        <div class="timeline-panel rounded p-2 mb-2 border">
+                                                    <a href="{{ $notif->link ?? '#' }}"
+                                                       class="notification-link in-app-notif-link {{ $notif->isUnread() ? '' : 'opacity-75' }}"
+                                                       data-id="{{ $notif->id }}">
+                                                        <div class="timeline-panel rounded p-2 mb-2 border {{ $notif->isUnread() ? 'border-primary border-opacity-25' : '' }}">
                                                             <div class="media me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #f8f9fa; border-radius: 50%;">
-                                                                <i class="fa {{ $notif['icon'] }} fs-20"></i>
+                                                                <i class="fa {{ $notif->icon }} fs-20"></i>
                                                             </div>
                                                             <div class="media-body">
-                                                                <h6 class="mb-1 text-dark fw-bold">{{ $notif['title'] }}</h6>
-                                                                <small class="d-block text-muted">{{ $notif['desc'] }}</small>
+                                                                <h6 class="mb-1 text-dark fw-bold">{{ $notif->title }}</h6>
+                                                                <small class="d-block text-muted">{{ $notif->message }}</small>
+                                                                <small class="d-block text-muted mt-1">{{ $notif->created_at->diffForHumans() }}</small>
                                                             </div>
                                                         </div>
                                                     </a>
@@ -419,7 +450,7 @@
                                             @empty
                                                 <li class="text-center text-muted py-4">
                                                     <i class="fa fa-bell-slash fs-24 mb-2 d-block opacity-50"></i>
-                                                    {{ __('header.no_new_notifications') ?? 'No new notifications' }}
+                                                    {{ __('header.no_new_notifications') }}
                                                 </li>
                                             @endforelse
                                         </ul>
@@ -583,6 +614,178 @@
                         });
 
                         document.getElementById('noSchoolFound').style.display = hasVisible ? 'none' : 'block';
+                    });
+                }
+
+                // Global Search
+                const globalWrap = document.getElementById('globalSearchWrap');
+                const globalToggle = document.getElementById('globalSearchToggle');
+                const globalInput = document.getElementById('globalSearchInput');
+                const globalDropdown = document.getElementById('globalSearchDropdown');
+
+                const expandSearch = () => {
+                    if (globalWrap) globalWrap.classList.add('is-expanded');
+                    if (globalInput) setTimeout(() => globalInput.focus(), 50);
+                };
+
+                let hideDropdown = () => {};
+
+                const collapseSearch = () => {
+                    if (!globalWrap) return;
+                    if (globalInput && globalInput.value.trim()) return;
+                    globalWrap.classList.remove('is-expanded');
+                    hideDropdown();
+                };
+
+                if (globalToggle) {
+                    globalToggle.addEventListener('click', expandSearch);
+                }
+
+                if (globalInput && globalDropdown) {
+                let debounceTimer = null;
+                let activeIndex = -1;
+                let currentResults = [];
+                const searchUrl = @json(route('global-search.suggest'));
+                const noResultsText = @json(__('header.global_search_no_results'));
+                const hintText = @json(__('header.global_search_hint'));
+
+                const escapeHtml = (str) => {
+                    if (!str) return '';
+                    return String(str)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;');
+                };
+
+                hideDropdown = () => {
+                    globalDropdown.classList.remove('show');
+                    globalDropdown.innerHTML = '';
+                    activeIndex = -1;
+                    currentResults = [];
+                };
+
+                const renderResults = (results) => {
+                    currentResults = results;
+                    activeIndex = -1;
+
+                    if (!globalInput.value.trim()) {
+                        hideDropdown();
+                        return;
+                    }
+
+                    if (globalInput.value.trim().length < 2) {
+                        globalDropdown.innerHTML = '<div class="global-search-empty">' + hintText + '</div>';
+                        globalDropdown.classList.add('show');
+                        return;
+                    }
+
+                    if (!results.length) {
+                        globalDropdown.innerHTML = '<div class="global-search-empty">' + noResultsText + '</div>';
+                        globalDropdown.classList.add('show');
+                        return;
+                    }
+
+                    globalDropdown.innerHTML = results.map((item, index) => `
+                        <a href="${escapeHtml(item.url)}" class="global-search-item" data-index="${index}">
+                            <span class="global-search-item-icon"><i class="la ${escapeHtml(item.icon)}"></i></span>
+                            <span class="global-search-item-body">
+                                <div class="global-search-item-label">${escapeHtml(item.label)}</div>
+                                ${item.subtitle ? `<div class="global-search-item-sub">${escapeHtml(item.subtitle)}</div>` : ''}
+                            </span>
+                            <span class="global-search-item-type">${escapeHtml(item.type_label)}</span>
+                        </a>
+                    `).join('');
+                    globalDropdown.classList.add('show');
+                };
+
+                const fetchResults = (query) => {
+                    fetch(searchUrl + '?q=' + encodeURIComponent(query), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(res => res.json())
+                    .then(data => renderResults(data.results || []))
+                    .catch(() => hideDropdown());
+                };
+
+                globalInput.addEventListener('input', function() {
+                    clearTimeout(debounceTimer);
+                    const query = this.value.trim();
+                    if (query.length < 2) {
+                        renderResults([]);
+                        return;
+                    }
+                    debounceTimer = setTimeout(() => fetchResults(query), 280);
+                });
+
+                globalInput.addEventListener('keydown', function(e) {
+                    const items = globalDropdown.querySelectorAll('.global-search-item');
+                    if (!items.length) return;
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        activeIndex = Math.max(activeIndex - 1, 0);
+                    } else if (e.key === 'Enter' && activeIndex >= 0) {
+                        e.preventDefault();
+                        window.location.href = currentResults[activeIndex].url;
+                        return;
+                    } else if (e.key === 'Escape') {
+                        hideDropdown();
+                        collapseSearch();
+                        return;
+                    } else {
+                        return;
+                    }
+
+                    items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+                    if (activeIndex >= 0) items[activeIndex].scrollIntoView({ block: 'nearest' });
+                });
+
+                globalInput.addEventListener('focus', expandSearch);
+
+                document.addEventListener('click', function(e) {
+                    const inSearch = globalWrap && globalWrap.contains(e.target);
+                    if (!inSearch) {
+                        hideDropdown();
+                        collapseSearch();
+                    }
+                });
+                }
+
+                // In-App Notifications
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                const markReadUrl = @json(url('/notifications'));
+                const markAllBtn = document.getElementById('markAllNotifications');
+
+                document.querySelectorAll('.in-app-notif-link').forEach(link => {
+                    link.addEventListener('click', function() {
+                        const id = this.dataset.id;
+                        if (!id || !csrfToken) return;
+                        fetch(`${markReadUrl}/${id}/read`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                    });
+                });
+
+                if (markAllBtn && csrfToken) {
+                    markAllBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        fetch(`${markReadUrl}/read-all`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        }).then(() => window.location.reload());
                     });
                 }
             });

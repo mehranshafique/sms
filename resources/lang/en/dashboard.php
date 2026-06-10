@@ -2,36 +2,60 @@
 
 return [
     'page_title' => 'Dashboard',
-    'welcome_back' => 'Welcome Back',
+    'fallback_message' => 'No dashboard is configured for your account. Please contact the administrator.',
+
+    // Welcome banner
+    'welcome_title' => 'Welcome! :school Admin',
+    'welcome_greeting' => 'Welcome back, :name, :role!',
+    'welcome_back' => 'Welcome back',
+    'academic_year' => 'School/Academic Year',
     'current_session' => 'Current Session',
+    'default_role' => 'User',
+
+    'roles' => [
+        'Super Admin' => 'Super Admin',
+        'School Admin' => 'School Admin',
+        'Head Officer' => 'Head Officer',
+        'Teacher' => 'Teacher',
+        'Student' => 'Student',
+        'Guardian' => 'Guardian',
+        'Staff' => 'Staff',
+        'Accountant' => 'Accountant',
+    ],
+
     'view_details' => 'View Details',
     'view_all' => 'View All',
-    
-    // Main Admin Specific
+
+    // Platform admin
     'main_admin_title' => 'Main Admin Dashboard',
     'platform_overview' => 'Digitex Whole Management Platform Overview',
+    'platform_greeting' => 'Hello :name, :role',
     'total_institutions' => 'Total Institutions',
     'institution_newcomer' => 'Institution Newcomer',
     'active_institutions' => 'Active Institutions',
     'funds_request' => 'Funds Request',
+    'funds_request_subscriptions' => 'Funds Request (Subscriptions)',
     'pending' => 'Pending',
     'validated' => 'Validated',
-    'statistics' => 'Statistics',
     'student_by_year' => 'Student by Year',
-    'module_activated' => 'Module Activated',
-    
-    // Financial / School Admin Stats
+    'students_joined' => 'Students Joined',
+    'personnel_platform_wide' => 'Personnel (Platform-wide)',
+    'active_personnel' => 'Active Personnel',
+    'system_status' => 'System Status',
+    'expired_subscriptions' => ':count Expired',
+    'subscriptions_needing_renewal' => 'Subscriptions needing renewal',
+    'audit_logs_count' => ':count Logs',
+    'system_activities_24h' => 'System activities (24h)',
+    'recent_institutions' => 'Recent Institutions',
+    'date' => 'Date',
+
+    // School admin stats
     'total_enrollment' => 'Total Enrollment',
     'students' => 'Students',
-    'new_comers' => 'New Comers',
-    'this_session' => 'This Session',
-    
-    // Enrollment-Based Finance Keys
     'paid_students' => 'Paid Students',
     'fully_settled' => 'Fully Settled',
     'unpaid_students' => 'Unpaid Students',
     'pending_dues' => 'Pending Dues',
-    
     'financial_health' => 'Financial Health',
     'expected_revenue' => 'Expected Revenue',
     'based_on_enrollment' => 'Based on Active Enrollments',
@@ -39,30 +63,23 @@ return [
     'collected' => 'Collected',
     'remaining_balance' => 'Remaining Balance',
     'outstanding' => 'Outstanding',
-    
     'installment_breakdown' => 'Installment Projections',
     'installment' => 'Installment',
+    'installment_number' => 'Installment :order',
     'expected' => 'Expected',
     'no_installments' => 'No installment data available.',
-    
-    'fees_summary' => 'Fees Summary',
-    'budget_spend' => 'Budget Spend',
     'personnel' => 'Personnel',
     'active_staff' => 'Active Staff',
-    
-    // Academic Stats
     'courses_teachers' => 'Courses & Teachers',
     'results' => 'Results',
     'published' => 'Published',
     'timetables' => 'Timetables',
     'classes' => 'Classes',
     'communication' => 'Communication',
-    
-    'paid' => 'Paid',
-    'rest' => 'Rest',
-    'spend' => 'Spend',
+    'sms_email' => 'SMS/Email',
+    'send_sms_email_parents' => 'Send SMS/Email to Parents',
 
-    // Accountant Specific
+    // Accountant
     'accountant_dashboard' => 'Accountant Dashboard',
     'no_active_session' => 'No Active Session',
     'quick_actions' => 'Quick Actions',
@@ -85,15 +102,15 @@ return [
     'budget_utilization' => 'Budget Utilization',
     'remaining_budget' => 'Remaining Budget',
     'recent_transactions' => 'Recent Transactions',
-    'date' => 'Date',
     'student' => 'Student',
     'payment_ref' => 'Payment Ref',
     'method' => 'Method',
     'amount' => 'Amount',
     'unknown_student' => 'Unknown Student',
     'no_recent_payments' => 'No recent payments found.',
-    
-    // Teacher Dashboard
+    'not_available' => 'N/A',
+
+    // Teacher
     'teacher_dashboard' => 'Teacher Dashboard',
     'my_courses' => 'My Courses',
     'my_students' => 'My Students',
@@ -108,8 +125,8 @@ return [
     'room' => 'Room',
     'action' => 'Action',
     'staff' => 'Staff',
-    
-    // Student Dashboard
+
+    // Student
     'student_dashboard' => 'Student Dashboard',
     'my_fees' => 'My Fees',
     'my_results' => 'My Results',
@@ -118,28 +135,24 @@ return [
     'published_exams' => 'Published Exams',
     'present' => 'Present',
     'teacher' => 'Teacher',
+    'paid' => 'Paid',
+    'rest' => 'Rest',
+    'profile_not_found' => 'Profile Not Found',
+    'no_student_profile' => 'Your user account is not linked to a student profile. Please contact the administrator.',
 
-    // Global
-    'switched_global_view' => 'Switched to Global View successfully.',
-    'context_switched_success' => 'School context switched successfully.',
-    'unauthorized_access' => 'Unauthorized access.',
-
-    // Head Officer Dashboard
+    // Head officer
     'my_schools_overview' => 'My Institutions Overview',
     'global_dashboard' => 'Global Dashboard',
-    'global_view' => 'Global View',
     'my_schools' => 'My Schools',
     'total_students' => 'Total Students',
     'total_staff' => 'Total Staff',
     'active_schools' => 'Active Schools',
     'financial_overview' => 'Financial Overview (All Schools)',
     'total_invoiced' => 'Total Invoiced',
-    
     'recent_activity' => 'Recent Activity',
     'actions' => 'Actions',
     'system_actions_desc' => 'System actions recorded in last 24h across your schools.',
     'view_logs' => 'View Logs',
-    
     'my_institutions_list' => 'My Institutions',
     'name' => 'Name',
     'code' => 'Code',
@@ -147,7 +160,6 @@ return [
     'status' => 'Status',
     'active' => 'Active',
     'inactive' => 'Inactive',
-    
     'add_new_school' => 'Add New School',
     'switch_dashboard' => 'Switch Dashboard',
     'edit' => 'Edit',

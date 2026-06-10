@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Institution;
 use App\Services\NotificationService;
 use App\Enums\RoleEnum;
+use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
 use Yajra\DataTables\Facades\DataTables;
@@ -19,6 +20,7 @@ class HeadOfficersController extends BaseController
     public function __construct(NotificationService $notificationService)
     {
         $this->middleware('auth');
+        $this->middleware(RoleMiddleware::class . ':Super Admin');
         $this->notificationService = $notificationService;
     }
 

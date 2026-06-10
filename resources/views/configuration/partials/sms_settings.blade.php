@@ -2,9 +2,16 @@
     if (!isset($isSuperAdmin)) {
         $isSuperAdmin = auth()->user()->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value) && is_null($institutionId);
     }
+
+    $isSuperAdminUser = auth()->user()->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value);
     
-    $smsProvider = $settings['sms_provider'] ?? 'system';
-    $waProvider = $settings['whatsapp_provider'] ?? 'system';
+    if ($isSuperAdmin) {
+        $smsProvider = $settings['sms_provider'] ?? config('sms.default', 'mobishastra');
+        $waProvider = $settings['whatsapp_provider'] ?? config('sms.whatsapp_default', 'meta');
+    } else {
+        $smsProvider = $settings['sms_provider'] ?? 'system';
+        $waProvider = $settings['whatsapp_provider'] ?? 'system';
+    }
     
     $allowedSms = $allowedSms ?? [];
     $allowedWa = $allowedWa ?? [];
@@ -18,6 +25,14 @@
         @endif
     </div>
     <div class="card-body">
+        @if($isSuperAdminUser && !$isSuperAdmin)
+            <div class="alert alert-warning border-warning mb-4">
+                <i class="fa fa-globe me-2"></i>
+                <strong>{{ __('configuration.global_view_required_title') }}</strong>
+                {{ __('configuration.global_view_required_body') }}
+            </div>
+        @endif
+
         <form action="{{ route('configuration.sms.update') }}" method="POST" id="smsSettingsForm">
             @csrf
             
@@ -25,6 +40,7 @@
             @if($isSuperAdmin)
                 <div class="alert alert-soft-primary border-primary border-opacity-25 mb-5 p-4 rounded-3">
                     <h5 class="text-primary fw-bold mb-3"><i class="fa fa-shield me-2"></i> {{ __('configuration.provider_control_title') }}</h5>
+                    <p class="text-muted small mb-3">{{ __('configuration.system_default_env_override_help') }}</p>
                     
                     <div class="row g-4">
                         <div class="col-md-6">

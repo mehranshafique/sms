@@ -15,29 +15,7 @@ class LoadInstitutionSettings
     {
         if (Auth::check()) {
             $user = Auth::user();
-            $institutionId = null;
-
-            // 1. Determine Active Institution ID (Logic mirrored from BaseController)
-            if ($user->institute_id) {
-                // Locked User (Staff/Student)
-                $institutionId = $user->institute_id;
-            } else {
-                // Multi-Institute User (Super Admin / Head Officer)
-                $institutionId = session('active_institution_id');
-                
-                // Fallback if no session set
-                if (!$institutionId) {
-                    if ($user->institutes && $user->institutes->count() > 0) {
-                        $institutionId = $user->institutes->first()->id;
-                        session(['active_institution_id' => $institutionId]);
-                    } elseif ($user->hasRole('Super Admin')) {
-                        // If Super Admin hasn't selected context, pick first active or allow null (Global)
-                        $firstInst = Institution::where('is_active', true)->first();
-                        $institutionId = $firstInst ? $firstInst->id : null;
-                        if($institutionId) session(['active_institution_id' => $institutionId]);
-                    }
-                }
-            }
+            $institutionId = $this->resolveInstitutionId($user);
 
             // 2. Apply Settings if ID found
             if ($institutionId) {
@@ -69,6 +47,9 @@ class LoadInstitutionSettings
                     }
                 }
 
+                // B2. Apply Currency Configuration
+                app(\App\Services\CurrencyService::class)->applyToConfig($institutionId);
+
                 // C. Share Enabled Modules with Views (Sidebar)
                 $rawModules = $settings['enabled_modules'] ?? '[]';
                 $enabledModules = json_decode($rawModules, true);
@@ -87,5 +68,41 @@ class LoadInstitutionSettings
         }
 
         return $next($request);
+    }
+
+    /**
+     * Resolve active institution as int|null (mirrors BaseController).
+     */
+    private function resolveInstitutionId($user): ?int
+    {
+        if ($user->institute_id) {
+            return (int) $user->institute_id;
+        }
+
+        $activeId = session('active_institution_id');
+
+        if (($activeId === 'global' || $activeId === 0 || $activeId === '0') && $user->hasRole('Super Admin')) {
+            return null;
+        }
+
+        if ($activeId !== null && $activeId !== '' && is_numeric($activeId)) {
+            return (int) $activeId;
+        }
+
+        if ($user->institutes && $user->institutes->count() > 0) {
+            $id = (int) $user->institutes->first()->id;
+            session(['active_institution_id' => $id]);
+            return $id;
+        }
+
+        if ($user->hasRole('Super Admin')) {
+            $firstInst = Institution::where('is_active', true)->first();
+            if ($firstInst) {
+                session(['active_institution_id' => $firstInst->id]);
+                return (int) $firstInst->id;
+            }
+        }
+
+        return null;
     }
 }

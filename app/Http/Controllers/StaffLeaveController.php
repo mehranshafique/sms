@@ -112,22 +112,30 @@ class StaffLeaveController extends BaseController
         
         if(!$targetStaffId) abort(403, 'Staff profile not found.');
 
+        if ($isAdmin) {
+            Staff::where('institution_id', $institutionId)->findOrFail($targetStaffId);
+        }
+
         $path = null;
         if($request->hasFile('attachment')) {
             $path = $request->file('attachment')->store('leaves', 'public');
         }
 
-        StaffLeave::create([
+        $leave = StaffLeave::create([
             'institution_id' => $institutionId,
             'staff_id' => $targetStaffId,
             'type' => $request->type,
             'reason' => $request->reason,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'status' => $isAdmin ? 'approved' : 'pending', // Auto-approve if admin created
+            'status' => $isAdmin ? 'approved' : 'pending',
             'action_by' => $isAdmin ? $user->id : null,
             'file_path' => $path
         ]);
+
+        if ($leave->status === 'pending') {
+            app(\App\Services\InAppNotificationService::class)->notifyStaffLeaveSubmitted($leave);
+        }
 
         return redirect()->route('staff-leaves.index')->with('success', __('staff_leave.success_create'));
     }
@@ -147,20 +155,41 @@ class StaffLeaveController extends BaseController
             return response()->json(['message' => __('staff_leave.unauthorized')], 403);
         }
 
-        $leave = StaffLeave::findOrFail($id);
+        $institutionId = $this->getInstitutionId();
+        $leave = StaffLeave::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->findOrFail($id);
         $leave->update([
             'status' => $request->status,
             'action_by' => $user->id,
             'admin_remarks' => $request->remarks
         ]);
 
+        app(\App\Services\InAppNotificationService::class)->notifyStaffLeaveUpdated($leave);
+
         return response()->json(['message' => __('staff_leave.success_update')]);
     }
 
     public function destroy($id)
     {
-        $leave = StaffLeave::findOrFail($id);
-        // Add ownership check here
+        $institutionId = $this->getInstitutionId();
+        $user = Auth::user();
+        $leave = StaffLeave::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->findOrFail($id);
+
+        $isAdmin = $user->hasRole([
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+        ]);
+
+        if (!$isAdmin && ($user->staff->id ?? null) !== $leave->staff_id) {
+            abort(403);
+        }
+
+        if (!$isAdmin && $leave->status !== 'pending') {
+            abort(403);
+        }
+
         if($leave->file_path) Storage::disk('public')->delete($leave->file_path);
         $leave->delete();
         return response()->json(['message' => __('staff_leave.success_delete')]);

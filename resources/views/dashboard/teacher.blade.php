@@ -65,7 +65,7 @@
             <div class="col-xl-8">
                 <div class="card">
                     <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.my_timetable') }} ({{ date('l') }})</h4>
+                        <h4 class="card-title">{{ __('dashboard.my_timetable') }} ({{ now()->translatedFormat('l') }})</h4>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -111,7 +111,7 @@
                             </span>
                             <div class="media-body">
                                 <h3 class="text-white">{{ __('dashboard.communication') }}</h3>
-                                <p class="mb-0 text-white opacity-75">Send SMS/Email to Parents</p>
+                                <p class="mb-0 text-white opacity-75">{{ __('dashboard.send_sms_email_parents') }}</p>
                             </div>
                         </div>
                         <a href="#" class="btn btn-light btn-sm mt-3 w-100 text-secondary fw-bold">{{ __('dashboard.open_center') }}</a>

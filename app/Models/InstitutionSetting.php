@@ -23,6 +23,19 @@ class InstitutionSetting extends Model
     }
 
     /**
+     * Resolve the platform-wide provider used when a school selects "System Default".
+     */
+    public static function resolveSystemProvider(string $channel): string
+    {
+        $key = $channel === 'whatsapp' ? 'whatsapp_provider' : 'sms_provider';
+        $fallback = $channel === 'whatsapp'
+            ? config('sms.whatsapp_default', 'meta')
+            : config('sms.default', 'mobishastra');
+
+        return self::get(null, $key, $fallback);
+    }
+
+    /**
      * Helper to set a setting value.
      */
     public static function set($institutionId, $key, $value, $group = 'general')

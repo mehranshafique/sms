@@ -148,6 +148,10 @@ class StudentRequestController extends BaseController
 
         $institutionId = $this->getInstitutionId();
         $studentId = $isAdmin ? $request->student_id : ($user->student->id ?? null);
+
+        if ($isAdmin && $studentId) {
+            Student::where('institution_id', $institutionId)->findOrFail($studentId);
+        }
         
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         
@@ -156,7 +160,7 @@ class StudentRequestController extends BaseController
             $path = $request->file('attachment')->store('requests', 'public');
         }
 
-        StudentRequest::create([
+        $createdRequest = StudentRequest::create([
             'institution_id' => $institutionId,
             'student_id' => $studentId,
             'academic_session_id' => $session ? $session->id : null,
@@ -171,6 +175,10 @@ class StudentRequestController extends BaseController
             'approved_at' => $isAdmin ? now() : null,
             'file_path' => $path
         ]);
+
+        if ($createdRequest->status === 'pending') {
+            app(\App\Services\InAppNotificationService::class)->notifyStudentRequestSubmitted($createdRequest);
+        }
 
         return redirect()->route('requests.index')->with('success', __('requests.success_create'));
     }
@@ -215,6 +223,7 @@ class StudentRequestController extends BaseController
 
         try {
             $this->notifyParent($studentRequest);
+            app(\App\Services\InAppNotificationService::class)->notifyStudentRequestUpdated($studentRequest);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Request Notification Error: " . $e->getMessage());
         }
@@ -224,7 +233,28 @@ class StudentRequestController extends BaseController
 
     public function destroy($id)
     {
-        $req = StudentRequest::findOrFail($id);
+        $institutionId = $this->getInstitutionId();
+        $user = Auth::user();
+
+        $req = StudentRequest::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->findOrFail($id);
+
+        $isAdmin = $user->hasRole([
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+        ]);
+
+        if (!$isAdmin) {
+            $studentId = $user->student->id ?? null;
+            if (!$studentId || (int) $req->student_id !== (int) $studentId) {
+                abort(403);
+            }
+            if ($req->status !== 'pending') {
+                abort(403);
+            }
+        }
+
         $req->delete();
         return response()->json(['message' => __('requests.success_delete') ?? 'Deleted']);
     }

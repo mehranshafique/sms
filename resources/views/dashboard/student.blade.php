@@ -12,8 +12,8 @@
                         <div class="d-flex align-items-center">
                             <i class="fa fa-exclamation-triangle me-2 fs-20"></i>
                             <div>
-                                <h5 class="text-white mb-1">Profile Not Found</h5>
-                                <p class="mb-0 fs-13">{{ $error ?? 'Your user account is not linked to a student profile. Please contact the administrator.' }}</p>
+                                <h5 class="text-white mb-1">{{ __('dashboard.profile_not_found') }}</h5>
+                                <p class="mb-0 fs-13">{{ $error ?? __('dashboard.no_student_profile') }}</p>
                             </div>
                         </div>
                     </div>
@@ -42,8 +42,8 @@
                                 </span>
                                 <div>
                                     <p class="mb-0 fs-12 text-muted">{{ __('dashboard.my_fees') }}</p>
-                                    <h5 class="mb-0 text-dark">${{ number_format($paidFees ?? 0, 2) }} <small class="text-muted fs-10">Paid</small></h5>
-                                    <small class="text-muted fs-11">Rest: ${{ number_format($unpaidInvoices ?? 0, 2) }}</small>
+                                    <h5 class="mb-0 text-dark">{{ \App\Enums\CurrencySymbol::default() }}{{ number_format($paidFees ?? 0, 2) }} <small class="text-muted fs-10">{{ __('dashboard.paid') }}</small></h5>
+                                    <small class="text-muted fs-11">{{ __('dashboard.rest') }}: {{ \App\Enums\CurrencySymbol::default() }}{{ number_format($unpaidInvoices ?? 0, 2) }}</small>
                                 </div>
                             </div>
                         </div>
@@ -110,7 +110,7 @@
                                             <tr>
                                                 <td class="fs-12">{{ $class->start_time->format('H:i') }} - {{ $class->end_time->format('H:i') }}</td>
                                                 <td class="fs-12 fw-bold">{{ $class->subject->name }}</td>
-                                                <td class="fs-12">{{ $class->teacher->user->name ?? 'N/A' }}</td>
+                                                <td class="fs-12">{{ $class->teacher->user->name ?? __('dashboard.not_available') }}</td>
                                                 <td class="fs-12">{{ $class->room_number ?? '-' }}</td>
                                             </tr>
                                         @empty

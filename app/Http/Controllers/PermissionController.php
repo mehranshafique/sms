@@ -6,14 +6,14 @@ use Illuminate\Http\Request;
 use Spatie\Permission\Models\Permission;
 use App\Models\Module;
 use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
 
 class PermissionController extends BaseController
 {
     public function __construct()
     {
         $this->setPageTitle(__('roles.permissions_page_title'));
-        // Using Spatie Middleware for granular control if Policy not generated
-        // $this->middleware('permission:permission.view')->only('index');
+        $this->middleware(RoleMiddleware::class . ':Super Admin')->only(['store', 'update', 'destroy']);
     }
 
     public function index($moduleId)

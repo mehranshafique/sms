@@ -36,6 +36,7 @@ class ModuleController extends BaseController
 
     public function edit(Module $module)
     {
+        authorize('module.view');
         return response()->json($module);
     }
 

@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\InstitutionSetting;
 use App\Models\Module;
 use App\Services\Sms\GatewayFactory;
+use App\Services\SystemCommunicationConfigService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
@@ -199,6 +200,11 @@ class ConfigurationController extends BaseController
         if (Auth::user()->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value)) {
             $this->saveSetting($institutionId, 'chatbot_free_interactions', $request->chatbot_free_interactions ?? '0');
         }
+
+        if ($isSuperAdmin) {
+            app(SystemCommunicationConfigService::class)->applyGlobalOverrides();
+        }
+
         return response()->json(['message' => __('configuration.sms_settings_updated')]);
     }
 

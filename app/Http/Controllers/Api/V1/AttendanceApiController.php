@@ -31,8 +31,8 @@ class AttendanceApiController extends Controller
 
     public function store(Request $request)
     {
-        if ($request->header('X-Hardware-Secret') !== env('HARDWARE_SECRET')) {
-            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
+        if ($denied = $this->denyInvalidHardware($request)) {
+            return $denied;
         }
 
         $request->validate([
@@ -61,13 +61,61 @@ class AttendanceApiController extends Controller
     }
 
     /**
+     * Bulk attendance scan (offline sync from hardware terminals).
+     */
+    public function bulkStore(Request $request)
+    {
+        if ($denied = $this->denyInvalidHardware($request)) {
+            return $denied;
+        }
+
+        $request->validate([
+            'scans' => 'required|array|min:1|max:500',
+            'scans.*.uid' => 'required|string',
+            'scans.*.timestamp' => 'nullable|date',
+            'scans.*.method' => 'nullable|string',
+            'scans.*.purpose' => 'nullable|string',
+            'device_id' => 'nullable|string',
+        ]);
+
+        $results = [];
+
+        foreach ($request->scans as $index => $scan) {
+            $single = new Request(array_merge($scan, [
+                'device_id' => $scan['device_id'] ?? $request->device_id,
+            ]));
+            $single->headers->replace($request->headers->all());
+
+            $response = $this->store($single);
+            $body = json_decode($response->getContent(), true);
+
+            $results[] = [
+                'index' => $index,
+                'uid' => $scan['uid'],
+                'success' => $response->getStatusCode() < 400,
+                'response' => $body,
+            ];
+        }
+
+        $successCount = collect($results)->where('success', true)->count();
+
+        return response()->json([
+            'success' => true,
+            'processed' => count($results),
+            'succeeded' => $successCount,
+            'failed' => count($results) - $successCount,
+            'results' => $results,
+        ]);
+    }
+
+    /**
      * Fetch Today's Attendance List for the POS/Mobile App
      * SCOPED: Students only see their own. Parents see kids. Teachers see their classes.
      */
     public function getTodayScans(Request $request)
     {
         $user = Auth::guard('sanctum')->user() ?? Auth::user();
-        $isHardware = $request->header('X-Hardware-Secret') === env('HARDWARE_SECRET');
+        $isHardware = $this->isValidHardwareRequest($request);
 
         if (!$user && !$isHardware) {
             return response()->json(['message' => 'Unauthorized Access'], 401);
@@ -79,8 +127,14 @@ class AttendanceApiController extends Controller
             ->where('attendance_date', $today)
             ->latest('updated_at');
 
+        if ($isHardware) {
+            $institutionId = $request->header('X-Institution-Id');
+            if (!$institutionId) {
+                return response()->json(['message' => 'X-Institution-Id header required'], 400);
+            }
+            $query->where('institution_id', $institutionId);
+        } elseif ($user) {
         // --- SMART SCOPING BASED ON USER ROLE ---
-        if ($user && !$isHardware) {
             // STRICT CHECK: Safely checks roles AND relationships
             if ($user->hasRole('Student') || $user->student) {
                 // Students only see themselves
@@ -140,22 +194,13 @@ class AttendanceApiController extends Controller
         
         $possibleUids = $this->getPossibleUids($uid);
 
-        $student = Student::with('parent', 'institution')
-            ->whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids) 
-            ->orWhereIn('qr_code_token', $possibleUids)
-            ->orWhereIn('admission_number', $possibleUids)
-            ->first();
+        $student = $this->findStudentByScanUids($possibleUids);
 
         if ($student) {
             return $this->processStudentAttendance($student, $date, $time, $scanTime, $method);
         }
 
-        $staff = Staff::with('user', 'institution')
-            ->whereIn('nfc_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)
-            ->orWhereIn('employee_id', $possibleUids) 
-            ->first();
+        $staff = $this->findStaffByScanUids($possibleUids);
 
         if ($staff) {
             return $this->processStaffAttendance($staff, $date, $time, $scanTime, $method);
@@ -343,14 +388,13 @@ class AttendanceApiController extends Controller
     {
         $possibleUids = $this->getPossibleUids($uid);
 
-        $student = Student::with(['enrollments.classSection'])->whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)
-            ->orWhereIn('admission_number', $possibleUids)
-            ->first();
+        $student = $this->findStudentByScanUids($possibleUids);
         
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student Card Not Found.'], 404);
         }
+
+        $student->load(['enrollments.classSection']);
 
         $invoices = Invoice::where('student_id', $student->id)->get();
         $unpaidInvoices = $invoices->whereIn('status', ['unpaid', 'partial', 'overdue']);
@@ -432,10 +476,7 @@ class AttendanceApiController extends Controller
             ]);
         }
 
-        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)
-            ->orWhereIn('admission_number', $possibleUids)
-            ->first();
+        $student = $this->findStudentByScanUids($possibleUids);
 
         if ($student) {
             $pickup = StudentPickup::create([
@@ -468,10 +509,7 @@ class AttendanceApiController extends Controller
     {
         $possibleUids = $this->getPossibleUids($uid);
 
-        $student = Student::whereIn('nfc_tag_uid', $possibleUids)
-            ->orWhereIn('rfid_uid', $possibleUids)
-            ->orWhereIn('admission_number', $possibleUids)
-            ->first();
+        $student = $this->findStudentByScanUids($possibleUids);
 
         if (!$student) return response()->json(['success' => false, 'message' => 'Student Not Found.'], 404);
 
@@ -497,7 +535,9 @@ class AttendanceApiController extends Controller
         
         $records = ExamRecord::with(['subject', 'exam.academicSession'])
             ->where('student_id', $student->id)
-            ->whereHas('exam', fn($q) => $q->where('academic_session_id', $session->id ?? 0))
+            ->whereHas('exam', fn ($q) => $q
+                ->where('academic_session_id', $session->id ?? 0)
+                ->where('status', 'published'))
             ->latest('updated_at')
             ->get(); 
 
@@ -627,7 +667,7 @@ class AttendanceApiController extends Controller
         
         $institution = $user->institute;
         $instType = $institution ? $institution->type : 'primary';
-        $isSubjectWise = in_array($instType, ['university', 'vocational']);
+        $isSubjectWise = in_array(is_object($instType) ? $instType->value : $instType, ['university', 'vocational', 'lmd']);
         
         $allAssignedClassIds = [];
         
@@ -659,7 +699,6 @@ class AttendanceApiController extends Controller
             return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
         }
 
-        // ADDED: ->with('gradeLevel') to eager load the grade
         $sectionsQuery = \App\Models\ClassSection::with('gradeLevel')->where('is_active', true)
             ->whereIn('id', $allAssignedClassIds);
             
@@ -676,7 +715,7 @@ class AttendanceApiController extends Controller
         $session = $currentSession->first();
         $sessionId = $session ? $session->id : null;
 
-        // Number of days to fetch backward
+        // Fetch backward a specific number of days
         $daysToFetch = (int) $request->input('days', 3); 
         $dates = [];
         for ($i = 0; $i < $daysToFetch; $i++) {
@@ -685,6 +724,7 @@ class AttendanceApiController extends Controller
 
         $report = [];
 
+        // FIXED LOGIC: Wrap the sections loop inside the dates loop
         foreach ($dates as $date) {
             $dateObj = \Carbon\Carbon::parse($date);
             $isToday = $dateObj->isToday();
@@ -749,6 +789,7 @@ class AttendanceApiController extends Controller
                 }
             }
 
+            // CRITICAL FIX: Append the populated daily groupings to the main report array 
             if (!empty($daySections)) {
                 $report[] = [
                     'date' => $date,
@@ -763,6 +804,50 @@ class AttendanceApiController extends Controller
             'success' => true,
             'data' => $report
         ]);
+    }
+
+    private function denyInvalidHardware(Request $request): ?\Illuminate\Http\JsonResponse
+    {
+        $secret = config('services.hardware.secret', env('HARDWARE_SECRET'));
+        if (empty($secret)) {
+            Log::critical('HARDWARE_SECRET is not configured — hardware API disabled');
+            return response()->json(['message' => 'Hardware API is disabled'], 503);
+        }
+
+        $provided = (string) $request->header('X-Hardware-Secret', '');
+        if (!hash_equals($secret, $provided)) {
+            return response()->json(['message' => 'Unauthorized Hardware Device'], 401);
+        }
+
+        return null;
+    }
+
+    private function isValidHardwareRequest(Request $request): bool
+    {
+        return $this->denyInvalidHardware($request) === null;
+    }
+
+    private function findStudentByScanUids(array $possibleUids): ?Student
+    {
+        return Student::with('parent', 'institution')
+            ->where(function ($q) use ($possibleUids) {
+                $q->whereIn('nfc_tag_uid', $possibleUids)
+                    ->orWhereIn('rfid_uid', $possibleUids)
+                    ->orWhereIn('qr_code_token', $possibleUids)
+                    ->orWhereIn('admission_number', $possibleUids);
+            })
+            ->first();
+    }
+
+    private function findStaffByScanUids(array $possibleUids): ?Staff
+    {
+        return Staff::with('user', 'institution')
+            ->where(function ($q) use ($possibleUids) {
+                $q->whereIn('nfc_uid', $possibleUids)
+                    ->orWhereIn('rfid_uid', $possibleUids)
+                    ->orWhereIn('employee_id', $possibleUids);
+            })
+            ->first();
     }
 
     private function getPossibleUids($uid)

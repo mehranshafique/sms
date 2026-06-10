@@ -287,7 +287,9 @@ class BudgetController extends BaseController
             'description' => 'nullable|string'
         ]);
 
-        $budget = Budget::findOrFail($request->budget_id);
+        $institutionId = $this->getInstitutionId();
+        $budget = Budget::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->findOrFail($request->budget_id);
         $institutionId = $budget->institution_id;
         
         // Check Balance
@@ -319,6 +321,8 @@ class BudgetController extends BaseController
         if ($phone) {
             $this->notificationService->sendFundRequestConfirmation($fundRequest, $phone, $user->name, $institutionId);
         }
+
+        app(\App\Services\InAppNotificationService::class)->notifyFundRequestSubmitted($fundRequest);
 
         if($request->ajax() || $request->wantsJson()) {
             return response()->json(['message' => __('budget.success_request_submitted')]);
@@ -383,7 +387,9 @@ class BudgetController extends BaseController
              abort(403);
         }
 
-        $fundRequest = FundRequest::findOrFail($id);
+        $institutionId = $this->getInstitutionId();
+        $fundRequest = FundRequest::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->findOrFail($id);
         if($fundRequest->status != 'pending') abort(403, __('budget.request_already_processed') ?? 'Request already processed');
 
         DB::transaction(function() use ($fundRequest, $request) {
@@ -407,6 +413,7 @@ class BudgetController extends BaseController
         // Prepare and trigger the Notification explicitly in the controller as requested
         try {
             $this->notificationService->sendFundRequestProcessedNotification($fundRequest, $fundRequest->institution_id);
+            app(\App\Services\InAppNotificationService::class)->notifyFundRequestProcessed($fundRequest);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Budget Notification Error: " . $e->getMessage());
         }

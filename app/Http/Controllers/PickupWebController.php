@@ -234,6 +234,7 @@ class PickupWebController extends BaseController
 
         // Notify Teacher
         $this->notifyTeacher($pickup);
+        app(\App\Services\InAppNotificationService::class)->notifyPickupScanned($pickup);
 
         return response()->json([
             'success' => true,
@@ -251,9 +252,22 @@ class PickupWebController extends BaseController
      */
     public function updateStatus(Request $request, $id)
     {
+        $user = Auth::user();
+        if (!$user->hasRole([
+            RoleEnum::TEACHER->value,
+            RoleEnum::STAFF->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SUPER_ADMIN->value,
+        ])) {
+            abort(403);
+        }
+
         $request->validate(['status' => 'required|in:approved,rejected']);
-        
-        $pickup = StudentPickup::findOrFail($id);
+
+        $institutionId = $this->getInstitutionId();
+        $pickup = StudentPickup::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->findOrFail($id);
         
         if($pickup->status !== 'scanned') {
             return response()->json(['message' => __('pickup.not_waiting')], 400);
@@ -264,6 +278,8 @@ class PickupWebController extends BaseController
             'approved_by' => Auth::id(),
             'approved_at' => now()
         ]);
+
+        app(\App\Services\InAppNotificationService::class)->notifyPickupStatusUpdated($pickup);
 
         return response()->json(['message' => __('pickup.updated_success')]);
     }

@@ -28,6 +28,7 @@ return [
     'modules' => 'Modules',
     'recharging' => 'Recharging',
     'sms_templates' => 'SMS Templates', 
+    'currency' => 'Currency',
     
     'tracking' => 'Tracking',
     'audit_log' => 'Audit Log',

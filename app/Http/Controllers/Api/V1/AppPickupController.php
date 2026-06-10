@@ -151,11 +151,19 @@ class AppPickupController extends Controller
     {
         $request->validate(['student_id' => 'required']);
         $user = Auth::user();
-        
-        // Match either DB ID or Admission Number
+
+        $allowedRoles = ['Guardian', 'Super Admin', 'School Admin', 'Head Officer', 'Teacher', 'Staff'];
+        if (!$user->hasRole($allowedRoles)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $student = \App\Models\Student::where('id', $request->student_id)
             ->orWhere('admission_number', $request->student_id)
             ->firstOrFail();
+
+        if (!$this->userCanAccessStudent($user, $student)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
         
         // Generate 6 digit OTP
         $otp = rand(100000, 999999);
@@ -191,6 +199,10 @@ class AppPickupController extends Controller
         }
         
         $student = \App\Models\Student::findOrFail($request->student_id);
+
+        if (!$this->userCanAccessStudent(Auth::user(), $student)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
         
         // Move to queue
         $pickup = StudentPickup::create([
@@ -229,7 +241,10 @@ class AppPickupController extends Controller
         $canApprove = false;
         
         if ($user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])) {
-            $canApprove = true; // Admins can approve anyone
+            if (!$this->userCanAccessPickupInstitution($user, (int) $pickup->institution_id)) {
+                return response()->json(['success' => false, 'message' => 'pickup_unauthorized'], 403);
+            }
+            $canApprove = true;
         } elseif ($user->hasRole('Teacher')) {
             if ($user->staff) {
                 $staffId = $user->staff->id;
@@ -297,5 +312,38 @@ class AppPickupController extends Controller
                 ['pickup_id' => $pickupId, 'type' => 'pickup_approved']
             );
         }
+    }
+
+    private function userCanAccessPickupInstitution($user, int $pickupInstitutionId): bool
+    {
+        if ($user->hasRole('Super Admin')) {
+            return true;
+        }
+
+        $allowedIds = array_filter(array_unique(array_merge(
+            [$user->institute_id],
+            $user->institutes?->pluck('id')->toArray() ?? []
+        )));
+
+        return in_array($pickupInstitutionId, $allowedIds, true);
+    }
+
+    private function userCanAccessStudent($user, \App\Models\Student $student): bool
+    {
+        if ($user->hasRole('Super Admin')) {
+            return true;
+        }
+
+        if (!$this->userCanAccessPickupInstitution($user, (int) $student->institution_id)) {
+            return false;
+        }
+
+        if ($user->hasRole('Guardian')) {
+            $parent = \App\Models\StudentParent::where('user_id', $user->id)->first();
+
+            return $parent && (int) $student->parent_id === (int) $parent->id;
+        }
+
+        return $user->hasRole(['School Admin', 'Head Officer', 'Teacher', 'Staff']);
     }
 }

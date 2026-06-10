@@ -17,6 +17,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Currency (overridden per institution via Currency module)
+    |--------------------------------------------------------------------------
+    */
+    'currency_code' => env('APP_CURRENCY_CODE', 'USD'),
+    'currency_symbol' => env('APP_CURRENCY_SYMBOL', '$'),
+    'currency_position' => env('APP_CURRENCY_POSITION', 'before'),
+    'currency_decimals' => (int) env('APP_CURRENCY_DECIMALS', 2),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
