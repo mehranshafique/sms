@@ -11,6 +11,10 @@ use App\Http\Controllers\Api\V1\AttendanceApiController;
 use App\Http\Controllers\Api\V1\AppPickupController;
 use App\Http\Controllers\Api\V1\PickupScanController;
 use App\Http\Controllers\Api\V1\UserProfileApiController;
+use App\Http\Controllers\Api\V1\MobileContextApiController;
+use App\Http\Controllers\Api\V1\TimetableApiController;
+use App\Http\Controllers\Api\V1\TeacherAttendanceApiController;
+use App\Http\Controllers\Api\V1\MobileLookupApiController;
 use App\Http\Controllers\Api\V1\StudentPortalApiController;
 
 // Chatbot
@@ -31,9 +35,13 @@ use App\Http\Controllers\Api\V1\Chatbot\PickupController as ChatbotPickupControl
 |--------------------------------------------------------------------------
 */
 
-// --- MOBILE APP AUTH ---
+// --- MOBILE APP AUTH & CONTEXT ---
 Route::post('/v1/login', [AuthApiController::class, 'login']);
-Route::middleware('auth:sanctum')->post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/v1/logout', [MobileContextApiController::class, 'logout']);
+    Route::get('/v1/me/context', [MobileContextApiController::class, 'context']);
+    Route::post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']);
+});
 
 // --- USER PROFILE ---
 Route::middleware('auth:sanctum')->prefix('v1/profile')->group(function () {
@@ -80,8 +88,29 @@ Route::prefix('v1/student')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/fees', [StudentPortalApiController::class, 'getFees']);
     Route::get('/homework', [StudentPortalApiController::class, 'getHomework']);
     Route::get('/results', [StudentPortalApiController::class, 'getResults']);
+    Route::get('/requests', [StudentPortalApiController::class, 'getRequests']);
     Route::post('/gate-pass', [StudentPortalApiController::class, 'generateGatePass']);
     Route::post('/requests', [StudentPortalApiController::class, 'submitRequest']);
+});
+
+// --- TIMETABLE ---
+Route::prefix('v1/timetable')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/today', [TimetableApiController::class, 'today']);
+    Route::get('/week', [TimetableApiController::class, 'week']);
+});
+
+// --- TEACHER MANUAL ATTENDANCE ---
+Route::prefix('v1/teacher/attendance')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/classes', [TeacherAttendanceApiController::class, 'classes']);
+    Route::get('/classes/{classSectionId}/subjects', [TeacherAttendanceApiController::class, 'subjects']);
+    Route::get('/roster', [TeacherAttendanceApiController::class, 'roster']);
+    Route::post('/mark', [TeacherAttendanceApiController::class, 'mark']);
+});
+
+// --- NOTICES & STAFF LOOKUP ---
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/v1/notices', [MobileLookupApiController::class, 'notices']);
+    Route::get('/v1/staff/fee-lookup', [MobileLookupApiController::class, 'feeLookup']);
 });
 
 // --- CHATBOT WEBHOOKS (public — provider callbacks) ---

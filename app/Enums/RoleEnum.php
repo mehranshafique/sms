@@ -11,4 +11,5 @@ enum RoleEnum: string
     case STUDENT = 'Student';
     case GUARDIAN = 'Guardian'; // Added Guardian Role
     case STAFF = 'Staff';       // Ensure Staff is also present if used
+    case GATE_ATTENDANT = 'Gate Attendant';
 }

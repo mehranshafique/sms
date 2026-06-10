@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\StaffLeave;
 use App\Models\StudentPickup;
 use App\Models\StudentRequest;
+use App\Models\StudentEnrollment;
 use App\Models\User;
 use App\Enums\RoleEnum;
 use Illuminate\Support\Collection;
@@ -489,6 +490,59 @@ class InAppNotificationService
             route('pickups.teacher'),
             'fa-qrcode',
             ['pickup_id' => $pickup->id]
+        );
+    }
+
+    /**
+     * Notify the student's class teacher (in-app + FCM push) when a parent scans at the gate.
+     */
+    public function notifyClassTeacherPickup(StudentPickup $pickup): void
+    {
+        $pickup->loadMissing('student');
+
+        $enrollment = StudentEnrollment::with(['classSection.classTeacher.user'])
+            ->where('student_id', $pickup->student_id)
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+
+        $teacherUser = $enrollment?->classSection?->classTeacher?->user;
+        if (!$teacherUser) {
+            return;
+        }
+
+        $eventKey = self::EVENT_KEYS['pickup_scan'];
+        $studentName = $pickup->student?->full_name ?? '';
+        $title = __('header.notif_pickup_scan_title');
+        if ($title === 'header.notif_pickup_scan_title') {
+            $title = 'Parent at Gate';
+        }
+        $message = __('header.notif_pickup_scan_message', ['student' => $studentName]);
+        if ($message === 'header.notif_pickup_scan_message') {
+            $message = "{$studentName}'s parent is waiting at the gate for pickup.";
+        }
+
+        $this->notifyUser(
+            $teacherUser,
+            $eventKey,
+            'pickup',
+            $title,
+            $message,
+            route('pickups.teacher'),
+            $pickup->institution_id,
+            'fa-qrcode',
+            ['pickup_id' => $pickup->id, 'student_id' => $pickup->student_id]
+        );
+
+        app(NotificationService::class)->sendPushNotification(
+            $teacherUser->id,
+            $title,
+            $message,
+            [
+                'pickup_id' => (string) $pickup->id,
+                'type' => 'pickup_requested',
+                'student_id' => (string) $pickup->student_id,
+            ]
         );
     }
 

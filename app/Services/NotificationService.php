@@ -368,7 +368,7 @@ class NotificationService
             $message = str_replace('{' . $key . '}', $value, $message);
         }
         
-        $isUnlimited = in_array($eventKey, $this->unlimitedGlobalEvents);
+        $isUnlimited = $this->preferences->isCreditExemptEvent($eventKey);
 
         return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel);
     }

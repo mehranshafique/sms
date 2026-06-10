@@ -6,9 +6,14 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Services\Mobile\MobileContextService;
 
 class AuthApiController extends Controller
 {
+    public function __construct(
+        protected MobileContextService $contextService
+    ) {}
+
     /**
      * Mobile App Staff Login
      */
@@ -60,6 +65,10 @@ class AuthApiController extends Controller
         $institution = $user->institute;
         $schoolName = $institution ? $institution->name : 'Digitex';
         $schoolLogo = ($institution && $institution->logo) ? asset('storage/' . $institution->logo) : null;
+        $institutionType = $institution
+            ? (is_object($institution->type) ? $institution->type->value : $institution->type)
+            : null;
+        $context = $this->contextService->build($user);
 
         return response()->json([
             'success' => true,
@@ -68,8 +77,12 @@ class AuthApiController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $roleName, // Now guaranteed to say 'Student' if they are a student
+                'role' => $roleName,
+                'roles' => $context['roles'],
                 'institution_id' => $user->institute_id,
+                'institution_type' => $institutionType,
+                'is_subject_wise' => $context['is_subject_wise'],
+                'capabilities' => $context['capabilities'],
                 'school_name' => $schoolName,
                 'school_logo' => $schoolLogo,
             ]

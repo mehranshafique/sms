@@ -15,6 +15,7 @@ use App\Models\InstitutionSetting;
 use App\Models\ExamRecord;
 use App\Models\Invoice;
 use App\Services\NotificationService;
+use App\Services\InAppNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -22,11 +23,15 @@ use Illuminate\Support\Facades\Auth;
 
 class AttendanceApiController extends Controller
 {
-    protected $notificationService;
+    protected NotificationService $notificationService;
+    protected InAppNotificationService $inAppNotifications;
 
-    public function __construct(NotificationService $notificationService)
-    {
+    public function __construct(
+        NotificationService $notificationService,
+        InAppNotificationService $inAppNotifications
+    ) {
         $this->notificationService = $notificationService;
+        $this->inAppNotifications = $inAppNotifications;
     }
 
     public function store(Request $request)
@@ -351,12 +356,14 @@ class AttendanceApiController extends Controller
 
         return response()->json([
             'status' => 'success',
+            'success' => true,
             'action' => $action,
             'type' => 'staff',
             'name' => optional($staff->user)->name ?? 'Staff Member',
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
             'ui_color' => $status === 'late' ? '#F59E0B' : '#10B981',
+            'message' => ($action === 'arrival' ? 'Check-in recorded' : 'Check-out recorded') . ' for ' . (optional($staff->user)->name ?? 'staff'),
         ], 200);
     }
 
@@ -569,6 +576,13 @@ class AttendanceApiController extends Controller
 
     private function notifyTeacher($pickup)
     {
+        try {
+            $this->inAppNotifications->notifyPickupScanned($pickup);
+            $this->inAppNotifications->notifyClassTeacherPickup($pickup);
+        } catch (\Throwable $e) {
+            Log::error('Pickup teacher notification failed: ' . $e->getMessage());
+        }
+
         $enrollment = StudentEnrollment::with(['classSection.classTeacher.user'])
             ->where('student_id', $pickup->student_id)
             ->where('status', 'active')
@@ -577,31 +591,13 @@ class AttendanceApiController extends Controller
 
         if ($enrollment && $enrollment->classSection && $enrollment->classSection->classTeacher) {
             $teacher = $enrollment->classSection->classTeacher->user;
-            
+
             if ($teacher && $teacher->phone) {
                 $message = __('notifications.teacher_pickup_alert', ['student_name' => $pickup->student->full_name]);
                 if ($message === 'notifications.teacher_pickup_alert') {
                     $message = "🚨 Student Pickup Alert: {$pickup->student->full_name}'s parent is waiting at the gate.";
                 }
                 $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, false, 'whatsapp');
-            }
-
-            if ($teacher && $teacher->id && method_exists($this->notificationService, 'sendPushNotification')) {
-                $title = __('notifications.parent_at_gate_title');
-                if ($title === 'notifications.parent_at_gate_title') {
-                    $title = "Parent at Gate 🚨";
-                }
-                $body = __('notifications.parent_at_gate_body', ['student_first_name' => $pickup->student->first_name]);
-                if ($body === 'notifications.parent_at_gate_body') {
-                    $body = "{$pickup->student->first_name}'s parent is waiting at the gate for pickup.";
-                }
-
-                $this->notificationService->sendPushNotification(
-                    $teacher->id,
-                    $title,
-                    $body,
-                    ['pickup_id' => $pickup->id, 'type' => 'pickup_requested']
-                );
             }
         }
     }

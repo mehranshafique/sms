@@ -44,6 +44,12 @@ class NotificationPreferenceService
         return $this->isChannelEnabled($institutionId, $eventKey, 'system');
     }
 
+    /** Events that bypass SMS/WhatsApp credit deduction on the system gateway. */
+    public function isCreditExemptEvent(string $eventKey): bool
+    {
+        return in_array($eventKey, self::ALWAYS_ENABLED_EVENTS, true);
+    }
+
     /**
      * @return array<string, bool>|null  null when no notify_{eventKey} setting exists
      */

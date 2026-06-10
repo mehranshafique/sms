@@ -157,6 +157,12 @@ class RolePermissionSeeder extends Seeder
             'institution_id' => null
         ]);
 
+        Role::firstOrCreate([
+            'name' => RoleEnum::GATE_ATTENDANT->value,
+            'guard_name' => 'web',
+            'institution_id' => null,
+        ]);
+
         // 5. Assign Permissions
         $superAdminRole->syncPermissions($allPermissions);
 

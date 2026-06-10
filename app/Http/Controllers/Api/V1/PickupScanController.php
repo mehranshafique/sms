@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\StudentPickup;
 use App\Models\StudentEnrollment;
 use App\Services\NotificationService;
+use App\Services\InAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PickupScanController extends Controller
 {
     public function __construct(
-        protected NotificationService $notificationService
+        protected NotificationService $notificationService,
+        protected InAppNotificationService $inAppNotifications
     ) {}
 
     /**
@@ -65,6 +67,13 @@ class PickupScanController extends Controller
 
     private function notifyTeacher($pickup): void
     {
+        try {
+            $this->inAppNotifications->notifyPickupScanned($pickup);
+            $this->inAppNotifications->notifyClassTeacherPickup($pickup);
+        } catch (\Throwable $e) {
+            // logged in service layer
+        }
+
         $enrollment = StudentEnrollment::with(['classSection.classTeacher.user'])
             ->where('student_id', $pickup->student_id)
             ->where('status', 'active')
@@ -79,7 +88,9 @@ class PickupScanController extends Controller
                 'gate' => Auth::user()->name,
             ]);
 
-            $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, true);
+            if ($teacher?->phone) {
+                $this->notificationService->performSend($teacher->phone, $message, $pickup->institution_id, true);
+            }
         }
     }
 

@@ -23,7 +23,7 @@ class StudentPortalApiController extends Controller
     /**
      * Helper to get the student securely for both Students AND Guardians
      */
-    private function getStudent()
+    private function getStudent(Request $request = null)
     {
         $user = Auth::user();
         if (!$user) abort(401, 'Unauthenticated');
@@ -35,14 +35,16 @@ class StudentPortalApiController extends Controller
             return $student;
         }
 
-        // If the user is a Guardian, return their first linked child
+        // If the user is a Guardian, return selected or first linked child
         if ($user->hasRole('Guardian')) {
             $parent = \App\Models\StudentParent::where('user_id', $user->id)->first();
             if (!$parent) abort(404, 'Parent profile missing.');
-            
-            $student = \App\Models\Student::where('parent_id', $parent->id)->first();
+
+            $studentId = $request?->query('student_id');
+            $query = \App\Models\Student::where('parent_id', $parent->id);
+            $student = $studentId ? $query->where('id', $studentId)->first() : $query->first();
             if (!$student) abort(404, 'No children linked to this account.');
-            
+
             return $student;
         }
 
@@ -52,10 +54,10 @@ class StudentPortalApiController extends Controller
     /**
      * Fetch Student's Attendance History
      */
-    public function getAttendance()
+    public function getAttendance(Request $request)
     {
         try {
-            $student = $this->getStudent();
+            $student = $this->getStudent($request);
             
             $records = StudentAttendance::with('subject')
                 ->where('student_id', $student->id)
@@ -84,10 +86,10 @@ class StudentPortalApiController extends Controller
     /**
      * Fetch Student's Fee Balances and Invoices
      */
-    public function getFees()
+    public function getFees(Request $request)
     {
         try {
-            $student = $this->getStudent();
+            $student = $this->getStudent($request);
             
             $invoices = Invoice::where('student_id', $student->id)->latest()->get();
             $totalFees = $invoices->sum('total_amount');
@@ -129,10 +131,10 @@ class StudentPortalApiController extends Controller
     /**
      * Fetch Recent Homework/Assignments
      */
-    public function getHomework()
+    public function getHomework(Request $request)
     {
         try {
-            $student = $this->getStudent();
+            $student = $this->getStudent($request);
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
 
             // Safe fallback if student is not enrolled in a class yet
@@ -176,7 +178,7 @@ class StudentPortalApiController extends Controller
                 'reason' => 'required|string|max:500'
             ]);
 
-            $student = $this->getStudent();
+            $student = $this->getStudent($request);
             $enrollment = $student->enrollments()->latest()->first();
             $sessionId = $enrollment ? $enrollment->academic_session_id : null;
             $ticket = 'REQ-' . strtoupper(Str::random(8));
@@ -206,10 +208,10 @@ class StudentPortalApiController extends Controller
     /**
      * Generate QR Code for Gate Pass
      */
-    public function generateGatePass()
+    public function generateGatePass(Request $request)
     {
         try {
-            $student = $this->getStudent();
+            $student = $this->getStudent($request);
             $institutionId = $student->institution_id;
 
             $lastPickup = StudentPickup::where('student_id', $student->id)
@@ -253,10 +255,10 @@ class StudentPortalApiController extends Controller
     /**
      * Fetch Exam Results (With Deep Diagnostic Logging)
      */
-    public function getResults()
+    public function getResults(Request $request)
     {
         try {
-            $student = $this->getStudent();
+            $student = $this->getStudent($request);
             Log::info("[API Results] Starting fetch for Student ID: {$student->id} ({$student->full_name})");
 
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
@@ -368,6 +370,35 @@ class StudentPortalApiController extends Controller
             
         } catch (\Exception $e) {
             Log::error("[API Results Exception] Error: " . $e->getMessage() . " | Line: " . $e->getLine());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * List student request history
+     */
+    public function getRequests(Request $request)
+    {
+        try {
+            $student = $this->getStudent($request);
+
+            $requests = StudentRequest::where('student_id', $student->id)
+                ->latest()
+                ->limit(50)
+                ->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id,
+                    'ticket_number' => $r->ticket_number,
+                    'type' => $r->type,
+                    'reason' => $r->reason,
+                    'status' => $r->status,
+                    'start_date' => $r->start_date ? Carbon::parse($r->start_date)->format('d M, Y') : null,
+                    'created_at' => $r->created_at?->format('d M, Y'),
+                ]);
+
+            return response()->json(['success' => true, 'data' => $requests]);
+        } catch (\Exception $e) {
+            Log::error("Student API Requests Error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
