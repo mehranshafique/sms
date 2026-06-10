@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Models\Staff;
 use App\Services\Mobile\MobileContextService;
 
 class AuthApiController extends Controller
@@ -24,15 +25,24 @@ class AuthApiController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)
-                    ->orWhere('username', $request->email)
-                    ->orWhere('shortcode', $request->email)
-                    ->first();
+        $credential = trim($request->email);
+
+        $user = User::where('email', $credential)
+            ->orWhere('username', $credential)
+            ->orWhere('shortcode', $credential)
+            ->first();
+
+        if (!$user) {
+            $staff = Staff::where('employee_id', $credential)->first();
+            if ($staff && $staff->user) {
+                $user = $staff->user;
+            }
+        }
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid credentials. Please verify your email/username and password.'
+                'message' => 'Invalid credentials. Please verify your email, username, staff ID and password.'
             ], 401);
         }
 
@@ -69,6 +79,7 @@ class AuthApiController extends Controller
             ? (is_object($institution->type) ? $institution->type->value : $institution->type)
             : null;
         $context = $this->contextService->build($user);
+        $sessionName = $context['academic_session_name'] ?? null;
 
         return response()->json([
             'success' => true,
@@ -85,6 +96,7 @@ class AuthApiController extends Controller
                 'capabilities' => $context['capabilities'],
                 'school_name' => $schoolName,
                 'school_logo' => $schoolLogo,
+                'academic_session_name' => $sessionName,
             ]
         ], 200);
     }

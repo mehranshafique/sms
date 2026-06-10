@@ -58,6 +58,8 @@ Route::prefix('v1/hardware')->group(function () {
         ->middleware('auth:sanctum');
     Route::get('/attendance/absentees', [AttendanceApiController::class, 'getTeacherClassAbsentees'])
         ->middleware('auth:sanctum');
+    Route::post('/attendance/absentees/notify', [AttendanceApiController::class, 'notifyAbsentStudents'])
+        ->middleware('auth:sanctum');
 });
 
 // Legacy terminal paths (backward compatible — hardware secret auth inside controller)

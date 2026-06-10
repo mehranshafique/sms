@@ -27,7 +27,7 @@ class AppPickupController extends Controller
         }
 
         $query = StudentPickup::whereIn('status', ['pending', 'scanned'])
-              ->whereDate('created_at', '>=', now()->subDays(1));
+              ->where('created_at', '>=', now()->subDays(7));
 
         // 1. INSTITUTION FILTERING (Super Admin Bypass)
         if (!$user->hasRole('Super Admin')) {
@@ -77,16 +77,16 @@ class AppPickupController extends Controller
         
         \Illuminate\Support\Facades\Log::info('--- START getPendingPickups ---', ['user_id' => $user->id ?? 'guest']);
 
-        $query = StudentPickup::with(['student.enrollments.classSection']);
+        $query = StudentPickup::with(['student.enrollments.classSection', 'student.parent']);
 
         // 1. INSTITUTION FILTERING (Super Admin Bypass)
         if (!$user->hasRole('Super Admin')) {
             $query->where('institution_id', $user->institute_id);
         }
 
-        // 2. STATUS FILTERING 
+        // 2. STATUS FILTERING — include pending/scanned up to 7 days so staff can identify older requests
         $query->whereIn('status', ['pending', 'scanned'])
-              ->whereDate('created_at', '>=', now()->subDays(1)); 
+              ->where('created_at', '>=', now()->subDays(7));
 
         // 3. ROLE PERMISSION: Filter by assigned class if the user is a Teacher
         if ($user->hasRole('Teacher')) {
@@ -113,20 +113,22 @@ class AppPickupController extends Controller
             }
         }
 
-        $pickups = $query->latest()->get()->map(function($pickup) {
+        $pickups = $query->latest('created_at')->get()->map(function($pickup) {
             $activeEnrollment = $pickup->student->enrollments->where('status', 'active')->first() 
                                 ?? $pickup->student->enrollments->first();
                                 
             $class = $activeEnrollment->classSection->name ?? 'N/A';
             $admNo = $pickup->student->admission_number ?? 'N/A';
             
-            // Task 7: Fetch parent contact
             $parent = $pickup->student->parent;
             $parentPhone = $parent->guardian_phone ?? $parent->father_phone ?? $parent->mother_phone ?? 'N/A';
+
+            $createdAt = $pickup->created_at;
+            $scannedAt = $pickup->scanned_at;
+            $displayAt = $scannedAt ?? $createdAt;
             
             return [
                 'pickup_id' => $pickup->id,
-                // Task Global: Append admission number
                 'student_name' => $pickup->student->full_name . ' (' . $admNo . ')',
                 'admission_number' => $admNo,
                 'parent_phone' => $parentPhone,
@@ -134,7 +136,13 @@ class AppPickupController extends Controller
                 'requested_by' => $pickup->requested_by,
                 'status' => $pickup->status, 
                 'scanned_by_device' => $pickup->scanned_by_device ?? 'Not Scanned (Web Request)',
-                'time' => $pickup->scanned_at ? $pickup->scanned_at->format('H:i') : $pickup->created_at->format('H:i'),
+                'time' => $displayAt ? $displayAt->format('H:i') : '--:--',
+                'date' => $createdAt ? $createdAt->format('Y-m-d') : null,
+                'date_label' => $createdAt ? $createdAt->format('D, d M Y') : 'N/A',
+                'created_at' => $createdAt?->toIso8601String(),
+                'scanned_at' => $scannedAt?->toIso8601String(),
+                'datetime_label' => $displayAt ? $displayAt->format('d M Y, h:i A') : 'N/A',
+                'is_today' => $createdAt ? $createdAt->isToday() : false,
             ];
         });
         

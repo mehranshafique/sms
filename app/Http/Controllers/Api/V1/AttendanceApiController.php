@@ -14,6 +14,8 @@ use App\Models\AcademicSession;
 use App\Models\InstitutionSetting;
 use App\Models\ExamRecord;
 use App\Models\Invoice;
+use App\Models\Institution;
+use App\Models\Timetable;
 use App\Services\NotificationService;
 use App\Services\InAppNotificationService;
 use Carbon\Carbon;
@@ -60,6 +62,9 @@ class AttendanceApiController extends Controller
         }
         if ($purpose === 'report_card') {
             return $this->handleReportCard($uid);
+        }
+        if ($purpose === 'identity_check') {
+            return $this->handleIdentityCheck($uid);
         }
 
         return $this->handleAttendanceLogging($request, $uid, $method);
@@ -223,7 +228,7 @@ class AttendanceApiController extends Controller
 
         $institutionId = $student->institution_id;
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
-        
+
         if (!$session) {
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'No active academic session'], 400);
         }
@@ -237,43 +242,51 @@ class AttendanceApiController extends Controller
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student is not enrolled in the active session.'], 403);
         }
 
-        $schoolStartTimeStr = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
-        $lateMargin = (int) InstitutionSetting::get($institutionId, 'late_margin_time', 1); 
-        $cooldownMinutes = (int) InstitutionSetting::get($institutionId, 'double_tap_wait_time', 15); 
+        $lateMargin = (int) InstitutionSetting::get($institutionId, 'late_margin_time', 1);
+        $cooldownMinutes = (int) InstitutionSetting::get($institutionId, 'double_tap_wait_time', 15);
+        $isSubjectWise = $this->isSubjectWiseInstitution($institutionId);
 
-        try {
-            $parsedStartTime = Carbon::parse($schoolStartTimeStr);
-            $expectedTime = $scanTime->copy()->setTime($parsedStartTime->hour, $parsedStartTime->minute, 0);
-            $expectedTime->addMinutes($lateMargin)->addSeconds(59);
-            $isLate = $scanTime->gt($expectedTime);
-        } catch (\Exception $e) {
-            $isLate = $scanTime->format('H:i') > '08:00'; 
-        }
-        
-        $status = $isLate ? 'late' : 'present';
+        $gateContext = $this->resolveGateAttendanceStatus(
+            $enrollment->class_section_id,
+            $institutionId,
+            $scanTime,
+            $lateMargin
+        );
 
-        $attendance = StudentAttendance::where('student_id', $student->id)
+        $status = $gateContext['status'];
+        $subjectId = $isSubjectWise ? ($gateContext['subject_id'] ?? null) : null;
+        $slotLabel = $gateContext['slot_label'] ?? null;
+
+        $attendanceQuery = StudentAttendance::where('student_id', $student->id)
             ->where('attendance_date', $date)
-            ->first();
+            ->where('class_section_id', $enrollment->class_section_id);
 
+        if ($isSubjectWise && $subjectId) {
+            $attendanceQuery->where('subject_id', $subjectId);
+        } else {
+            $attendanceQuery->whereNull('subject_id');
+        }
+
+        $attendance = $attendanceQuery->first();
         $action = '';
 
         if (!$attendance) {
-            $attendance = StudentAttendance::create([
+            StudentAttendance::create([
                 'institution_id' => $institutionId,
                 'academic_session_id' => $session->id,
                 'class_section_id' => $enrollment->class_section_id,
                 'student_id' => $student->id,
+                'subject_id' => $subjectId,
                 'attendance_date' => $date,
                 'status' => $status,
                 'check_in' => $time,
-                'method' => $method, 
+                'method' => $method,
             ]);
             $action = 'arrival';
         } else {
             $cleanCheckInTime = Carbon::parse($attendance->check_in)->format('H:i:s');
             $checkInTime = Carbon::parse($date . ' ' . $cleanCheckInTime);
-            
+
             if ($scanTime->lt($checkInTime)) {
                 return response()->json(['status' => 'error', 'message' => 'Check-out time cannot be before check-in time.'], 400);
             }
@@ -284,11 +297,18 @@ class AttendanceApiController extends Controller
 
             $attendance->update(['check_out' => $time]);
             $action = 'departure';
+            $status = $attendance->status;
         }
 
         $this->notifyParent($student, $action, $scanTime->format('h:i A'), $institutionId);
-        
+
         $admNo = $student->admission_number ?? 'N/A';
+        $statusColor = match ($status) {
+            'present' => '#10B981',
+            'late' => '#F59E0B',
+            'absent' => '#DC2626',
+            default => '#6B7280',
+        };
 
         return response()->json([
             'status' => 'success',
@@ -298,9 +318,94 @@ class AttendanceApiController extends Controller
             'name' => $student->first_name . ' ' . $student->last_name . ' (' . $admNo . ')',
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
-            'ui_color' => $status === 'late' ? '#F59E0B' : '#10B981', 
-            'message' => ($action === 'arrival' ? 'Welcome' : 'Goodbye') . ', ' . $student->first_name . '!'
+            'subject' => $slotLabel,
+            'ui_color' => $statusColor,
+            'message' => ($action === 'arrival' ? 'Welcome' : 'Goodbye') . ', ' . $student->first_name . '!',
         ], 200);
+    }
+
+    private function isSubjectWiseInstitution(int $institutionId): bool
+    {
+        $institution = Institution::find($institutionId);
+        if (!$institution) {
+            return false;
+        }
+        $type = is_object($institution->type) ? $institution->type->value : $institution->type;
+
+        return in_array($type, ['university', 'vocational', 'lmd'], true);
+    }
+
+    /**
+     * Determine present / late / absent from timetable slot and late margin.
+     */
+    private function resolveGateAttendanceStatus(
+        int $classSectionId,
+        int $institutionId,
+        Carbon $scanTime,
+        int $lateMarginMinutes
+    ): array {
+        $day = strtolower($scanTime->format('l'));
+        $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+
+        $slotsQuery = Timetable::with('subject')
+            ->where('class_section_id', $classSectionId)
+            ->whereRaw('LOWER(day_of_week) = ?', [$day])
+            ->orderBy('start_time');
+
+        if ($session) {
+            $slotsQuery->where('academic_session_id', $session->id);
+        }
+
+        $slots = $slotsQuery->get();
+        $dateStr = $scanTime->format('Y-m-d');
+
+        // Active class period
+        foreach ($slots as $slot) {
+            $start = Carbon::parse("{$dateStr} {$slot->start_time}");
+            $end = Carbon::parse("{$dateStr} {$slot->end_time}");
+            if ($scanTime->between($start, $end)) {
+                $lateThreshold = $start->copy()->addMinutes($lateMarginMinutes);
+                return [
+                    'status' => $scanTime->lte($lateThreshold) ? 'present' : 'late',
+                    'subject_id' => $slot->subject_id,
+                    'slot_label' => $slot->subject?->name,
+                ];
+            }
+        }
+
+        // After a class ended → absent for the most recently ended slot
+        $lastEnded = null;
+        foreach ($slots as $slot) {
+            $end = Carbon::parse("{$dateStr} {$slot->end_time}");
+            if ($scanTime->gt($end)) {
+                $lastEnded = $slot;
+            }
+        }
+
+        if ($lastEnded) {
+            return [
+                'status' => 'absent',
+                'subject_id' => $lastEnded->subject_id,
+                'slot_label' => $lastEnded->subject?->name,
+            ];
+        }
+
+        // No timetable — fall back to school start time
+        $schoolStartTimeStr = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
+        try {
+            $parsedStartTime = Carbon::parse($schoolStartTimeStr);
+            $expectedTime = $scanTime->copy()->setTime($parsedStartTime->hour, $parsedStartTime->minute, 0);
+            $expectedTime->addMinutes($lateMarginMinutes);
+            $isLate = $scanTime->gt($expectedTime);
+        } catch (\Exception $e) {
+            $isLate = $scanTime->format('H:i') > '08:00';
+        }
+
+        return [
+            'status' => $isLate ? 'late' : 'present',
+            'subject_id' => null,
+            'slot_label' => null,
+        ];
     }
 
     private function processStaffAttendance($staff, $date, $time, $scanTime, $method)
@@ -574,6 +679,57 @@ class AttendanceApiController extends Controller
         ]);
     }
 
+    private function handleIdentityCheck($uid)
+    {
+        $possibleUids = $this->getPossibleUids($uid);
+        $student = $this->findStudentByScanUids($possibleUids);
+
+        if (!$student) {
+            return response()->json(['success' => false, 'message' => 'Student not found.'], 404);
+        }
+
+        $student->load(['parent', 'classSection.gradeLevel', 'enrollments.classSection.gradeLevel']);
+
+        $className = 'N/A';
+        $sectionName = 'N/A';
+        $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+
+        if ($enrollment?->classSection) {
+            $sectionName = $enrollment->classSection->name ?? 'N/A';
+            $className = $enrollment->classSection->gradeLevel->name ?? 'N/A';
+        } elseif ($student->classSection) {
+            $sectionName = $student->classSection->name ?? 'N/A';
+            $className = $student->classSection->gradeLevel->name ?? 'N/A';
+        }
+
+        $parent = $student->parent;
+        $photoUrl = $student->student_photo ? asset('storage/' . $student->student_photo) : null;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student identity verified.',
+            'data' => [
+                'student_id' => $student->id,
+                'full_name' => $student->full_name,
+                'admission_number' => $student->admission_number,
+                'roll_number' => $student->roll_number,
+                'gender' => $student->gender,
+                'dob' => $student->dob?->format('Y-m-d'),
+                'blood_group' => $student->blood_group,
+                'class_name' => $className,
+                'section_name' => $sectionName,
+                'status' => $student->status,
+                'mobile_number' => $student->mobile_number,
+                'email' => $student->email,
+                'photo_url' => $photoUrl,
+                'parent_name' => $parent?->father_name ?? $parent?->mother_name,
+                'parent_phone' => $parent?->father_phone ?? $parent?->mother_phone,
+                'current_address' => $student->current_address,
+                'color' => '#2563eb',
+            ],
+        ]);
+    }
+
     private function notifyTeacher($pickup)
     {
         try {
@@ -677,8 +833,8 @@ class AttendanceApiController extends Controller
             
             $allAssignedClassIds = $query->pluck('id')->toArray();
         } 
-        // --- 2. TEACHER LOGIC: See only assigned classes ---
-        elseif ($user->hasRole('Teacher') && $user->staff) {
+        // --- 2. TEACHER / STAFF: See only assigned classes ---
+        elseif ($user->staff) {
             $staffId = $user->staff->id;
             
             $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->toArray();
@@ -728,12 +884,16 @@ class AttendanceApiController extends Controller
             $daySections = [];
 
             foreach ($sections as $section) {
-                $enrollments = \App\Models\StudentEnrollment::with(['student.parent'])
+                $enrollmentQuery = \App\Models\StudentEnrollment::with(['student.parent'])
                     ->whereHas('student')
                     ->where('class_section_id', $section->id)
-                    ->where('academic_session_id', $sessionId)
-                    ->where('status', 'active')
-                    ->get();
+                    ->where('status', 'active');
+
+                if ($sessionId) {
+                    $enrollmentQuery->where('academic_session_id', $sessionId);
+                }
+
+                $enrollments = $enrollmentQuery->get();
 
                 $studentIds = $enrollments->pluck('student_id')->toArray();
                 $totalClass = count($studentIds);
@@ -756,7 +916,15 @@ class AttendanceApiController extends Controller
                         $presentCount++;
                     } else {
                         $parent = $student->parent;
-                        $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? 'N/A';
+                        $phone = $parent?->father_phone
+                            ?? $parent?->mother_phone
+                            ?? $parent?->guardian_phone
+                            ?? $student->mobile_number
+                            ?? 'N/A';
+                        $parentName = $parent?->father_name
+                            ?? $parent?->mother_name
+                            ?? $parent?->guardian_name
+                            ?? 'N/A';
                         
                         $firstName = $student->first_name ?? '';
                         $lastName = $student->last_name ?? '';
@@ -765,7 +933,9 @@ class AttendanceApiController extends Controller
                         if (empty($fullName)) $fullName = 'Unknown Student';
 
                         $absenteesList[] = [
+                            'student_id' => $student->id,
                             'student_name' => "{$fullName} ({$admNo})",
+                            'parent_name' => $parentName,
                             'parent_phone' => $phone,
                         ];
                     }
@@ -800,6 +970,183 @@ class AttendanceApiController extends Controller
             'success' => true,
             'data' => $report
         ]);
+    }
+
+    /**
+     * Manually notify parents of absent students (SMS / WhatsApp).
+     */
+    public function notifyAbsentStudents(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
+
+        if (!$user || $user->hasRole(['Student', 'Guardian'])) {
+            return response()->json(['success' => false, 'message' => 'unauthorized_access: Staff only'], 403);
+        }
+
+        $request->validate([
+            'student_ids' => 'required|array|min:1|max:100',
+            'student_ids.*' => 'integer|exists:students,id',
+            'date' => 'nullable|date',
+            'channels' => 'nullable|array|min:1',
+            'channels.*' => 'in:sms,whatsapp',
+        ]);
+
+        $date = $request->input('date', Carbon::today()->toDateString());
+        $channels = $request->input('channels', ['sms', 'whatsapp']);
+        $channels = array_values(array_unique(array_intersect($channels, ['sms', 'whatsapp'])));
+
+        if (empty($channels)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select at least one channel: sms or whatsapp.',
+            ], 422);
+        }
+
+        $assignedClassIds = $this->resolveAssignedClassIdsForUser($user);
+
+        if (empty($assignedClassIds) && !$user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
+            return response()->json(['success' => false, 'message' => 'No assigned classes found.'], 403);
+        }
+
+        $results = [];
+        $sentCount = 0;
+        $failedCount = 0;
+
+        foreach ($request->student_ids as $studentId) {
+            $student = Student::with(['parent', 'institution', 'enrollments'])->find($studentId);
+
+            if (!$student) {
+                $results[] = ['student_id' => $studentId, 'success' => false, 'message' => 'Student not found.'];
+                $failedCount++;
+                continue;
+            }
+
+            if (!$this->teacherCanAccessStudent($user, $student, $assignedClassIds)) {
+                $results[] = ['student_id' => $studentId, 'success' => false, 'message' => 'Not authorized for this student.'];
+                $failedCount++;
+                continue;
+            }
+
+            $parentPhone = $student->parent?->father_phone
+                ?? $student->parent?->mother_phone
+                ?? $student->parent?->guardian_phone;
+
+            if (!$parentPhone) {
+                $results[] = [
+                    'student_id' => $studentId,
+                    'student_name' => $student->full_name,
+                    'success' => false,
+                    'message' => 'No parent phone number on file.',
+                ];
+                $failedCount++;
+                continue;
+            }
+
+            $institutionId = $student->institution_id;
+            $eventKey = 'student_absent';
+            $payload = [
+                'StudentName' => $student->full_name,
+                'Date' => Carbon::parse($date)->format('d/m/Y'),
+                'SchoolName' => $student->institution?->name ?? 'School',
+            ];
+
+            $channelsSent = [];
+            $channelErrors = [];
+
+            foreach ($channels as $channel) {
+                $response = $this->notificationService->sendNotificationEvent(
+                    $eventKey,
+                    $parentPhone,
+                    $payload,
+                    $institutionId,
+                    $channel
+                );
+
+                if (($response['success'] ?? false) === true) {
+                    $channelsSent[] = $channel;
+                } else {
+                    $channelErrors[] = $channel . ': ' . ($response['message'] ?? 'Failed');
+                }
+            }
+
+            if (!empty($channelsSent)) {
+                $sentCount++;
+                $results[] = [
+                    'student_id' => $studentId,
+                    'student_name' => $student->full_name,
+                    'success' => true,
+                    'channels' => $channelsSent,
+                    'message' => 'Notification sent via ' . implode(', ', $channelsSent) . '.',
+                ];
+            } else {
+                $failedCount++;
+                $results[] = [
+                    'student_id' => $studentId,
+                    'student_name' => $student->full_name,
+                    'success' => false,
+                    'message' => !empty($channelErrors)
+                        ? implode(' | ', $channelErrors)
+                        : 'No active SMS/WhatsApp template for absence alerts.',
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => $sentCount > 0,
+            'sent' => $sentCount,
+            'failed' => $failedCount,
+            'results' => $results,
+            'message' => $sentCount > 0
+                ? "Notifications sent for {$sentCount} student(s)."
+                : 'No notifications were sent.',
+        ], $sentCount > 0 ? 200 : 422);
+    }
+
+    private function resolveAssignedClassIdsForUser($user): array
+    {
+        if ($user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
+            $query = \App\Models\ClassSection::where('is_active', true);
+            if (!$user->hasRole('Super Admin') && $user->institute_id) {
+                $query->where('institution_id', $user->institute_id);
+            }
+            return $query->pluck('id')->all();
+        }
+
+        if (!$user->hasRole('Teacher') || !$user->staff) {
+            return [];
+        }
+
+        $staffId = $user->staff->id;
+        $dayOfWeek = strtolower(now()->format('l'));
+
+        $homeroomIds = \App\Models\ClassSection::where('staff_id', $staffId)->pluck('id')->all();
+        $timetableIds = Timetable::where('teacher_id', $staffId)
+            ->where('day_of_week', $dayOfWeek)
+            ->pluck('class_section_id')->all();
+        $allocatedIds = \App\Models\ClassSubject::where('teacher_id', $staffId)
+            ->pluck('class_section_id')->all();
+
+        return array_values(array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds)));
+    }
+
+    private function teacherCanAccessStudent($user, Student $student, array $assignedClassIds): bool
+    {
+        if ($user->hasRole('Super Admin')) {
+            return true;
+        }
+
+        if ($user->institute_id && $student->institution_id != $user->institute_id) {
+            return false;
+        }
+
+        if ($user->hasRole(['Head Officer', 'School Admin'])) {
+            return true;
+        }
+
+        return StudentEnrollment::where('student_id', $student->id)
+            ->where('status', 'active')
+            ->whereIn('class_section_id', $assignedClassIds)
+            ->exists();
     }
 
     private function denyInvalidHardware(Request $request): ?\Illuminate\Http\JsonResponse
