@@ -13,6 +13,8 @@
         height: 1.75em !important;
         cursor: pointer;
     }
+    .cursor-pointer { cursor: pointer; }
+    .setup-config-alert { border-left: 4px solid #f59e0b !important; }
     .modal-dialog { max-width: 90%; margin: 1.75rem auto; }
     @media (min-width: 576px) { .modal-dialog { max-width: 600px; margin: 1.75rem auto; } }
     @media (min-width: 992px) { .modal-dialog.modal-lg { max-width: 800px; } }
@@ -118,8 +120,31 @@
                             <div class="card-body">
                                 <form action="{{ route('configuration.notifications.update') }}" method="POST" id="notificationsForm">
                                     @csrf
+                                    <div class="d-flex flex-wrap gap-2 mb-3 p-3 bg-light rounded border">
+                                        <span class="align-self-center fw-bold me-2">{{ __('configuration.select_all_channels') }}:</span>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input cursor-pointer" type="checkbox" id="selectAllChannels">
+                                            <label class="form-check-label cursor-pointer" for="selectAllChannels">{{ __('configuration.select_all_everything') }}</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input cursor-pointer notify-select-all" type="checkbox" id="selectAllSms" data-channel="sms">
+                                            <label class="form-check-label cursor-pointer" for="selectAllSms"><i class="fa fa-comment text-primary me-1"></i> {{ __('configuration.select_all_sms') }}</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input cursor-pointer notify-select-all" type="checkbox" id="selectAllWhatsapp" data-channel="whatsapp">
+                                            <label class="form-check-label cursor-pointer" for="selectAllWhatsapp"><i class="fab fa-whatsapp text-success me-1"></i> {{ __('configuration.select_all_whatsapp') }}</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input cursor-pointer notify-select-all" type="checkbox" id="selectAllEmail" data-channel="email">
+                                            <label class="form-check-label cursor-pointer" for="selectAllEmail"><i class="fa fa-envelope text-warning me-1"></i> {{ __('configuration.select_all_email') }}</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input cursor-pointer notify-select-all" type="checkbox" id="selectAllSystem" data-channel="system">
+                                            <label class="form-check-label cursor-pointer" for="selectAllSystem"><i class="fa fa-bell text-info me-1"></i> {{ __('configuration.select_all_bell') }}</label>
+                                        </div>
+                                    </div>
                                     <div class="table-responsive">
-                                        <table class="table table-bordered table-striped">
+                                        <table class="table table-bordered table-striped" id="notificationPrefsTable">
                                             <thead class="bg-light">
                                                 <tr>
                                                     <th>{{ __('configuration.event') ?? 'Event' }}</th>
@@ -142,22 +167,22 @@
                                                             <td class="fw-bold text-dark">{{ $event->name }}</td>
                                                             <td class="text-center">
                                                                 <div class="form-check form-switch d-flex justify-content-center">
-                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_sms" {{ !empty($prefs['sms']) ? 'checked' : '' }}>
+                                                                    <input class="form-check-input notify-channel-sms" type="checkbox" name="{{ $event->event_key }}_sms" {{ !empty($prefs['sms']) ? 'checked' : '' }}>
                                                                 </div>
                                                             </td>
                                                             <td class="text-center">
                                                                 <div class="form-check form-switch d-flex justify-content-center">
-                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_whatsapp" {{ !empty($prefs['whatsapp']) ? 'checked' : '' }}>
+                                                                    <input class="form-check-input notify-channel-whatsapp" type="checkbox" name="{{ $event->event_key }}_whatsapp" {{ !empty($prefs['whatsapp']) ? 'checked' : '' }}>
                                                                 </div>
                                                             </td>
                                                             <td class="text-center">
                                                                 <div class="form-check form-switch d-flex justify-content-center">
-                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_email" {{ !empty($prefs['email']) ? 'checked' : '' }}>
+                                                                    <input class="form-check-input notify-channel-email" type="checkbox" name="{{ $event->event_key }}_email" {{ !empty($prefs['email']) ? 'checked' : '' }}>
                                                                 </div>
                                                             </td>
                                                             <td class="text-center">
                                                                 <div class="form-check form-switch d-flex justify-content-center">
-                                                                    <input class="form-check-input" type="checkbox" name="{{ $event->event_key }}_system" {{ !empty($prefs['system']) ? 'checked' : '' }}>
+                                                                    <input class="form-check-input notify-channel-system" type="checkbox" name="{{ $event->event_key }}_system" {{ !empty($prefs['system']) ? 'checked' : '' }}>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -329,6 +354,35 @@
         // Module Select/Deselect All
         $('#selectAllModules').click(function() { $('.module-switch').prop('checked', true); });
         $('#deselectAllModules').click(function() { $('.module-switch').prop('checked', false); });
+
+        // Notification preferences — bulk select
+        function setChannelChecks(channel, checked) {
+            $('#notificationsForm .notify-channel-' + channel).prop('checked', checked);
+        }
+
+        function syncNotifySelectAllStates() {
+            ['sms', 'whatsapp', 'email', 'system'].forEach(function(channel) {
+                var $boxes = $('#notificationsForm .notify-channel-' + channel);
+                var allOn = $boxes.length > 0 && $boxes.filter(':checked').length === $boxes.length;
+                $('#selectAll' + channel.charAt(0).toUpperCase() + channel.slice(1)).prop('checked', allOn);
+            });
+            var $all = $('#notificationsForm input[type=checkbox].notify-channel-sms, #notificationsForm input[type=checkbox].notify-channel-whatsapp, #notificationsForm input[type=checkbox].notify-channel-email, #notificationsForm input[type=checkbox].notify-channel-system');
+            $('#selectAllChannels').prop('checked', $all.length > 0 && $all.filter(':checked').length === $all.length);
+        }
+
+        $('#selectAllChannels').on('change', function() {
+            var checked = $(this).is(':checked');
+            $('#notificationsForm input[type=checkbox][class*="notify-channel-"]').prop('checked', checked);
+            $('.notify-select-all').prop('checked', checked);
+        });
+
+        $('.notify-select-all').on('change', function() {
+            setChannelChecks($(this).data('channel'), $(this).is(':checked'));
+            syncNotifySelectAllStates();
+        });
+
+        $('#notificationsForm').on('change', 'input[class*="notify-channel-"]', syncNotifySelectAllStates);
+        syncNotifySelectAllStates();
 
         // Recharge Balance Logic
         function updateRechargeBalance() {

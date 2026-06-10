@@ -9,13 +9,15 @@
             $currency = \App\Enums\CurrencySymbol::default();
         @endphp
 
-        <div class="row page-titles mx-0">
-            <div class="col-sm-6 p-md-0">
-                <div class="welcome-text">
-                    <h3 class="text-white fw-bold mb-1">
-                        {{ __('dashboard.platform_greeting', ['name' => Auth::user()->name, 'role' => $roleName]) }}
-                    </h3>
-                    <p class="mb-0">{{ __('dashboard.platform_overview') }}</p>
+        <div class="row mb-4">
+            <div class="col-xl-12">
+                <div class="card bg-primary text-white shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <h3 class="text-white fw-bold mb-1">
+                            {{ __('dashboard.platform_greeting', ['name' => Auth::user()->name, 'role' => $roleName]) }}
+                        </h3>
+                        <p class="mb-0 text-white opacity-75">{{ __('dashboard.platform_overview') }}</p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -73,8 +73,13 @@ class NotifyAbsentStudents extends Command
                     'SchoolName' => $institution->name
                 ];
 
-                // Send SMS via Service (which handles Template 'student_absent')
-                $this->notificationService->sendSmsEvent('student_absent', $parentPhone, $smsData, $institution->id);
+                $this->notificationService->sendNotificationEvent(
+                    'student_absent',
+                    $parentPhone,
+                    $smsData,
+                    $institution->id,
+                    'sms'
+                );
                 
                 $count++;
             }

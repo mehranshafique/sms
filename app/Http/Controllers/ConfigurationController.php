@@ -8,6 +8,7 @@ use App\Models\InstitutionSetting;
 use App\Models\Module;
 use App\Services\Sms\GatewayFactory;
 use App\Services\SystemCommunicationConfigService;
+use App\Services\InstitutionSetupAlertService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
@@ -99,6 +100,20 @@ class ConfigurationController extends BaseController
         }
 
         return response()->json(['message' => __('configuration.settings_saved')]);
+    }
+
+    public function dismissSetupAlert(Request $request, InstitutionSetupAlertService $alerts)
+    {
+        $request->validate(['key' => 'required|string|max:80']);
+
+        $institutionId = $this->getInstitutionId();
+        if (!$institutionId) {
+            return response()->json(['message' => 'No institution context.'], 422);
+        }
+
+        $alerts->dismiss($institutionId, $request->key);
+
+        return response()->json(['success' => true]);
     }
 
     /**

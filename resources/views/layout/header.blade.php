@@ -29,6 +29,7 @@
 
 	<link rel="stylesheet" href="{{ asset('vendor/bootstrap-select/dist/css/bootstrap-select.min.css') }}">
     <link class="" rel="stylesheet" href="{{ asset('css/style.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/digitex-preloader.css') }}">
     
     <!-- Date & Time Picker CSS -->
     <link href="{{asset('vendor/bootstrap-daterangepicker/daterangepicker.css')}}" rel="stylesheet">
@@ -265,10 +266,19 @@
         Preloader start
     ********************-->
     <div id="preloader">
-        <div class="sk-three-bounce">
-            <div class="sk-child sk-bounce1"></div>
-            <div class="sk-child sk-bounce2"></div>
-            <div class="sk-child sk-bounce3"></div>
+        <div class="digitex-preloader">
+            <div class="digitex-preloader__ring"></div>
+            <img src="{{ asset('images/digitex-logo.png') }}" alt="Digitex" class="digitex-preloader__logo">
+            <p class="digitex-preloader__text">{{ __('configuration.loading') ?? 'Loading' }}</p>
+        </div>
+    </div>
+    <div id="digitex-ajax-loader" aria-hidden="true">
+        <div class="digitex-ajax-loader__card">
+            <div class="digitex-preloader">
+                <div class="digitex-preloader__ring"></div>
+                <img src="{{ asset('images/digitex-logo.png') }}" alt="Digitex" class="digitex-preloader__logo">
+            </div>
+            <p class="digitex-ajax-loader__label">{{ __('configuration.processing') ?? 'Processing...' }}</p>
         </div>
     </div>
     <!--*******************
@@ -302,7 +312,7 @@
                     if ($activeInst && $activeInst->logo) {
                         $institutionLogo = asset('storage/' . $activeInst->logo);
                     } else {
-                        $institutionLogo = "https://e-digitex.com/public/images/smsslogonew.png";
+                        $institutionLogo = asset('images/digitex-logo.png');
                     }
                 @endphp
                 <img src="{{ $institutionLogo }}" style="max-width: 117px; max-height: 50px; object-fit: contain;" alt="Logo">

@@ -14,6 +14,7 @@ use App\Interfaces\SmsGatewayInterface;
 use App\Services\Sms\InfobipService;
 use App\Services\Sms\MobishastraService;
 use App\Services\SystemCommunicationConfigService;
+use App\Services\InstitutionSetupAlertService;
 use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
@@ -64,6 +65,15 @@ class AppServiceProvider extends ServiceProvider
                 $service = app(InAppNotificationService::class);
                 $view->with('inAppNotifications', $service->getRecent(Auth::id(), 12));
                 $view->with('inAppUnreadCount', $service->getUnreadCount(Auth::id()));
+            }
+        });
+
+        View::composer(['layout.layout', 'layout.partials.setup-alerts'], function ($view) {
+            if (Auth::check()) {
+                $view->with(
+                    'setupAlerts',
+                    app(InstitutionSetupAlertService::class)->getAlertsForUser(Auth::user())
+                );
             }
         });
 

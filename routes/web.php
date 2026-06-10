@@ -593,6 +593,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/sms/test', [ConfigurationController::class, 'testSms'])->name('configuration.sms.test');
             Route::post('/school-year', [ConfigurationController::class, 'updateSchoolYear'])->name('configuration.year.update');
             Route::post('/notifications/update', [ConfigurationController::class, 'updateNotifications'])->name('configuration.notifications.update');
+            Route::post('/setup-alert/dismiss', [ConfigurationController::class, 'dismissSetupAlert'])->name('configuration.setup_alert.dismiss');
             // SMS Templates
             Route::middleware([CheckModuleAccess::class . ':sms_templates'])->group(function() {
                 Route::get('/sms-templates', [SmsTemplateController::class, 'index'])->name('sms_templates.index');

@@ -144,4 +144,22 @@ return [
     'late_margin_help' => 'Grace period after school start time before marking as late.',
     'double_tap_wait_time' => 'Double Tap Wait Time (minutes)',
     'double_tap_help' => 'Minimum minutes between check-in and check-out to prevent accidental double taps.',
+
+    'select_all_channels' => 'Bulk select',
+    'select_all_everything' => 'Select all',
+    'select_all_sms' => 'All SMS',
+    'select_all_whatsapp' => 'All WhatsApp',
+    'select_all_email' => 'All Email',
+    'select_all_bell' => 'All In-App',
+    'loading' => 'Loading',
+    'processing' => 'Processing...',
+    'dismiss' => 'Dismiss',
+
+    'setup_alert_title' => 'Configuration required',
+    'setup_alert_fix_now' => 'Fix now',
+    'alert_smtp_missing' => 'SMTP email is not configured. Parents and staff may not receive email notifications.',
+    'alert_school_hours_missing' => 'School start/end times are not set. Gate attendance and late marking may be incorrect.',
+    'alert_academic_dates_missing' => 'Academic session dates are missing. Please set the school year.',
+    'alert_communication_missing' => 'SMS/WhatsApp communication setup is incomplete. Configure your messaging providers.',
+    'alert_no_current_session' => 'No current academic session is active. Create or mark one as current.',
 ];

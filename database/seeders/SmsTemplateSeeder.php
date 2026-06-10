@@ -137,6 +137,13 @@ class SmsTemplateSeeder extends Seeder
                 'available_tags' => '$ParentName, $StudentName, $Time, $Date, $SchoolName',
                 'is_active' => true,
             ],
+            [
+                'event_key' => 'student_absent',
+                'name' => 'Student Absence Alert',
+                'body' => 'Dear Parent, your child $StudentName was marked absent from $SchoolName on $Date. Please contact the school if you have any questions.',
+                'available_tags' => '$StudentName, $Date, $SchoolName, $ParentName',
+                'is_active' => true,
+            ],
             // --- Automated Request / Ticket Processing ---
             [
                 'event_key' => 'request_submitted',

@@ -1,0 +1,102 @@
+/* Digitex page & AJAX preloader */
+#preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    background: linear-gradient(145deg, #f8fafc 0%, #eef2ff 55%, #ffffff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.digitex-preloader {
+    text-align: center;
+    position: relative;
+    width: 140px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.digitex-preloader__ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid rgba(8, 51, 102, 0.12);
+    border-top-color: #083366;
+    animation: digitex-spin 0.9s linear infinite;
+}
+
+.digitex-preloader__logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    animation: digitex-pulse 1.6s ease-in-out infinite;
+    position: relative;
+    z-index: 2;
+}
+
+.digitex-preloader__text {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+#digitex-ajax-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 999998;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+#digitex-ajax-loader.is-visible {
+    display: flex;
+}
+
+.digitex-ajax-loader__card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px 36px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+    text-align: center;
+    min-width: 160px;
+}
+
+.digitex-ajax-loader__card .digitex-preloader {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto;
+}
+
+.digitex-ajax-loader__card .digitex-preloader__logo {
+    width: 56px;
+    height: 56px;
+}
+
+.digitex-ajax-loader__label {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+}
+
+@keyframes digitex-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes digitex-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.06); opacity: 0.88; }
+}

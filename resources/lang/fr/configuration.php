@@ -135,4 +135,22 @@ return [
     'success' => 'Succès',
     'error' => 'Erreur',
     'saving' => 'Enregistrement...',
+
+    'select_all_channels' => 'Sélection groupée',
+    'select_all_everything' => 'Tout sélectionner',
+    'select_all_sms' => 'Tous SMS',
+    'select_all_whatsapp' => 'Tous WhatsApp',
+    'select_all_email' => 'Tous Email',
+    'select_all_bell' => 'Toutes In-App',
+    'loading' => 'Chargement',
+    'processing' => 'Traitement...',
+    'dismiss' => 'Fermer',
+
+    'setup_alert_title' => 'Configuration requise',
+    'setup_alert_fix_now' => 'Corriger',
+    'alert_smtp_missing' => 'SMTP non configuré. Les emails aux parents et au personnel peuvent échouer.',
+    'alert_school_hours_missing' => 'Les heures de début/fin ne sont pas définies. La présence au portail peut être incorrecte.',
+    'alert_academic_dates_missing' => 'Les dates de session académique manquent. Veuillez définir l\'année scolaire.',
+    'alert_communication_missing' => 'La configuration SMS/WhatsApp est incomplète. Configurez vos fournisseurs.',
+    'alert_no_current_session' => 'Aucune session académique active. Créez-en une ou marquez-la comme actuelle.',
 ];

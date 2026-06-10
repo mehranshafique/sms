@@ -84,6 +84,9 @@
             });
 
             $(document).ajaxSend(function(event, jqXHR, settings) {
+                if (!settings.skipDigitexLoader) {
+                    $('#digitex-ajax-loader').addClass('is-visible');
+                }
                 var $trigger = null;
                 var $active = $(document.activeElement);
                 
@@ -118,6 +121,7 @@
             });
 
             $(document).ajaxComplete(function(event, jqXHR, settings) {
+                $('#digitex-ajax-loader').removeClass('is-visible');
                 var $trigger = settings.triggerElement;
                 if ($trigger && $trigger.length) {
                     if ($trigger.is('input')) {
@@ -129,6 +133,22 @@
                     $trigger.data('is-loading', false);
                     $lastClickedBtn = null;
                 }
+            });
+
+            // Dismiss setup configuration alerts
+            $(document).on('click', '.setup-alert-dismiss', function() {
+                var $alert = $(this).closest('.setup-config-alert');
+                var key = $(this).data('alert-key');
+                $alert.fadeOut(200, function() {
+                    $(this).remove();
+                    if ($('#setup-alerts-wrap .setup-config-alert').length === 0) {
+                        $('#setup-alerts-wrap').remove();
+                    }
+                });
+                $.post('{{ route('configuration.setup_alert.dismiss') }}', {
+                    _token: '{{ csrf_token() }}',
+                    key: key
+                }).fail(function() { /* silent */ });
             });
         });
     </script>

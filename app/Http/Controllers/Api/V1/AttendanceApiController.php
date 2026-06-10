@@ -1091,6 +1091,12 @@ class AttendanceApiController extends Controller
             }
         }
 
+        $failureDetail = collect($results)
+            ->where('success', false)
+            ->pluck('message')
+            ->filter()
+            ->first();
+
         return response()->json([
             'success' => $sentCount > 0,
             'sent' => $sentCount,
@@ -1098,7 +1104,7 @@ class AttendanceApiController extends Controller
             'results' => $results,
             'message' => $sentCount > 0
                 ? "Notifications sent for {$sentCount} student(s)."
-                : 'No notifications were sent.',
+                : ($failureDetail ?: 'No notifications were sent.'),
         ], $sentCount > 0 ? 200 : 422);
     }
 
