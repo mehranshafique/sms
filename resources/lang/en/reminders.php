@@ -21,6 +21,12 @@ return [
     'exam_reminders_desc' => 'Automatically scans the Date Sheets for exams scheduled for Tomorrow. Sends highly personalized alerts to parents combining their child\'s name, subjects, times, and examination rooms.',
     'exam_info' => 'Only parents of students who have exams specifically scheduled for tomorrow will receive this automated message.',
     'trigger_exam_reminders' => 'Trigger Exam Reminders',
+
+    'attendance_reports_title' => 'Attendance Summary Reports',
+    'attendance_reports_desc' => 'Send weekly or monthly attendance summaries to parents (days present, absent, late, and attendance percentage with comparison to the previous period).',
+    'attendance_period' => 'Report period',
+    'send_attendance_reports' => 'Send Attendance Reports Now',
+    'attendance_auto_schedule' => 'Automatic schedule: weekly reports every Friday 18:00, monthly reports on the 1st at 08:00.',
     
     'standard_sms' => 'Standard SMS',
     'whatsapp' => 'WhatsApp',
@@ -43,5 +49,7 @@ return [
         'template_not_found' => 'The message template for this event is missing or disabled.',
         'notifications_disabled' => 'Notifications are disabled for this channel in your institution\'s notification preferences.',
         'gateway_config_error' => 'Gateway configuration error: :error',
+        'no_institution' => 'No active institution context. Please select a school first.',
+        'attendance_sent' => 'Attendance reports sent to :sent parents. Skipped: :skipped.',
     ],
 ];

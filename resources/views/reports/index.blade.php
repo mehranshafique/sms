@@ -171,14 +171,23 @@
                 studentGroup.classList.add('d-none');
                 classGroup.classList.remove('d-none');
                 studentSelect.required = false;
+                studentSelect.disabled = true;
+                studentSelect.value = '';
                 classSelect.required = true;
+                classSelect.disabled = false;
+                if ($.fn.select2) $(studentSelect).val('').trigger('change');
             } else {
                 classGroup.classList.add('d-none');
                 studentGroup.classList.remove('d-none');
                 classSelect.required = false;
+                classSelect.disabled = true;
+                classSelect.value = '';
                 studentSelect.required = true;
+                studentSelect.disabled = false;
+                if ($.fn.selectpicker) $(classSelect).selectpicker('refresh');
             }
         }
+        toggleMode();
 
         modeRadios.forEach(radio => radio.addEventListener('change', toggleMode));
 

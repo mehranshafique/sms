@@ -474,8 +474,13 @@ class InvoiceController extends BaseController
             abort(403);
         }
 
-        $invoice->load(['student', 'items', 'academicSession', 'institution']);
-        return view('finance.invoices.show', compact('invoice'));
+        $invoice->load(['student', 'items', 'academicSession', 'institution', 'payments.receivedBy']);
+
+        $paymentMethodService = app(\App\Services\PaymentMethodService::class);
+        $onlinePayEnabled = $paymentMethodService->isOnlineEnabled($invoice->institution_id);
+        $paymentUrl = $invoice->payment_token ? route('pay.show', $invoice->payment_token) : null;
+
+        return view('finance.invoices.show', compact('invoice', 'onlinePayEnabled', 'paymentUrl'));
     }
 
     public function print($id)
@@ -528,5 +533,24 @@ class InvoiceController extends BaseController
         $invoice->delete();
 
         return response()->json(['message' => __('invoice.success_deleted')]);
+    }
+
+    public function refreshPaymentLink(Invoice $invoice)
+    {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $invoice->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
+            abort(403);
+        }
+
+        $invoice->update(['payment_token' => Str::random(48)]);
+
+        return response()->json([
+            'message' => __('invoice.payment_link_refreshed'),
+            'url' => route('pay.show', $invoice->payment_token),
+        ]);
     }
 }

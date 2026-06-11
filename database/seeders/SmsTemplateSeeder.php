@@ -121,6 +121,20 @@ class SmsTemplateSeeder extends Seeder
                 'available_tags' => '$ParentName, $StudentName, $ClassName, $ExamDetails, $SchoolName',
                 'is_active' => true,
             ],
+            [
+                'event_key' => 'payment_proof_submitted',
+                'name' => 'Payment Proof Submitted',
+                'body' => 'Dear Parent, we received your payment proof of $Amount for $StudentName (Invoice $InvoiceNumber). Our accounts team will review it shortly. — $SchoolName',
+                'available_tags' => '$StudentName, $Amount, $InvoiceNumber, $SchoolName, $PayerName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'payment_proof_rejected',
+                'name' => 'Payment Proof Rejected',
+                'body' => 'Dear Parent, your payment proof for $StudentName (Invoice $InvoiceNumber, $Amount) could not be verified. Please resubmit or contact the school. — $SchoolName',
+                'available_tags' => '$StudentName, $Amount, $InvoiceNumber, $SchoolName, $Reason',
+                'is_active' => true,
+            ],
 
              // --- RFID Access Control Templates ---
             [
@@ -142,6 +156,20 @@ class SmsTemplateSeeder extends Seeder
                 'name' => 'Student Absence Alert',
                 'body' => 'Dear Parent, your child $StudentName was marked absent from $SchoolName on $Date. Please contact the school if you have any questions.',
                 'available_tags' => '$StudentName, $Date, $SchoolName, $ParentName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'attendance_weekly_summary',
+                'name' => 'Weekly Attendance Summary',
+                'body' => '$SchoolName: $StudentName — $PeriodLabel. Days: $TotalDays, Present: $Present, Absent: $Absent, Late: $Late. Attendance: $Percentage (prev: $PrevPercentage).',
+                'available_tags' => '$StudentName, $SchoolName, $PeriodLabel, $TotalDays, $Present, $Absent, $Late, $Percentage, $PrevPercentage',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'attendance_monthly_summary',
+                'name' => 'Monthly Attendance Summary',
+                'body' => '$SchoolName — Monthly report for $StudentName ($PeriodLabel). Present: $Present/$TotalDays days. Attendance: $Percentage (last month: $PrevPercentage). Absent: $Absent, Late: $Late.',
+                'available_tags' => '$StudentName, $SchoolName, $PeriodLabel, $TotalDays, $Present, $Absent, $Late, $Percentage, $PrevPercentage',
                 'is_active' => true,
             ],
             // --- Automated Request / Ticket Processing ---

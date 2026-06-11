@@ -99,6 +99,37 @@
                 </div>
             </div>
         </div>
+
+        <div class="row mt-2">
+            <div class="col-xl-12">
+                <div class="card shadow-sm">
+                    <div class="card-header border-bottom">
+                        <h4 class="card-title"><i class="fa fa-chart-line text-info me-2"></i> {{ __('reminders.attendance_reports_title') }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">{{ __('reminders.attendance_reports_desc') }}</p>
+                        <form id="attendanceReportForm" action="{{ route('reminders.attendance.send') }}" method="POST" class="row g-3 align-items-end">
+                            @csrf
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">{{ __('reminders.attendance_period') }}</label>
+                                <select name="period_type" class="form-control default-select" required>
+                                    <option value="week">{{ __('attendance.this_week') }}</option>
+                                    <option value="month">{{ __('attendance.this_month') }}</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <button type="submit" class="btn btn-info submit-btn w-100 shadow text-white">
+                                    <i class="fa fa-paper-plane me-2"></i> {{ __('reminders.send_attendance_reports') }}
+                                </button>
+                            </div>
+                        </form>
+                        <div class="alert alert-light border mt-3 mb-0">
+                            <i class="fa fa-clock-o me-1"></i> {{ __('reminders.attendance_auto_schedule') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -159,6 +190,7 @@
 
         handleForm('#feeReminderForm');
         handleForm('#examReminderForm');
+        handleForm('#attendanceReportForm');
     });
 </script>
 @endsection

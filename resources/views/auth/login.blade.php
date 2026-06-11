@@ -61,4 +61,17 @@
             <button type="submit" class="btn btn-primary btn-block">{{ __('login.submit_btn') }}</button>
         </div>
     </form>
+
+    <div class="text-center mt-4 pt-3 border-top">
+        <p class="text-muted small mb-2">{{ __('login.help_links') }}</p>
+        <div class="d-flex flex-wrap justify-content-center gap-2 gap-md-3">
+            <a href="{{ route('help.index') }}" class="btn-link small">{{ __('manual.hub_title') }}</a>
+            <span class="text-muted">·</span>
+            <a href="{{ route('manual.web') }}" class="btn-link small">{{ __('manual.nav_web') }}</a>
+            <span class="text-muted">·</span>
+            <a href="{{ route('community.index') }}" class="btn-link small">{{ __('help.nav_community') }}</a>
+            <span class="text-muted">·</span>
+            <a href="{{ route('pay.lookup') }}" class="btn-link small">{{ __('help.nav_pay') }}</a>
+        </div>
+    </div>
 @endsection

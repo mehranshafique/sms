@@ -35,4 +35,5 @@ return [
     'teacher' => 'Enseignant',
     'request_submitted_success' => 'Requête soumise avec succès ! Ticket : :ticket',
     'na' => 'N/D',
+    'lmd_not_applicable' => 'Le relevé LMD est réservé aux étudiants universitaires.',
 ];

@@ -40,6 +40,11 @@ return [
     'failed' => 'Non Validé (NV)',
     'average' => 'Moyenne',
     'mention' => 'Mention',
+    'mention_excellent' => 'Très Bien',
+    'mention_good' => 'Bien',
+    'mention_fair' => 'Assez Bien',
+    'mention_pass' => 'Passable',
+    'mention_fail' => '—',
     'credits_earned' => 'Crédits Acquis',
     'credits_attempted' => 'Crédits Tentés',
 ];

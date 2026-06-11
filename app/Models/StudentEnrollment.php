@@ -17,6 +17,7 @@ class StudentEnrollment extends Model
         'class_section_id',
         'roll_number',
         'status',
+        'enrollment_type',
         'enrolled_at',
         // Added these to allow saving discounts
         'discount_amount', 

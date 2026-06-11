@@ -84,6 +84,23 @@
                     </div>
                     <div class="card-body pt-3">
                         
+                        {{-- Responsible Person --}}
+                        <div class="mb-4">
+                            <h5 class="text-uppercase fs-12 font-w600 text-muted mb-3 border-bottom pb-2">{{ __('institute.responsible_person_section') }}</h5>
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-sm-4 col-5">
+                                    <span class="text-dark font-w500"><i class="fa fa-user me-2 text-primary"></i> {{ __('institute.head_person_name') }}</span>
+                                </div>
+                                <div class="col-sm-8 col-7 text-muted">{{ $institute->head_person_name ?? 'N/A' }}</div>
+                            </div>
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-sm-4 col-5">
+                                    <span class="text-dark font-w500"><i class="fa fa-mobile me-2 text-primary"></i> {{ __('institute.head_person_phone') }}</span>
+                                </div>
+                                <div class="col-sm-8 col-7 text-muted">{{ $institute->head_person_phone ?? 'N/A' }}</div>
+                            </div>
+                        </div>
+
                         {{-- Contact Details Group --}}
                         <div class="mb-4">
                             <h5 class="text-uppercase fs-12 font-w600 text-muted mb-3 border-bottom pb-2">{{ __('institute.contact_information') }}</h5>

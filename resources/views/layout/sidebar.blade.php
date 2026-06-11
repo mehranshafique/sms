@@ -33,15 +33,26 @@
                 // Get Active Institution Object (for ID display and Type check)
                 $activeInstitution = null;
                 $activeInstType = null;
+                $instTypeValue = '';
 
                 // Only fetch institution details if we are NOT in global mode, or if user is strictly a school-level user
                 if (!$isGlobalMode || $isHeadOfficer || $isSchoolAdmin) {
                     $targetId = $activeInstId ?: $user->institute_id;
                     if ($targetId && $targetId !== 'global') {
                         $activeInstitution = Institution::find($targetId);
-                        $activeInstType = $activeInstitution ? $activeInstitution->type : null;
+                        if ($activeInstitution) {
+                            $activeInstType = $activeInstitution->type;
+                            $instTypeValue = $activeInstType instanceof InstitutionType
+                                ? $activeInstType->value
+                                : (string) $activeInstType;
+                        }
                     }
                 }
+
+                $isUniversityInst = in_array($instTypeValue, ['university', 'vocational'], true);
+                $isK12Inst = in_array($instTypeValue, ['primary', 'secondary', 'mixed'], true);
+                $showStateExams = in_array($instTypeValue, ['primary', 'secondary', 'mixed'], true);
+                $showLmdFeatures = in_array($instTypeValue, ['university', 'mixed', 'vocational'], true);
 
                 // Helper to check module access
                 if (!isset($enabledModules)) {
@@ -185,12 +196,12 @@
                         <li><a class="ai-icon {{ request()->routeIs('academic-sessions.*') ? 'mm-active' : '' }}" href="{{ route('academic-sessions.index') }}"><i class="la la-calendar-check-o"></i><span class="nav-text">{{ __('sidebar.sessions.title') }}</span></a></li>
                     @endif
 
-                    @if($hasModule('departments') && $user->can('department.view') && in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']))
+                    @if($hasModule('departments') && $user->can('department.view') && $showLmdFeatures)
                         <li><a class="ai-icon {{ request()->routeIs('departments.*') ? 'mm-active' : '' }}" href="{{ route('departments.index') }}"><i class="la la-building"></i><span class="nav-text">{{ __('sidebar.departments.title') }}</span></a></li>
                     @endif
 
                     {{-- PROGRAMS (University Only) --}}
-                    @if(in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']))
+                    @if($showLmdFeatures)
                         <li>
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
                                 <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs.title') ?? 'Programs' }}</span>
@@ -255,7 +266,7 @@
                             @endif
 
                             {{-- University Enrollment --}}
-                            @if($hasModule('university_enrollments') && in_array($activeInstType, [InstitutionType::UNIVERSITY->value, 'mixed', 'lmd']) && $user->can('university_enrollment.view'))
+                            @if($hasModule('university_enrollments') && $showLmdFeatures && $user->can('university_enrollment.view'))
                                 <li><a class="{{ request()->routeIs('university.enrollments.*') ? 'mm-active' : '' }}" href="{{ route('university.enrollments.index') }}">{{ __('sidebar.university_enrollments.title') }}</a></li>
                             @endif
 
@@ -280,10 +291,13 @@
                     </li>
 
                     @if($hasModule('staff') && $user->can('staff.view'))
-                        <li class="{{ request()->routeIs('staff.*', 'staff-attendance.*') ? 'mm-active' : '' }}">
+                        <li class="{{ request()->routeIs('staff.*', 'staff-attendance.*', 'staff-leaves.*') ? 'mm-active' : '' }}">
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-chalkboard-teacher"></i><span class="nav-text">{{ __('sidebar.staff.title') }}</span></a>
                             <ul aria-expanded="false">
                                 <li><a class="{{ request()->routeIs('staff.*') ? 'mm-active' : '' }}" href="{{ route('staff.index') }}">{{ __('sidebar.staff.title') }}</a></li>
+                                @if($hasModule('staff_leaves') && $user->can('staff_leave.view'))
+                                <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}</a></li>
+                                @endif
                                 @if($user->can('staff_attendance.view'))
                                     <li><a class="{{ request()->routeIs('staff-attendance.*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
                                 @endif
@@ -327,6 +341,12 @@
                                 <li><a class="{{ request()->routeIs('invoices.create') ? 'mm-active' : '' }}" href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
                             @endif
                             <li><a class="{{ request()->routeIs('invoices.index', 'invoices.show', 'invoices.edit') ? 'mm-active' : '' }}" href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
+                            @if($hasModule('payments') && $user->can('invoice.view'))
+                                <li><a class="{{ request()->routeIs('payment-methods.*') ? 'mm-active' : '' }}" href="{{ route('payment-methods.index') }}">{{ __('sidebar.payment_methods') }}</a></li>
+                            @endif
+                            @if($hasModule('payments') && $user->can('payment.create'))
+                                <li><a class="{{ request()->routeIs('payment-proofs.*') ? 'mm-active' : '' }}" href="{{ route('payment-proofs.index') }}">{{ __('sidebar.payment_proofs') }}</a></li>
+                            @endif
                             <li><a class="{{ request()->routeIs('finance.balances.*') ? 'mm-active' : '' }}" href="{{ route('finance.balances.index') }}">{{ __('sidebar.student_balances') }}</a></li>
                             <li><a class="{{ request()->routeIs('finance.reports.*') ? 'mm-active' : '' }}" href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
                         </ul>
@@ -360,7 +380,7 @@
                 {{-- EXAMINATIONS --}}
                 @if($hasModule('exams') && $user->can('exam.view'))
                     <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                    <li class="{{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span></a>
                         <ul aria-expanded="false">
                             <li><a class="{{ request()->routeIs('exams.*') ? 'mm-active' : '' }}" href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}</a></li>
@@ -375,6 +395,12 @@
                             
                             <li><a class="{{ request()->routeIs('results.*') ? 'mm-active' : '' }}" href="{{ route('results.index') }}">{{ __('sidebar.results') }}</a></li>
                             <li><a class="{{ request()->routeIs('reports.*') ? 'mm-active' : '' }}" href="{{ route('reports.index') }}">{{ __('sidebar.academic_reports') }}</a></li>
+                            @if($showStateExams)
+                            <li><a class="{{ request()->routeIs('state-exams.*') ? 'mm-active' : '' }}" href="{{ route('state-exams.index') }}">{{ __('sidebar.state_exams') }}</a></li>
+                            @endif
+                            @if($showLmdFeatures)
+                            <li><a class="{{ request()->routeIs('lmd-deliberations.*') ? 'mm-active' : '' }}" href="{{ route('lmd-deliberations.index') }}">{{ __('sidebar.lmd_deliberations') }}</a></li>
+                            @endif
                         </ul>
                     </li>
                 @endif
@@ -402,29 +428,10 @@
                     @endif
                 @endif
 
-                {{-- OPERATIONS (Library, Transport, Inventory) --}}
-                @if($hasModule('library') || $hasModule('transport') || $hasModule('inventory'))
-                    @canany(['library.view', 'transport.view', 'inventory.view'])
-                    <!-- <li class="nav-label">{{ __('sidebar.operations') ?? 'Operations' }}</li>
-                    
-                    @if($hasModule('library'))
-                        @can('library.view')
-                        <li><a class="ai-icon" href="#"><i class="la la-book-reader"></i><span class="nav-text">{{ __('sidebar.library.title') ?? 'Library' }}</span></a></li>
-                        @endcan
-                    @endif
-
-                    @if($hasModule('transport'))
-                        @can('transport.view')
-                        <li><a class="ai-icon" href="#"><i class="la la-bus"></i><span class="nav-text">{{ __('sidebar.transport.title') ?? 'Transport' }}</span></a></li>
-                        @endcan
-                    @endif
-
-                    @if($hasModule('inventory'))
-                        @can('inventory.view')
-                        <li><a class="ai-icon" href="#"><i class="la la-boxes"></i><span class="nav-text">{{ __('sidebar.inventory.title') ?? 'Inventory' }}</span></a></li>
-                        @endcan
-                    @endif -->
-                    @endcanany
+                {{-- OPERATIONS (Transport) — Inventory excluded by product decision --}}
+                @if($user->hasRole(['Super Admin', 'Head Officer', 'School Admin']))
+                    <li class="nav-label">{{ __('sidebar.operations') }}</li>
+                    <li><a class="ai-icon {{ request()->routeIs('transport.*') ? 'mm-active' : '' }}" href="{{ route('transport.index') }}"><i class="la la-bus"></i><span class="nav-text">{{ __('sidebar.transport') }}</span></a></li>
                 @endif
 
                 {{-- CONFIGURATION --}}
@@ -523,13 +530,11 @@
             {{-- ============================================================= --}}
             @if($isGuardian)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
-                <!-- 3. For PARENTS: Place this in the Guardian Section (Part 5) -->
-                @if($isGuardian)
-                    <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">
-                        <i class="la la-chart-pie"></i>
-                        <span class="nav-text">{{ __('sidebar.children_attendance') ?? 'Children Attendance' }}</span>
-                    </a></li>
-                @endif
+                <li><a class="ai-icon {{ request()->routeIs('guardian.*') ? 'mm-active' : '' }}" href="{{ route('guardian.index') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.guardian_portal') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">
+                    <i class="la la-chart-pie"></i>
+                    <span class="nav-text">{{ __('sidebar.children_attendance') ?? 'Children Attendance' }}</span>
+                </a></li>
                 <li><a class="ai-icon {{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
             @endif
 

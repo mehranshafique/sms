@@ -77,7 +77,8 @@ return [
     'primary_school' => 'Primary School',
     'secondary_school' => 'Secondary School',
     'university' => 'University',
-    'mixed_level' => 'Mixed Level',
+    'vocational_school' => 'Vocational / Technical School',
+    'mixed_level' => 'Mixed Level (Primary & Secondary)',
 
     // Buttons
     'save_institute' => 'Save Institute',
@@ -111,6 +112,13 @@ return [
     'basic_information' => 'Basic Information',
     'location_details'  => 'Location Details',
     'contact_information' => 'Contact Information',
+    'responsible_person_section' => 'Head / Responsible Person',
+    'responsible_person_help' => 'The person accountable for this school or university. Their name is used for the admin login account.',
+    'head_person_name' => 'Head / Responsible Person Name',
+    'head_person_name_placeholder' => 'e.g. Moutard Kabila',
+    'head_person_phone' => 'Head / Responsible Person Phone',
+    'validation_head_name_required' => 'The head / responsible person name is required.',
+    'validation_head_phone_required' => 'The head / responsible person phone number is required.',
     'edit_institute' => 'Edit Institute',
     'update_institute_details' => 'Update institute details',
 
@@ -130,4 +138,8 @@ return [
     'email_greeting' => 'Hello :name,',
     'create_success' => 'Institute created successfully.',
     'update_success' => 'Institute updated successfully.',
+    'epst_school_code' => 'EPST School Code',
+    'secondary_currency' => 'Secondary Currency (ISO)',
+    'exchange_rate' => 'Exchange Rate (primary → secondary)',
+    'exchange_rate_hint' => 'e.g. 2800 CDF = 1 USD',
 ];

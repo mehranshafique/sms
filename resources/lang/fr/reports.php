@@ -58,4 +58,11 @@ return [
     'principal_signature' => 'Signature du Chef d\'Établissement',
     'done_at' => 'Fait à :city, le :date',
     'motto_placeholder' => 'DISCIPLINE - TRAVAIL - EXCELLENCE',
+    'epst_republic_line' => 'République Démocratique du Congo',
+    'epst_ministry_line' => 'Ministère de l\'Enseignement Primaire, Secondaire et Technique (EPST)',
+    'epst_school_code' => 'Code école EPST',
+    'epst_director' => 'Directeur(trice)',
+    'esu_ministry_line' => 'Ministère de l\'Enseignement Supérieur et Universitaire (ESU)',
+    'esu_transcript_title' => 'Relevé de notes académique (LMD — ESU)',
+    'mention' => 'Mention',
 ];

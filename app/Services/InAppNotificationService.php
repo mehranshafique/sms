@@ -8,6 +8,7 @@ use App\Models\InAppNotification;
 use App\Models\Invoice;
 use App\Models\Notice;
 use App\Models\Payment;
+use App\Models\PaymentProofSubmission;
 use App\Models\StaffLeave;
 use App\Models\StudentPickup;
 use App\Models\StudentRequest;
@@ -33,6 +34,8 @@ class InAppNotificationService
         'staff_leave' => 'staff_leave_updated',
         'fund_request_new' => 'fund_request_submitted',
         'fund_request' => 'fund_request_processed',
+        'payment_proof_submitted' => 'payment_proof_submitted',
+        'payment_proof_rejected' => 'payment_proof_rejected',
     ];
 
     private const ADMIN_ROLES = [
@@ -335,6 +338,106 @@ class InAppNotificationService
             null,
             Auth::id()
         );
+    }
+
+    public function notifyPaymentProofSubmitted(PaymentProofSubmission $proof): void
+    {
+        $proof->loadMissing(['invoice.student.parent.user', 'invoice.student.user']);
+        $invoice = $proof->invoice;
+        $student = $invoice?->student;
+        if (!$student) {
+            return;
+        }
+
+        $eventKey = self::EVENT_KEYS['payment_proof_submitted'];
+        $amount = number_format((float) $proof->amount, 2);
+        $studentName = $student->full_name;
+        $invoiceNo = $invoice->invoice_number ?? ('#' . $invoice->id);
+
+        $this->notifyFinanceTeam(
+            $proof->institution_id,
+            $eventKey,
+            'payment_proof',
+            __('header.notif_proof_submitted_title'),
+            __('header.notif_proof_submitted_admin_message', [
+                'student' => $studentName,
+                'amount' => $amount,
+                'invoice' => $invoiceNo,
+            ]),
+            route('payment-proofs.index'),
+            'fa-file-invoice',
+            ['proof_id' => $proof->id]
+        );
+
+        $this->notifyStudentAndParent(
+            $student,
+            $eventKey,
+            'payment_proof',
+            __('header.notif_proof_submitted_title'),
+            __('header.notif_proof_submitted_parent_message', [
+                'student' => $studentName,
+                'amount' => $amount,
+                'invoice' => $invoiceNo,
+            ]),
+            route('pay.show', $invoice->payment_token),
+            $proof->institution_id,
+            'fa-file-upload'
+        );
+    }
+
+    public function notifyPaymentProofRejected(PaymentProofSubmission $proof): void
+    {
+        $proof->loadMissing(['invoice.student.parent.user', 'invoice.student.user']);
+        $invoice = $proof->invoice;
+        $student = $invoice?->student;
+        if (!$student) {
+            return;
+        }
+
+        $eventKey = self::EVENT_KEYS['payment_proof_rejected'];
+        $amount = number_format((float) $proof->amount, 2);
+        $invoiceNo = $invoice->invoice_number ?? ('#' . $invoice->id);
+        $link = $invoice->payment_token ? route('pay.show', $invoice->payment_token) : route('pay.lookup');
+
+        $this->notifyStudentAndParent(
+            $student,
+            $eventKey,
+            'payment_proof',
+            __('header.notif_proof_rejected_title'),
+            __('header.notif_proof_rejected_message', [
+                'student' => $student->full_name,
+                'amount' => $amount,
+                'invoice' => $invoiceNo,
+                'reason' => $proof->rejection_reason ?: __('header.notif_proof_no_reason'),
+            ]),
+            $link,
+            $proof->institution_id,
+            'fa-times-circle'
+        );
+    }
+
+    /**
+     * Notify student and/or parent user accounts when linked (respects notify_* system toggles).
+     */
+    private function notifyStudentAndParent(
+        $student,
+        string $eventKey,
+        string $type,
+        string $title,
+        string $message,
+        ?string $link,
+        ?int $institutionId,
+        string $icon = 'fa-bell'
+    ): void {
+        $targets = collect();
+        if ($student->user) {
+            $targets->push($student->user);
+        }
+        if ($student->parent?->user) {
+            $targets->push($student->parent->user);
+        }
+
+        $this->notifyUsers($targets, $eventKey, $type, $title, $message, $link, $institutionId, $icon);
     }
 
     public function notifyInvoiceCreated(Invoice $invoice): void

@@ -141,4 +141,7 @@ return [
     'percentage' => 'Pourcentage (%)',
     'reason_remark' => 'Raison / Remarque',
     'reason_placeholder' => 'ex: Mérite, Enfant du personnel',
+    'national_id' => 'Numéro d\'identité nationale',
+    'national_id_hint' => 'Optionnel — ex. carte d\'identité',
+    'origin_province' => 'Province d\'origine',
 ];

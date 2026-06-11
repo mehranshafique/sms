@@ -77,8 +77,6 @@ class NotificationService
         $parent = $student->parent;
         $institutionId = $payment->institution_id;
 
-        if (!$parent) return;
-
         $eventKey = 'payment_received';
 
         $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
@@ -142,9 +140,7 @@ class NotificationService
 
         $message = str_replace($search, $replace, $template->body);
 
-        // Retrieve Parent Phone
-        $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
-        $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+        $phone = $this->resolveStudentContactPhone($student, $parent);
 
         if (empty($phone)) return;
 
@@ -155,6 +151,78 @@ class NotificationService
         if ($sendWa) {
             $this->dispatchMessage($phone, $message, $institutionId, 'whatsapp');
         }
+    }
+
+    public function sendPaymentProofSubmittedNotification(\App\Models\PaymentProofSubmission $proof): void
+    {
+        $proof->loadMissing(['invoice.student.parent', 'institution']);
+        $this->sendProofExternalNotification($proof, 'payment_proof_submitted', [
+            '$StudentName' => $proof->invoice?->student?->full_name ?? '',
+            '$Amount' => number_format((float) $proof->amount, 2),
+            '$InvoiceNumber' => $proof->invoice?->invoice_number ?? '',
+            '$SchoolName' => $proof->institution?->name ?? 'School',
+            '$PayerName' => $proof->payer_name ?? '',
+        ], $proof->payer_phone);
+    }
+
+    public function sendPaymentProofRejectedNotification(\App\Models\PaymentProofSubmission $proof): void
+    {
+        $proof->loadMissing(['invoice.student.parent', 'institution']);
+        $this->sendProofExternalNotification($proof, 'payment_proof_rejected', [
+            '$StudentName' => $proof->invoice?->student?->full_name ?? '',
+            '$Amount' => number_format((float) $proof->amount, 2),
+            '$InvoiceNumber' => $proof->invoice?->invoice_number ?? '',
+            '$SchoolName' => $proof->institution?->name ?? 'School',
+            '$Reason' => $proof->rejection_reason ?? '',
+        ]);
+    }
+
+    private function sendProofExternalNotification(
+        \App\Models\PaymentProofSubmission $proof,
+        string $eventKey,
+        array $tags,
+        ?string $fallbackPhone = null
+    ): void {
+        $institutionId = $proof->institution_id;
+        $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
+        $sendWa = $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp');
+
+        if (!$sendSms && !$sendWa) {
+            return;
+        }
+
+        $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
+        if (!$template || !$template->is_active) {
+            return;
+        }
+
+        $message = str_replace(array_keys($tags), array_values($tags), $template->body);
+        $student = $proof->invoice?->student;
+        $phone = $fallbackPhone ?: $this->resolveStudentContactPhone($student, $student?->parent);
+
+        if (empty($phone)) {
+            return;
+        }
+
+        if ($sendSms) {
+            $this->dispatchMessage($phone, $message, $institutionId, 'sms');
+        }
+        if ($sendWa) {
+            $this->dispatchMessage($phone, $message, $institutionId, 'whatsapp');
+        }
+    }
+
+    private function resolveStudentContactPhone($student, $parent = null): ?string
+    {
+        if ($parent) {
+            $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
+            $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+            if (!empty($phone)) {
+                return $phone;
+            }
+        }
+
+        return $student?->mobile_number ?? $student?->phone ?? null;
     }
 
     private function dispatchMessage($phone, $message, $institutionId, $channel)

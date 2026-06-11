@@ -185,17 +185,27 @@ class AttendanceReportController extends BaseController
         }
 
         if ($isSubjectWise && empty($selectedSubjectId)) {
-            $stats = []; 
+            $stats = [];
+            $comparisonTable = null;
         } else {
             $stats = $this->analyticsService->getComparativeStats(
-                $student->id, 
-                $classSectionId, 
-                $period, 
-                $isSubjectWise, 
+                $student->id,
+                $classSectionId,
+                $period,
+                $isSubjectWise,
+                $selectedSubjectId
+            );
+            $comparisonTable = $this->analyticsService->getComparativeSummaryTable(
+                $student->id,
+                $classSectionId,
+                $period,
+                $isSubjectWise,
                 $selectedSubjectId
             );
         }
 
-        return view('attendance.reports.student_analytics', compact('student', 'stats', 'period', 'isSubjectWise', 'subjects', 'selectedSubjectId'));
+        return view('attendance.reports.student_analytics', compact(
+            'student', 'stats', 'period', 'isSubjectWise', 'subjects', 'selectedSubjectId', 'comparisonTable'
+        ));
     }
 }

@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'page_title' => 'State Exams (EXETAT)',
+    'heading' => 'Examen d\'État / EXETAT',
+    'subtitle' => 'Register candidates and record results for 6th primary and 8th secondary.',
+    'create_exam' => 'Create State Exam',
+    'name' => 'Exam name',
+    'level' => 'Level',
+    'level_primary_6' => '6th Primary (EXETAT)',
+    'level_secondary_8' => '8th Secondary (EXETAT)',
+    'exam_date' => 'Exam date',
+    'centre' => 'Exam centre',
+    'session' => 'Academic session',
+    'candidates' => 'Candidates',
+    'register_candidate' => 'Register candidate',
+    'candidate_number' => 'Candidate number',
+    'score' => 'Score (%)',
+    'status' => 'Status',
+    'mention' => 'Mention',
+    'created' => 'State exam created successfully.',
+    'candidate_registered' => 'Candidate registered.',
+    'candidate_updated' => 'Candidate record updated.',
+    'no_exams' => 'No state exams configured yet.',
+];

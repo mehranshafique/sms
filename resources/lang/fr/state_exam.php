@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'page_title' => 'Examens d\'État (EXETAT)',
+    'heading' => 'Examen d\'État / EXETAT',
+    'subtitle' => 'Inscrire les candidats et enregistrer les résultats pour la 6e primaire et la 8e secondaire.',
+    'create_exam' => 'Créer un examen d\'État',
+    'name' => 'Nom de l\'examen',
+    'level' => 'Niveau',
+    'level_primary_6' => '6e Primaire (EXETAT)',
+    'level_secondary_8' => '8e Secondaire (EXETAT)',
+    'exam_date' => 'Date de l\'examen',
+    'centre' => 'Centre d\'examen',
+    'session' => 'Année scolaire',
+    'candidates' => 'Candidats',
+    'register_candidate' => 'Inscrire un candidat',
+    'candidate_number' => 'Numéro de candidat',
+    'score' => 'Score (%)',
+    'status' => 'Statut',
+    'mention' => 'Mention',
+    'created' => 'Examen d\'État créé avec succès.',
+    'candidate_registered' => 'Candidat inscrit.',
+    'candidate_updated' => 'Dossier candidat mis à jour.',
+    'no_exams' => 'Aucun examen d\'État configuré.',
+];

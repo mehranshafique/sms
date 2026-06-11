@@ -114,6 +114,8 @@ class InstituteController extends BaseController
             'city'      => 'required|exists:cities,id',
             'address'   => 'nullable|string',
             'full_phone'=> 'required|string|max:30',
+            'head_person_name' => 'required|string|max:150',
+            'head_full_phone' => 'required|string|max:30',
             'email'     => ['required', 'email', 'unique:institutions,email', 'unique:users,email'],
             'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
@@ -127,13 +129,15 @@ class InstituteController extends BaseController
             'state.required'      => __('locations.state_required'),
             'city.required'       => __('locations.city_required'),
             'full_phone.required' => __('institute.validation_phone_required'),
+            'head_person_name.required' => __('institute.validation_head_name_required'),
+            'head_full_phone.required' => __('institute.validation_head_phone_required'),
             'email.unique'        => __('institute.validation_email_unique'), 
         ];
 
         $validated = $request->validate($rules, $messages);
 
-        $textFields = ['name', 'acronym', 'address'];
-        $data = $request->except(['logo', 'password', 'full_phone', 'commune']); 
+        $textFields = ['name', 'acronym', 'address', 'head_person_name'];
+        $data = $request->except(['logo', 'password', 'full_phone', 'head_full_phone', 'commune']); 
         
         foreach ($textFields as $field) {
             if (!empty($data[$field])) {
@@ -146,6 +150,7 @@ class InstituteController extends BaseController
             $institute->fill($data);
             $institute->code = IdGeneratorService::generateInstitutionCode($request->state, $request->city);
             $institute->phone = $request->full_phone;
+            $institute->head_person_phone = $request->head_full_phone;
 
             if ($request->hasFile('logo')) {
                 $institute->logo = $request->file('logo')->store('institutes', 'public');
@@ -167,8 +172,12 @@ class InstituteController extends BaseController
             $this->createInstituteRoles($institute);
 
             if($request->filled('email') && $request->filled('password')) {
-                $adminName = __('institute.admin_default_name', ['name' => ($data['acronym'] ?? $data['name'])]);
+                $adminName = !empty($data['head_person_name'])
+                    ? $data['head_person_name']
+                    : __('institute.admin_default_name', ['name' => ($data['acronym'] ?? $data['name'])]);
                 
+                $adminPhone = $request->head_full_phone ?: $request->full_phone;
+
                 $adminUser = User::create([
                     'name'          => $adminName,
                     'email'         => $request->email,
@@ -177,8 +186,8 @@ class InstituteController extends BaseController
                     'shortcode'     => $institute->code, 
                     'username'      => $institute->code,
                     'user_type'     => UserType::SCHOOL_ADMIN->value, 
-                    'phone'         => $request->full_phone,
-                    'mobile_number' => $request->full_phone,
+                    'phone'         => $adminPhone,
+                    'mobile_number' => $adminPhone,
                     'is_active'     => true,
                 ]);
 
@@ -224,6 +233,11 @@ class InstituteController extends BaseController
             'city'      => 'required|exists:cities,id',
             'address'   => 'nullable|string',
             'full_phone'=> 'required|string|max:30',
+            'head_person_name' => 'required|string|max:150',
+            'head_full_phone' => 'required|string|max:30',
+            'epst_school_code' => 'nullable|string|max:50',
+            'secondary_currency' => 'nullable|string|size:3',
+            'exchange_rate' => 'nullable|numeric|min:0',
             'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
             'password'  => 'nullable|string|min:6',
@@ -241,12 +255,14 @@ class InstituteController extends BaseController
             'state.required'      => __('locations.state_required'),
             'city.required'       => __('locations.city_required'),
             'full_phone.required' => __('institute.validation_phone_required'),
+            'head_person_name.required' => __('institute.validation_head_name_required'),
+            'head_full_phone.required' => __('institute.validation_head_phone_required'),
         ];
 
         $validated = $request->validate($rules, $messages);
 
-        $textFields = ['name', 'acronym', 'address'];
-        $data = $request->except(['logo', 'password', 'full_phone', 'commune']);
+        $textFields = ['name', 'acronym', 'address', 'head_person_name'];
+        $data = $request->except(['logo', 'password', 'full_phone', 'head_full_phone', 'commune']);
 
         foreach ($textFields as $field) {
             if (!empty($data[$field])) {
@@ -262,6 +278,7 @@ class InstituteController extends BaseController
         }
 
         $data['phone'] = $request->full_phone;
+        $data['head_person_phone'] = $request->head_full_phone;
 
         DB::transaction(function () use ($validated, $request, $institute, $adminUser, $data) {
             
@@ -272,7 +289,12 @@ class InstituteController extends BaseController
 
             if($request->filled('email')) {
                 if($adminUser) {
-                    $updateData = ['email' => $request->email];
+                    $updateData = [
+                        'email' => $request->email,
+                        'name' => $data['head_person_name'] ?? $adminUser->name,
+                        'phone' => $request->head_full_phone ?: $request->full_phone,
+                        'mobile_number' => $request->head_full_phone ?: $request->full_phone,
+                    ];
                     if ($request->filled('password')) {
                         $updateData['password'] = Hash::make($request->password);
                     }

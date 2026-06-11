@@ -6,7 +6,10 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 
 | File | Description |
 |------|-------------|
-| `markdown/user-manual.md` | **Module-by-module** end-user guide with examples (Green Valley school), SMS/WhatsApp setup, flows, FAQs |
+| `markdown/user-manual.md` | **Web admin** module-by-module guide with examples (Green Valley school), SMS/WhatsApp setup, flows, FAQs |
+| `markdown/deployment-roadmap.md` | **4-phase deployment plan** (DRC focus, no inventory module) — track go-live tasks |
+| `go-live-checklist.md` | **Production go-live checklist** per school |
+| `markdown/mobile-app-user-manual.md` | **Mobile app (Digitex Portal)** complete guide for all roles |
 | `markdown/developer-manual.md` | **Module-by-module** technical reference: routes, models, permissions, scoping, integrations |
 | `markdown/api-manual.md` | REST API for hardware scanners and mobile apps |
 
@@ -15,6 +18,7 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 Generated PDFs are written to `pdf/`:
 
 - `User-Manual.pdf`
+- `Mobile-App-User-Manual.pdf`
 - `Developer-Manual.pdf`
 - `REST-API-Manual-(Hardware-&-Mobile-App).pdf`
 

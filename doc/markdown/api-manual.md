@@ -399,6 +399,31 @@ Assignments for enrolled class (typically 7-day window) with subject, title, dea
 
 Published exam records only. Returns `403`/empty if `block_reports_on_debt` enabled and student has outstanding fees.
 
+### 6.4a LMD Transcript (University)
+
+**GET** `/v1/student/lmd-transcript`
+
+Optional query: `student_id` (guardian with multiple children).
+
+Returns semester-by-semester LMD results (UE averages, credits, mention, decision) for university/LMD students. Returns `422` if student is not on a university cycle.
+
+**Example response:**
+```json
+{
+  "success": true,
+  "data": {
+    "student_name": "Jean Kabila",
+    "admission_number": "120001",
+    "institution": "Université Example",
+    "sessions": {
+      "2025-2026": {
+        "semester_1": { "average": "14.50", "mention": "Bien", "decision": "Admis", "units": [] }
+      }
+    }
+  }
+}
+```
+
 ### 6.5 Gate Pass (Pickup QR)
 
 **POST** `/v1/student/gate-pass`

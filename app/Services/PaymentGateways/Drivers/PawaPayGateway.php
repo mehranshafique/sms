@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Services\PaymentGateways\Drivers;
+
+use App\Contracts\PaymentGatewayInterface;
+use App\Models\Invoice;
+use App\Models\PaymentGatewayTransaction;
+use App\Services\PaymentGateways\PaymentGatewayConfigService;
+use App\Services\PaymentGateways\PaymentPhoneHelper;
+use Illuminate\Support\Facades\Http;
+use RuntimeException;
+
+class PawaPayGateway implements PaymentGatewayInterface
+{
+    public function __construct(
+        protected PaymentGatewayConfigService $configService,
+        protected ?int $institutionId
+    ) {}
+
+    public function getName(): string
+    {
+        return 'pawapay';
+    }
+
+    public function initiate(Invoice $invoice, PaymentGatewayTransaction $transaction, array $context): array
+    {
+        $provider = config('payment_gateways.pawapay_providers')[$context['method']] ?? null;
+        if (!$provider) {
+            throw new RuntimeException(__('payment_gateway.method_not_supported'));
+        }
+
+        $creds = $this->configService->credentials($this->institutionId, 'pawapay');
+        $baseUrl = $this->configService->environment($this->institutionId) === 'production'
+            ? config('payment_gateways.providers.pawapay.production_url')
+            : config('payment_gateways.providers.pawapay.sandbox_url');
+
+        $phone = PaymentPhoneHelper::toMsisdn($context['payer_phone']);
+        $amount = PaymentPhoneHelper::gatewayAmount((float) $context['amount'], $context['currency'], 'pawapay');
+
+        $payload = [
+            'depositId' => $transaction->external_id,
+            'amount' => (string) $amount,
+            'currency' => $context['currency'],
+            'payer' => [
+                'type' => 'MMO',
+                'accountDetails' => [
+                    'phoneNumber' => $phone,
+                    'provider' => $provider,
+                ],
+            ],
+            'customerMessage' => 'School fees ' . substr($invoice->invoice_number, 0, 12),
+        ];
+
+        $response = Http::withToken($creds['api_token'])
+            ->acceptJson()
+            ->post(rtrim($baseUrl, '/') . '/v2/deposits', $payload);
+
+        $body = $response->json() ?? [];
+
+        if (!$response->successful()) {
+            throw new RuntimeException($body['failureReason']['failureMessage'] ?? $body['message'] ?? 'PawaPay request failed.');
+        }
+
+        $status = strtolower((string) ($body['status'] ?? 'pending'));
+
+        return [
+            'status' => in_array($status, ['accepted', 'processing', 'completed'], true) ? 'processing' : 'failed',
+            'gateway_reference' => $body['depositId'] ?? $transaction->external_id,
+            'checkout_url' => null,
+            'message' => __('payment_gateway.pawapay_confirm_phone'),
+            'raw' => $body,
+        ];
+    }
+
+    public function parseCallback(array $payload): array
+    {
+        $status = strtoupper((string) ($payload['status'] ?? ''));
+        $mapped = match ($status) {
+            'COMPLETED', 'SUCCESS' => 'completed',
+            'FAILED', 'REJECTED', 'CANCELLED' => 'failed',
+            default => 'processing',
+        };
+
+        return [
+            'status' => $mapped,
+            'gateway_reference' => $payload['depositId'] ?? null,
+            'raw' => $payload,
+        ];
+    }
+
+    public function verifyTransaction(PaymentGatewayTransaction $transaction): array
+    {
+        $creds = $this->configService->credentials($this->institutionId, 'pawapay');
+        $baseUrl = $this->configService->environment($this->institutionId) === 'production'
+            ? config('payment_gateways.providers.pawapay.production_url')
+            : config('payment_gateways.providers.pawapay.sandbox_url');
+
+        $response = Http::withToken($creds['api_token'])
+            ->acceptJson()
+            ->get(rtrim($baseUrl, '/') . '/v2/deposits/' . $transaction->external_id);
+
+        return $this->parseCallback($response->json() ?? []);
+    }
+}

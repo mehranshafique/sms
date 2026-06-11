@@ -123,6 +123,7 @@ return [
     'payment_date' => 'Date de paiement',
     'payment_method' => 'Mode de paiement',
     'system' => 'Système',
+    'online' => 'En ligne (Parent)',
 
     'payment_history' => 'Historique des paiements',
     'date' => 'Date',

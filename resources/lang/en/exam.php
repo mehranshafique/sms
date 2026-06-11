@@ -64,6 +64,8 @@ return [
     
     'university_session_1' => 'First Session Exam',
     'university_session_2' => 'Second Session Exam',
+    'rattrapage_session_1' => 'Resit Session (Semester 1)',
+    'rattrapage_session_2' => 'Resit Session (Semester 2)',
     
     // Statuses
     'scheduled' => 'Scheduled',

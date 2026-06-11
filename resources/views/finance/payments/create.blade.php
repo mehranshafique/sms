@@ -51,12 +51,24 @@
 
                             <div class="mb-3">
                                 <label class="form-label">{{ __('payment.method') }} <span class="text-danger">*</span></label>
-                                <select name="method" class="form-control default-select">
-                                    <option value="cash">{{ __('payment.cash') }}</option>
-                                    <option value="bank_transfer">{{ __('payment.bank_transfer') }}</option>
-                                    <option value="card">{{ __('payment.card') }}</option>
-                                    <option value="online">{{ __('payment.online') }}</option>
+                                @if(empty($methods))
+                                    <div class="alert alert-warning mb-0">{{ __('payment.no_methods_enabled') }}
+                                        <a href="{{ route('payment-methods.index') }}">{{ __('payment_methods.page_title') }}</a>
+                                    </div>
+                                @else
+                                <select name="method" id="paymentMethod" class="form-control default-select" required>
+                                    @foreach($methods as $key => $method)
+                                        <option value="{{ $key }}" data-mobile="{{ ($method['mobile'] ?? false) ? '1' : '0' }}">
+                                            {{ __('payment.' . $key) }}
+                                        </option>
+                                    @endforeach
                                 </select>
+                                @endif
+                            </div>
+
+                            <div class="mb-3" id="mobileReferenceBlock" style="display:none;">
+                                <label class="form-label">{{ __('payment.mobile_reference') }} <span class="text-danger">*</span></label>
+                                <input type="text" name="mobile_reference" id="mobileReference" class="form-control" placeholder="{{ __('payment.mobile_reference_placeholder') }}">
                             </div>
 
                             <div class="mb-3">
@@ -64,7 +76,7 @@
                                 <textarea name="notes" class="form-control" rows="2"></textarea>
                             </div>
 
-                            <button type="submit" class="btn btn-success w-100">{{ __('payment.confirm_payment') }}</button>
+                            <button type="submit" class="btn btn-success w-100" @if(empty($methods)) disabled @endif>{{ __('payment.confirm_payment') }}</button>
                         </form>
                     </div>
                 </div>
@@ -78,6 +90,18 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function(){
+        const mobileMethods = ['orange_money', 'airtel_money', 'mpesa', 'vodacom'];
+        function toggleMobileRef() {
+            const el = $('#paymentMethod');
+            if (!el.length) return;
+            const val = el.val();
+            const isMobile = mobileMethods.includes(val) || el.find(':selected').data('mobile') == 1;
+            $('#mobileReferenceBlock').toggle(isMobile);
+            $('#mobileReference').prop('required', isMobile);
+        }
+        $('#paymentMethod').on('change', toggleMobileRef);
+        toggleMobileRef();
+
         $('#paymentForm').submit(function(e){
             e.preventDefault();
             

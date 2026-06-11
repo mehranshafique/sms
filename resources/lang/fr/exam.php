@@ -51,6 +51,8 @@ return [
     'semester_exam_2' => 'Examen Final Semestre 2',
     'university_session_1' => 'Examen Première Session',
     'university_session_2' => 'Examen Deuxième Session',
+    'rattrapage_session_1' => 'Session de rattrapage (Semestre 1)',
+    'rattrapage_session_2' => 'Session de rattrapage (Semestre 2)',
     'scheduled' => 'Planifié',
     'ongoing' => 'En cours',
     'completed' => 'Terminé',

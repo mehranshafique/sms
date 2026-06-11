@@ -99,4 +99,10 @@ return [
     'notif_fund_new_message' => ':requester submitted fund request: :title.',
     'notif_fund_status_title' => 'Fund Request :status',
     'notif_fund_status_message' => 'Your fund request ":title" was :status.',
+    'notif_proof_submitted_title' => 'Payment Proof Submitted',
+    'notif_proof_submitted_admin_message' => ':student submitted payment proof of :amount for invoice :invoice. Review required.',
+    'notif_proof_submitted_parent_message' => 'We received your payment proof of :amount for :student (invoice :invoice). Accounts will review it soon.',
+    'notif_proof_rejected_title' => 'Payment Proof Rejected',
+    'notif_proof_rejected_message' => 'Payment proof for :student (invoice :invoice, :amount) was not accepted. :reason',
+    'notif_proof_no_reason' => 'Please contact the school office.',
 ];

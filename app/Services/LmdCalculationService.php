@@ -33,16 +33,21 @@ class LmdCalculationService
 
         $records = ExamRecord::where('student_id', $student->id)
             ->whereHas('exam', fn($q) => $q->where('academic_session_id', $academicSessionId))
+            ->with('exam')
             ->get()
-            ->keyBy('subject_id');
+            ->groupBy('subject_id');
 
         $ueResults = [];
         $totalSemesterPoints = 0;
         $totalSemesterCoeffs = 0;
         $totalCreditsAttempted = 0;
         $totalCreditsEarned = 0;
-        
-        $validationThreshold = 10; 
+
+        $institutionId = $student->institution_id;
+        $settingThreshold = (float) InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50);
+        $validationThreshold = $settingThreshold > 20
+            ? ($settingThreshold / 100) * 20
+            : $settingThreshold;
 
         foreach ($units as $unit) {
             $uePoints = 0;
@@ -51,8 +56,21 @@ class LmdCalculationService
             $subjectsData = [];
 
             foreach ($unit->subjects as $subject) {
-                $record = $records->get($subject->id);
-                $mark = $record ? $record->marks_obtained : 0;
+                $subjectRecords = $records->get($subject->id, collect());
+                $regularMark = 0;
+                $rattrapageMark = 0;
+
+                foreach ($subjectRecords as $record) {
+                    $category = $record->exam->category ?? '';
+                    $value = (float) ($record->marks_obtained ?? 0);
+                    if (str_starts_with($category, 'rattrapage')) {
+                        $rattrapageMark = max($rattrapageMark, $value);
+                    } else {
+                        $regularMark = max($regularMark, $value);
+                    }
+                }
+
+                $mark = max($regularMark, $rattrapageMark);
                 $maxMark = $subject->total_marks > 0 ? $subject->total_marks : 20;
                 $normalizedMark = ($mark / $maxMark) * 20;
                 
@@ -113,7 +131,22 @@ class LmdCalculationService
             'credits_attempted' => $totalCreditsAttempted,
             'credits_earned' => $totalCreditsEarned,
             'units' => $ueResults,
-            'decision' => $isSemesterValidated ? __('lmd.admitted') : __('lmd.adjourned')
+            'mention' => $this->computeMention($semesterAverage),
+            'decision' => $isSemesterValidated ? __('lmd.admitted') : __('lmd.adjourned'),
         ];
+    }
+
+    /**
+     * Standard LMD mention scale (on /20).
+     */
+    private function computeMention(float $average): string
+    {
+        return match (true) {
+            $average >= 16 => __('lmd.mention_excellent'),
+            $average >= 14 => __('lmd.mention_good'),
+            $average >= 12 => __('lmd.mention_fair'),
+            $average >= 10 => __('lmd.mention_pass'),
+            default => __('lmd.mention_fail'),
+        };
     }
 }

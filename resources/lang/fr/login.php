@@ -10,6 +10,7 @@ return [
     'remember_me' => 'Se souvenir de moi',
     'forgot_password' => 'Mot de passe oublié ?',
     'submit_btn' => 'Se connecter',
+    'help_links' => 'Besoin d\'aide ? Consultez les guides sans connexion :',
     
     'forgot_password_title' => 'Mot de passe oublié | E-Digitex',
     'reset_password_header' => 'Réinitialiser le mot de passe',

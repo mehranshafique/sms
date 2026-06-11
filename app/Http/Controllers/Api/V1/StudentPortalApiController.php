@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Services\LmdCalculationService;
 
 class StudentPortalApiController extends Controller
 {
@@ -399,6 +400,75 @@ class StudentPortalApiController extends Controller
             return response()->json(['success' => true, 'data' => $requests]);
         } catch (\Exception $e) {
             Log::error("Student API Requests Error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getAttendanceSummary(Request $request)
+    {
+        try {
+            $student = $this->getStudent($request);
+            $period = $request->query('period', 'week');
+            $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+            $service = app(\App\Services\AttendanceAnalyticsService::class);
+            $table = $service->getComparativeSummaryTable(
+                $student->id,
+                $enrollment?->class_section_id,
+                in_array($period, ['week', 'month'], true) ? $period : 'week'
+            );
+            return response()->json(['success' => true, 'data' => $table]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * LMD semester results / transcript data for university students.
+     */
+    public function getLmdTranscript(Request $request, LmdCalculationService $lmdService)
+    {
+        try {
+            $student = $this->getStudent($request);
+            $student->load(['enrollments.academicSession', 'gradeLevel']);
+
+            $cycle = $student->gradeLevel->education_cycle ?? 'primary';
+            $cycleValue = is_object($cycle) ? $cycle->value : $cycle;
+
+            if (!in_array($cycleValue, ['university', 'lmd', 'mixed'], true)) {
+                return response()->json(['success' => false, 'message' => __('api.lmd_not_applicable')], 422);
+            }
+
+            $history = [];
+            foreach ($student->enrollments as $enrol) {
+                $sessionId = $enrol->academic_session_id;
+                $sessionName = $enrol->academicSession->name ?? (string) $sessionId;
+
+                $sem1 = $lmdService->calculateSemesterResults($student, $sessionId, 1);
+                if ($sem1) {
+                    $history[$sessionName]['semester_1'] = $sem1;
+                }
+
+                $sem2 = $lmdService->calculateSemesterResults($student, $sessionId, 2);
+                if ($sem2) {
+                    $history[$sessionName]['semester_2'] = $sem2;
+                }
+            }
+
+            if (empty($history)) {
+                return response()->json(['success' => false, 'message' => __('reports.no_records_found')], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'student_name' => $student->full_name,
+                    'admission_number' => $student->admission_number,
+                    'institution' => $student->institution->name ?? null,
+                    'sessions' => $history,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Student API LMD Error: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

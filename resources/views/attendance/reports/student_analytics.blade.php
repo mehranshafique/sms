@@ -83,6 +83,9 @@
                 </div>
             </div>
 
+            {{-- Attendance summary comparison --}}
+            @include('attendance.reports._comparison_table', ['comparisonTable' => $comparisonTable ?? null])
+
             {{-- Raw Logs Table --}}
             <div class="row mt-3">
                 <div class="col-12">

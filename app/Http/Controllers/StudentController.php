@@ -249,6 +249,8 @@ class StudentController extends BaseController
             'email' => 'nullable|email|unique:users,email', 
             'password' => 'nullable|string|min:6', 
             'status' => 'required|string|in:active,inactive,suspended,transferred,graduated', 
+            'national_id' => 'nullable|string|max:50',
+            'origin_province' => 'nullable|string|max:100',
             'rfid_uid' => 'nullable|string|max:100', 
         ]);
 
@@ -271,7 +273,7 @@ class StudentController extends BaseController
         ));
 
         // Clean text fields
-        $textFields = ['first_name', 'last_name', 'post_name', 'place_of_birth', 'avenue', 'country', 'state', 'city', 'religion'];
+        $textFields = ['first_name', 'last_name', 'post_name', 'place_of_birth', 'origin_province', 'avenue', 'country', 'state', 'city', 'religion'];
         foreach ($textFields as $field) {
             if (!empty($data[$field])) {
                 $data[$field] = mb_convert_case($data[$field], MB_CASE_TITLE, "UTF-8");
@@ -501,6 +503,8 @@ class StudentController extends BaseController
             'last_name' => 'required|string|max:100',
             'password' => 'nullable|string|min:6', 
             'status' => 'required|string|in:active,inactive,suspended,transferred,graduated',
+            'national_id' => 'nullable|string|max:50',
+            'origin_province' => 'nullable|string|max:100',
             'rfid_uid' => 'nullable|string|max:100', 
         ]);
 

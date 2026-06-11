@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.api' => TenantApiMiddleware::class,
             // Add other aliases if needed, e.g., 'role' => \Spatie\Permission\Middleware\RoleMiddleware::class
         ]);
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/payments/*',
+        ]);
+
         // Register the "web" middleware group
         $middleware->web(append: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,

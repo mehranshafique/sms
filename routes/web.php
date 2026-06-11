@@ -54,6 +54,10 @@ use App\Http\Controllers\ExamMarkController;
 use App\Http\Controllers\ResultCardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ExamScheduleController; 
+use App\Http\Controllers\StateExamController;
+use App\Http\Controllers\TransportController;
+use App\Http\Controllers\LmdDeliberationController;
+use App\Http\Controllers\GuardianPortalController;
 
 // --- Controllers: Communication & Voting ---
 use App\Http\Controllers\NoticeController;
@@ -68,12 +72,17 @@ use App\Http\Controllers\Finance\FeeTypeController;
 use App\Http\Controllers\Finance\FeeStructureController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
+use App\Http\Controllers\Finance\PaymentMethodController;
+use App\Http\Controllers\Finance\OnlinePaymentController;
 use App\Http\Controllers\Finance\FinancialReportController; 
 use App\Http\Controllers\Finance\StudentFinanceController; 
 use App\Http\Controllers\Finance\StudentStatementController; 
 use App\Http\Controllers\SalaryStructureController; 
 use App\Http\Controllers\Finance\BudgetController; 
 use App\Http\Controllers\Finance\StudentBalanceController; // Added
+use App\Http\Controllers\HelpCenterController;
+use App\Http\Controllers\CommunityForumController;
+use App\Http\Controllers\ManualController;
 
 // --- Middleware ---
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -93,7 +102,49 @@ Route::get('/change-language', function (\Illuminate\Http\Request $request) {
     app()->setLocale($locale);
     session(['locale' => $locale]);
     return redirect()->back();
+})->name('change-language');
+
+Route::get('/help/language/{language}', function (\Illuminate\Http\Request $request, string $language) {
+    if (!in_array($language, ['en', 'fr'])) abort(400);
+    app()->setLocale($language);
+    session(['locale' => $language]);
+    return redirect()->back();
+})->name('help.change_language');
+
+// =========================================================================
+// PUBLIC ONLINE PAYMENT (no login required)
+// =========================================================================
+Route::get('/pay', [OnlinePaymentController::class, 'lookup'])->name('pay.lookup');
+Route::post('/pay/find', [OnlinePaymentController::class, 'find'])->name('pay.find');
+Route::get('/pay/callback/{gateway}/{reference}', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'returnUrl'])->name('pay.gateway.return');
+Route::post('/webhooks/payments/pawapay', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'pawapay'])->name('webhooks.payments.pawapay');
+Route::post('/webhooks/payments/cinetpay', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'cinetpay'])->name('webhooks.payments.cinetpay');
+Route::post('/webhooks/payments/flutterwave', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'flutterwave'])->name('webhooks.payments.flutterwave');
+Route::get('/pay/{token}/status/{reference}', [OnlinePaymentController::class, 'gatewayStatus'])->name('pay.gateway.status');
+Route::post('/pay/{token}/gateway', [OnlinePaymentController::class, 'initiateGateway'])->name('pay.gateway');
+Route::post('/pay/{token}/proof', [OnlinePaymentController::class, 'submitProof'])->name('pay.proof');
+Route::get('/pay/{token}', [OnlinePaymentController::class, 'show'])->name('pay.show');
+
+// =========================================================================
+// PUBLIC HELP CENTER, USER MANUAL & COMMUNITY FORUM
+// =========================================================================
+Route::get('/help', [ManualController::class, 'hub'])->name('help.index');
+Route::get('/help/articles/{slug}', [HelpCenterController::class, 'show'])->name('help.show');
+Route::get('/help/{slug}', [HelpCenterController::class, 'show'])->name('help.article')->where('slug', '[a-z0-9\-]+');
+
+Route::get('/manual', [ManualController::class, 'hub'])->name('manual.hub');
+Route::get('/manual/web', [ManualController::class, 'webIndex'])->name('manual.web');
+Route::get('/manual/web/{slug}', [ManualController::class, 'webShow'])->name('manual.web.show');
+Route::get('/manual/mobile', [ManualController::class, 'mobileIndex'])->name('manual.mobile');
+Route::get('/manual/mobile/{slug}', [ManualController::class, 'mobileShow'])->name('manual.mobile.show');
+
+Route::get('/community', [CommunityForumController::class, 'index'])->name('community.index');
+Route::middleware('auth')->group(function () {
+    Route::get('/community/create', [CommunityForumController::class, 'create'])->name('community.create');
+    Route::post('/community', [CommunityForumController::class, 'store'])->name('community.store');
+    Route::post('/community/{thread}/reply', [CommunityForumController::class, 'reply'])->name('community.reply');
 });
+Route::get('/community/{thread}', [CommunityForumController::class, 'show'])->name('community.show');
 
 // =========================================================================
 // AUTHENTICATED ROUTES
@@ -394,6 +445,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/transcript', [ReportController::class, 'transcript'])->name('transcript');
     });
 
+    // State exams (EXETAT / Examen d'État)
+    Route::prefix('state-exams')->name('state-exams.')->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->group(function () {
+        Route::get('/', [StateExamController::class, 'index'])->name('index');
+        Route::post('/', [StateExamController::class, 'store'])->name('store');
+        Route::get('/{stateExam}', [StateExamController::class, 'show'])->name('show');
+        Route::post('/{stateExam}/candidates', [StateExamController::class, 'registerCandidate'])->name('candidates.store');
+        Route::put('/{stateExam}/candidates/{candidate}', [StateExamController::class, 'updateCandidate'])->name('candidates.update');
+    });
+
+    // LMD deliberation / jury
+    Route::prefix('lmd-deliberations')->name('lmd-deliberations.')->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->group(function () {
+        Route::get('/', [LmdDeliberationController::class, 'index'])->name('index');
+        Route::post('/generate', [LmdDeliberationController::class, 'generate'])->name('generate');
+        Route::post('/{deliberation}/validate', [LmdDeliberationController::class, 'validateDeliberation'])->name('validate');
+    });
+
+    // School transport
+    Route::prefix('transport')->name('transport.')->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->group(function () {
+        Route::get('/', [TransportController::class, 'index'])->name('index');
+        Route::post('/vehicles', [TransportController::class, 'storeVehicle'])->name('vehicles.store');
+        Route::post('/routes', [TransportController::class, 'storeRoute'])->name('routes.store');
+        Route::post('/assignments', [TransportController::class, 'assignStudent'])->name('assignments.store');
+    });
+
+    // Guardian web portal
+    Route::prefix('guardian')->name('guardian.')->middleware([RoleMiddleware::class . ':Guardian'])->group(function () {
+        Route::get('/', [GuardianPortalController::class, 'index'])->name('index');
+        Route::get('/fees', [GuardianPortalController::class, 'fees'])->name('fees');
+        Route::get('/results', [GuardianPortalController::class, 'results'])->name('results');
+        Route::get('/attendance', [GuardianPortalController::class, 'attendance'])->name('attendance');
+        Route::get('/requests', [GuardianPortalController::class, 'requests'])->name('requests');
+    });
+
     // =========================================================================
     // 5. FINANCE MODULE 
     // =========================================================================
@@ -459,8 +543,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         // Payments
         Route::middleware([CheckModuleAccess::class . ':payments'])->group(function () {
+            Route::get('payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
+            Route::post('payment-methods', [PaymentMethodController::class, 'update'])->name('payment-methods.update');
+            Route::get('payment-proofs', [\App\Http\Controllers\Finance\PaymentProofController::class, 'index'])->name('payment-proofs.index');
+            Route::post('payment-proofs/{proof}/approve', [\App\Http\Controllers\Finance\PaymentProofController::class, 'approve'])->name('payment-proofs.approve');
+            Route::post('payment-proofs/{proof}/reject', [\App\Http\Controllers\Finance\PaymentProofController::class, 'reject'])->name('payment-proofs.reject');
             Route::get('payments/create', [PaymentController::class, 'create'])->name('payments.create');
             Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
+        });
+
+        Route::middleware([CheckModuleAccess::class . ':invoices'])->group(function () {
+            Route::post('invoices/{invoice}/refresh-payment-link', [InvoiceController::class, 'refreshPaymentLink'])->name('invoices.refresh_payment_link');
         });
         
         // Platform Invoices (Super Admin View)
@@ -506,6 +599,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('reminders', [ReminderController::class, 'index'])->name('reminders.index');
         Route::post('reminders/fees', [ReminderController::class, 'sendFeeReminders'])->name('reminders.fees.send');
         Route::post('reminders/exams', [ReminderController::class, 'sendExamReminders'])->name('reminders.exams.send');
+        Route::post('reminders/attendance', [ReminderController::class, 'sendAttendanceReports'])->name('reminders.attendance.send');
 
     });
 

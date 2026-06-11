@@ -67,6 +67,12 @@ return [
     'made_in' => 'Fait à',
     'on_date' => 'le',
     'direction' => 'DIRECTION',
+    'epst_republic_line' => 'République Démocratique du Congo',
+    'epst_ministry_line' => 'Ministère de l\'Enseignement Primaire, Secondaire et Technique (EPST)',
+    'epst_school_code' => 'Code école EPST',
+    'epst_director' => 'Directeur(trice)',
+    'esu_ministry_line' => 'Ministère de l\'Enseignement Supérieur et Universitaire (ESU)',
+    'esu_transcript_title' => 'Relevé de notes académique (LMD — ESU)',
     
     'session' => 'Session',
     'date' => 'Date',

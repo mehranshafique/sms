@@ -182,4 +182,7 @@ return [
     'leave_blank_keep_current' => 'Leave blank to keep current',
     'password_instruction' => 'Used by the student to log into the mobile app.',
     'app_access' => 'App Access',
+    'national_id' => 'National ID',
+    'national_id_hint' => 'Optional — e.g. carte d\'identité',
+    'origin_province' => 'Province of Origin',
 ];

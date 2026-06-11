@@ -149,6 +149,35 @@
                             </div>
                         </div>
 
+                        @if(!empty($onlinePayEnabled) && $paymentUrl && $invoice->status != 'paid')
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card border-primary bg-light">
+                                    <div class="card-body">
+                                        <h6 class="text-primary fw-bold mb-2"><i class="fa fa-link me-2"></i>{{ __('invoice.online_payment_link') }}</h6>
+                                        <p class="text-muted small mb-3">{{ __('invoice.online_payment_help') }}</p>
+                                        <div class="mb-2">
+                                            <span class="text-muted small">{{ __('invoice.invoice_id_label') }}:</span>
+                                            <strong>{{ $invoice->invoice_number }}</strong>
+                                        </div>
+                                        <div class="input-group mb-2">
+                                            <input type="text" class="form-control" id="paymentLinkInput" value="{{ $paymentUrl }}" readonly>
+                                            <button type="button" class="btn btn-primary" id="copyPaymentLinkBtn">
+                                                <i class="fa fa-copy me-1"></i> {{ __('invoice.copy_link') }}
+                                            </button>
+                                        </div>
+                                        @can('invoice.view')
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="refreshPaymentLinkBtn" data-url="{{ route('invoices.refresh_payment_link', $invoice->id) }}">
+                                            <i class="fa fa-refresh me-1"></i> {{ __('invoice.refresh_link') }}
+                                        </button>
+                                        @endcan
+                                        <div class="mt-2 small text-muted">{{ __('online_pay.lookup_alt') }}: <a href="{{ route('pay.lookup') }}" target="_blank">{{ route('pay.lookup') }}</a></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
                     </div>
                 </div>
             </div>
@@ -177,7 +206,13 @@
                                         <td class="py-3">{{ $payment->payment_date->format('d M, Y') }}</td>
                                         <td class="py-3"><span class="badge badge-light text-dark border">{{ $payment->transaction_id }}</span></td>
                                         <td class="py-3">{{ ucfirst($payment->method) }}</td>
-                                        <td class="py-3">{{ $payment->receivedBy->name ?? __('finance.system') }}</td>
+                                        <td class="py-3">
+                                            @if($payment->source === 'online')
+                                                {{ $payment->payer_name ?? __('finance.online') }}
+                                            @else
+                                                {{ $payment->receivedBy->name ?? __('finance.system') }}
+                                            @endif
+                                        </td>
                                         <td class="text-success fw-bold py-3 text-end">+ {{ $currency }} {{ number_format($payment->amount, 2) }}</td>
                                     </tr>
                                     @empty
@@ -195,4 +230,38 @@
 
     </div>
 </div>
+@endsection
+
+@section('js')
+<script>
+$(function() {
+    $('#copyPaymentLinkBtn').on('click', function() {
+        const input = document.getElementById('paymentLinkInput');
+        if (!input) return;
+        input.select();
+        navigator.clipboard.writeText(input.value).then(function() {
+            if (typeof toastr !== 'undefined') toastr.success(@json(__('invoice.link_copied')));
+            else alert(@json(__('invoice.link_copied')));
+        });
+    });
+
+    $('#refreshPaymentLinkBtn').on('click', function() {
+        const url = $(this).data('url');
+        if (!url || !confirm(@json(__('invoice.refresh_link') . '?'))) return;
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                'Accept': 'application/json',
+            },
+        })
+        .then(r => r.json())
+        .then(data => {
+            $('#paymentLinkInput').val(data.url);
+            if (typeof toastr !== 'undefined') toastr.success(data.message);
+        });
+    });
+});
+</script>
 @endsection

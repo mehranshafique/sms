@@ -9,25 +9,7 @@
         @endphp
 
         {{-- Welcome Banner --}}
-        <div class="row mb-4">
-            <div class="col-xl-12">
-                <div class="card bg-primary text-white shadow-sm">
-                    <div class="card-body d-flex justify-content-between align-items-center p-4">
-                        <div>
-                            <h3 class="text-white fw-bold mb-1">
-                                {{ __('dashboard.welcome_title', ['school' => $institution->name ?? '']) }}
-                            </h3>
-                            @if(isset($currentSession))
-                                <p class="mb-0 opacity-75">
-                                    {{ __('dashboard.academic_year') }}: <strong>{{ $currentSession->name }}</strong>
-                                </p>
-                            @endif
-                        </div>
-                        <i class="la la-graduation-cap opacity-25" style="font-size: 3rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('dashboard.partials.welcome-banner', ['institution' => $institution, 'currentSession' => $currentSession ?? null])
 
         {{-- ROW 1: ENROLLMENT & PAYMENT STATUS --}}
         <div class="row">

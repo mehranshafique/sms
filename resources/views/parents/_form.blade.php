@@ -59,26 +59,59 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
+                        @php
+                            $linkedUser = isset($parent) ? $parent->user : null;
+                        @endphp
+
+                        @if($linkedUser)
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('parent.parent_id') }}</label>
+                            <input type="text" class="form-control bg-light" value="{{ $linkedUser->shortcode }}" readonly>
+                            <small class="text-muted">{{ __('parent.parent_id_hint') }}</small>
+                        </div>
+                        @else
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('parent.parent_id') }}</label>
+                            <input type="text" class="form-control bg-light" value="{{ __('parent.auto_generated') }}" readonly>
+                        </div>
+                        @endif
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('parent.username') }}</label>
+                            <input type="text" name="username" class="form-control" value="{{ old('username', $linkedUser->username ?? '') }}" placeholder="{{ __('parent.username_placeholder') }}">
+                            <small class="text-muted">{{ __('parent.username_hint') }}</small>
+                        </div>
+
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.guardian_name') }}</label>
-                            <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name', $parent->guardian_name ?? '') }}" placeholder="Primary Contact Name">
+                            <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name', optional($parent)->guardian_name) }}" placeholder="Primary Contact Name">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.guardian_email') }}</label>
-                            <input type="email" name="guardian_email" class="form-control" value="{{ old('guardian_email', $parent->guardian_email ?? '') }}" placeholder="Used for Login">
-                            <small class="text-muted">A user account will be created if this email is unique.</small>
+                            <input type="email" name="guardian_email" class="form-control" value="{{ old('guardian_email', optional($parent)->guardian_email) }}" placeholder="Used for Login">
+                            <small class="text-muted">{{ __('parent.email_hint') }}</small>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.guardian_phone') }}</label>
-                            <input type="text" name="guardian_phone" class="form-control" value="{{ old('guardian_phone', $parent->guardian_phone ?? '') }}">
+                            <input type="text" name="guardian_phone" class="form-control" value="{{ old('guardian_phone', optional($parent)->guardian_phone) }}">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('parent.guardian_relation') }}</label>
-                            <input type="text" name="guardian_relation" class="form-control" value="{{ old('guardian_relation', $parent->guardian_relation ?? '') }}" placeholder="e.g. Uncle, Brother">
+                            <input type="text" name="guardian_relation" class="form-control" value="{{ old('guardian_relation', optional($parent)->guardian_relation) }}" placeholder="e.g. Uncle, Brother">
                         </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('parent.password') }}</label>
+                            <input type="password" name="password" class="form-control" autocomplete="new-password" placeholder="{{ isset($parent) ? __('parent.password_edit_placeholder') : __('parent.password_create_placeholder') }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">{{ __('parent.password_confirm') }}</label>
+                            <input type="password" name="password_confirmation" class="form-control" autocomplete="new-password">
+                        </div>
+
                         <div class="col-md-12 mb-3">
                             <label class="form-label">{{ __('parent.address_label') }}</label>
-                            <textarea name="family_address" class="form-control" rows="2">{{ old('family_address', $parent->family_address ?? '') }}</textarea>
+                            <textarea name="family_address" class="form-control" rows="2">{{ old('family_address', optional($parent)->family_address) }}</textarea>
                         </div>
                     </div>
                 </div>

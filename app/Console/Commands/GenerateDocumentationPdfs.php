@@ -17,6 +17,7 @@ class GenerateDocumentationPdfs extends Command
     {
         $manuals = [
             'user-manual' => 'User Manual',
+            'mobile-app-user-manual' => 'Mobile App User Manual',
             'developer-manual' => 'Developer Manual',
             'api-manual' => 'REST API Manual (Hardware & Mobile App)',
         ];

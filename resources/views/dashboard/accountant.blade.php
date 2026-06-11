@@ -5,28 +5,11 @@
     <div class="container-fluid">
         
         {{-- Welcome Banner --}}
-        <div class="row mb-4">
-            <div class="col-xl-12">
-                <div class="card bg-primary text-white shadow-sm border-0">
-                    <div class="card-body d-flex justify-content-between align-items-center p-4">
-                        <div>
-                            <h3 class="text-white fw-bold mb-1">
-                                {{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}
-                            </h3>
-                            <p class="mb-0 opacity-75">
-                                {{ __('dashboard.accountant_dashboard') }} |
-                                @if(isset($currentSession))
-                                    {{ __('dashboard.current_session') }}: <strong>{{ $currentSession->name }}</strong>
-                                @else
-                                    {{ __('dashboard.no_active_session') }}
-                                @endif
-                            </p>
-                        </div>
-                        <i class="la la-calculator opacity-25" style="font-size: 3rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('dashboard.partials.welcome-banner', [
+            'institution' => $institution ?? null,
+            'currentSession' => $currentSession ?? null,
+            'subtitle' => __('dashboard.accountant_dashboard'),
+        ])
 
         {{-- QUICK ACTIONS --}}
         <div class="row mb-4">

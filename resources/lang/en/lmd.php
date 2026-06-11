@@ -40,6 +40,11 @@ return [
     'failed' => 'Failed (NV)',
     'average' => 'Average',
     'mention' => 'Mention',
+    'mention_excellent' => 'Très Bien',
+    'mention_good' => 'Bien',
+    'mention_fair' => 'Assez Bien',
+    'mention_pass' => 'Passable',
+    'mention_fail' => '—',
     'credits_earned' => 'Earned Credits',
     'credits_attempted' => 'Attempted Credits',
 

@@ -87,9 +87,11 @@ Route::prefix('v1/pickup')->middleware(['auth:sanctum'])->group(function () {
 // --- STUDENT MOBILE PORTAL ---
 Route::prefix('v1/student')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/attendance', [StudentPortalApiController::class, 'getAttendance']);
+    Route::get('/attendance-summary', [StudentPortalApiController::class, 'getAttendanceSummary']);
     Route::get('/fees', [StudentPortalApiController::class, 'getFees']);
     Route::get('/homework', [StudentPortalApiController::class, 'getHomework']);
     Route::get('/results', [StudentPortalApiController::class, 'getResults']);
+    Route::get('/lmd-transcript', [StudentPortalApiController::class, 'getLmdTranscript']);
     Route::get('/requests', [StudentPortalApiController::class, 'getRequests']);
     Route::post('/gate-pass', [StudentPortalApiController::class, 'generateGatePass']);
     Route::post('/requests', [StudentPortalApiController::class, 'submitRequest']);

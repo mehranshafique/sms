@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'settings_title' => 'Passerelle de paiement (RDC)',
+    'provider' => 'Fournisseur',
+    'provider_none' => 'Aucun — preuve manuelle uniquement',
+    'provider_help' => 'PawaPay est recommandé pour Orange/Airtel/M-Pesa en RDC. CinetPay et Flutterwave sont des alternatives courantes.',
+    'environment' => 'Environnement',
+    'manual_proof_enabled' => 'Autoriser le téléversement de preuve de paiement',
+    'webhook_urls' => 'Configurez ces URLs webhook dans votre tableau de bord gateway',
+    'pay_now' => 'Payer instantanément',
+    'pay_now_help' => 'Payer via :provider. Confirmez sur votre téléphone ou via la page de paiement.',
+    'continue_checkout' => 'Continuer vers le paiement',
+    'not_configured' => 'Passerelle non configurée pour cette école.',
+    'method_not_supported' => 'Ce mode de paiement n\'est pas pris en charge par la passerelle active.',
+    'processing' => 'Paiement en cours de traitement…',
+    'payment_success' => 'Paiement effectué avec succès !',
+    'payment_pending' => 'Paiement en cours. Patientez ou contactez l\'école.',
+    'payment_failed' => 'Échec du paiement. Réessayez ou téléversez une preuve.',
+    'pawapay_confirm_phone' => 'Confirmez le paiement sur votre téléphone (code PIN Mobile Money).',
+    'status_title' => 'Statut du paiement',
+    'back_to_invoice' => 'Retour à la facture',
+    'try_again' => 'Réessayer',
+    'polling_hint' => 'Cette page se rafraîchit automatiquement.',
+];

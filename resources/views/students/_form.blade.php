@@ -87,6 +87,20 @@
                             <input type="text" name="place_of_birth" class="form-control" value="{{ old('place_of_birth', $student->place_of_birth ?? '') }}">
                         </div>
                         <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.origin_province') }}</label>
+                            <select name="origin_province" class="form-control default-select">
+                                <option value="">{{ __('student.select_option') }}</option>
+                                @php $drcProvinces = array_keys(include database_path('seeders/data/drc_provinces.php')); @endphp
+                                @foreach($drcProvinces as $province)
+                                    <option value="{{ $province }}" {{ old('origin_province', $student->origin_province ?? '') == $province ? 'selected' : '' }}>{{ $province }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('student.national_id') }}</label>
+                            <input type="text" name="national_id" class="form-control" value="{{ old('national_id', $student->national_id ?? '') }}" placeholder="{{ __('student.national_id_hint') }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('student.dob') }} <span class="text-danger">*</span></label>
                             <input type="text" name="dob" class="datepicker form-control" value="{{ old('dob', isset($student) ? $student->dob->format('Y-m-d') : '') }}" placeholder="YYYY-MM-DD" required>
                         </div>

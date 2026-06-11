@@ -115,6 +115,7 @@ return [
     'payment_date' => 'Payment Date',
     'payment_method' => 'Payment Method',
     'system' => 'System',
+    'online' => 'Online (Parent)',
 
     'payment_history' => 'Payment History',
     'date' => 'Date',

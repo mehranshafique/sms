@@ -4,6 +4,8 @@
 **Audience:** School administrators, teachers, accountants, parents, and staff who are **not technical experts**.  
 **Goal:** Explain every part of the system in plain language, with real-world examples, so you know *what to click*, *why it exists*, and *what must be done first*.
 
+> **Mobile app users:** For the Digitex Portal Android app (NFC gate, pickup, student portal, teacher attendance), see **`mobile-app-user-manual.md`** in this folder — a separate complete guide for all app roles with example login values and step-by-step workflows.
+
 ---
 
 ## How to Read This Manual
@@ -1386,6 +1388,309 @@ Internal school spending control — departments get **budget envelopes**; staff
 
 ---
 
+## Module H7: Payment Methods Configuration
+
+### Purpose
+
+Configure which payment options your school accepts — **Cash**, **Bank transfer**, **Orange Money**, **Airtel Money**, **M-Pesa/Vodacom**, and **Card/Online** — instead of hardcoded choices. These settings control both **office payment recording** and **parent online pay pages**.
+
+### Menu path
+
+**Finance → Fees & Collection → Payment Methods**
+
+### Step-by-step — Enable methods
+
+1. Log in as **School Admin** or **Accountant**.
+2. Open **Payment Methods**.
+3. Toggle **Online payments** ON to allow public pay links.
+4. For each payment method row:
+   - Check **Enabled**
+   - Fill **Merchant code** (Mobile Money) or **Bank details** (transfer)
+   - Add **Instructions** parents will see on the pay page
+5. Toggle **Manual proof upload** ON (recommended backup when gateway is unavailable).
+6. Click **Save settings**.
+
+### Example — Orange Money (DRC)
+
+| Field | Example value |
+|-------|----------------|
+| Merchant code | `123456` |
+| Instructions | Dial *144# → Pay Merchant → enter 123456 → amount → confirm PIN |
+
+### Depends on
+
+Finance module enabled, active institution selected (building icon, top-right).
+
+---
+
+## Module H8: Online Invoice Payment Links
+
+### Purpose
+
+Share a **secure pay link** with parents so they can pay fees **without logging in**. Each invoice can have a unique token URL.
+
+### How it works
+
+1. Accountant generates or opens an invoice (Module H3).
+2. On the invoice detail page, copy the **Online Payment Link** (or regenerate if needed).
+3. Send link via **WhatsApp**, **SMS**, or email.
+4. Parent opens link → sees amount due and payment options.
+
+### Public invoice lookup (no link)
+
+If the parent lost the link:
+
+1. Open **https://e-digitex.com/pay** (or your school domain + `/pay`).
+2. Enter **Invoice number** (e.g. INV-2025-0089) and **Student admission number**.
+3. System finds the invoice and opens the pay page.
+
+### Pay page tabs
+
+| Tab | What happens |
+|-----|----------------|
+| **Pay instantly** | Mobile Money via PawaPay, CinetPay, or Flutterwave — invoice marked **Paid** automatically |
+| **Upload proof** | Parent submits receipt + transaction ID — status **Pending** until accountant approves (Module H10) |
+
+### Example workflow
+
+1. Invoice INV-2025-0089 — Marie Kouassi — 150,000 CDF unpaid  
+2. Accountant copies link: `https://e-digitex.com/pay/abc123...`  
+3. Sends WhatsApp to parent  
+4. Parent pays via Orange Money → invoice **Paid** within seconds  
+
+---
+
+## Module H9: Payment Gateways (PawaPay, CinetPay, Flutterwave)
+
+### Purpose
+
+Collect **Mobile Money** payments online in the **Democratic Republic of Congo (DRC)**. One gateway is active per school at a time.
+
+### Supported gateways
+
+| Gateway | Best for | DRC operators | Currencies |
+|---------|----------|---------------|------------|
+| **PawaPay** (recommended) | Direct API — PIN prompt on parent's phone | Orange, Airtel, Vodacom M-Pesa | CDF, USD |
+| **CinetPay** | Redirect checkout (popular in Francophone Africa) | Orange CD, Airtel CD, M-Pesa CD | CDF, USD |
+| **Flutterwave** | Pan-African + cards | DRC mobile money, cards | CDF, USD |
+
+### Configuration checklist
+
+1. **Payment Methods** → scroll to **Payment Gateway (DRC)**.
+2. Choose **Provider** (PawaPay / CinetPay / Flutterwave).
+3. Set **Environment**: **Sandbox** (testing) or **Production** (live).
+4. Paste **API credentials** from gateway dashboard (see below).
+5. Copy **Webhook URLs** from the page into your gateway dashboard.
+6. Enable **Online payments** and required Mobile Money methods.
+7. **Save settings** → test with a small invoice → switch to Production when ready.
+
+### Webhook URLs (register in gateway dashboard)
+
+Replace `YOUR-DOMAIN.com` with your live domain (e.g. `e-digitex.com`):
+
+```
+https://YOUR-DOMAIN.com/webhooks/payments/pawapay
+https://YOUR-DOMAIN.com/webhooks/payments/cinetpay
+https://YOUR-DOMAIN.com/webhooks/payments/flutterwave
+```
+
+**Why webhooks matter:** When payment completes on the parent's phone, the gateway notifies your server so the invoice is marked **Paid** automatically — even if the browser is closed.
+
+**Return URL (after checkout):** `https://YOUR-DOMAIN.com/pay/callback/{gateway}/{reference}` — configured automatically; CinetPay/Flutterwave redirect parents here.
+
+---
+
+### H9A: PawaPay Setup
+
+#### Get API keys
+
+1. Register at **https://dashboard.pawapay.io** (production) or **https://dashboard.sandbox.pawapay.io** (testing).
+2. Complete merchant verification (school name, contact, bank details).
+3. Dashboard → **Settings → API** → copy **Bearer API Token**.
+4. **Never share the token publicly.**
+
+#### Configure in Digitex SMS
+
+| Setting | Value |
+|---------|-------|
+| Provider | PawaPay |
+| Environment | Sandbox (then Production) |
+| PawaPay API Token | Paste token |
+| Online payments | ON |
+
+#### Register webhook
+
+1. Payment Methods page → copy PawaPay webhook URL.
+2. PawaPay dashboard → **Webhooks** → add URL.
+3. Events: **Deposit completed**, **Deposit failed**.
+
+#### Operator mapping (automatic)
+
+| Digitex method | PawaPay provider |
+|----------------|------------------|
+| Orange Money | ORANGE_COD |
+| Airtel Money | AIRTEL_COD |
+| M-Pesa / Vodacom | VODACOM_MPESA_COD |
+
+#### Go live
+
+1. Complete PawaPay production KYC.
+2. Get production API token.
+3. Payment Methods → Environment: **Production** → save.
+4. Update webhook on production PawaPay dashboard.
+5. Test with small real payment (e.g. 100 CDF).
+
+**Docs:** https://docs.pawapay.io
+
+---
+
+### H9B: CinetPay Setup
+
+#### Get API keys
+
+1. Register at **https://cinetpay.com** → merchant dashboard.
+2. Complete account verification.
+3. Copy **Site ID** and **API Key** from integration settings.
+
+#### Configure in Digitex SMS
+
+| Setting | Value |
+|---------|-------|
+| Provider | CinetPay |
+| Environment | Sandbox / Production |
+| CinetPay Site ID | From dashboard |
+| CinetPay API Key | From dashboard |
+
+#### Register webhook
+
+1. Copy CinetPay webhook URL from Payment Methods page.
+2. CinetPay dashboard → **Notifications / Webhook** → paste URL.
+3. Save.
+
+#### Test
+
+1. Create test invoice → copy pay link.
+2. **Pay instantly** → CinetPay checkout → use sandbox test credentials.
+3. Confirm invoice status **Paid**.
+
+**Docs:** https://docs.cinetpay.com
+
+---
+
+### H9C: Flutterwave Setup
+
+#### Get API keys
+
+1. Register at **https://dashboard.flutterwave.com**.
+2. Complete business verification.
+3. Copy **Public Key**, **Secret Key**, and **Encryption Key** (if shown).
+
+#### Configure in Digitex SMS
+
+| Setting | Value |
+|---------|-------|
+| Provider | Flutterwave |
+| Environment | Test / Live |
+| Flutterwave Secret Key | From dashboard |
+| Flutterwave Public Key | From dashboard |
+
+#### Register webhook
+
+1. Copy Flutterwave webhook URL from Payment Methods page.
+2. Flutterwave dashboard → **Settings → Webhooks** → add URL.
+3. Enable **charge.completed** (or equivalent payment success event).
+
+**Docs:** https://developer.flutterwave.com/docs
+
+---
+
+### Gateway troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Payment stays pending | Verify webhook URL is HTTPS and reachable from internet |
+| Invalid API key | Regenerate key in gateway dashboard; re-save in Payment Methods |
+| Wrong operator | Parent phone must match operator (243…) |
+| Gateway down | Parents can use **Upload proof** tab (Module H10) |
+| Sandbox works, production fails | Switch Environment to Production and use live API keys |
+
+### Public help articles
+
+Detailed step-by-step guides (no login required): **https://e-digitex.com/help**
+
+---
+
+## Module H10: Manual Payment Proof (Upload & Review)
+
+### Purpose
+
+When parents pay **offline** (Mobile Money agent, bank deposit, cash at office without immediate recording), they can **upload proof** on the pay page. Accountants **approve or reject** submissions before the invoice is marked paid.
+
+---
+
+### H10A: Parent — Upload proof
+
+1. Parent opens invoice pay link (`/pay/...`) or finds invoice at `/pay`.
+2. Select tab **Upload proof**.
+3. Fill in:
+   - **Payment date and time**
+   - **Transaction / reference ID**
+   - **Payment method** (Orange, Airtel, bank, etc.)
+   - **Amount paid**
+   - **Receipt photo** (screenshot or photo of slip)
+4. Submit → status **Pending review**.
+
+**Tip:** Encourage parents to include the full transaction SMS or agent receipt for faster approval.
+
+---
+
+### H10B: Accountant — Review proofs
+
+**Menu:** Finance → Fees & Collection → **Payment Proofs**
+
+| Action | Result |
+|--------|--------|
+| **Approve** | Payment recorded; invoice balance updated; parent notified |
+| **Reject** | Parent can re-submit with correct information |
+
+#### Step-by-step — Approve
+
+1. Open **Payment Proofs**.
+2. Review pending list — click submission to see receipt image and details.
+3. Verify amount and transaction ID match bank/Mobile Money statement.
+4. Click **Approve** → invoice marked paid (or partial payment applied).
+5. If invalid duplicate or wrong amount → **Reject** with reason.
+
+### Example
+
+1. Parent pays 150,000 CDF at Orange agent — TRX: `OM-20250914-8821`.
+2. Uploads proof on pay page with receipt photo.
+3. Accountant sees pending proof next morning.
+4. Matches statement → **Approve** → INV-2025-0089 **Paid**.
+
+### Depends on
+
+**Manual proof upload** enabled in Payment Methods; `storage:link` run on server for receipt file uploads.
+
+---
+
+## Help Center & Community Forum
+
+### Public Documentation (no login)
+
+| Page | URL | Content |
+|------|-----|---------|
+| **Documentation home** | `/help` | Search, links to full manuals, quick guides, forum |
+| **Web user manual** | `/manual/web` | Complete browser admin guide — all modules A–M |
+| **Mobile app manual** | `/manual/mobile` | Digitex Portal app — 21 chapters |
+| **Quick guides** | `/help/payment-gateway-overview` (etc.) | Focused setup articles |
+| **Community forum** | `/community` | Ask questions (post requires login) |
+| **Pay fees** | `/pay` | Public invoice payment |
+
+**Live example:** https://e-digitex.com/help
+
+---
+
 # PART I — COMMUNICATION
 
 ---
@@ -1500,6 +1805,37 @@ Marie votes for candidate **Yao Christian** as President — one vote per studen
 
 # PART L — QUICK REFERENCE — MODULE DEPENDENCY CHART
 
+---
+
+## Module L1: Module Dependency Chart
+
+### Purpose
+
+See **what must be created first** before using each area of the system. If something is missing from a menu, work through this chart from top to bottom.
+
+### Who uses it
+
+School Admin, Head Officer, Super Admin — especially during **initial school setup**.
+
+### Setup order (recommended)
+
+| Step | Create first | Then you can use |
+|------|----------------|------------------|
+| 1 | **Institution** (school) | Everything else |
+| 2 | **Campus** (optional) | Multi-site reports |
+| 3 | **Academic Session** (mark one as *current*) | Enrollments, fees, exams |
+| 4 | **Configuration** (SMS, email, WhatsApp) | Notifications, reminders |
+| 5 | **Grade Levels** | Class sections, fee structures |
+| 6 | **Class Sections** | Enrollments, attendance, timetables |
+| 7 | **Subjects** | Class subjects, exam marks |
+| 8 | **Parents / Guardians** | Link to students |
+| 9 | **Students** | Enrollments, invoices, attendance |
+| 10 | **Fee Types** → **Fee Structures** | Invoices, payments |
+| 11 | **Staff** | Timetables, payroll, gate pickup |
+| 12 | **Exams** → **Schedules** → **Marks** | Result cards, reports |
+
+### Visual dependency chart
+
 ```
 Institution → Academic Session → Grade Levels → Class Sections
      ↓              ↓                                    ↓
@@ -1509,23 +1845,69 @@ Configuration   Invoices → Payments              Attendance / Exams / Pickup
 (SMS/Email)
 ```
 
+### Example story
+
+Green Valley opens in September. The admin creates **Session 2025-2026**, then **Grade 5**, then **Grade 5 Section A**, then imports **students**, then **enrolls** them — only then **Bulk Generate Invoices** works.
+
+### Common questions
+
+**Q: Invoices menu is empty / generate fails.**  
+A: Check fee structures exist for the student's grade and session, and the student is **enrolled** in a class.
+
+**Q: Teacher cannot mark attendance.**  
+A: Student must be **enrolled** in that class; teacher must be assigned to class/subject.
+
+**Q: Parent cannot pay online.**  
+A: Invoice must exist; **Payment Methods** → Online payments must be ON; gateway configured (Module H9).
+
 ---
 
 # PART M — GLOSSARY FOR NON-TECHNICAL USERS
 
+---
+
+## Module M1: Glossary for Non-Technical Users
+
+### Purpose
+
+Plain-language definitions of words you will see in Digitex SMS menus, reports, and mobile app.
+
+### Who uses it
+
+Everyone — especially new secretaries, accountants, teachers, and parents.
+
 | Term | Simple meaning |
 |------|----------------|
-| Institution | Your school in the system |
-| Session | School year (2025-2026) |
-| Enrollment | Student placed in a class for a year |
-| Tranche | Fee installment (1st payment, 2nd payment…) |
-| Invoice | Bill for fees |
-| RFID / NFC | Electronic ID card for gate |
-| Gate pass | QR code for picking up child |
-| OTP | One-time SMS code for verification |
-| Module | A feature area (menu section) |
-| Permission | Allow/deny one action |
-| In-app notification | Alert inside bell icon (not SMS) |
+| **Institution** | Your school in the system |
+| **Session** | School year (e.g. 2025-2026) |
+| **Enrollment** | Student placed in a class for a year |
+| **Tranche** | Fee installment (1st payment, 2nd payment…) |
+| **Invoice** | Bill for fees owed |
+| **Payment proof** | Photo/receipt parent uploads after paying offline |
+| **Payment gateway** | Online service (PawaPay, CinetPay, Flutterwave) that collects Mobile Money |
+| **Webhook** | Automatic message from gateway to your server when payment succeeds |
+| **RFID / NFC** | Electronic ID card for gate scanning |
+| **Gate pass / Pickup QR** | QR code for authorizing child collection |
+| **OTP** | One-time SMS code for verification |
+| **Module** | A feature area (menu section) |
+| **Permission** | Allow or deny one action for a role |
+| **Role** | Job type: Teacher, Accountant, School Admin, etc. |
+| **In-app notification** | Alert inside the bell icon (not SMS) |
+| **Head Officer** | Manages multiple schools on the platform |
+| **Super Admin** | Platform operator (Digitex) |
+| **LMD** | University credit system (Licence-Master-Doctorat) |
+| **Deliberation** | University exam board decision on pass/fail |
+| **Merchant code** | Number parents dial for Mobile Money payments |
+| **Sandbox** | Test mode — no real money |
+| **Production** | Live mode — real payments |
+
+### Common questions
+
+**Q: What is the difference between invoice and payment?**  
+A: **Invoice** = bill (money owed). **Payment** = money received against that bill.
+
+**Q: What is a payment token / pay link?**  
+A: A secret URL on an invoice that lets parents pay without logging in.
 
 ---
 

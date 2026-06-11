@@ -172,4 +172,135 @@ class AttendanceAnalyticsService
             return "Punctuality is identical to $periodTxt.";
         }
     }
+
+    /**
+     * Parent-friendly period summary: school days, present, absent, late, percentage.
+     */
+    public function getPeriodSummary(
+        int $studentId,
+        ?int $classSectionId,
+        Carbon $start,
+        Carbon $end,
+        bool $isSubjectWise = false,
+        ?int $subjectId = null
+    ): array {
+        $records = $this->fetchRecords($studentId, $start, $end, $isSubjectWise, $subjectId);
+        $expectedDays = $this->countExpectedDays($classSectionId, $start, $end, $isSubjectWise, $subjectId);
+
+        $present = $records->where('status', 'present')->count();
+        $absent = $records->where('status', 'absent')->count();
+        $late = $records->where('status', 'late')->count();
+        $excused = $records->whereIn('status', ['excused', 'half_day'])->count();
+        $attended = $present + $late + $excused;
+
+        $percentage = $expectedDays > 0 ? round(min(($attended / $expectedDays) * 100, 100), 1) : 0;
+
+        return [
+            'total_school_days' => $expectedDays,
+            'days_present' => $present,
+            'days_absent' => $absent,
+            'days_late' => $late,
+            'days_excused' => $excused,
+            'attendance_percentage' => $percentage,
+            'period_start' => $start->toDateString(),
+            'period_end' => $end->toDateString(),
+        ];
+    }
+
+    /**
+     * Current vs previous period comparison table for parents/staff.
+     */
+    public function getComparativeSummaryTable(
+        int $studentId,
+        ?int $classSectionId,
+        string $period = 'week',
+        bool $isSubjectWise = false,
+        ?int $subjectId = null
+    ): array {
+        $now = Carbon::now();
+        [$currentStart, $currentEnd, $previousStart, $previousEnd, $periodLabel, $previousLabel] =
+            $this->resolvePeriodBounds($period, $now);
+
+        $current = $this->getPeriodSummary($studentId, $classSectionId, $currentStart, $currentEnd, $isSubjectWise, $subjectId);
+        $previous = $this->getPeriodSummary($studentId, $classSectionId, $previousStart, $previousEnd, $isSubjectWise, $subjectId);
+
+        $metrics = ['total_school_days', 'days_present', 'days_absent', 'days_late', 'attendance_percentage'];
+        $rows = [];
+        foreach ($metrics as $metric) {
+            $cur = $current[$metric] ?? 0;
+            $prev = $previous[$metric] ?? 0;
+            $rows[] = [
+                'metric' => $metric,
+                'label' => __('attendance.summary_' . $metric),
+                'current' => $cur,
+                'previous' => $prev,
+                'change' => is_float($cur) || is_float($prev)
+                    ? round($cur - $prev, 1)
+                    : ($cur - $prev),
+            ];
+        }
+
+        return [
+            'period' => $period,
+            'period_label' => $periodLabel,
+            'previous_label' => $previousLabel,
+            'current' => $current,
+            'previous' => $previous,
+            'rows' => $rows,
+        ];
+    }
+
+    private function resolvePeriodBounds(string $period, Carbon $now): array
+    {
+        return match ($period) {
+            'month' => [
+                $now->copy()->startOfMonth(),
+                $now->copy()->endOfMonth(),
+                $now->copy()->subMonth()->startOfMonth(),
+                $now->copy()->subMonth()->endOfMonth(),
+                $now->format('F Y'),
+                $now->copy()->subMonth()->format('F Y'),
+            ],
+            default => [
+                $now->copy()->startOfWeek(),
+                $now->copy()->endOfWeek(),
+                $now->copy()->subWeek()->startOfWeek(),
+                $now->copy()->subWeek()->endOfWeek(),
+                __('attendance.this_week') . ' (' . $now->copy()->startOfWeek()->format('d M') . ' – ' . $now->copy()->endOfWeek()->format('d M') . ')',
+                __('attendance.last_week') . ' (' . $now->copy()->subWeek()->startOfWeek()->format('d M') . ' – ' . $now->copy()->subWeek()->endOfWeek()->format('d M') . ')',
+            ],
+        };
+    }
+
+    private function fetchRecords(int $studentId, Carbon $start, Carbon $end, bool $isSubjectWise, ?int $subjectId)
+    {
+        $query = StudentAttendance::where('student_id', $studentId)
+            ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()]);
+
+        if ($isSubjectWise && $subjectId) {
+            $query->where('subject_id', $subjectId);
+        } else {
+            $query->whereNull('subject_id');
+        }
+
+        return $query->get();
+    }
+
+    private function countExpectedDays(?int $classSectionId, Carbon $start, Carbon $end, bool $isSubjectWise, ?int $subjectId): int
+    {
+        if (!$classSectionId) {
+            return 0;
+        }
+
+        $query = StudentAttendance::where('class_section_id', $classSectionId)
+            ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()]);
+
+        if ($isSubjectWise && $subjectId) {
+            $query->where('subject_id', $subjectId);
+        } else {
+            $query->whereNull('subject_id');
+        }
+
+        return (int) $query->distinct('attendance_date')->count('attendance_date');
+    }
 }

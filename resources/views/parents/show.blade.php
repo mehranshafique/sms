@@ -68,6 +68,10 @@
                                 </div>
                                 <span class="badge badge-success">{{ __('parent.active') }}</span>
                             </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">{{ __('parent.parent_id') }}:</span>
+                                <span class="font-w600">{{ $parent->user->shortcode ?? '-' }}</span>
+                            </div>
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">{{ __('parent.username') }}:</span>
                                 <span class="font-w600">{{ $parent->user->username ?? '-' }}</span>

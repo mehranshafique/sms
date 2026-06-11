@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
 use App\Services\LmdCalculationService; 
+use App\Services\GradeMentionService;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 
@@ -110,7 +111,23 @@ class ReportController extends BaseController
         $targetStudents = collect();
         $classSection = null;
 
-        if ($request->class_section_id) {
+        // Single student takes priority over class (form may retain stale class_section_id)
+        if ($request->filled('student_id')) {
+            $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
+            if ($student->institution_id != $institutionId) abort(403);
+
+            $this->checkFinancialClearance($student->id, $institutionId, true);
+
+            $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+            if (!$enrollment) {
+                $msg = __('reports.no_enrollment');
+                if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+                return back()->with('error', $msg);
+            }
+
+            $classSection = $enrollment->classSection;
+            $targetStudents = collect([$enrollment]);
+        } elseif ($request->class_section_id) {
             $classSection = ClassSection::with('gradeLevel')->find($request->class_section_id);
             if ($classSection->institution_id != $institutionId) abort(403);
 
@@ -125,22 +142,11 @@ class ReportController extends BaseController
                 return back()->with('error', $msg);
             }
             
-            $targetStudents = $enrollments; 
+            $targetStudents = $enrollments;
         } else {
-            $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
-            if ($student->institution_id != $institutionId) abort(403);
-
-            $this->checkFinancialClearance($student->id, $institutionId, true);
-
-            $enrollment = $student->enrollments()->latest()->first();
-            if (!$enrollment) {
-                $msg = __('reports.no_enrollment');
-                if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
-                return back()->with('error', $msg);
-            }
-            
-            $classSection = $enrollment->classSection;
-            $targetStudents = collect([$enrollment]);
+            $msg = __('reports.select_student');
+            if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+            return back()->with('error', $msg);
         }
 
         $bulkData = [];
@@ -261,7 +267,7 @@ class ReportController extends BaseController
                 return response()->json(['status' => 'success']);
             }
 
-            $pdf = Pdf::loadView('reports.transcript_lmd', compact('student', 'history'));
+            $pdf = Pdf::loadView($request->input('format') === 'esu' ? 'reports.transcript_lmd_esu' : 'reports.transcript_lmd', compact('student', 'history'));
             return $pdf->stream('LMD_Transcript_' . $student->admission_number . '.pdf');
 
         } else {
@@ -572,7 +578,12 @@ class ReportController extends BaseController
             $row['total_score'] = $s1 + $s2 + $ex;
         }
 
-        return ['data' => $data, 'trimester' => $trimester];
+        $sumTotObt = array_sum(array_column($data, 'total_score'));
+        $sumTotMax = array_sum(array_column($data, 'total_max'));
+        $percentageTotal = $sumTotMax > 0 ? ($sumTotObt / $sumTotMax) * 100 : 0;
+        $mention = app(GradeMentionService::class)->fromPercentage($percentageTotal);
+
+        return ['data' => $data, 'trimester' => $trimester, 'mention' => $mention, 'percentage_total' => $percentageTotal];
     }
 
     private function getSecondaryData($student, $enrollment, $semester)
@@ -641,6 +652,11 @@ class ReportController extends BaseController
             $row['total_score'] = $s1 + $s2 + $ex;
         }
 
-        return ['data' => $data, 'semester' => $semester];
+        $sumTotObt = array_sum(array_column($data, 'total_score'));
+        $sumTotMax = array_sum(array_column($data, 'total_max'));
+        $percentageTotal = $sumTotMax > 0 ? ($sumTotObt / $sumTotMax) * 100 : 0;
+        $mention = app(GradeMentionService::class)->fromPercentage($percentageTotal);
+
+        return ['data' => $data, 'semester' => $semester, 'mention' => $mention, 'percentage_total' => $percentageTotal];
     }
 }

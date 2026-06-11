@@ -10,6 +10,7 @@ return [
     'remember_me' => 'Remember my preference',
     'forgot_password' => 'Forgot Password?',
     'submit_btn' => 'Sign Me In',
+    'help_links' => 'Need help? Browse guides without logging in:',
     
     // Forgot Password Page Keys
     'forgot_password_title' => 'Forgot Password | E-Digitex',

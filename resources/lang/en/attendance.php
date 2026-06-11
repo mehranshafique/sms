@@ -125,4 +125,16 @@ return [
     'check_out_hardware' => 'Check Out (Hardware)',
     'on_time' => 'On Time',
     'no_hardware_logs' => 'No hardware/scan logs found for this period.',
+
+    // Parent summary reports
+    'summary_comparison_title' => 'Attendance Summary Comparison',
+    'parent_report_title' => 'Attendance Report',
+    'metric' => 'Metric',
+    'change' => 'Change',
+    'last_week' => 'Last week',
+    'summary_total_school_days' => 'Total school days',
+    'summary_days_present' => 'Days present',
+    'summary_days_absent' => 'Days absent',
+    'summary_days_late' => 'Late arrivals',
+    'summary_attendance_percentage' => 'Attendance %',
 ];

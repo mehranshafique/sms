@@ -140,4 +140,11 @@ return [
     'admission_no' => 'Admission No',
     'academic_year' => 'Academic Year',
     'make_payment' => 'Make Payment',
+    'online_payment_link' => 'Online Payment Link',
+    'online_payment_help' => 'Share this link with parents so they can pay online using Mobile Money or other enabled methods.',
+    'copy_link' => 'Copy link',
+    'link_copied' => 'Payment link copied!',
+    'refresh_link' => 'Regenerate link',
+    'payment_link_refreshed' => 'Payment link regenerated.',
+    'invoice_id_label' => 'Invoice ID',
 ];

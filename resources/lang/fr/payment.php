@@ -18,6 +18,16 @@ return [
     'bank_transfer' => 'Virement bancaire',
     'card' => 'Carte',
     'online' => 'En ligne',
+    'orange_money' => 'Orange Money',
+    'airtel_money' => 'Airtel Money',
+    'mpesa' => 'M-Pesa',
+    'vodacom' => 'Vodacom',
+    'mobile_reference' => 'Référence Mobile Money',
+    'mobile_reference_placeholder' => 'ID transaction du SMS/reçu',
+    'method_not_enabled' => 'Ce mode de paiement n\'est pas activé pour votre école.',
+    'mobile_reference_required' => 'La référence Mobile Money est obligatoire.',
+    'global_cap_exceeded' => 'Le paiement dépasse le plafond annuel de :limit. Il reste :remaining payable.',
+    'no_methods_enabled' => 'Aucun mode de paiement activé. Configurez les modes sous Finance.',
     
     'confirm_payment' => 'Confirmer le paiement',
     

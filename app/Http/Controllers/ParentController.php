@@ -7,11 +7,12 @@ use App\Models\StudentParent;
 use App\Models\Institution;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
+use App\Services\IdGeneratorService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class ParentController extends BaseController
@@ -19,7 +20,6 @@ class ParentController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
-        // $this->authorizeResource(StudentParent::class, 'student_parent');
         $this->middleware(PermissionMiddleware::class . ':student_parent.view')->only(['index']);
         $this->middleware(PermissionMiddleware::class . ':student_parent.create')->only(['create', 'store']);
         $this->middleware(PermissionMiddleware::class . ':student_parent.update')->only(['edit', 'update']);
@@ -42,7 +42,6 @@ class ParentController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('name', function($row){
-                    // Priority: Guardian > Father > Mother
                     $name = $row->guardian_name ?? $row->father_name ?? $row->mother_name ?? 'N/A';
                     return '<a href="'.route('parents.show', $row->id).'" class="fw-bold text-primary">'.$name.'</a>';
                 })
@@ -88,37 +87,21 @@ class ParentController extends BaseController
     public function store(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        
+
         $request->validate([
             'guardian_name' => 'nullable|required_without_all:father_name,mother_name|string|max:100',
             'guardian_phone' => 'nullable|required_without_all:father_phone,mother_phone|string|max:20',
             'guardian_email' => 'nullable|email|unique:users,email',
+            'username' => 'nullable|string|max:50|unique:users,username',
+            'password' => 'nullable|string|min:8|confirmed',
         ]);
 
-        DB::transaction(function () use ($request, $institutionId) {
-            
-            // 1. Create User Account if Email Provided
-            $userId = null;
-            if ($request->guardian_email) {
-                $password = 'Parent123!'; // Default, should notify
-                $shortcode = 'PAR-' . rand(10000, 99999);
-                
-                $user = User::create([
-                    'name' => $request->guardian_name ?? $request->father_name ?? 'Parent',
-                    'email' => $request->guardian_email,
-                    'password' => Hash::make($password),
-                    'user_type' => UserType::GUARDIAN->value,
-                    'institute_id' => $institutionId,
-                    'username' => $shortcode,
-                    'shortcode' => $shortcode,
-                    'phone' => $request->guardian_phone ?? $request->father_phone,
-                    'is_active' => true,
-                ]);
-                $user->assignRole(RoleEnum::GUARDIAN->value);
-                $userId = $user->id;
-            }
+        $credentialsMessage = null;
 
-            // 2. Create Parent Record
+        DB::transaction(function () use ($request, $institutionId, &$credentialsMessage) {
+            $userResult = $this->createOrUpdateGuardianUser($request, null, $institutionId);
+            $userId = $userResult['user']?->id;
+
             StudentParent::create([
                 'institution_id' => $institutionId,
                 'user_id' => $userId,
@@ -134,9 +117,22 @@ class ParentController extends BaseController
                 'guardian_relation' => $request->guardian_relation,
                 'family_address' => $request->family_address,
             ]);
+
+            if ($userResult['user']) {
+                $credentialsMessage = __('parent.credentials_created', [
+                    'id' => $userResult['user']->shortcode,
+                    'username' => $userResult['user']->username,
+                    'password' => $userResult['plain_password'],
+                ]);
+            }
         });
 
-        return redirect()->route('parents.index')->with('success', __('parent.success_create'));
+        $success = __('parent.success_create');
+        if ($credentialsMessage) {
+            $success .= ' ' . $credentialsMessage;
+        }
+
+        return redirect()->route('parents.index')->with('success', $success);
     }
 
     public function show(StudentParent $parent)
@@ -153,6 +149,8 @@ class ParentController extends BaseController
         $institutionId = $this->getInstitutionId();
         if ($institutionId && $parent->institution_id != $institutionId) abort(403);
 
+        $parent->load('user');
+
         return view('parents.edit', compact('parent'));
     }
 
@@ -162,16 +160,30 @@ class ParentController extends BaseController
         if ($institutionId && $parent->institution_id != $institutionId) abort(403);
 
         $request->validate([
-            'guardian_email' => 'nullable|email|unique:users,email,' . $parent->user_id,
+            'guardian_email' => [
+                'nullable',
+                'email',
+                Rule::unique('users', 'email')->ignore($parent->user_id),
+            ],
+            'username' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('users', 'username')->ignore($parent->user_id),
+            ],
+            'password' => 'nullable|string|min:8|confirmed',
         ]);
 
-        $parent->update($request->except(['_token', '_method']));
+        DB::transaction(function () use ($request, $parent, $institutionId) {
+            $this->createOrUpdateGuardianUser($request, $parent, $institutionId);
 
-        // Update User Email if linked
-        if ($parent->user_id && $request->guardian_email) {
-            $user = User::find($parent->user_id);
-            if($user) $user->update(['email' => $request->guardian_email]);
-        }
+            $parent->update($request->only([
+                'father_name', 'father_phone', 'father_occupation',
+                'mother_name', 'mother_phone', 'mother_occupation',
+                'guardian_name', 'guardian_phone', 'guardian_email',
+                'guardian_relation', 'family_address',
+            ]));
+        });
 
         return redirect()->route('parents.index')->with('success', __('parent.success_update'));
     }
@@ -194,11 +206,98 @@ class ParentController extends BaseController
         return response()->json(['message' => __('parent.success_delete')]);
     }
 
-    // Keep existing 'check' method
     /**
-     * AJAX: Check if a parent exists by phone number.
-     * Checks both the StudentParent (parents) table and the User table.
+     * Create or update the linked guardian user account.
+     *
+     * @return array{user: ?User, plain_password: ?string}
      */
+    private function createOrUpdateGuardianUser(Request $request, ?StudentParent $parent, ?int $institutionId): array
+    {
+        $name = $request->guardian_name ?? $request->father_name ?? $request->mother_name ?? 'Parent';
+        $phone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
+        $email = $request->guardian_email;
+
+        $existingUser = $parent?->user_id ? User::find($parent->user_id) : null;
+
+        if (!$existingUser && !$email && !$phone && !$name) {
+            return ['user' => null, 'plain_password' => null];
+        }
+
+        $institution = $institutionId ? Institution::find($institutionId) : null;
+        $plainPassword = $request->filled('password') ? $request->password : null;
+
+        if ($existingUser) {
+            $updates = [
+                'name' => $name,
+                'phone' => $phone,
+            ];
+
+            if ($email) {
+                $updates['email'] = $email;
+            }
+
+            if ($request->filled('username')) {
+                $updates['username'] = $request->username;
+            }
+
+            if ($plainPassword) {
+                $updates['password'] = Hash::make($plainPassword);
+            }
+
+            $existingUser->update($updates);
+
+            if (!$existingUser->shortcode && $institution) {
+                $shortcode = IdGeneratorService::generateParentShortcode($institution, $existingUser->id);
+                $existingUser->update([
+                    'shortcode' => $shortcode,
+                    'username' => $existingUser->username ?: $shortcode,
+                ]);
+            }
+
+            return ['user' => $existingUser->fresh(), 'plain_password' => $plainPassword];
+        }
+
+        if (!$institution) {
+            return ['user' => null, 'plain_password' => null];
+        }
+
+        $plainPassword = $plainPassword ?? ('Parent' . rand(1000, 9999) . '!');
+
+        if (!$email) {
+            $email = 'par.' . $institution->id . '.' . uniqid('', true) . '@parents.local';
+        }
+
+        $user = User::create([
+            'name' => $name,
+            'email' => $email,
+            'password' => Hash::make($plainPassword),
+            'user_type' => UserType::GUARDIAN->value,
+            'institute_id' => $institutionId,
+            'phone' => $phone,
+            'is_active' => true,
+        ]);
+
+        $shortcode = IdGeneratorService::generateParentShortcode($institution, $user->id);
+        $username = $request->username ?: $shortcode;
+
+        while (User::where('username', $username)->where('id', '!=', $user->id)->exists()) {
+            $username = $shortcode . '-' . rand(10, 99);
+        }
+
+        $user->update([
+            'shortcode' => $shortcode,
+            'username' => $username,
+        ]);
+
+        $user->assignRole(RoleEnum::GUARDIAN->value);
+
+        if ($parent) {
+            $parent->update(['user_id' => $user->id]);
+        }
+
+        return ['user' => $user->fresh(), 'plain_password' => $plainPassword];
+    }
+
     public function check(Request $request)
     {
         $request->validate([
@@ -207,8 +306,6 @@ class ParentController extends BaseController
 
         $phone = $request->phone;
 
-        // 1. Check 'parents' table (StudentParent model)
-        // We look for the phone number in father, mother, or guardian fields
         $studentParent = StudentParent::where(function($query) use ($phone) {
             $query->where('father_phone', $phone)
                   ->orWhere('mother_phone', $phone)
@@ -216,10 +313,8 @@ class ParentController extends BaseController
         })->first();
 
         if ($studentParent) {
-            // Determine the most relevant name to display
             $displayName = $studentParent->guardian_name ?? $studentParent->father_name ?? $studentParent->mother_name ?? 'Parent';
             
-            // Try to be specific if we know which phone matched
             if ($studentParent->father_phone == $phone && !empty($studentParent->father_name)) {
                 $displayName = $studentParent->father_name;
             } elseif ($studentParent->mother_phone == $phone && !empty($studentParent->mother_name)) {
@@ -231,13 +326,11 @@ class ParentController extends BaseController
             return response()->json([
                 'exists' => true,
                 'source' => 'parent_record',
-                'id' => $studentParent->id,           // ID from parents table
-                'parent_id' => $studentParent->id,    // Explicit parent ID
-                'user_id' => $studentParent->user_id, // Linked User ID (if any)
+                'id' => $studentParent->id,
+                'parent_id' => $studentParent->id,
+                'user_id' => $studentParent->user_id,
                 'name' => $displayName,
                 'email' => $studentParent->guardian_email,
-                
-                // Return all specific fields for auto-filling the form
                 'father_name' => $studentParent->father_name,
                 'father_phone' => $studentParent->father_phone,
                 'mother_name' => $studentParent->mother_name,
@@ -248,7 +341,6 @@ class ParentController extends BaseController
             ]);
         }
 
-        // 2. Check 'users' table (Fallback)
         $userParent = User::where('phone', $phone)
             ->where('user_type', UserType::GUARDIAN->value)
             ->first();
@@ -257,12 +349,11 @@ class ParentController extends BaseController
             return response()->json([
                 'exists' => true,
                 'source' => 'user_account',
-                'id' => $userParent->id,         // ID from users table
-                'parent_id' => null,             // No parent record yet
-                'user_id' => $userParent->id,    // Explicit User ID
+                'id' => $userParent->id,
+                'parent_id' => null,
+                'user_id' => $userParent->id,
                 'name' => $userParent->name,
                 'email' => $userParent->email,
-                // Map generic user info to guardian fields as fallback
                 'guardian_name' => $userParent->name,
                 'guardian_email' => $userParent->email,
                 'guardian_phone' => $userParent->phone,

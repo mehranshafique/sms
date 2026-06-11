@@ -20,6 +20,16 @@ return [
     'bank_transfer' => 'Bank Transfer',
     'card' => 'Card',
     'online' => 'Online',
+    'orange_money' => 'Orange Money',
+    'airtel_money' => 'Airtel Money',
+    'mpesa' => 'M-Pesa',
+    'vodacom' => 'Vodacom',
+    'mobile_reference' => 'Mobile Money Reference',
+    'mobile_reference_placeholder' => 'Transaction ID from SMS/receipt',
+    'method_not_enabled' => 'This payment method is not enabled for your school.',
+    'mobile_reference_required' => 'Mobile Money transaction reference is required.',
+    'global_cap_exceeded' => 'Payment exceeds annual fee limit of :limit. You can pay up to :remaining more.',
+    'no_methods_enabled' => 'No payment methods are enabled. Ask an administrator to configure Payment Methods under Finance.',
     
     // Buttons
     'confirm_payment' => 'Confirm Payment',

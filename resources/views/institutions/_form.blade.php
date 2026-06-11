@@ -60,6 +60,21 @@
                                 <input type="text" name="code" value="{{ old('code', $institute->code ?? __('institute.auto_generated')) }}" class="form-control bg-light" readonly>
                             </div>
 
+                            <div class="mb-3 col-md-3">
+                                <label class="form-label">{{ __('institute.epst_school_code') }}</label>
+                                <input type="text" name="epst_school_code" value="{{ old('epst_school_code', $institute->epst_school_code ?? '') }}" class="form-control" placeholder="EPST-XXXX">
+                            </div>
+
+                            <div class="mb-3 col-md-3">
+                                <label class="form-label">{{ __('institute.secondary_currency') }}</label>
+                                <input type="text" name="secondary_currency" maxlength="3" value="{{ old('secondary_currency', $institute->secondary_currency ?? 'USD') }}" class="form-control" placeholder="USD">
+                            </div>
+
+                            <div class="mb-3 col-md-3">
+                                <label class="form-label">{{ __('institute.exchange_rate') }}</label>
+                                <input type="number" step="0.0001" name="exchange_rate" value="{{ old('exchange_rate', $institute->exchange_rate ?? '') }}" class="form-control" placeholder="{{ __('institute.exchange_rate_hint') }}">
+                            </div>
+
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('institute.institute_type') }} <span class="text-danger">*</span></label>
                                 <select name="type" class="form-control default-select" required>
@@ -79,6 +94,29 @@
                                     <option value="0" {{ (old('is_active', $institute->is_active ?? 1) == 0) ? 'selected' : '' }}>{{ __('institute.inactive') }}</option>
                                 </select>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Head / Responsible Person -->
+        <div class="col-xl-12 col-lg-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">{{ __('institute.responsible_person_section') }}</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">{{ __('institute.responsible_person_help') }}</p>
+                    <div class="row">
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ __('institute.head_person_name') }} <span class="text-danger">*</span></label>
+                            <input type="text" name="head_person_name" value="{{ old('head_person_name', $institute->head_person_name ?? '') }}" class="form-control" placeholder="{{ __('institute.head_person_name_placeholder') }}" required>
+                        </div>
+                        <div class="mb-3 col-md-6">
+                            <label class="form-label">{{ __('institute.head_person_phone') }} <span class="text-danger">*</span></label>
+                            <input type="hidden" name="head_full_phone" id="headFullPhoneInput">
+                            <input type="tel" id="headPhoneInput" class="form-control" value="{{ old('head_person_phone', $institute->head_person_phone ?? '') }}" required>
                         </div>
                     </div>
                 </div>
@@ -235,21 +273,37 @@
         // --- 2. Phone Input Integration (intl-tel-input) ---
         const phoneInput = document.querySelector("#phoneInput");
         const fullPhoneInput = document.querySelector("#fullPhoneInput");
+        const headPhoneInput = document.querySelector("#headPhoneInput");
+        const headFullPhoneInput = document.querySelector("#headFullPhoneInput");
         const form = document.querySelector("#instituteForm");
 
+        let headIti = null;
+
         if (phoneInput) {
-            const iti = window.intlTelInput(phoneInput, {
+            window.institutePhoneIti = window.intlTelInput(phoneInput, {
                 utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js",
                 initialCountry: "cd",
                 separateDialCode: true,
                 preferredCountries: ['cd', 'us', 'fr'],
             });
+        }
 
+        if (headPhoneInput) {
+            headIti = window.intlTelInput(headPhoneInput, {
+                utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/js/utils.js",
+                initialCountry: "cd",
+                separateDialCode: true,
+                preferredCountries: ['cd', 'us', 'fr'],
+            });
+        }
+
+        if (form) {
             form.addEventListener('submit', function() {
-                if (iti.isValidNumber()) {
-                    fullPhoneInput.value = iti.getNumber();
-                } else {
-                    fullPhoneInput.value = iti.getNumber(); 
+                if (phoneInput && window.institutePhoneIti) {
+                    fullPhoneInput.value = window.institutePhoneIti.getNumber();
+                }
+                if (headPhoneInput && headIti) {
+                    headFullPhoneInput.value = headIti.getNumber();
                 }
             });
         }

@@ -184,9 +184,12 @@ class DashboardController extends BaseController
             ->take(6)
             ->get();
 
+        $institution = Institution::find($institutionId);
+
         return view('dashboard.accountant', compact(
             'currentSession', 'expectedTotal', 'collectedTotal', 'remainingToCollect',
-            'installmentStats', 'totalBudget', 'budgetSpent', 'recentPayments', 'activeStudentsCount'
+            'installmentStats', 'totalBudget', 'budgetSpent', 'recentPayments', 'activeStudentsCount',
+            'institution'
         ));
     }
 
@@ -487,8 +490,9 @@ class DashboardController extends BaseController
             $myTotalClasses = Timetable::where('teacher_id', $staffId)->count();
         }
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        $institution = Institution::find($institutionId);
 
-        return view('dashboard.teacher', compact('myStudentsCount', 'todayClasses', 'currentSession', 'myCoursesCount', 'myTotalClasses'));
+        return view('dashboard.teacher', compact('myStudentsCount', 'todayClasses', 'currentSession', 'myCoursesCount', 'myTotalClasses', 'institution'));
     }
 
     private function studentDashboard($user, $institutionId)
@@ -521,6 +525,7 @@ class DashboardController extends BaseController
         }
         
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        $institution = Institution::find($institutionId);
         $resultsCount = 0;
         if($currentSession) {
              $resultsCount = \App\Models\ExamRecord::where('student_id', $student->id)
@@ -529,6 +534,6 @@ class DashboardController extends BaseController
                 })->distinct('exam_id')->count();
         }
 
-        return view('dashboard.student', compact('student', 'attendancePercentage', 'unpaidInvoices', 'todayClasses', 'totalFees', 'paidFees', 'resultsCount', 'currentSession'));
+        return view('dashboard.student', compact('student', 'attendancePercentage', 'unpaidInvoices', 'todayClasses', 'totalFees', 'paidFees', 'resultsCount', 'currentSession', 'institution'));
     }
 }

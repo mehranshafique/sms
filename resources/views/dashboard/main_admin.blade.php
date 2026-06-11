@@ -7,20 +7,19 @@
         @php
             $roleName = Auth::user()->roles->first()?->name ?? __('dashboard.default_role');
             $currency = \App\Enums\CurrencySymbol::default();
+            $activeInstId = session('active_institution_id');
+            $platformInstitution = null;
+            if ($activeInstId && $activeInstId !== 'global') {
+                $platformInstitution = \App\Models\Institution::find($activeInstId);
+            }
         @endphp
 
-        <div class="row mb-4">
-            <div class="col-xl-12">
-                <div class="card bg-primary text-white shadow-sm border-0">
-                    <div class="card-body p-4">
-                        <h3 class="text-white fw-bold mb-1">
-                            {{ __('dashboard.platform_greeting', ['name' => Auth::user()->name, 'role' => $roleName]) }}
-                        </h3>
-                        <p class="mb-0 text-white opacity-75">{{ __('dashboard.platform_overview') }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('dashboard.partials.welcome-banner', [
+            'institution' => $platformInstitution,
+            'currentSession' => null,
+            'subtitle' => __('dashboard.platform_overview'),
+            'showIcon' => false,
+        ])
 
         <div class="row">
             <div class="col-xl-3 col-lg-6 col-sm-6">

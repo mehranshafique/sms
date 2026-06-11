@@ -130,6 +130,8 @@ return [
         'generate' => 'Générer facture',
         'list' => 'Liste factures'
     ],
+    'payment_methods' => 'Modes de paiement',
+    'payment_proofs' => 'Preuves de paiement',
     'settings' => 'Paramètres',
     'permissions' => [
         'roles' => 'Rôles',
@@ -153,4 +155,9 @@ return [
     ],
     'salary_structures' => 'Structure salariale',
     'generate_payroll' => 'Générer la paie',
+    'state_exams' => 'Examens d\'État (EXETAT)',
+    'lmd_deliberations' => 'Délibérations LMD',
+    'transport' => 'Transport scolaire',
+    'operations' => 'Opérations',
+    'guardian_portal' => 'Portail tuteur',
 ];

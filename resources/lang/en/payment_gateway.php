@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'settings_title' => 'Payment Gateway (DRC)',
+    'provider' => 'Gateway provider',
+    'provider_none' => 'None — manual proof only',
+    'provider_help' => 'PawaPay is recommended for Orange/Airtel/M-Pesa in DRC. CinetPay and Flutterwave are widely used alternatives.',
+    'environment' => 'Environment',
+    'manual_proof_enabled' => 'Allow manual payment proof upload',
+    'webhook_urls' => 'Configure these webhook/notify URLs in your gateway dashboard',
+    'pay_now' => 'Pay instantly',
+    'pay_now_help' => 'Pay securely via :provider. You will confirm on your phone or be redirected to checkout.',
+    'continue_checkout' => 'Continue to payment',
+    'not_configured' => 'Online gateway is not configured for this school.',
+    'method_not_supported' => 'This payment method is not supported by the active gateway.',
+    'processing' => 'Payment is being processed…',
+    'payment_success' => 'Payment completed successfully!',
+    'payment_pending' => 'Payment is still processing. Please wait or contact the school.',
+    'payment_failed' => 'Payment failed. Please try again or upload proof manually.',
+    'pawapay_confirm_phone' => 'Confirm the payment on your phone when prompted (Mobile Money PIN).',
+    'status_title' => 'Payment status',
+    'back_to_invoice' => 'Back to invoice',
+    'try_again' => 'Try again',
+    'polling_hint' => 'This page refreshes automatically every few seconds.',
+];

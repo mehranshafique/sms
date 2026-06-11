@@ -44,6 +44,7 @@
     @endphp
 
         <div class="header-content">
+            @include('reports.partials.epst_header', ['student' => $student])
             <div class="logo-box">
                 @if(isset($student->institution->logo) && $student->institution->logo)
                     <img src="{{ asset('storage/' . $student->institution->logo) }}" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
@@ -167,6 +168,10 @@
                 <span class="label">{{ __('reports.percentage') ?? 'POURCENTAGE' }}</span>
                 <span class="val">{{ number_format($percentagePeriod, 2) }}%</span>
                 <span class="val">{{ number_format($percentageTotal, 2) }}%</span>
+            </div>
+            <div class="summary-row">
+                <span class="label">{{ __('reports.mention') ?? 'MENTION' }}</span>
+                <span class="val" colspan="2">{{ $mention ?? '—' }}</span>
             </div>
             <div class="summary-row">
                 <span class="label">{{ __('reports.conduct') ?? 'CONDUITE' }}</span>

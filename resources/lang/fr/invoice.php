@@ -140,4 +140,11 @@ return [
     'admission_no' => 'N° d\'admission',
     'academic_year' => 'Année académique',
     'make_payment' => 'Effectuer le paiement',
+    'online_payment_link' => 'Lien de paiement en ligne',
+    'online_payment_help' => 'Partagez ce lien avec les parents pour payer en ligne (Mobile Money, etc.).',
+    'copy_link' => 'Copier le lien',
+    'link_copied' => 'Lien copié !',
+    'refresh_link' => 'Régénérer le lien',
+    'payment_link_refreshed' => 'Lien de paiement régénéré.',
+    'invoice_id_label' => 'N° facture',
 ];

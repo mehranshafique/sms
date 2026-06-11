@@ -20,6 +20,7 @@ class Student extends Model
         'parent_id', // Replaces direct parent fields
         'user_id',
         'admission_number', 
+        'national_id',
         'roll_number', 
         'admission_date',
         'first_name', 
@@ -28,6 +29,7 @@ class Student extends Model
         'dob', 
         'blood_group',
         'place_of_birth', 
+        'origin_province',
         'religion', 
         'category',
         'post_name', // Ensure this is present

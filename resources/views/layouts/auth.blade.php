@@ -19,6 +19,14 @@
     <!-- SweetAlert2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 
+    <style>
+        body.swal2-shown .bootstrap-select,
+        body.swal2-shown .bs-container.bootstrap-select {
+            display: none !important;
+            visibility: hidden !important;
+        }
+    </style>
+
     @yield('styles')
 </head>
 <body>
@@ -75,52 +83,97 @@
     <!-- Required vendors -->
     <script src="{{ asset('vendor/global/global.min.js') }}"></script>
 	<script src="{{ asset('vendor/bootstrap-select/dist/js/bootstrap-select.min.js') }}"></script>
+    <script>
+        if (typeof jQuery !== 'undefined' && jQuery.fn.selectpicker) {
+            jQuery.fn.selectpicker.defaults.noneSelectedText = '\u00a0';
+            jQuery.fn.selectpicker.defaults.noneResultsText = 'No results found';
+        }
+    </script>
     <script src="{{ asset('js/custom.min.js') }}"></script>
     
     <!-- SweetAlert2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        (function () {
+            function digitexHideSelectPickers() {
+                if (typeof jQuery === 'undefined') {
+                    return;
+                }
+                jQuery('.bootstrap-select.open, .bootstrap-select.show').removeClass('open show');
+                jQuery('.bootstrap-select .dropdown-menu').removeClass('show');
+            }
+
+            if (typeof Swal !== 'undefined' && Swal.fire) {
+                var digitexAuthSwalFire = Swal.fire.bind(Swal);
+                Swal.fire = function () {
+                    digitexHideSelectPickers();
+                    return digitexAuthSwalFire.apply(Swal, arguments);
+                };
+            }
+
+            window.digitexDestroyAuthSelectPickers = function () {
+                if (typeof jQuery === 'undefined' || !jQuery.fn.selectpicker) {
+                    return;
+                }
+                jQuery('select').each(function () {
+                    var $el = jQuery(this);
+                    if ($el.data('selectpicker')) {
+                        $el.selectpicker('destroy');
+                    }
+                });
+            };
+        })();
+    </script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             
-            // --- 1. Session-Based Alerts (For Standard Form Submissions) ---
-            
-            // Success Message (session('status') or session('success'))
-            @if (session('status') || session('success'))
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Success',
-                    text: "{{ session('status') ?? session('success') }}",
-                    confirmButtonColor: '#3085d6',
-                });
-            @endif
+            // --- 1. Session-Based Alerts (after selectpicker init is neutralized) ---
+            function showSessionAlerts() {
+                if (typeof window.digitexDestroyAuthSelectPickers === 'function') {
+                    window.digitexDestroyAuthSelectPickers();
+                }
 
-            // Error Message (session('error'))
-            @if (session('error'))
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: "{{ session('error') }}",
-                    confirmButtonColor: '#d33',
-                });
-            @endif
+                @if (session('status') || session('success'))
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success',
+                        text: @json(session('status') ?? session('success')),
+                        confirmButtonColor: '#3085d6',
+                    });
+                @endif
 
-            // Validation Errors (session('errors'))
-            @if ($errors->any())
-                let errorHtml = '<ul style="text-align: left; margin-left: 1rem;">';
-                @foreach ($errors->all() as $error)
-                    errorHtml += '<li>{{ $error }}</li>';
-                @endforeach
-                errorHtml += '</ul>';
+                @if (session('error'))
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: @json(session('error')),
+                        confirmButtonColor: '#d33',
+                    });
+                @endif
 
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Validation Error',
-                    html: errorHtml,
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'OK'
-                });
-            @endif
+                @if ($errors->any())
+                    let errorHtml = '<ul style="text-align: left; margin-left: 1rem;">';
+                    @foreach ($errors->all() as $error)
+                        errorHtml += '<li>{{ $error }}</li>';
+                    @endforeach
+                    errorHtml += '</ul>';
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        html: errorHtml,
+                        confirmButtonColor: '#d33',
+                        confirmButtonText: 'OK'
+                    });
+                @endif
+            }
+
+            if (document.readyState === 'complete') {
+                showSessionAlerts();
+            } else {
+                window.addEventListener('load', showSessionAlerts);
+            }
 
 
             // --- 2. AJAX Form Submission Handler (Only for forms with class 'ajax-form') ---
@@ -228,18 +281,6 @@
             });
         });
 
-        // --- 4. FIX: Bootstrap Select "Nothing selected" ---
-        window.addEventListener('load', function() {
-            if (typeof jQuery !== 'undefined' && jQuery.fn.selectpicker) {
-                jQuery.fn.selectpicker.defaults.noneSelectedText = 'Select Option';
-                jQuery('.default-select, .selectpicker').each(function() {
-                    if (!jQuery(this).attr('title')) {
-                        jQuery(this).attr('title', 'Select Option');
-                    }
-                    jQuery(this).selectpicker('refresh');
-                });
-            }
-        });
     </script>
     
     @yield('scripts')

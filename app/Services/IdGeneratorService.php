@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Student;
 use App\Models\Institution;
 use App\Models\AcademicSession;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -46,6 +47,21 @@ class IdGeneratorService
 
             return $id;
         });
+    }
+
+    /**
+     * Generate a permanent Parent / Guardian ID (stored as user shortcode).
+     * Format: PAR-[InstitutionID]-[UserID padded to 5 digits]
+     */
+    public static function generateParentShortcode(Institution $institution, int $userId): string
+    {
+        $code = 'PAR-' . $institution->id . '-' . str_pad((string) $userId, 5, '0', STR_PAD_LEFT);
+
+        if (User::where('shortcode', $code)->where('id', '!=', $userId)->exists()) {
+            throw new Exception('Parent ID collision for ' . $code);
+        }
+
+        return $code;
     }
 
     /**

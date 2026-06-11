@@ -4,14 +4,11 @@
 <div class="content-body">
     <div class="container-fluid">
         
-        <div class="row page-titles mx-0">
-            <div class="col-sm-6 p-md-0">
-                <div class="welcome-text">
-                    <h4>{{ __('dashboard.teacher_dashboard') }}</h4>
-                    <p class="mb-0">{{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}</p>
-                </div>
-            </div>
-        </div>
+        @include('dashboard.partials.welcome-banner', [
+            'institution' => $institution ?? null,
+            'currentSession' => $currentSession ?? null,
+            'subtitle' => __('dashboard.teacher_dashboard'),
+        ])
 
         <div class="row">
             {{-- 1. My Courses --}}

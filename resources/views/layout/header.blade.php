@@ -47,12 +47,30 @@
     
     <style>
         /* Header specific fixes */
+        .content-body {
+            padding-bottom: 5rem;
+        }
         .select2-selection{
             border: 1px solid #d9dee3 !important;
             border-radius: 4px !important;
             height: 38px !important;
         }
         .dtp { z-index: 9999 !important; }
+
+        /* Hide bootstrap-select bleed-through inside SweetAlert modals */
+        body.swal2-shown .bootstrap-select.open,
+        body.swal2-shown .bootstrap-select.show,
+        body.swal2-shown .bootstrap-select .dropdown-menu.show {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        body.swal2-shown .bs-container.bootstrap-select {
+            z-index: 1040 !important;
+        }
+        .swal2-container .bootstrap-select,
+        .swal2-container .dropdown.bootstrap-select {
+            display: none !important;
+        }
 
         .select2-selection__arrow{ margin: 4px !important; }
 

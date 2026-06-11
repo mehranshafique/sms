@@ -22,14 +22,11 @@
         @else
             {{-- Main Dashboard Content (Only renders if Student exists) --}}
             
-            <div class="row page-titles mx-0">
-                <div class="col-sm-6 p-md-0">
-                    <div class="welcome-text">
-                        <h5 class="text-primary">{{ __('dashboard.student_dashboard') }}</h5>
-                        <p class="mb-0 fs-12">{{ __('dashboard.welcome_back') }}, {{ Auth::user()->name }}</p>
-                    </div>
-                </div>
-            </div>
+            @include('dashboard.partials.welcome-banner', [
+                'institution' => $institution ?? null,
+                'currentSession' => $currentSession ?? null,
+                'subtitle' => __('dashboard.student_dashboard'),
+            ])
 
             <div class="row">
                 {{-- 1. My Fees --}}

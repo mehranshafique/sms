@@ -152,6 +152,8 @@ return [
         'generate' => 'Generate Invoice',
         'list' => 'Invoice List'
     ],
+    'payment_methods' => 'Payment Methods',
+    'payment_proofs' => 'Payment Proofs',
     'settings' => 'Settings',
     'permissions' => [
         'roles' => 'Roles',
@@ -175,4 +177,9 @@ return [
     ],
     'salary_structures' => 'Salary Structure',
     'generate_payroll' => 'Generate Payroll',
+    'state_exams' => 'State Exams (EXETAT)',
+    'lmd_deliberations' => 'LMD Deliberations',
+    'transport' => 'Transport',
+    'operations' => 'Operations',
+    'guardian_portal' => 'Guardian Portal',
 ];

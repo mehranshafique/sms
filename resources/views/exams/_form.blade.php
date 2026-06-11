@@ -61,6 +61,8 @@
                                     <option disabled>──────────</option>
                                     <option value="university_session_1" {{ (old('category', $exam->category ?? '') == 'university_session_1') ? 'selected' : '' }}>{{ __('exam.university_session_1') }}</option>
                                     <option value="university_session_2" {{ (old('category', $exam->category ?? '') == 'university_session_2') ? 'selected' : '' }}>{{ __('exam.university_session_2') }}</option>
+                                    <option value="rattrapage_session_1" {{ (old('category', $exam->category ?? '') == 'rattrapage_session_1') ? 'selected' : '' }}>{{ __('exam.rattrapage_session_1') }}</option>
+                                    <option value="rattrapage_session_2" {{ (old('category', $exam->category ?? '') == 'rattrapage_session_2') ? 'selected' : '' }}>{{ __('exam.rattrapage_session_2') }}</option>
                                 </select>
                                 <small class="text-muted">Used for report card aggregation (e.g. P1 + P2 + Trimester Exam 1).</small>
                             </div>

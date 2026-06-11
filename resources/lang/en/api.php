@@ -35,4 +35,5 @@ return [
     'teacher' => 'Teacher',
     'request_submitted_success' => 'Request submitted successfully! Ticket: :ticket',
     'na' => 'N/A',
+    'lmd_not_applicable' => 'LMD transcript is only available for university students.',
 ];

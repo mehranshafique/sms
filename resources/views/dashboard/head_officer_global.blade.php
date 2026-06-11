@@ -8,18 +8,15 @@
             $roleName = Auth::user()->roles->first()?->name ?? __('dashboard.default_role');
         @endphp
 
-        <div class="row page-titles mx-0">
-            <div class="col-sm-6 p-md-0">
-                <div class="welcome-text">
-                    <h3 class="text-white fw-bold mb-1">
-                        {{ __('dashboard.welcome_greeting', ['name' => Auth::user()->name, 'role' => $roleName]) }}
-                    </h3>
-                    <h4>{{ __('dashboard.my_schools_overview') }}</h4>
-                    <p class="mb-0">{{ __('dashboard.global_dashboard') }}</p>
-                </div>
-            </div>
-            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
-                 {{-- Button to create new institute if allowed --}}
+        @include('dashboard.partials.welcome-banner', [
+            'institution' => null,
+            'currentSession' => null,
+            'subtitle' => __('dashboard.my_schools_overview') . ' — ' . __('dashboard.global_dashboard'),
+            'showIcon' => false,
+        ])
+
+        <div class="row mb-3">
+            <div class="col-sm-12 d-flex justify-content-sm-end">
                  @can('institution.create')
                  <a href="{{ route('institutes.create') }}" class="btn btn-primary btn-sm btn-rounded"><i class="fa fa-plus"></i> {{ __('dashboard.add_new_school') }}</a>
                  @endcan

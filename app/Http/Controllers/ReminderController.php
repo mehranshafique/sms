@@ -327,4 +327,35 @@ class ReminderController extends BaseController
             'status' => 'success'
         ]);
     }
+
+    /**
+     * Manually trigger weekly or monthly attendance summary reports to parents.
+     */
+    public function sendAttendanceReports(Request $request)
+    {
+        $request->validate([
+            'period_type' => 'required|in:week,month',
+        ]);
+
+        $institutionId = $this->getInstitutionId();
+        if (!$institutionId) {
+            return response()->json(['message' => __('reminders.messages.no_institution'), 'status' => 'error'], 400);
+        }
+
+        $eventKey = $request->period_type === 'month' ? 'attendance_monthly_summary' : 'attendance_weekly_summary';
+        if (!$this->checkPreferences($eventKey, 'sms', $institutionId)) {
+            return response()->json(['message' => __('reminders.messages.notifications_disabled'), 'status' => 'error'], 400);
+        }
+
+        $result = app(\App\Services\AttendanceReportDispatchService::class)
+            ->dispatchForInstitution($institutionId, $request->period_type);
+
+        return response()->json([
+            'message' => __('reminders.messages.attendance_sent', [
+                'sent' => $result['sent'],
+                'skipped' => $result['skipped'],
+            ]),
+            'status' => 'success',
+        ]);
+    }
 }

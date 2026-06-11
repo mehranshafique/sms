@@ -65,4 +65,10 @@ return [
     'notif_fund_new_message' => ':requester a soumis une demande de fonds : :title.',
     'notif_fund_status_title' => 'Demande de fonds :status',
     'notif_fund_status_message' => 'Votre demande de fonds « :title » est :status.',
+    'notif_proof_submitted_title' => 'Preuve de paiement soumise',
+    'notif_proof_submitted_admin_message' => ':student a soumis une preuve de :amount pour la facture :invoice. Vérification requise.',
+    'notif_proof_submitted_parent_message' => 'Nous avons reçu votre preuve de paiement de :amount pour :student (facture :invoice).',
+    'notif_proof_rejected_title' => 'Preuve de paiement refusée',
+    'notif_proof_rejected_message' => 'La preuve pour :student (facture :invoice, :amount) n\'a pas été acceptée. :reason',
+    'notif_proof_no_reason' => 'Veuillez contacter le secrétariat.',
 ];
