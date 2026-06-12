@@ -36,15 +36,17 @@ if(!function_exists('isActive')){
 
 if(!function_exists('authorize')){
     function authorize($permissions){
-        
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
         try {
-            // Check permission if it exists
-            if (!auth()->user()->hasPermissionTo($permissions)) {
+            if (!$user->hasPermissionTo($permissions)) {
                 abort(403);
             }
         } catch (PermissionDoesNotExist $e) {
-            // If permission does not exist, allow access
-            return true;
+            abort(403);
         }
 
         return true;

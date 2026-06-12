@@ -602,6 +602,37 @@ Super Admin only.
 
 ---
 
+## Module B9 : Paramètres de devise
+
+### Objectif
+
+Définir **comment les montants sont affichés** pour votre école — code devise (USD, CDF, XOF, etc.), symbole, position du symbole et décimales. Cela affecte les factures, paiements, tableaux de bord, rapports de frais et la page de paiement en ligne.
+
+### Qui l'utilise
+
+Admin école, Responsable régional, Super Admin (permission `currency.view`).
+
+### Où le trouver
+
+**Menu → Configuration → Devise**
+
+### Étapes
+
+1. Sélectionnez votre école dans l'en-tête (ex. **Green Valley**).
+2. Ouvrez **Configuration → Devise**.
+3. **Devise principale** — choisissez le code ISO (ex. **USD** ou **CDF**).
+4. **Symbole d'affichage** — personnalisez si nécessaire (ex. `FC`, `CFA`).
+5. **Position du symbole** — avant (`$ 1 250,00`) ou après (`1 250,00 $`) le montant.
+6. **Décimales** — généralement **2** ; **0** si vous n'affichez pas de centimes.
+7. Vérifiez l'**Aperçu en direct** à droite.
+8. Cliquez **Enregistrer**.
+
+### Où cela s'applique
+
+Factures, paiements, soldes élèves, tableaux de bord, paiement en ligne Mobile Money et rapports financiers. Chaque école peut avoir sa propre devise.
+
+---
+
 # PARTIE C — MODULES ACADÉMIQUES
 
 ---
@@ -1460,163 +1491,137 @@ If the parent lost the link:
 
 ---
 
-## Module H9 : Passerelles paiement
+## Module H9 : Paiements en ligne (connecter le Mobile Money)
 
-### Objectif
+> **À lire d'abord — en mots simples.**
+> Cette page permet aux parents de payer les frais scolaires depuis leur téléphone avec le **Mobile Money** (Orange Money, Airtel Money, M-Pesa). Pour que cela fonctionne, votre école ouvre un compte chez une **société de paiement** (nous prenons en charge **PawaPay**, **CinetPay** ou **Flutterwave**), copie quelques codes secrets chez elle, puis les colle dans Digitex. Une fois fait, chaque fois qu'un parent paie, la facture passe **automatiquement à « Payé »** — aucun travail manuel pour votre comptable. Vous ne configurez ceci qu'**une seule fois**.
 
-Collect **Mobile Money** payments online in the **Democratic Republic of Congo (DRC)**. One gateway is active per school at a time.
+### Comment ça marche (vue d'ensemble)
 
-### Supported gateways
+Imaginez la société de paiement comme un **caissier placé entre le parent et votre école** :
 
-| Gateway | Best for | DRC operators | Currencies |
-|---------|----------|---------------|------------|
-| **PawaPay** (recommended) | Direct API — PIN prompt on parent's phone | Orange, Airtel, Vodacom M-Pesa | CDF, USD |
-| **CinetPay** | Redirect checkout (popular in Francophone Africa) | Orange CD, Airtel CD, M-Pesa CD | CDF, USD |
-| **Flutterwave** | Pan-African + cards | DRC mobile money, cards | CDF, USD |
+1. Le parent clique sur le lien de paiement et choisit le Mobile Money.
+2. La société de paiement demande au parent de confirmer sur son téléphone.
+3. Le parent saisit son code PIN et l'argent est collecté.
+4. La société de paiement **dit à Digitex « c'est payé »**, et la facture devient verte automatiquement.
 
-### Configuration checklist
+Pas besoin de comprendre la technique — vous devez seulement **relier les deux** en copiant des codes. Suivez les étapes ci-dessous pour la société que vous choisissez.
 
-1. **Payment Methods** → scroll to **Payment Gateway (DRC)**.
-2. Choose **Provider** (PawaPay / CinetPay / Flutterwave).
-3. Set **Environment**: **Sandbox** (testing) or **Production** (live).
-4. Paste **API credentials** from gateway dashboard (see below).
-5. Copy **Webhook URLs** from the page into your gateway dashboard.
-6. Enable **Online payments** and required Mobile Money methods.
-7. **Save settings** → test with a small invoice → switch to Production when ready.
+### Quelle société choisir ?
 
-### Webhook URLs (register in gateway dashboard)
+Vous n'en avez besoin que d'**une seule**. Choisissez selon ce qui convient à votre école :
 
-Replace `YOUR-DOMAIN.com` with your live domain (e.g. `e-digitex.com`):
+| Société | Pourquoi la choisir | Compatible (RDC) |
+|---------|---------------------|------------------|
+| **PawaPay** (la plus simple, recommandée) | Le parent reçoit juste une demande de PIN sur son téléphone — sans page supplémentaire | Orange, Airtel, Vodacom M-Pesa |
+| **CinetPay** | Très répandue en Afrique francophone ; ouvre une page de paiement familière | Orange, Airtel, M-Pesa |
+| **Flutterwave** | Accepte aussi les cartes bancaires, pas seulement le Mobile Money | Mobile Money + cartes |
+
+> **Conseil :** En cas de doute, commencez par **PawaPay**. C'est le plus simple pour les parents.
+
+### Ce qu'il vous faut avant de commencer
+
+- Un compte chez **une** société de paiement (l'inscription est gratuite — liens plus bas).
+- Les **codes secrets** qu'elle vous donne (appelés « clés API » — voyez-les comme le mot de passe de votre boutique).
+- Environ **15 minutes**, une seule fois.
+
+### Toujours tester d'abord (« Sandbox » ou « Production »)
+
+Chaque société propose **deux modes** :
+
+- **Sandbox / Test** = un mode d'entraînement avec de la fausse monnaie. Utilisez-le d'abord pour vérifier que tout fonctionne.
+- **Production / En direct** = le mode réel qui encaisse de l'argent réel. Passez-y **seulement après** un test réussi.
+
+Ce choix s'appelle **Environnement** sur la page Méthodes de paiement. Commencez sur **Sandbox**, testez avec une petite facture, puis passez en **Production**.
+
+---
+
+### Étape 1 — Configurer dans Digitex (identique pour toutes les sociétés)
+
+1. Allez dans **Configuration → Méthodes de paiement**.
+2. Descendez jusqu'à la section **Passerelle de paiement (RDC)**.
+3. Choisissez votre **Fournisseur** (PawaPay, CinetPay ou Flutterwave).
+4. Réglez l'**Environnement** sur **Sandbox** pour l'instant.
+5. Collez les **codes secrets** de la société choisie (voir l'Étape 2 pour les trouver).
+6. Activez **Paiements en ligne** et cochez les options Mobile Money voulues (Orange, Airtel, etc.).
+7. Cliquez sur **Enregistrer**.
+
+Cette page affiche aussi un encadré **URL de webhook**. Un « webhook » est simplement le **message de retour** que la société de paiement envoie pour prévenir Digitex qu'un paiement a réussi. Vous copierez ces URL dans le site de la société à l'Étape 2 — c'est ce qui met les factures à jour automatiquement.
+
+Vos URL de webhook (remplacez `VOTRE-DOMAINE.com` par l'adresse réelle de votre site, ex. `e-digitex.com`) :
 
 ```
-https://YOUR-DOMAIN.com/webhooks/payments/pawapay
-https://YOUR-DOMAIN.com/webhooks/payments/cinetpay
-https://YOUR-DOMAIN.com/webhooks/payments/flutterwave
+https://VOTRE-DOMAINE.com/webhooks/payments/pawapay
+https://VOTRE-DOMAINE.com/webhooks/payments/cinetpay
+https://VOTRE-DOMAINE.com/webhooks/payments/flutterwave
 ```
 
-**Why webhooks matter:** When payment completes on the parent's phone, the gateway notifies your server so the invoice is marked **Paid** automatically — even if the browser is closed.
-
-**Return URL (after checkout):** `https://YOUR-DOMAIN.com/pay/callback/{gateway}/{reference}` — configured automatically; CinetPay/Flutterwave redirect parents here.
+> **En bref :** Digitex a besoin des codes secrets de la société, et la société a besoin de l'URL de webhook de Digitex. Vous ne faites que les présenter l'un à l'autre.
 
 ---
 
-### H9A: PawaPay Setup
+### Étape 2 — Récupérer vos codes chez la société de paiement
 
-#### Get API keys
+Choisissez la section de la société que vous avez retenue.
 
-1. Register at **https://dashboard.pawapay.io** (production) or **https://dashboard.sandbox.pawapay.io** (testing).
-2. Complete merchant verification (school name, contact, bank details).
-3. Dashboard → **Settings → API** → copy **Bearer API Token**.
-4. **Never share the token publicly.**
+#### Option A — PawaPay (recommandée)
 
-#### Configure in Digitex SMS
+1. Créez un compte gratuit sur **https://dashboard.pawapay.io** (en direct) ou **https://dashboard.sandbox.pawapay.io** (pour tester).
+2. Renseignez les informations de l'école (nom, contact, coordonnées bancaires) pour être approuvé.
+3. Dans leur menu, ouvrez **Settings → API** et **copiez le jeton API** (un long code secret). Gardez-le privé — ne le partagez jamais.
+4. De retour dans Digitex (Méthodes de paiement), collez-le dans **Jeton API PawaPay** et enregistrez.
+5. Dans PawaPay, ouvrez **Webhooks**, cliquez sur **Ajouter**, et collez l'URL de webhook PawaPay copiée depuis Digitex. Choisissez les événements **Deposit completed** et **Deposit failed**.
 
-| Setting | Value |
-|---------|-------|
-| Provider | PawaPay |
-| Environment | Sandbox (then Production) |
-| PawaPay API Token | Paste token |
-| Online payments | ON |
+C'est tout. PawaPay reconnaît automatiquement le réseau (Orange, Airtel ou M-Pesa) d'après le numéro du parent.
 
-#### Register webhook
+**Documentation :** https://docs.pawapay.io
 
-1. Payment Methods page → copy PawaPay webhook URL.
-2. PawaPay dashboard → **Webhooks** → add URL.
-3. Events: **Deposit completed**, **Deposit failed**.
+#### Option B — CinetPay
 
-#### Operator mapping (automatic)
+1. Créez un compte sur **https://cinetpay.com** et vérifiez-le.
+2. Trouvez les réglages d'intégration et **copiez deux codes : le Site ID et la clé API (API Key)**.
+3. Dans Digitex, collez-les dans **Site ID CinetPay** et **Clé API CinetPay**, puis enregistrez.
+4. Dans CinetPay, allez dans **Notifications / Webhook** et collez l'URL de webhook CinetPay copiée depuis Digitex.
 
-| Digitex method | PawaPay provider |
-|----------------|------------------|
-| Orange Money | ORANGE_COD |
-| Airtel Money | AIRTEL_COD |
-| M-Pesa / Vodacom | VODACOM_MPESA_COD |
+**Documentation :** https://docs.cinetpay.com
 
-#### Go live
+#### Option C — Flutterwave
 
-1. Complete PawaPay production KYC.
-2. Get production API token.
-3. Payment Methods → Environment: **Production** → save.
-4. Update webhook on production PawaPay dashboard.
-5. Test with small real payment (e.g. 100 CDF).
+1. Créez un compte sur **https://dashboard.flutterwave.com** et vérifiez votre entreprise.
+2. **Copiez la clé publique (Public Key) et la clé secrète (Secret Key)** (et la clé de chiffrement si elle s'affiche).
+3. Dans Digitex, collez la **clé secrète** et la **clé publique**, puis enregistrez.
+4. Dans Flutterwave, allez dans **Settings → Webhooks**, ajoutez l'URL de webhook Flutterwave copiée depuis Digitex, et activez l'événement de **succès de paiement** (souvent appelé `charge.completed`).
 
-**Docs:** https://docs.pawapay.io
+**Documentation :** https://developer.flutterwave.com/docs
 
 ---
 
-### H9B: CinetPay Setup
+### Étape 3 — Tester, puis passer en direct
 
-#### Get API keys
+1. Créez une **petite facture de test** (ex. 100 CDF).
+2. Ouvrez son lien de paiement et choisissez **Payer maintenant**.
+3. Effectuez le paiement avec les **instructions de test** de la société (mode Sandbox).
+4. Vérifiez que la facture passe à **Payé** toute seule en quelques secondes.
+5. Si le test réussit : revenez sur **Méthodes de paiement**, passez l'**Environnement** sur **Production**, collez vos codes secrets **réels** et mettez à jour l'URL de webhook sur le tableau de bord en direct de la société.
+6. Faites un dernier test avec un **petit paiement réel**.
 
-1. Register at **https://cinetpay.com** → merchant dashboard.
-2. Complete account verification.
-3. Copy **Site ID** and **API Key** from integration settings.
-
-#### Configure in Digitex SMS
-
-| Setting | Value |
-|---------|-------|
-| Provider | CinetPay |
-| Environment | Sandbox / Production |
-| CinetPay Site ID | From dashboard |
-| CinetPay API Key | From dashboard |
-
-#### Register webhook
-
-1. Copy CinetPay webhook URL from Payment Methods page.
-2. CinetPay dashboard → **Notifications / Webhook** → paste URL.
-3. Save.
-
-#### Test
-
-1. Create test invoice → copy pay link.
-2. **Pay instantly** → CinetPay checkout → use sandbox test credentials.
-3. Confirm invoice status **Paid**.
-
-**Docs:** https://docs.cinetpay.com
+C'est terminé — les parents peuvent désormais payer depuis leur téléphone.
 
 ---
 
-### H9C: Flutterwave Setup
+### En cas de problème
 
-#### Get API keys
+| Ce que vous voyez | Que faire |
+|-------------------|-----------|
+| Le parent a payé mais la facture reste impayée | L'URL de webhook est absente ou erronée. Recopiez-la depuis Digitex vers le tableau de bord de la société. Votre site doit utiliser **https://** et être accessible en ligne. |
+| « Clé API invalide » ou erreurs de connexion | Le code secret est erroné ou expiré. Générez-en un nouveau sur le site de la société et recollez-le dans Méthodes de paiement. |
+| Le paiement est refusé sur le téléphone | Le numéro du parent doit correspondre à son réseau Mobile Money et commencer par l'indicatif RDC (243…). |
+| La société de paiement est momentanément indisponible | Les parents peuvent quand même payer via l'onglet **Téléverser une preuve** (voir Module H10). |
+| Cela marchait en test mais échoue en réel | Vous avez oublié de passer l'**Environnement** en **Production** ou vous utilisez encore les codes secrets de **test**. Utilisez les codes **réels**. |
 
-1. Register at **https://dashboard.flutterwave.com**.
-2. Complete business verification.
-3. Copy **Public Key**, **Secret Key**, and **Encryption Key** (if shown).
+### Besoin d'aide ?
 
-#### Configure in Digitex SMS
-
-| Setting | Value |
-|---------|-------|
-| Provider | Flutterwave |
-| Environment | Test / Live |
-| Flutterwave Secret Key | From dashboard |
-| Flutterwave Public Key | From dashboard |
-
-#### Register webhook
-
-1. Copy Flutterwave webhook URL from Payment Methods page.
-2. Flutterwave dashboard → **Settings → Webhooks** → add URL.
-3. Enable **charge.completed** (or equivalent payment success event).
-
-**Docs:** https://developer.flutterwave.com/docs
-
----
-
-### Gateway troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Payment stays pending | Verify webhook URL is HTTPS and reachable from internet |
-| Invalid API key | Regenerate key in gateway dashboard; re-save in Payment Methods |
-| Wrong operator | Parent phone must match operator (243…) |
-| Gateway down | Parents can use **Upload proof** tab (Module H10) |
-| Sandbox works, production fails | Switch Environment to Production and use live API keys |
-
-### Public help articles
-
-Detailed step-by-step guides (no login required): **https://e-digitex.com/help**
+Des guides simples, image par image (sans connexion), sont en ligne sur : **https://e-digitex.com/help**
 
 ---
 
@@ -1862,6 +1867,133 @@ A: Invoice must exist; **Payment Methods** → Online payments must be ON; gatew
 
 ---
 
+---
+
+# PARTIE L — DIGITEX IA (OPTION FACULTATIVE)
+
+---
+
+## Module L1 : Accès IA et où la trouver
+
+### Objectif
+
+**Digitex IA** aide le personnel à rédiger des avis, rappels, commentaires de bulletin, réponses support et synthèses — **directement dans le module en cours**, sans copier les données vers un chatbot externe.
+
+L’IA est une **option d’abonnement** (Basic / Premium / PRO / Enterprise). Si votre forfait inclut l’IA, vous verrez :
+
+- **Menu latéral :** **Assistant IA** (chat complet) et **Studio IA** (outils de rédaction)
+- **Bouton violet en bas à gauche :** aide rapide sur **la page actuelle**
+- **Boutons « IA » violets** sur avis, rappels, résultats, factures, élèves, notes, support et tableau de bord
+
+### Qui l'utilise
+
+Administration, enseignants, comptables, Head Officers (si le forfait inclut l’IA).
+
+### Étapes — Ouvrir l’Assistant IA
+
+1. Connectez-vous sur **https://e-digitex.com/**
+2. Menu **Digitex IA → Assistant IA**
+3. Posez une question, ex. *« Comment générer les factures en masse pour la 5e A ? »*
+4. Cliquez **Nouvelle conversation** pour recommencer
+
+### Étapes — Widget flottant
+
+1. Cliquez le bouton **baguette magique** violet en bas à gauche
+2. Posez une question sur **cet écran**
+3. Ouvrez l’assistant complet via l’icône lien externe
+
+---
+
+## Module L2 : IA sur le tableau de bord (Copilote)
+
+### Objectif
+
+La carte **Copilote école** résume ce qui requiert votre attention (frais en retard, brouillons d’avis, examens à venir).
+
+### Étapes
+
+1. **Tableau de bord**
+2. Carte **Copilote école**
+3. Cliquez **Quoi de neuf ?**
+4. Agissez selon les points listés
+
+---
+
+## Module L3 : IA dans les avis
+
+### Étapes
+
+1. **Communication → Avis → Créer**
+2. Renseignez titre, type, public
+3. **Brouillon IA** → confirmez **Appliquer**
+4. **Traduire IA** si besoin
+5. **Enregistrer** / publier
+
+---
+
+## Module L4 : IA dans les résultats et bulletins
+
+### Étapes
+
+1. **Examens → Résultats**
+2. Section **Commentaires en masse**
+3. Choisissez **Examen** et **Classe**
+4. **Générer commentaires**
+
+---
+
+## Module L5 : IA dans les rappels (frais et examens)
+
+### Étapes
+
+1. **Communication → Rappels**
+2. Frais ou examens : canal, classe, tranche
+3. **Brouillon IA** → modifiez l’**Aperçu du message**
+4. Envoyez et confirmez (l’aperçu s’affiche dans la confirmation)
+
+---
+
+## Module L6 : IA dans la finance (factures)
+
+1. Ouvrez une facture **impayée** / **partielle** / **en retard**
+2. **Expliquer avec l’IA**
+
+---
+
+## Module L7 : IA fiche élève (synthèse 360°)
+
+1. **Élèves →** ouvrir un profil
+2. **Synthèse 360° IA**
+
+---
+
+## Module L8 : IA saisie des notes (analyse à risque)
+
+1. **Examens → Saisir les notes**
+2. Sélectionnez examen et classe
+3. **Scan à risque IA**
+
+---
+
+## Module L9 : IA tickets support
+
+1. Ouvrez un ticket
+2. **Suggestion IA** → modifiez → envoyer
+
+---
+
+## Module L10 : Studio IA
+
+Menu **Digitex IA → Studio IA** — traduction, résumé, amélioration de texte, etc.
+
+---
+
+## Module L11 : Paramètres IA (Super Admin)
+
+**Digitex IA → Paramètres IA** — clé API, modèle, usage. Activez l’IA par forfait dans **Finance → Forfaits**.
+
+---
+
 # PARTIE M — GLOSSAIRE
 
 ---
@@ -1899,7 +2031,12 @@ Everyone — especially new secretaries, accountants, teachers, and parents.
 | **Deliberation** | University exam board decision on pass/fail |
 | **Merchant code** | Number parents dial for Mobile Money payments |
 | **Sandbox** | Test mode — no real money |
-| **Production** | Live mode — real payments |
+| **Production** | Mode réel — vrais paiements |
+| **Digitex IA** | Assistant et outils de rédaction intégrés (option de forfait) |
+| **Assistant IA** | Chat complet pour questions et brouillons |
+| **Studio IA** | Outils autonomes (traduction, résumé, etc.) |
+| **Copilote école** | Briefing IA sur le tableau de bord |
+| **Bouton IA** | Action IA violette sur une page métier |
 
 ### Questions fréquentes
 

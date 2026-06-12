@@ -88,6 +88,21 @@ class MobileContextService
             'staff_id' => $user->staff?->id,
             'student_id' => $user->student?->id,
             'children' => $children,
+            'app_links' => $this->appLinks(),
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function appLinks(): array
+    {
+        $base = rtrim(config('app.url'), '/');
+
+        return [
+            'help' => $base . '/help',
+            'manual_web' => $base . '/manual/web',
+            'manual_mobile' => $base . '/manual/mobile',
+            'community' => $base . '/community',
+            'pay_lookup' => $base . '/pay',
         ];
     }
 

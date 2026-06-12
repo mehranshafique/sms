@@ -10,11 +10,14 @@ class SettingsController extends BaseController
 {
     public function __construct()
     {
+        $this->middleware('auth');
         $this->setPageTitle(__('settings.page_title'));
     }
 
     public function index()
     {
+        $this->authorizeAdminOrAnyPermission(['setting.view', 'setting.manage']);
+
         $institutionId = $this->getInstitutionId();
         
         if (!$institutionId) {
@@ -62,7 +65,7 @@ class SettingsController extends BaseController
         }
 
         $user = Auth::user();
-        if (!$user->can('setting.manage') && !$user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])) {
+        if (!$user->can('setting.manage') && !$this->userIsSchoolAdmin($user)) {
             abort(403);
         }
 

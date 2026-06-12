@@ -3,72 +3,58 @@
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
-        
+
         @include('dashboard.partials.welcome-banner', [
             'institution' => $institution ?? null,
             'currentSession' => $currentSession ?? null,
             'subtitle' => __('dashboard.teacher_dashboard'),
         ])
 
-        <div class="row">
-            {{-- 1. My Courses --}}
-            <div class="col-xl-4 col-sm-6">
-                <div class="widget-stat card">
-                    <div class="card-body p-4">
-                        <div class="media ai-icon">
-                            <span class="me-3 bgl-primary text-primary"><i class="la la-book"></i></span>
-                            <div class="media-body">
-                                <p class="mb-1">{{ __('dashboard.my_courses') }}</p>
-                                <h4 class="mb-0">{{ $myCoursesCount }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        {{-- KEY STATS --}}
+        <div class="row g-3 mb-2">
+            <div class="col-xl-3 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-book', 'tint' => 'primary',
+                    'label' => __('dashboard.my_courses'), 'value' => $myCoursesCount,
+                    'hint' => __('dashboard.subjects_taught'),
+                ])
             </div>
-
-            {{-- 2. My Students --}}
-            <div class="col-xl-4 col-sm-6">
-                <div class="widget-stat card">
-                    <div class="card-body p-4">
-                        <div class="media ai-icon">
-                            <span class="me-3 bgl-warning text-warning"><i class="la la-users"></i></span>
-                            <div class="media-body">
-                                <p class="mb-1">{{ __('dashboard.my_students') }}</p>
-                                <h4 class="mb-0">{{ $myStudentsCount }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-xl-3 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-chalkboard', 'tint' => 'info',
+                    'label' => __('dashboard.my_classes'), 'value' => $myClassesCount ?? 0,
+                    'hint' => __('dashboard.class_sections'),
+                ])
             </div>
-
-            {{-- 3. Today's Classes --}}
-            <div class="col-xl-4 col-sm-6">
-                <div class="widget-stat card">
-                    <div class="card-body p-4">
-                        <div class="media ai-icon">
-                            <span class="me-3 bgl-info text-info"><i class="la la-calendar-check-o"></i></span>
-                            <div class="media-body">
-                                <p class="mb-1">{{ __('dashboard.todays_classes') }}</p>
-                                <h4 class="mb-0">{{ $todayClasses->count() }}</h4>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-xl-3 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-users', 'tint' => 'warning',
+                    'label' => __('dashboard.my_students'), 'value' => $myStudentsCount,
+                    'hint' => __('dashboard.students'),
+                ])
+            </div>
+            <div class="col-xl-3 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-calendar-check-o', 'tint' => 'success',
+                    'label' => __('dashboard.todays_classes'), 'value' => $todayClasses->count(),
+                    'hint' => __('dashboard.weekly_sessions', ['count' => $weeklyClassesCount ?? 0]),
+                    'hintClass' => 'text-tint-success',
+                ])
             </div>
         </div>
 
-        {{-- Schedule & Quick Actions --}}
-        <div class="row">
-            <div class="col-xl-8">
-                <div class="card">
-                    <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.my_timetable') }} ({{ now()->translatedFormat('l') }})</h4>
+        {{-- SCHEDULE + WEEKLY LOAD --}}
+        <div class="row g-3">
+            <div class="col-xl-8 mb-3">
+                <div class="dash-panel h-100">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.my_timetable') }} <span class="dash-mini-label fw-normal">({{ now()->translatedFormat('l') }})</span></h4>
                     </div>
-                    <div class="card-body">
+                    <div class="dash-panel__body">
                         <div class="table-responsive">
-                            <table class="table table-responsive-sm">
-                                <thead class="thead-light">
-                                    <tr>
+                            <table class="table table-sm table-borderless align-middle mb-0">
+                                <thead>
+                                    <tr class="dash-mini-label">
                                         <th>{{ __('dashboard.time') }}</th>
                                         <th>{{ __('dashboard.class') }}</th>
                                         <th>{{ __('dashboard.subject') }}</th>
@@ -79,7 +65,7 @@
                                 <tbody>
                                     @forelse($todayClasses as $class)
                                         <tr>
-                                            <td><span class="text-primary fw-bold">{{ $class->start_time->format('H:i') }}</span></td>
+                                            <td><span class="text-tint-primary fw-bold">{{ $class->start_time->format('H:i') }}</span></td>
                                             <td>{{ $class->classSection->name }}</td>
                                             <td>{{ $class->subject->name }}</td>
                                             <td>{{ $class->room_number ?? '-' }}</td>
@@ -88,9 +74,7 @@
                                             </td>
                                         </tr>
                                     @empty
-                                        <tr>
-                                            <td colspan="5" class="text-center text-muted">{{ __('dashboard.no_classes_today') }}</td>
-                                        </tr>
+                                        <tr><td colspan="5" class="text-center text-muted py-4">{{ __('dashboard.no_classes_today') }}</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
@@ -99,24 +83,78 @@
                 </div>
             </div>
 
-            <div class="col-xl-4">
-                <div class="card bg-secondary text-white">
-                    <div class="card-body">
-                        <div class="media align-items-center">
-                            <span class="me-4">
-                                <i class="la la-envelope" style="font-size: 2.5rem;"></i>
-                            </span>
-                            <div class="media-body">
-                                <h3 class="text-white">{{ __('dashboard.communication') }}</h3>
-                                <p class="mb-0 text-white opacity-75">{{ __('dashboard.send_sms_email_parents') }}</p>
-                            </div>
-                        </div>
-                        <a href="#" class="btn btn-light btn-sm mt-3 w-100 text-secondary fw-bold">{{ __('dashboard.open_center') }}</a>
+            <div class="col-xl-4 mb-3">
+                <div class="dash-panel h-100">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.weekly_load') }}</h4>
+                    </div>
+                    <div class="dash-panel__body">
+                        <canvas id="weeklyLoadChart" height="180"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
+        {{-- NOTICES --}}
+        @if(isset($recentNotices) && $recentNotices->count())
+        <div class="row g-3">
+            <div class="col-12 mb-3">
+                <div class="dash-panel">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.latest_notices') }}</h4>
+                    </div>
+                    <div class="dash-panel__body">
+                        <div class="row">
+                            @foreach($recentNotices as $notice)
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-start">
+                                        <span class="dash-stat__icon tint-info me-3" style="width:38px;height:38px;font-size:16px;"><i class="la la-bullhorn"></i></span>
+                                        <div>
+                                            <div class="fw-bold text-dark fs-14">{{ $notice->title }}</div>
+                                            <small class="dash-mini-label">{{ $notice->created_at->diffForHumans() }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
     </div>
 </div>
+@endsection
+
+@section('js')
+<script src="{{ asset('vendor/chart.js/Chart.bundle.min.js') }}"></script>
+<script>
+    (function($) {
+        "use strict";
+        if (typeof Chart === 'undefined') return;
+        var el = document.getElementById("weeklyLoadChart");
+        if (el) {
+            new Chart(el.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: {!! json_encode($weekChartLabels ?? []) !!},
+                    datasets: [{
+                        label: @json(__('dashboard.classes')),
+                        data: {!! json_encode($weekChartValues ?? []) !!},
+                        backgroundColor: 'rgba(91, 83, 232, 0.85)',
+                        borderRadius: 6,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: { display: false },
+                    scales: { yAxes: [{ ticks: { beginAtZero: true, precision: 0 } }] }
+                }
+            });
+        }
+    })(jQuery);
+</script>
 @endsection

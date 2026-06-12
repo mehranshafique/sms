@@ -12,12 +12,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use App\Enums\RoleEnum;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class AssignmentController extends BaseController
 {
-    // ... (Constructor and index methods unchanged) ...
     public function __construct()
     {
+        $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':assignment.view')->only(['index', 'create', 'getSubjects']);
+        $this->middleware(PermissionMiddleware::class . ':assignment.create')->only(['store']);
+        $this->middleware(PermissionMiddleware::class . ':assignment.delete')->only(['destroy']);
         $this->setPageTitle(__('assignment.page_title'));
     }
 

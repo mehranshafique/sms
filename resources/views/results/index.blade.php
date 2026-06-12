@@ -67,6 +67,50 @@
                 </div>
             </div>
         </div>
+
+        @if(!empty($planCtx['has_ai']))
+        <div class="row mt-3">
+            <div class="col-xl-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0"><i class="la la-magic text-primary me-2"></i> {{ __('ai.tools.bulk_report_comments') }}</h5>
+                        <p class="text-muted small mb-0">{{ __('ai.tools.bulk_report_comments_desc') }}</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold">{{ __('results.select_exam') }}</label>
+                                <select id="ai_bulk_exam" class="form-control default-select">
+                                    <option value="">{{ __('results.select_exam_placeholder') }}</option>
+                                    @if(isset($exams))
+                                        @foreach($exams as $id => $name)
+                                            <option value="{{ $id }}">{{ is_array($name) ? implode(' ', $name) : $name }}</option>
+                                        @endforeach
+                                    @endif
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold">{{ __('results.select_class') }}</label>
+                                <select id="ai_bulk_class" class="form-control default-select" disabled>
+                                    <option value="">{{ __('results.select_class_first') }}</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-primary w-100 ai-embed-btn" id="ai-bulk-comments-btn"
+                                    data-ai-tool="bulk_report_comments"
+                                    data-ai-params="{}"
+                                    data-ai-fields='{"exam_id":"#ai_bulk_exam","class_section_id":"#ai_bulk_class"}'
+                                    data-ai-panel="#ai-bulk-comments-output">
+                                    <i class="la la-magic"></i> {{ __('ai.btn_bulk_comments') }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ai-embed-panel mt-3" id="ai-bulk-comments-output"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
     </div>
 </div>
 @endsection
@@ -151,6 +195,25 @@
                 });
             }
         });
+
+        @if(!empty($planCtx['has_ai']))
+        $('#ai_bulk_exam').on('change', function() {
+            let examId = $(this).val();
+            let classSelect = $('#ai_bulk_class');
+            classSelect.html('<option>{{ __('results.loading') }}</option>').prop('disabled', true);
+            refreshSelect(classSelect);
+            if (examId) {
+                $.get("{{ route('results.get_classes') }}", { exam_id: examId }, function(data) {
+                    classSelect.empty().append('<option value="">{{ __('results.select_class_placeholder') }}</option>');
+                    $.each(data, function(id, name) {
+                        classSelect.append(new Option(name, id));
+                    });
+                    classSelect.prop('disabled', false);
+                    refreshSelect(classSelect);
+                });
+            }
+        });
+        @endif
     });
 </script>
 @endsection

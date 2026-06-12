@@ -80,6 +80,11 @@
                 }
                 
                 $modules = $enabledModules ?? [];
+                $isAdminRole = $isSuperAdmin || $isHeadOfficer || $isSchoolAdmin;
+                $showStudentNav = $isStudent && !$isAdminRole && !$isTeacher;
+                $showTeacherNav = $isTeacher && !$isAdminRole;
+                $showGuardianNav = $isGuardian && !$isAdminRole && !$isStudent && !$isTeacher;
+                $showManagementNav = !$isGlobalMode && ($isAdminRole || ($isManagement && !$showStudentNav && !$showTeacherNav && !$showGuardianNav));
                 $hasModule = function($slug) use ($modules, $isSuperAdmin) {
                     if ($isSuperAdmin) return true;
                     $slug = strtolower(trim($slug));
@@ -132,7 +137,7 @@
                         <li><a class="{{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show') ? 'mm-active' : '' }}" href="{{ route('institutes.index') }}">{{ __('sidebar.all_institutions') }}</a></li>
                         <li><a class="{{ request()->routeIs('campuses.*') ? 'mm-active' : '' }}" href="{{ route('campuses.index') }}">{{ __('sidebar.campuses.title') }}</a></li>
                         <li><a class="{{ request()->routeIs('header-officers.index', 'header-officers.edit') ? 'mm-active' : '' }}" href="{{ route('header-officers.index') }}">{{ __('sidebar.header_officers.title') }}</a></li>
-                        <li><a href="{{ route('institutes.index') }}?status=0">{{ __('sidebar.expired_institution') }}</a></li>
+                        <li><a href="{{ route('institutes.index', ['filter' => 'expired']) }}">{{ __('sidebar.expired_institution') }}</a></li>
                         <li><a class="{{ request()->routeIs('packages.*') ? 'mm-active' : '' }}" href="{{ route('packages.index') }}">{{ __('sidebar.packages.title') }}</a></li>
                         <li><a class="{{ request()->routeIs('subscriptions.index', 'subscriptions.edit') ? 'mm-active' : '' }}" href="{{ route('subscriptions.index') }}">{{ __('sidebar.subscriptions.title') }}</a></li>
                     </ul>
@@ -165,7 +170,7 @@
             {{-- ============================================================= --}}
             
             {{-- FIXED: Uses $isManagement logic instead of strictly checking $isSchoolAdmin --}}
-            @if($isManagement && !$isGlobalMode)
+            @if($showManagementNav)
                 
                 {{-- SEPARATOR / HEADER WITH SCHOOL ID --}}
                 <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
@@ -200,11 +205,11 @@
                         <li><a class="ai-icon {{ request()->routeIs('departments.*') ? 'mm-active' : '' }}" href="{{ route('departments.index') }}"><i class="la la-building"></i><span class="nav-text">{{ __('sidebar.departments.title') }}</span></a></li>
                     @endif
 
-                    {{-- PROGRAMS (University Only) --}}
-                    @if($showLmdFeatures)
+                    {{-- PROGRAMS (University / Vocational) --}}
+                    @if($showLmdFeatures && $user->can('department.view'))
                         <li>
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
-                                <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs.title') ?? 'Programs' }}</span>
+                                <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs.title') }}</span>
                             </a>
                             <ul aria-expanded="false">
                                 <li><a class="{{ request()->routeIs('programs.*') ? 'mm-active' : '' }}" href="{{ route('programs.index') }}">{{ __('lmd.programs_page_title') ?? 'Programs' }}</a></li>
@@ -256,7 +261,7 @@
                                 <li><a class="{{ request()->routeIs('students.*') ? 'mm-active' : '' }}" href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
                             @endif
                             
-                            @can('student.view') 
+                            @can('student_parent.view')
                                 <li><a class="{{ request()->routeIs('parents.*') ? 'mm-active' : '' }}" href="{{ route('parents.index') }}">{{ __('parent.page_title') ?? 'Parents' }}</a></li>
                             @endcan
 
@@ -282,11 +287,13 @@
                                 <li><a class="{{ request()->routeIs('promotions.*') ? 'mm-active' : '' }}" href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
                             @endif
                             
-                            {{-- Requests / Leaves --}}
+                            @if($hasModule('student_request') && $user->can('student_request.view'))
                             <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}</a></li>
+                            @endif
                             
+                            @if($user->can('student.view') || $user->hasRole(RoleEnum::TEACHER->value))
                             <li><a class="{{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</a></li>
-                            <li><a class="{{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}">{{ __('pickup.page_title') ?? 'Generate Student QR' }}</a></li>
+                            @endif
                         </ul>
                     </li>
 
@@ -307,8 +314,8 @@
                 @endif
                 
                 {{-- SECURITY / GUARD LINK --}}
-                @if($user->hasRole('Guard') || $user->can('student.view'))
-                    <li class="nav-label">Security</li>
+                @if($user->hasRole('Guard'))
+                    <li class="nav-label">{{ __('sidebar.security') }}</li>
                     <li>
                         <a class="ai-icon {{ request()->routeIs('pickups.scanner') ? 'mm-active' : '' }}" href="{{ route('pickups.scanner') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.scanner_title') ?? 'QR Scanner' }}</span></a>
                     </li>
@@ -389,12 +396,16 @@
                                 <li><a class="{{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.manage') }}">{{ __('sidebar.exam_schedules.manage') }}</a></li>
                             @endif
                             
-                            @if($hasModule('exam_marks'))
-                                <li><a class="{{ request()->routeIs('marks.*') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}">{{ __('sidebar.marks.title') }}</a></li>
+                            @if($hasModule('exam_marks') && $user->can('exam_mark.create'))
+                                <li><a class="{{ request()->routeIs('marks.create', 'marks.index') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}">{{ __('sidebar.marks.enter_marks') }}</a></li>
                             @endif
                             
+                            @if($user->can('result_card.view'))
                             <li><a class="{{ request()->routeIs('results.*') ? 'mm-active' : '' }}" href="{{ route('results.index') }}">{{ __('sidebar.results') }}</a></li>
+                            @endif
+                            @if($user->can('academic_report.view'))
                             <li><a class="{{ request()->routeIs('reports.*') ? 'mm-active' : '' }}" href="{{ route('reports.index') }}">{{ __('sidebar.academic_reports') }}</a></li>
+                            @endif
                             @if($showStateExams)
                             <li><a class="{{ request()->routeIs('state-exams.*') ? 'mm-active' : '' }}" href="{{ route('state-exams.index') }}">{{ __('sidebar.state_exams') }}</a></li>
                             @endif
@@ -435,20 +446,26 @@
                 @endif
 
                 {{-- CONFIGURATION --}}
-                @if($user->can('setting.manage') || $user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                @if($user->can('setting.manage') || $user->can('setting.view') || $user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
                     <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'currency.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
                         <ul aria-expanded="false">
-                            @if($user->can('setting.manage') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                            @if($user->can('setting.manage') || $user->can('setting.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                                 <li><a class="{{ request()->routeIs('settings.*') ? 'mm-active' : '' }}" href="{{ route('settings.index') }}">{{ __('settings.page_title') ?? 'Settings' }}</a></li>
+                            @endif
+                            @if($user->can('setting.manage') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                                 <li><a class="{{ request()->routeIs('configuration.*') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('configuration.page_title') ?? 'Configuration' }}</a></li>
                             @endif
                             @if($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                                 <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}">{{ __('sidebar.currency') }}</a></li>
                             @endif
+                            @can('sms_template.view')
                             <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') ?? 'SMS Templates' }}</a></li>
+                            @endcan
+                            @can('role.viewAny')
                             <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
+                            @endcan
                         </ul>
                     </li>
                 @endif
@@ -459,7 +476,7 @@
             {{-- ============================================================= --}}
             {{-- PART 3: TEACHER SECTION --}}
             {{-- ============================================================= --}}
-            @if($isTeacher)
+            @if($showTeacherNav)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
                 
@@ -471,7 +488,7 @@
                 @endif
                 
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('marks.*') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('marks.create', 'marks.index') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}"><i class="la la-edit"></i><span class="nav-text">{{ __('sidebar.marks.enter_marks') }}</span></a></li>
                 
                 @if($hasModule('exam_schedules'))
                     <li><a class="ai-icon {{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
@@ -483,7 +500,7 @@
                 {{-- Teacher Requests/Leaves --}}
                 <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span></a></li>
 
-                <li class="nav-label">Pickup System</li>
+                <li class="nav-label">{{ __('sidebar.pickup_system') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span></a></li>
             @endif
 
@@ -491,7 +508,7 @@
             {{-- ============================================================= --}}
             {{-- PART 4: STUDENT SECTION --}}
             {{-- ============================================================= --}}
-            @if($isStudent)
+            @if($showStudentNav)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('dashboard') ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
                 
@@ -502,15 +519,12 @@
                     <li><a class="ai-icon {{ request()->routeIs('assignments.*') ? 'mm-active' : '' }}" href="{{ route('assignments.index') }}"><i class="la la-tasks"></i><span class="nav-text">{{ __('sidebar.assignments.my_assignments') }}</span></a></li>
                 @endif
 
-                <!-- 2. For STUDENTS: Place this in the Student Section (Part 4) -->
-                @if($isStudent)
-                    <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.show') }}">
+                <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.show') }}">
                         <i class="la la-chart-pie"></i>
-                        <span class="nav-text">{{ __('sidebar.my_attendance_analytics') ?? 'My Attendance Analytics' }}</span>
+                        <span class="nav-text">{{ __('sidebar.my_attendance_analytics') }}</span>
                     </a></li>
-                @endif
                 <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('marks.my_marks') ? 'mm-active' : '' }}" href="{{ route('marks.my_marks') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.marks.title') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('marks.my_marks') ? 'mm-active' : '' }}" href="{{ route('marks.my_marks') }}"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.marks.my_results') }}</span></a></li>
                 
                 @if($hasModule('exam_schedules'))
                     <li><a class="ai-icon {{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
@@ -528,7 +542,7 @@
             {{-- ============================================================= --}}
             {{-- PART 5: PARENT / GUARDIAN SECTION --}}
             {{-- ============================================================= --}}
-            @if($isGuardian)
+            @if($showGuardianNav)
                 <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('guardian.*') ? 'mm-active' : '' }}" href="{{ route('guardian.index') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.guardian_portal') }}</span></a></li>
                 <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">
@@ -537,6 +551,44 @@
                 </a></li>
                 <li><a class="ai-icon {{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
             @endif
+
+            {{-- ============================================================= --}}
+            {{-- AI (optional, plan-gated module — hidden when not available) --}}
+            {{-- ============================================================= --}}
+            @php
+                try {
+                    $planSnap = app(\App\Services\PlanContextService::class)->snapshot();
+                    $aiAccess = $planSnap['has_ai'] ?? false;
+                } catch (\Throwable $e) {
+                    $aiAccess = false;
+                }
+            @endphp
+            @if($aiAccess)
+                <li class="nav-label">{{ __('sidebar.ai_section') }}</li>
+                <li><a class="ai-icon {{ request()->routeIs('ai.assistant') ? 'mm-active' : '' }}" href="{{ route('ai.assistant') }}">
+                    <i class="la la-robot"></i>
+                    <span class="nav-text">{{ __('sidebar.ai_assistant') }}</span>
+                </a></li>
+                <li><a class="ai-icon {{ request()->routeIs('ai.studio') ? 'mm-active' : '' }}" href="{{ route('ai.studio') }}">
+                    <i class="la la-magic"></i>
+                    <span class="nav-text">{{ __('sidebar.ai_studio') }}</span>
+                </a></li>
+                @if($isSuperAdmin)
+                    <li><a class="ai-icon {{ request()->routeIs('ai.settings.*') ? 'mm-active' : '' }}" href="{{ route('ai.settings.index') }}">
+                        <i class="la la-cog"></i>
+                        <span class="nav-text">{{ __('sidebar.ai_settings') }}</span>
+                    </a></li>
+                @endif
+            @endif
+
+            {{-- ============================================================= --}}
+            {{-- HELP & SUPPORT (available to all authenticated users) --}}
+            {{-- ============================================================= --}}
+            <li class="nav-label">{{ __('sidebar.support_section') }}</li>
+            <li><a class="ai-icon {{ request()->routeIs('support.*') ? 'mm-active' : '' }}" href="{{ route('support.index') }}">
+                <i class="la la-life-ring"></i>
+                <span class="nav-text">{{ $isSuperAdmin ? __('sidebar.support_inbox') : __('sidebar.support') }}</span>
+            </a></li>
 
         </ul>
     </div>

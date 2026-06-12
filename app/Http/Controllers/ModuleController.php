@@ -8,8 +8,9 @@ use Illuminate\Support\Str;
 use App\Http\Controllers\BaseController;
 class ModuleController extends BaseController
 {
-    public  function __construct(){
-        parent::__construct();
+    public function __construct()
+    {
+        $this->middleware('auth');
         $this->setPageTitle(__('modules.page_title'));
     }
     public function index()
@@ -42,7 +43,7 @@ class ModuleController extends BaseController
 
     public function update(Request $request, Module $module)
     {
-        authorize('module.edit');
+        authorize('module.update');
         $request->validate([
             'name' => 'required|unique:modules,name,' . $module->id,
         ]);

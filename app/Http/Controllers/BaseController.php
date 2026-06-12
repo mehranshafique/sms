@@ -129,4 +129,70 @@ class BaseController extends LaravelController
             abort(403);
         }
     }
+
+    /** @return list<string> */
+    protected function adminRoleNames(): array
+    {
+        return ['Super Admin', 'School Admin', 'Head Officer'];
+    }
+
+    protected function userIsSchoolAdmin(?\App\Models\User $user = null): bool
+    {
+        $user = $user ?? Auth::user();
+
+        return $user && $user->hasRole($this->adminRoleNames());
+    }
+
+    protected function authorizeAdminOrPermission(string $permission, int $status = 403): void
+    {
+        $user = Auth::user();
+        if (!$user) {
+            abort(401);
+        }
+        if ($this->userIsSchoolAdmin($user)) {
+            return;
+        }
+
+        try {
+            if ($user->can($permission)) {
+                return;
+            }
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+            abort($status);
+        }
+
+        abort($status);
+    }
+
+    /** @param list<string> $permissions */
+    protected function authorizeAdminOrAnyPermission(array $permissions, int $status = 403): void
+    {
+        $user = Auth::user();
+        if (!$user) {
+            abort(401);
+        }
+        if ($this->userIsSchoolAdmin($user)) {
+            return;
+        }
+
+        foreach ($permissions as $permission) {
+            try {
+                if ($user->can($permission)) {
+                    return;
+                }
+            } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+                continue;
+            }
+        }
+
+        abort($status);
+    }
+
+    protected function denyStudentLikeRoles(): void
+    {
+        $user = Auth::user();
+        if ($user && $user->hasRole(['Student', 'Guardian'])) {
+            abort(403);
+        }
+    }
 }

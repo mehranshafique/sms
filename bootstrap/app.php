@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register aliases here
         $middleware->alias([
             'tenant.api' => TenantApiMiddleware::class,
+            'ai.access'  => \App\Http\Middleware\EnsureAiAccess::class,
             // Add other aliases if needed, e.g., 'role' => \Spatie\Permission\Middleware\RoleMiddleware::class
         ]);
         $middleware->validateCsrfTokens(except: [

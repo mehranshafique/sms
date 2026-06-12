@@ -12,6 +12,8 @@
             if ($activeInstId && $activeInstId !== 'global') {
                 $platformInstitution = \App\Models\Institution::find($activeInstId);
             }
+            $totalFunds = $pendingFunds + $validatedFunds;
+            $validatedPercent = $totalFunds > 0 ? round(($validatedFunds / $totalFunds) * 100) : 0;
         @endphp
 
         @include('dashboard.partials.welcome-banner', [
@@ -21,176 +23,118 @@
             'showIcon' => false,
         ])
 
-        <div class="row">
-            <div class="col-xl-3 col-lg-6 col-sm-6">
-                <div class="widget-stat card bg-primary text-white">
-                    <div class="card-body p-4">
-                        <div class="media">
-                            <span class="me-3">
-                                <i class="la la-university"></i>
-                            </span>
-                            <div class="media-body text-white">
-                                <p class="mb-1 text-white opacity-75">{{ __('dashboard.total_institutions') }}</p>
-                                <h3 class="text-white">{{ $totalInstitutions }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        {{-- KEY STATS --}}
+        <div class="row g-3 mb-2">
+            <div class="col-xl-3 col-lg-6 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-university', 'tint' => 'primary',
+                    'label' => __('dashboard.total_institutions'), 'value' => $totalInstitutions,
+                    'hint' => __('dashboard.active_count', ['count' => $activeInstitutionsCount]), 'hintClass' => 'text-tint-primary',
+                ])
             </div>
-
-            <div class="col-xl-3 col-lg-6 col-sm-6">
-                <div class="widget-stat card bg-warning text-white">
-                    <div class="card-body p-4">
-                        <div class="media">
-                            <span class="me-3">
-                                <i class="la la-plus-circle"></i>
-                            </span>
-                            <div class="media-body text-white">
-                                <p class="mb-1 text-white opacity-75">{{ __('dashboard.institution_newcomer') }}</p>
-                                <h3 class="text-white">{{ $newInstitutionsCount }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-xl-3 col-lg-6 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-plus-circle', 'tint' => 'success',
+                    'label' => __('dashboard.institution_newcomer'), 'value' => $newInstitutionsCount,
+                    'hint' => __('dashboard.last_30_days'), 'hintClass' => 'text-tint-success',
+                ])
             </div>
-
-            <div class="col-xl-3 col-lg-6 col-sm-6">
-                <div class="widget-stat card bg-success text-white">
-                    <div class="card-body p-4">
-                        <div class="media">
-                            <span class="me-3">
-                                <i class="la la-check-circle"></i>
-                            </span>
-                            <div class="media-body text-white">
-                                <p class="mb-1 text-white opacity-75">{{ __('dashboard.active_institutions') }}</p>
-                                <h3 class="text-white">{{ $activeInstitutionsCount }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-xl-3 col-lg-6 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-users', 'tint' => 'info',
+                    'label' => __('dashboard.total_enrollment'), 'value' => number_format($totalStudents),
+                    'hint' => __('dashboard.students'),
+                ])
             </div>
-
-            <div class="col-xl-3 col-lg-6 col-sm-6">
-                <div class="widget-stat card bg-info text-white">
-                    <div class="card-body p-4">
-                        <div class="media">
-                            <span class="me-3">
-                                <i class="la la-users"></i>
-                            </span>
-                            <div class="media-body text-white">
-                                <p class="mb-1 text-white opacity-75">{{ __('dashboard.total_enrollment') }}</p>
-                                <h3 class="text-white">{{ $totalStudents }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-xl-3 col-lg-6 col-sm-6 mb-3">
+                @include('dashboard.partials.stat-card', [
+                    'icon' => 'la la-chalkboard-teacher', 'tint' => 'warning',
+                    'label' => __('dashboard.active_personnel'), 'value' => number_format($totalStaff),
+                    'hint' => __('dashboard.personnel_platform_wide'),
+                ])
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-xl-6 col-lg-12">
-                <div class="card">
-                    <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.funds_request_subscriptions') }}</h4>
+        {{-- FUNDS + SYSTEM STATUS --}}
+        <div class="row g-3">
+            <div class="col-xl-6 col-lg-12 mb-3">
+                <div class="dash-panel h-100">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.funds_request_subscriptions') }}</h4>
+                        <a href="{{ route('subscriptions.index') }}" class="text-tint-primary small">{{ __('dashboard.view_details') }}</a>
                     </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-6">
-                                <h4 class="text-warning mb-2">{{ $currency }}{{ number_format($pendingFunds, 2) }}</h4>
-                                <span class="text-muted">{{ __('dashboard.pending') }}</span>
+                    <div class="dash-panel__body">
+                        <div class="row text-center mb-3">
+                            <div class="col-6 border-end">
+                                <h4 class="text-tint-warning mb-1">{{ $currency }}{{ number_format($pendingFunds, 0) }}</h4>
+                                <span class="dash-mini-label">{{ __('dashboard.pending') }}</span>
                             </div>
                             <div class="col-6">
-                                <h4 class="text-success mb-2">{{ $currency }}{{ number_format($validatedFunds, 2) }}</h4>
-                                <span class="text-muted">{{ __('dashboard.validated') }}</span>
+                                <h4 class="text-tint-success mb-1">{{ $currency }}{{ number_format($validatedFunds, 0) }}</h4>
+                                <span class="dash-mini-label">{{ __('dashboard.validated') }}</span>
                             </div>
                         </div>
-                        <div class="mt-4">
-                            <a href="{{ route('subscriptions.index') }}" class="btn btn-outline-primary btn-sm w-100">{{ __('dashboard.view_details') }}</a>
+                        <div class="dash-progress">
+                            <span style="width: {{ $validatedPercent }}%; background: var(--dash-success);"></span>
                         </div>
+                        <small class="dash-mini-label d-block mt-2 text-center">{{ $validatedPercent }}% {{ __('dashboard.validated') }}</small>
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-6 col-lg-12">
-                <div class="card">
-                    <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.personnel_platform_wide') }}</h4>
+            <div class="col-xl-6 col-lg-12 mb-3">
+                <div class="dash-panel h-100">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.system_status') }}</h4>
+                        <a href="{{ route('institutes.index') }}" class="text-tint-primary small">{{ __('dashboard.view_all') }}</a>
                     </div>
-                    <div class="card-body d-flex align-items-center justify-content-center">
-                        <div class="text-center">
-                            <h2 class="fs-36 text-primary">{{ $totalStaff }}</h2>
-                            <span class="fs-14">{{ __('dashboard.active_personnel') }}</span>
+                    <div class="dash-panel__body">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="dash-stat__icon tint-danger me-3"><i class="la la-exclamation-triangle"></i></span>
+                            <div>
+                                <h5 class="mb-0">{{ __('dashboard.expired_subscriptions', ['count' => $expiredInstitutions]) }}</h5>
+                                <small class="dash-mini-label">{{ __('dashboard.subscriptions_needing_renewal') }}</small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="dash-stat__icon tint-info me-3"><i class="la la-eye"></i></span>
+                            <div>
+                                <h5 class="mb-0">{{ __('dashboard.audit_logs_count', ['count' => $auditLogCount]) }}</h5>
+                                <small class="dash-mini-label">{{ __('dashboard.system_activities_24h') }}</small>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-xl-8 col-lg-8">
-                <div class="card">
-                    <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.student_by_year') }}</h4>
+        {{-- GROWTH CHART --}}
+        <div class="row g-3">
+            <div class="col-12 mb-3">
+                <div class="dash-panel">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.student_by_year') }}</h4>
+                        <span class="dash-mini-label">{{ __('dashboard.last_12_months') }}</span>
                     </div>
-                    <div class="card-body">
-                        <canvas id="studentChart" height="100"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-xl-4 col-lg-4">
-                <div class="card">
-                    <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.system_status') }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="widget-media">
-                            <ul class="timeline">
-                                <li>
-                                    <div class="timeline-panel">
-                                        <div class="media me-2">
-                                            <span class="head-officer-icon bgl-danger text-danger">
-                                                <i class="la la-exclamation-triangle"></i>
-                                            </span>
-                                        </div>
-                                        <div class="media-body">
-                                            <h5 class="mb-1">{{ __('dashboard.expired_subscriptions', ['count' => $expiredInstitutions]) }}</h5>
-                                            <small class="d-block">{{ __('dashboard.subscriptions_needing_renewal') }}</small>
-                                        </div>
-                                    </div>
-                                </li>
-                                <li>
-                                    <div class="timeline-panel">
-                                        <div class="media me-2">
-                                            <span class="head-officer-icon bgl-info text-info">
-                                                <i class="la la-eye"></i>
-                                            </span>
-                                        </div>
-                                        <div class="media-body">
-                                            <h5 class="mb-1">{{ __('dashboard.audit_logs_count', ['count' => $auditLogCount]) }}</h5>
-                                            <small class="d-block">{{ __('dashboard.system_activities_24h') }}</small>
-                                        </div>
-                                    </div>
-                                </li>
-                            </ul>
-                        </div>
-                        <a href="{{ route('institutes.index') }}" class="btn btn-block btn-link m-t-15">{{ __('dashboard.view_all') }}</a>
+                    <div class="dash-panel__body">
+                        <canvas id="studentChart" height="80"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header border-0 pb-0">
-                        <h4 class="card-title">{{ __('dashboard.recent_institutions') }}</h4>
+        {{-- RECENT INSTITUTIONS --}}
+        <div class="row g-3">
+            <div class="col-12 mb-3">
+                <div class="dash-panel">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('dashboard.recent_institutions') }}</h4>
                     </div>
-                    <div class="card-body">
+                    <div class="dash-panel__body">
                         <div class="table-responsive">
-                            <table class="table table-responsive-sm">
+                            <table class="table table-borderless align-middle mb-0">
                                 <thead>
-                                    <tr>
+                                    <tr class="dash-mini-label">
                                         <th>{{ __('dashboard.name') }}</th>
                                         <th>{{ __('dashboard.code') }}</th>
                                         <th>{{ __('dashboard.city') }}</th>
@@ -229,29 +173,30 @@
 <script>
     (function($) {
         "use strict";
-        var ctx = document.getElementById("studentChart").getContext('2d');
-        var myChart = new Chart(ctx, {
+        if (typeof Chart === 'undefined') return;
+        var el = document.getElementById("studentChart");
+        if (!el) return;
+        new Chart(el.getContext('2d'), {
             type: 'line',
             data: {
                 labels: {!! json_encode($chartLabels) !!},
                 datasets: [{
                     label: @json(__('dashboard.students_joined')),
                     data: {!! json_encode($chartValues) !!},
-                    borderColor: '#4caf50',
-                    borderWidth: 2,
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                    pointBackgroundColor: '#4caf50',
+                    borderColor: '#5b53e8',
+                    borderWidth: 3,
+                    backgroundColor: 'rgba(91, 83, 232, 0.08)',
+                    pointBackgroundColor: '#5b53e8',
+                    pointRadius: 3,
+                    fill: true,
                     tension: 0.4
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    yAxes: [{
-                        ticks: { beginAtZero: true }
-                    }]
-                }
+                legend: { display: false },
+                scales: { yAxes: [{ ticks: { beginAtZero: true, precision: 0 } }] }
             }
         });
     })(jQuery);

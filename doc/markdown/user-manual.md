@@ -309,7 +309,7 @@ A: Their role lacks permission for that page. School Admin adds the permission.
 
 ### Purpose
 
-The **Configuration** area is where the school connects the system to the **outside world**: email server, SMS gateway, WhatsApp Business API, notification toggles, school hours, and academic calendar dates.
+The **Configuration** area is where the school connects the system to the **outside world**: email server, SMS gateway, WhatsApp Business API, notification toggles, school hours, academic calendar dates, and **display currency** (see **Module B9**).
 
 ### Who uses it
 
@@ -599,6 +599,65 @@ Super Admin only.
 ### Example entry
 
 *"User admin@gvis.edu.ci updated Invoice INV-2025-0089 at 2025-11-03 14:22"*
+
+---
+
+## Module B9: Currency Settings
+
+### Purpose
+
+Set how **money amounts are displayed** for your school — currency code (USD, CDF, XOF, etc.), symbol, symbol position, and decimal places. This affects invoices, payments, dashboards, fee reports, and online pay pages.
+
+### Who uses it
+
+School Admin, Head Officer, Super Admin (with `currency.view` permission).
+
+### Where to find it
+
+**Menu → Configuration → Currency**  
+(or **Finance → Currency** on some layouts)
+
+### Depends on
+
+- A school must be selected in the header (not Global View for per-school currency).
+
+### Step-by-step
+
+1. Switch to your school in the header (e.g. **Green Valley International School**).
+2. Open **Configuration → Currency**.
+3. **Primary Currency** — choose ISO code from the list (e.g. **USD — US Dollar ($)** or **CDF — Congolese Franc**).
+4. **Display Symbol** — adjust if your school uses a custom abbreviation (e.g. `FC`, `CFA`). Defaults to the standard symbol for the selected currency.
+5. **Symbol Position** — choose **Before amount** (`$ 1,250.00`) or **After amount** (`1,250.00 $`).
+6. **Decimal Places** — usually **2** for money; use **0** if your school never shows cents.
+7. Check the **Live Preview** panel on the right.
+8. Click **Save Currency Settings**.
+
+### Example story
+
+Green Valley in Kinshasa sets **CDF** with symbol **FC**, symbol **before** amount, **0** decimal places. Invoices show `FC 125,000` instead of `$ 125.00`. A sister school in Abidjan keeps **XOF** with **CFA** after the amount.
+
+### Where this applies
+
+| Area | Effect |
+|------|--------|
+| Invoices & payments | Line totals, balance due, receipts |
+| Student fee balances | Outstanding amounts on student profile |
+| Dashboards | Collection totals for admins and accountants |
+| Online pay page | Amount shown to parents paying via Mobile Money |
+| Reports | Class fee summary, financial exports |
+
+Each school can have its own currency. Switch institution in the header to configure another school.
+
+### Common questions
+
+**Q: I changed currency but old invoices still look wrong?**  
+A: Display updates immediately for all screens. Historical amounts are stored as numbers — only the **symbol and formatting** change, not the stored values.
+
+**Q: Can we use two currencies?**  
+A: The **display currency** is one per school. Some institutions store a **secondary currency** on the institution profile for reference; day-to-day billing uses the Currency Settings page.
+
+**Q: Parents pay in CDF but we report in USD?**  
+A: Set the display currency to what parents and staff should see on invoices. Payment gateways (PawaPay, CinetPay) use the currency configured for online pay at transaction time.
 
 ---
 
@@ -1460,33 +1519,64 @@ If the parent lost the link:
 
 ---
 
-## Module H9: Payment Gateways (PawaPay, CinetPay, Flutterwave)
+## Module H9: Online Payments (Connecting Mobile Money)
 
-### Purpose
+> **Read this first — in plain words.**
+> This page lets parents pay school fees from their phone using **Mobile Money** (Orange Money, Airtel Money, M-Pesa). To make this work, your school signs up with a **payment company** (we support **PawaPay**, **CinetPay**, or **Flutterwave**), copies a few secret codes from them, and pastes those codes into Digitex. Once done, every time a parent pays, the invoice is marked **Paid by itself** — no manual work for your accountant. You only set this up **once**.
 
-Collect **Mobile Money** payments online in the **Democratic Republic of Congo (DRC)**. One gateway is active per school at a time.
+### How it works (the big picture)
 
-### Supported gateways
+Think of the payment company as a **cashier standing between the parent and your school**:
 
-| Gateway | Best for | DRC operators | Currencies |
-|---------|----------|---------------|------------|
-| **PawaPay** (recommended) | Direct API — PIN prompt on parent's phone | Orange, Airtel, Vodacom M-Pesa | CDF, USD |
-| **CinetPay** | Redirect checkout (popular in Francophone Africa) | Orange CD, Airtel CD, M-Pesa CD | CDF, USD |
-| **Flutterwave** | Pan-African + cards | DRC mobile money, cards | CDF, USD |
+1. The parent clicks the pay link and chooses Mobile Money.
+2. The payment company asks the parent to confirm on their phone.
+3. The parent enters their PIN and the money is collected.
+4. The payment company **tells Digitex "this is paid"**, and the invoice turns green automatically.
 
-### Configuration checklist
+You don't need to understand the technical details — you just need to **connect the two** by copying codes. Follow the steps below for whichever company you choose.
 
-1. **Payment Methods** → scroll to **Payment Gateway (DRC)**.
-2. Choose **Provider** (PawaPay / CinetPay / Flutterwave).
-3. Set **Environment**: **Sandbox** (testing) or **Production** (live).
-4. Paste **API credentials** from gateway dashboard (see below).
-5. Copy **Webhook URLs** from the page into your gateway dashboard.
-6. Enable **Online payments** and required Mobile Money methods.
-7. **Save settings** → test with a small invoice → switch to Production when ready.
+### Which company should I pick?
 
-### Webhook URLs (register in gateway dashboard)
+You only need **one**. Pick based on what suits your school:
 
-Replace `YOUR-DOMAIN.com` with your live domain (e.g. `e-digitex.com`):
+| Company | Why choose it | Works with (DRC) |
+|---------|---------------|------------------|
+| **PawaPay** (easiest, recommended) | Parent just gets a PIN prompt on their phone — no extra page | Orange, Airtel, Vodacom M-Pesa |
+| **CinetPay** | Very common in French-speaking Africa; opens a familiar payment page | Orange, Airtel, M-Pesa |
+| **Flutterwave** | Also accepts bank cards, not just Mobile Money | Mobile Money + cards |
+
+> **Tip:** If unsure, start with **PawaPay**. It is the simplest for parents.
+
+### What you need before you start
+
+- A registered account with **one** payment company (free to sign up — links below).
+- The **secret codes** they give you (called "API keys" — think of them as your shop's password).
+- Around **15 minutes**, once.
+
+### Always test first ("Sandbox" vs "Production")
+
+Every company gives you **two modes**:
+
+- **Sandbox / Test** = a practice mode using fake money. Use this first to make sure everything works.
+- **Production / Live** = real mode that collects real money. Switch to this **only after** your test succeeds.
+
+You will see this choice as **Environment** on the Payment Methods page. Start on **Sandbox**, test with a small invoice, then change to **Production**.
+
+---
+
+### Step 1 — Set up in Digitex (same for all companies)
+
+1. Go to **Configuration → Payment Methods**.
+2. Scroll to the section **Payment Gateway (DRC)**.
+3. Choose your **Provider** (PawaPay, CinetPay, or Flutterwave).
+4. Set **Environment** to **Sandbox** for now.
+5. Paste the **secret codes** from your chosen company (see Step 2 for where to find them).
+6. Turn **Online payments ON** and tick the Mobile Money options you want (Orange, Airtel, etc.).
+7. Click **Save**.
+
+There is also a box on this page showing **Webhook URLs**. A "webhook" is simply the **return message** the payment company sends back to tell Digitex a payment succeeded. You will copy these URLs into the payment company's website in Step 2 — that's what makes invoices update automatically.
+
+Your webhook URLs (replace `YOUR-DOMAIN.com` with your real website address, e.g. `e-digitex.com`):
 
 ```
 https://YOUR-DOMAIN.com/webhooks/payments/pawapay
@@ -1494,129 +1584,72 @@ https://YOUR-DOMAIN.com/webhooks/payments/cinetpay
 https://YOUR-DOMAIN.com/webhooks/payments/flutterwave
 ```
 
-**Why webhooks matter:** When payment completes on the parent's phone, the gateway notifies your server so the invoice is marked **Paid** automatically — even if the browser is closed.
-
-**Return URL (after checkout):** `https://YOUR-DOMAIN.com/pay/callback/{gateway}/{reference}` — configured automatically; CinetPay/Flutterwave redirect parents here.
+> **In short:** Digitex needs the company's secret codes, and the company needs Digitex's webhook URL. You are just introducing them to each other.
 
 ---
 
-### H9A: PawaPay Setup
+### Step 2 — Get your codes from the payment company
 
-#### Get API keys
+Pick the section for the company you chose.
 
-1. Register at **https://dashboard.pawapay.io** (production) or **https://dashboard.sandbox.pawapay.io** (testing).
-2. Complete merchant verification (school name, contact, bank details).
-3. Dashboard → **Settings → API** → copy **Bearer API Token**.
-4. **Never share the token publicly.**
+#### Option A — PawaPay (recommended)
 
-#### Configure in Digitex SMS
+1. Create a free account at **https://dashboard.pawapay.io** (for live) or **https://dashboard.sandbox.pawapay.io** (for testing).
+2. Fill in your school details (name, contact, bank info) so they can approve you.
+3. In their menu, open **Settings → API** and **copy the API Token** (a long secret code). Keep it private — never share it.
+4. Back in Digitex (Payment Methods), paste it into **PawaPay API Token** and Save.
+5. In PawaPay, open **Webhooks**, click **Add**, and paste your PawaPay webhook URL from Digitex. Choose the events **Deposit completed** and **Deposit failed**.
 
-| Setting | Value |
-|---------|-------|
-| Provider | PawaPay |
-| Environment | Sandbox (then Production) |
-| PawaPay API Token | Paste token |
-| Online payments | ON |
+That's it. PawaPay automatically knows which network to use (Orange, Airtel, or M-Pesa) based on the parent's phone number.
 
-#### Register webhook
+**Their help docs:** https://docs.pawapay.io
 
-1. Payment Methods page → copy PawaPay webhook URL.
-2. PawaPay dashboard → **Webhooks** → add URL.
-3. Events: **Deposit completed**, **Deposit failed**.
+#### Option B — CinetPay
 
-#### Operator mapping (automatic)
+1. Create an account at **https://cinetpay.com** and verify it.
+2. Find the integration settings and **copy two codes: the Site ID and the API Key**.
+3. In Digitex, paste them into **CinetPay Site ID** and **CinetPay API Key**, then Save.
+4. In CinetPay, go to **Notifications / Webhook** and paste your CinetPay webhook URL from Digitex.
 
-| Digitex method | PawaPay provider |
-|----------------|------------------|
-| Orange Money | ORANGE_COD |
-| Airtel Money | AIRTEL_COD |
-| M-Pesa / Vodacom | VODACOM_MPESA_COD |
+**Their help docs:** https://docs.cinetpay.com
 
-#### Go live
+#### Option C — Flutterwave
 
-1. Complete PawaPay production KYC.
-2. Get production API token.
-3. Payment Methods → Environment: **Production** → save.
-4. Update webhook on production PawaPay dashboard.
-5. Test with small real payment (e.g. 100 CDF).
+1. Create an account at **https://dashboard.flutterwave.com** and verify your business.
+2. **Copy the Public Key and the Secret Key** (and Encryption Key if shown).
+3. In Digitex, paste the **Secret Key** and **Public Key**, then Save.
+4. In Flutterwave, go to **Settings → Webhooks**, add your Flutterwave webhook URL from Digitex, and turn on the **payment success** event (often called `charge.completed`).
 
-**Docs:** https://docs.pawapay.io
+**Their help docs:** https://developer.flutterwave.com/docs
 
 ---
 
-### H9B: CinetPay Setup
+### Step 3 — Test it, then go live
 
-#### Get API keys
+1. Create a **small test invoice** (e.g. 100 CDF).
+2. Open its pay link and choose **Pay instantly**.
+3. Complete the payment using the company's **test instructions** (Sandbox mode).
+4. Check that the invoice turns to **Paid** by itself within a few seconds.
+5. When the test works: return to **Payment Methods**, change **Environment** to **Production**, paste your **live** secret codes, and update the webhook URL on the company's live dashboard.
+6. Do one final test with a **small real payment**.
 
-1. Register at **https://cinetpay.com** → merchant dashboard.
-2. Complete account verification.
-3. Copy **Site ID** and **API Key** from integration settings.
-
-#### Configure in Digitex SMS
-
-| Setting | Value |
-|---------|-------|
-| Provider | CinetPay |
-| Environment | Sandbox / Production |
-| CinetPay Site ID | From dashboard |
-| CinetPay API Key | From dashboard |
-
-#### Register webhook
-
-1. Copy CinetPay webhook URL from Payment Methods page.
-2. CinetPay dashboard → **Notifications / Webhook** → paste URL.
-3. Save.
-
-#### Test
-
-1. Create test invoice → copy pay link.
-2. **Pay instantly** → CinetPay checkout → use sandbox test credentials.
-3. Confirm invoice status **Paid**.
-
-**Docs:** https://docs.cinetpay.com
+You're done — parents can now pay from their phones.
 
 ---
 
-### H9C: Flutterwave Setup
+### If something goes wrong
 
-#### Get API keys
+| What you see | What to do |
+|--------------|------------|
+| Parent paid, but invoice still shows unpaid | The webhook URL is missing or wrong. Re-copy it from Digitex into the company's dashboard. Your website must use **https://** and be reachable online. |
+| "Invalid API key" or login errors | The secret code is wrong or expired. Generate a fresh one on the company's website and paste it again in Payment Methods. |
+| Payment is rejected on the phone | The parent's phone number must match their Mobile Money network and start with the DRC code (243…). |
+| The payment company is temporarily down | Parents can still pay using the **Upload proof** tab instead (see Module H10). |
+| Worked in testing but fails live | You forgot to switch **Environment** to **Production** or are still using the **test** secret codes. Use the **live** codes. |
 
-1. Register at **https://dashboard.flutterwave.com**.
-2. Complete business verification.
-3. Copy **Public Key**, **Secret Key**, and **Encryption Key** (if shown).
+### Need more help?
 
-#### Configure in Digitex SMS
-
-| Setting | Value |
-|---------|-------|
-| Provider | Flutterwave |
-| Environment | Test / Live |
-| Flutterwave Secret Key | From dashboard |
-| Flutterwave Public Key | From dashboard |
-
-#### Register webhook
-
-1. Copy Flutterwave webhook URL from Payment Methods page.
-2. Flutterwave dashboard → **Settings → Webhooks** → add URL.
-3. Enable **charge.completed** (or equivalent payment success event).
-
-**Docs:** https://developer.flutterwave.com/docs
-
----
-
-### Gateway troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| Payment stays pending | Verify webhook URL is HTTPS and reachable from internet |
-| Invalid API key | Regenerate key in gateway dashboard; re-save in Payment Methods |
-| Wrong operator | Parent phone must match operator (243…) |
-| Gateway down | Parents can use **Upload proof** tab (Module H10) |
-| Sandbox works, production fails | Switch Environment to Production and use live API keys |
-
-### Public help articles
-
-Detailed step-by-step guides (no login required): **https://e-digitex.com/help**
+Simple, picture-by-picture guides (no login needed) are online at: **https://e-digitex.com/help**
 
 ---
 
@@ -1862,6 +1895,276 @@ A: Invoice must exist; **Payment Methods** → Online payments must be ON; gatew
 
 ---
 
+---
+
+# PART L — DIGITEX AI (OPTIONAL ADD-ON)
+
+---
+
+## Module L1: AI Access and Where to Find It
+
+### Purpose
+
+**Digitex AI** helps staff draft notices, reminders, report comments, support replies, and quick summaries — **inside the module you are already using**, without copying data to an external chatbot.
+
+AI is an **optional add-on** on your subscription plan (Basic / Premium / PRO / Enterprise). If your plan includes AI, you will see:
+
+- **Sidebar:** **AI Assistant** (full chat) and **AI Studio** (writing tools)
+- **Bottom-left purple button:** Quick help about the **current page**
+- **Purple “AI” buttons** on notices, reminders, results, invoices, students, marks, support, and the dashboard
+
+If you do **not** see these, your school plan may not include AI — contact your administrator or Digitex support to upgrade.
+
+### Who uses it
+
+School Admin, Teachers, Accountants, Head Officers (when plan includes AI). Students and parents typically do **not** use staff AI tools.
+
+### Depends on
+
+- Your **subscription package** has **AI enabled**
+- Platform administrator configured an **AI provider key** (OpenAI or compatible API)
+- You are **logged in** with a role that can open the module (e.g. you need notice permissions to draft notices)
+
+### Step-by-step — Open the AI Assistant
+
+1. Log in at **https://e-digitex.com/**
+2. In the left sidebar, open **Digitex AI → AI Assistant**
+3. Type a question, e.g. *“How do I bulk generate invoices for Grade 5?”*
+4. Click **New chat** anytime to start a fresh conversation
+
+### Step-by-step — Use the floating widget (any page)
+
+1. Look at the **bottom-left corner** for the purple **magic wand** button
+2. Click it to open a small chat panel
+3. Ask about **this screen**, e.g. on the Invoices page: *“What does overdue mean?”*
+4. Click the external-link icon to open the full **AI Assistant**
+
+### Common questions
+
+**Q: AI says “not included in your plan”.**  
+A: Your package needs **AI enabled**. Super Admin can check **Finance → Packages** or **Plan** page for upgrade.
+
+**Q: AI gives generic answers.**  
+A: Use the **module AI buttons** (they send real context like exam marks or invoice totals). For school-specific rules, confirm with your admin.
+
+---
+
+## Module L2: AI on the Dashboard (School Copilot)
+
+### Purpose
+
+On the **Dashboard** home page, the **School copilot** card summarizes what needs attention today — overdue fees, draft notices, upcoming exams — using live school data.
+
+### Who uses it
+
+School Admin, Head Officer, Accountant, Teacher (items shown depend on your permissions).
+
+### Step-by-step
+
+1. Go to **Dashboard**
+2. At the top, find the **School copilot** card
+3. Click **What needs attention?**
+4. Read the bullet list and act (open Invoices, Notices, etc.)
+
+### Example story
+
+Monday morning, the bursar opens the dashboard, clicks **What needs attention?**, and sees *“12 overdue invoices”* and *“2 unpublished notices”* — she opens Finance and Notices first.
+
+---
+
+## Module L3: AI in Notices
+
+### Purpose
+
+Draft and translate notice text before publishing to staff, students, or parents.
+
+### Who uses it
+
+School Admin, staff with **notice create/edit** permission.
+
+### Step-by-step — Draft a notice with AI
+
+1. Go to **Communication → Notices → Create**
+2. Fill **Title**, **Type**, and **Audience**
+3. Optionally type a short topic in the **AI topic** box (or leave blank to use the title)
+4. Click **AI draft** — review the text in the confirmation popup
+5. Click **Apply** to paste into **Content**
+6. Click **AI translate** to translate existing content (e.g. English ↔ French)
+7. Tick **Publish immediately** or save as draft
+8. Click **Save**
+
+### Example story
+
+The head teacher needs a urgent rain-day closure notice. She enters title *“School closed — heavy rain”*, clicks **AI draft**, edits one sentence, and publishes to **All**.
+
+### Common questions
+
+**Q: Can AI publish without me?**  
+A: No. You always confirm before text is applied, and you click **Save** to publish.
+
+---
+
+## Module L4: AI in Results and Report Cards
+
+### Purpose
+
+Generate **report card comments** for every student in a class after an exam, based on their marks.
+
+### Who uses it
+
+Teachers and admins with access to **Results** / report cards.
+
+### Step-by-step
+
+1. Go to **Exams → Results** (student result card page)
+2. Scroll to **Bulk report comments** (AI section)
+3. Select **Exam** and **Class**
+4. Click **Generate comments**
+5. Copy comments into your report card workflow or printing process
+
+### Example story
+
+After Term 1 exams, Mr. Dupont selects *Mid-Term 2025* and *Grade 5 A*, generates comments, and pastes each student’s comment into the report template.
+
+---
+
+## Module L5: AI in Reminders (Fees and Exams)
+
+### Purpose
+
+Draft SMS, WhatsApp, or email reminder text **before** sending fee or exam broadcasts.
+
+### Who uses it
+
+School Admin, Accountant (fee reminders); Admin, Teachers (exam reminders).
+
+### Step-by-step — Fee reminder with AI preview
+
+1. Go to **Communication → Reminders**
+2. Under **Fee reminders**, choose **Class** (optional), **Fee tranche**, and **Channel**
+3. Click **AI draft message** — text appears in **Message preview**
+4. Edit the preview if needed (placeholders like `[Student Name]` stay for the system)
+5. Click **Send fee reminders**
+6. Confirm in the popup — the preview is shown again before dispatch
+
+### Step-by-step — Exam reminder
+
+Same flow on the **Exam reminders** card: set class and channel, **AI draft message**, edit, then **Trigger exam reminders** and confirm.
+
+### Example story
+
+The accountant drafts a polite French SMS for overdue tranche 2, tweaks the amount wording, then sends to **Grade 5 A** only.
+
+---
+
+## Module L6: AI in Finance (Invoices)
+
+### Purpose
+
+Explain an invoice in plain language: amount due, status, and suggested follow-up for parents who have not paid.
+
+### Who uses it
+
+Accountant, School Admin.
+
+### Step-by-step
+
+1. Go to **Finance → Invoices** and open an **unpaid**, **partial**, or **overdue** invoice
+2. At the top, click **Explain with AI**
+3. Read the summary and use it when calling parents or writing emails
+
+---
+
+## Module L7: AI in Students (360° Summary)
+
+### Purpose
+
+One-click summary of a student: class, recent marks, attendance trend, and fee balance — for parent meetings or staff handover.
+
+### Who uses it
+
+Teachers, School Admin, counselors.
+
+### Step-by-step
+
+1. Go to **Students → Student list →** open a student profile
+2. Click **AI 360° summary** at the top
+3. Read the bullet summary (generated from that student’s records)
+
+---
+
+## Module L8: AI in Exam Marks (At-Risk Analysis)
+
+### Purpose
+
+After entering marks, identify students who may need extra support (low averages) with suggested interventions.
+
+### Who uses it
+
+Teachers, School Admin.
+
+### Step-by-step
+
+1. Go to **Exams → Enter marks**
+2. Select **Exam** and **Class section** (same as for mark entry)
+3. In the **At-risk analysis** card, click **AI at-risk scan**
+4. Review the list and plan remedial sessions
+
+---
+
+## Module L9: AI in Support Tickets
+
+### Purpose
+
+Draft a professional reply to a support conversation (school ↔ Digitex support).
+
+### Who uses it
+
+Anyone who can reply on a support ticket thread.
+
+### Step-by-step
+
+1. Go to **Support → My tickets** (or Super Admin inbox)
+2. Open a ticket
+3. Click **AI suggest reply**
+4. Edit the text in the message box and send as usual
+
+---
+
+## Module L10: AI Studio (Standalone Writing Tools)
+
+### Purpose
+
+General-purpose tools when you are **not** on a specific module page: draft notices, translate, summarize, improve writing, report comments, support replies.
+
+### Step-by-step
+
+1. Sidebar → **Digitex AI → AI Studio**
+2. Pick a tool card (e.g. **Translate**)
+3. Paste your text, choose tone or language
+4. Click **Generate** and **Copy**
+
+---
+
+## Module L11: AI Settings (Super Admin)
+
+### Purpose
+
+Configure the platform AI API key, model, and monitor usage across schools.
+
+### Who uses it
+
+**Super Admin** only.
+
+### Step-by-step
+
+1. Sidebar → **Digitex AI → AI Settings**
+2. Enter API key and model (or leave default)
+3. Save
+4. Enable AI per package under **Finance → Packages** (tick **AI enabled**, set monthly limit or unlimited)
+
+---
+
 # PART M — GLOSSARY FOR NON-TECHNICAL USERS
 
 ---
@@ -1900,6 +2203,11 @@ Everyone — especially new secretaries, accountants, teachers, and parents.
 | **Merchant code** | Number parents dial for Mobile Money payments |
 | **Sandbox** | Test mode — no real money |
 | **Production** | Live mode — real payments |
+| **Digitex AI** | In-app assistant and writing tools (optional plan add-on) |
+| **AI Assistant** | Full chat for how-to questions and drafting |
+| **AI Studio** | Standalone writing tools (translate, summarize, etc.) |
+| **School copilot** | Dashboard AI briefing of urgent items |
+| **AI embed** | Purple AI button on a module page (uses that page’s data) |
 
 ### Common questions
 

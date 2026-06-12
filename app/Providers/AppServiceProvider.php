@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Gate; // <--- IMPORTANT: Don't forget this!
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Auth;
 use App\Services\InAppNotificationService;
+use App\Services\PlanContextService;
 use Illuminate\Support\Facades\File;
 use App\Policies\ResourcePolicy;
 use App\Interfaces\SmsGatewayInterface;
@@ -65,6 +66,13 @@ class AppServiceProvider extends ServiceProvider
                 $service = app(InAppNotificationService::class);
                 $view->with('inAppNotifications', $service->getRecent(Auth::id(), 12));
                 $view->with('inAppUnreadCount', $service->getUnreadCount(Auth::id()));
+                $view->with('planCtx', app(PlanContextService::class)->snapshot());
+            }
+        });
+
+        View::composer(['layout.layout', 'layout.footer'], function ($view) {
+            if (Auth::check()) {
+                $view->with('planCtx', app(PlanContextService::class)->snapshot());
             }
         });
 

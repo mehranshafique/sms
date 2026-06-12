@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Services\AuditLogger;
+use App\Services\SubscriptionPlanService;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class SubscriptionController extends BaseController
@@ -39,6 +40,7 @@ class SubscriptionController extends BaseController
             'duration_days' => 'required|integer|min:1',
             'modules' => 'nullable|array',
             'student_limit' => 'nullable|integer',
+            'ai_monthly_limit' => 'nullable|integer|min:0',
             'is_active' => 'boolean'
         ]);
 
@@ -49,6 +51,9 @@ class SubscriptionController extends BaseController
             'modules' => $request->modules ?? [],
             'student_limit' => $request->student_limit,
             'staff_limit' => $request->staff_limit, 
+            'ai_enabled' => $request->boolean('ai_enabled'),
+            'ai_unlimited' => $request->boolean('ai_unlimited'),
+            'ai_monthly_limit' => $request->filled('ai_monthly_limit') ? (int) $request->ai_monthly_limit : null,
             'is_active' => true 
         ]);
 
@@ -70,6 +75,7 @@ class SubscriptionController extends BaseController
             'duration_days' => 'required|integer|min:1',
             'modules' => 'nullable|array',
             'student_limit' => 'nullable|integer',
+            'ai_monthly_limit' => 'nullable|integer|min:0',
             'is_active' => 'boolean'
         ]);
 
@@ -80,11 +86,74 @@ class SubscriptionController extends BaseController
             'modules' => $request->modules ?? [],
             'student_limit' => $request->student_limit,
             'staff_limit' => $request->staff_limit, 
+            'ai_enabled' => $request->boolean('ai_enabled'),
+            'ai_unlimited' => $request->boolean('ai_unlimited'),
+            'ai_monthly_limit' => $request->filled('ai_monthly_limit') ? (int) $request->ai_monthly_limit : null,
             'is_active' => $request->has('is_active')
         ]);
 
+        $package->refresh();
+        $this->ensureProPackageAiFlags($package);
+
+        // Propagate the updated module set to every school currently on this plan
+        $this->syncPackageModulesToInstitutions($package);
+        $this->syncPackageAiToInstitutions($package);
+
         AuditLogger::log('Update', 'Package', 'Updated package: ' . $package->name);
         return redirect()->route('packages.index')->with('success', __('subscription.success_update'));
+    }
+
+    /**
+     * Re-sync a package's module set onto every institution that currently has
+     * an active subscription to it, so edits to a plan take effect live.
+     */
+    private function syncPackageModulesToInstitutions(Package $package): void
+    {
+        $modules = json_encode($package->modules ?? []);
+
+        Subscription::where('package_id', $package->id)
+            ->where('status', 'active')
+            ->pluck('institution_id')
+            ->unique()
+            ->each(function ($institutionId) use ($modules) {
+                \App\Models\InstitutionSetting::set($institutionId, 'enabled_modules', $modules, 'modules');
+            });
+    }
+
+    /**
+     * Sync AI flags onto every institution subscribed to this package.
+     */
+    private function syncPackageAiToInstitutions(Package $package): void
+    {
+        $planService = app(SubscriptionPlanService::class);
+
+        Subscription::where('package_id', $package->id)
+            ->where('status', 'active')
+            ->pluck('institution_id')
+            ->unique()
+            ->each(fn ($institutionId) => $planService->syncInstitutionFromPackage($institutionId, $package));
+    }
+
+    /**
+     * Pro / full-tier packages always get AI flags when saved.
+     */
+    private function ensureProPackageAiFlags(Package $package): void
+    {
+        $planContext = app(\App\Services\PlanContextService::class);
+        if (! $planContext->isProPackage($package)) {
+            return;
+        }
+
+        $updates = [];
+        if (! $package->ai_enabled) {
+            $updates['ai_enabled'] = true;
+        }
+        if (! $package->ai_unlimited && $planContext->isProPackage($package)) {
+            $updates['ai_unlimited'] = true;
+        }
+        if (! empty($updates)) {
+            $package->update($updates);
+        }
     }
 
     public function destroyPackage(Package $package)
@@ -101,8 +170,23 @@ class SubscriptionController extends BaseController
     // --- SUBSCRIPTIONS ---
     public function index(Request $request)
     {
-        $subscriptions = Subscription::with(['institution', 'package'])->latest()->get();
-        return view('finance.subscription.index', compact('subscriptions'));
+        $subscriptions = Subscription::with(['institution', 'package'])
+            ->whereIn('id', function ($query) {
+                $query->selectRaw('MAX(id)')
+                    ->from('subscriptions')
+                    ->groupBy('institution_id');
+            })
+            ->latest()
+            ->get();
+
+        $stats = [
+            'total'    => $subscriptions->count(),
+            'active'   => $subscriptions->filter(fn ($s) => $s->displayStatus() === 'active')->count(),
+            'expiring' => $subscriptions->filter(fn ($s) => !$s->isExpired() && $s->daysLeft() <= 30)->count(),
+            'expired'  => $subscriptions->filter(fn ($s) => $s->isExpired())->count(),
+        ];
+
+        return view('finance.subscription.index', compact('subscriptions', 'stats'));
     }
 
     public function create()
@@ -191,18 +275,26 @@ class SubscriptionController extends BaseController
                 'notes' => $request->notes,
             ]);
 
-            if ($subscription->wasChanged('package_id')) {
-                $package = Package::find($request->package_id);
-                \App\Models\InstitutionSetting::set(
-                    $subscription->institution_id, 
-                    'enabled_modules', 
-                    json_encode($package->modules), 
-                    'modules'
-                );
+            $package = Package::findOrFail($request->package_id);
+            app(SubscriptionPlanService::class)->syncInstitutionFromPackage($subscription->institution_id, $package);
+        });
+
+        AuditLogger::log('Update', 'Subscription', 'Updated subscription #' . $subscription->id);
+        return redirect()->route('subscriptions.index')->with('success', __('subscription.subscription_updated'));
+    }
+
+    public function destroy(Subscription $subscription)
+    {
+        DB::transaction(function () use ($subscription) {
+            if ($subscription->invoices()->exists()) {
+                $subscription->update(['status' => 'cancelled']);
+            } else {
+                $subscription->delete();
             }
         });
 
-        return redirect()->route('subscriptions.index')->with('success', __('subscription.subscription_updated'));
+        AuditLogger::log('Delete', 'Subscription', 'Removed subscription #' . $subscription->id);
+        return redirect()->route('subscriptions.index')->with('success', __('subscription.success_delete'));
     }
 
     // --- INVOICES ---

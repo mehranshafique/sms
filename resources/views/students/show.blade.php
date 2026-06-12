@@ -19,6 +19,22 @@
         </div>
 
         <div class="row">
+            @if(!empty($planCtx['has_ai']))
+            <div class="col-xl-12 mb-3">
+                <div class="ai-copilot-card">
+                    <div class="ai-copilot-card__head">
+                        <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.student_summary') }}</strong>
+                        @include('ai.partials.embed-button', [
+                            'tool' => 'student_summary',
+                            'params' => ['student_id' => $student->id],
+                            'label' => __('ai.btn_student_summary'),
+                            'panel' => '#ai-student-summary-panel',
+                        ])
+                    </div>
+                    <div class="ai-embed-panel" id="ai-student-summary-panel"></div>
+                </div>
+            </div>
+            @endif
             {{-- Left Column: Identity Card Style --}}
             <div class="col-xl-4 col-lg-4">
                 <div class="card overflow-hidden">

@@ -30,6 +30,11 @@ class ReportController extends BaseController
     public function __construct(LmdCalculationService $lmdService)
     {
         $this->middleware('auth');
+        $this->middleware(function ($request, $next) {
+            $this->denyStudentLikeRoles();
+            $this->authorizeAdminOrPermission('academic_report.view');
+            return $next;
+        })->only(['index', 'bulletin', 'transcript']);
         $this->setPageTitle(__('reports.page_title'));
         $this->lmdService = $lmdService;
     }

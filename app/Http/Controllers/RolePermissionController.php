@@ -5,14 +5,15 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use App\Models\Module;
-use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\Auth;
-use App\Enums\RoleEnum;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class RolePermissionController extends BaseController
 {
     public function __construct()
     {
+        $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':role.update')->only(['edit', 'update']);
         $this->setPageTitle(__('roles.role_permissions_page_title'));
     }
 
@@ -29,15 +30,9 @@ class RolePermissionController extends BaseController
 
     public function update(Request $request, Role $role)
     {
-        $user = Auth::user();
-
         $this->checkInstitution($role);
 
-        if (!$user->hasRole(RoleEnum::SUPER_ADMIN->value) && !$user->can('role.update')) {
-            abort(403, __('roles.messages.unauthorized_action'));
-        }
-
-        // 1. Prevent updating own role permissions (unless Super Admin)
+        $user = Auth::user();
         if (!$user->hasRole('Super Admin') && $user->hasRole($role->name)) {
             return back()->with('error', __('roles.cannot_update_own_role'));
         }

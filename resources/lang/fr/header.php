@@ -5,6 +5,7 @@ return [
     'my_institute' => 'Mon Institut',
     'global_view' => 'Vue globale',
     'global_dashboard' => 'Tableau de bord global',
+    'mobile_menu' => 'Menu',
     'search_school' => 'Rechercher une école...',
     'no_school_found' => 'Aucune école trouvée',
     'global_search_placeholder' => 'Rechercher élèves, personnel, pages...',

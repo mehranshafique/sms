@@ -180,16 +180,25 @@ class InAppNotificationService
             ->count();
     }
 
-    public function markAsRead(int $notificationId, int $userId): bool
+    public function markAsRead(int $notificationId, int $userId): array
     {
         $notification = InAppNotification::where('user_id', $userId)->find($notificationId);
         if (!$notification) {
-            return false;
+            return [
+                'success'      => false,
+                'was_unread'   => false,
+                'unread_count' => $this->getUnreadCount($userId),
+            ];
         }
 
+        $wasUnread = $notification->isUnread();
         $notification->markAsRead();
 
-        return true;
+        return [
+            'success'      => true,
+            'was_unread'   => $wasUnread,
+            'unread_count' => $this->getUnreadCount($userId),
+        ];
     }
 
     public function markAllAsRead(int $userId): int

@@ -334,6 +334,7 @@ class BudgetController extends BaseController
     // --- FINANCE OVERVIEW (HEADOFF DASHBOARD) ---
     public function financeOverview()
     {
+        $this->authorizeAdminOrAnyPermission(['budget.view', 'budget.viewAny']);
         $user = Auth::user();
         $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value) || $user->hasRole(RoleEnum::SUPER_ADMIN->value);
         $institutionId = $this->getInstitutionId();

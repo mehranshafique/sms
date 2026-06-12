@@ -12,6 +12,8 @@ class SmsTemplateController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':sms_template.view')->only(['index']);
+        $this->middleware(PermissionMiddleware::class . ':sms_template.update')->only(['update', 'override']);
         $this->setPageTitle(__('sms_template.page_title'));
     }
 

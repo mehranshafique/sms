@@ -8,12 +8,16 @@ use App\Models\GradeLevel;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class AcademicUnitController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':department.view')->only(['index']);
+        $this->middleware(PermissionMiddleware::class . ':department.create')->only(['store', 'assignSubjects']);
+        $this->middleware(PermissionMiddleware::class . ':department.delete')->only(['destroy']);
         $this->setPageTitle(__('lmd.units_page_title'));
     }
 

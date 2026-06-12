@@ -69,6 +69,29 @@
             </div>
         </div>
 
+        @if(!empty($planCtx['has_ai']))
+        <div class="row mt-2">
+            <div class="col-12">
+                <div class="ai-copilot-card">
+                    <div class="ai-copilot-card__head">
+                        <div>
+                            <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.exam_at_risk') }}</strong>
+                            <div class="text-muted small">{{ __('ai.tools.exam_at_risk_desc') }}</div>
+                        </div>
+                        <button type="button" class="ai-embed-btn" id="ai-at-risk-btn"
+                            data-ai-tool="exam_at_risk"
+                            data-ai-params="{}"
+                            data-ai-fields='{"exam_id":"#exam_select","class_section_id":"#section_select"}'
+                            data-ai-panel="#ai-at-risk-panel">
+                            <i class="la la-magic"></i> {{ __('ai.btn_exam_at_risk') }}
+                        </button>
+                    </div>
+                    <div class="ai-embed-panel" id="ai-at-risk-panel"></div>
+                </div>
+            </div>
+        </div>
+        @endif
+
         {{-- Table Container --}}
         <div id="marks_container" class="d-none">
             <form id="marksForm" action="{{ route('marks.store') }}" method="POST">

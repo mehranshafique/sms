@@ -11,11 +11,14 @@ class CurrencyController extends BaseController
     public function __construct(
         protected CurrencyService $currencyService
     ) {
+        $this->middleware('auth');
         $this->setPageTitle(__('currency.page_title'));
     }
 
     public function index()
     {
+        $this->authorizeAdminOrPermission('currency.view');
+
         $institutionId = $this->getInstitutionId();
         $user = Auth::user();
 
@@ -35,7 +38,7 @@ class CurrencyController extends BaseController
         $institutionId = $this->getInstitutionId();
         $user = Auth::user();
 
-        if (!$user->can('currency.update') && !$user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])) {
+        if (!$user->can('currency.update') && !$this->userIsSchoolAdmin($user)) {
             abort(403);
         }
 

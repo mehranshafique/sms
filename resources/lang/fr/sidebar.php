@@ -52,6 +52,16 @@ return [
         'title' => 'Élections',
     ],
     'my_elections' => 'Mes élections',
+    'attendance_analytics' => 'Analyses de présence',
+    'my_attendance_analytics' => 'Ma présence (analyses)',
+    'children_attendance' => 'Présence des enfants',
+    'security' => 'Sécurité',
+    'pickup_system' => 'Système de retrait',
+    'programs' => [
+        'title' => 'Programmes',
+    ],
+    'reminders' => 'Rappels',
+    'requests' => 'Demandes',
     'academics' => 'Académique',
     'sessions' => [
         'title' => 'Sessions'
@@ -63,10 +73,10 @@ return [
         'title' => 'Niveaux[Classe]'
     ],
     'class_sections' => [
-        'title' => 'Classes'
+        'title' => 'Section'
     ],
     'subjects' => [
-        'title' => 'Matières[Cours]'
+        'title' => 'Cours'
     ],
     'class_subjects' => [
         'title' => 'Cours par classe',
@@ -79,7 +89,10 @@ return [
         'title' => 'Epreuves'
     ],
     'marks' => [
-        'title' => 'Notes[Points]'
+        'title' => 'Notes[Points]',
+        'enter_marks' => 'Saisir les notes',
+        'my_marks' => 'Mes notes',
+        'my_results' => 'Mes résultats',
     ],
     'results' => 'Relevé',
     'academic_reports' => 'e-Bulletin',
@@ -160,4 +173,11 @@ return [
     'transport' => 'Transport scolaire',
     'operations' => 'Opérations',
     'guardian_portal' => 'Portail tuteur',
+    'support_section' => 'Centre d\'aide',
+    'support' => 'Aide et support',
+    'support_inbox' => 'Boîte de réception',
+    'ai_section' => 'Intelligence Artificielle',
+    'ai_assistant' => 'Assistant IA',
+    'ai_studio' => 'Studio IA',
+    'ai_settings' => 'Paramètres IA',
 ];

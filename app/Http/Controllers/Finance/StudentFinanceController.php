@@ -9,12 +9,14 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\AcademicSession;
 use Illuminate\Http\Request;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class StudentFinanceController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index']);
         $this->setPageTitle(__('finance.student_finance_dashboard'));
     }
 

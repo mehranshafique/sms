@@ -58,8 +58,20 @@
         <div class="row page-titles mx-0 mb-4 p-4 bg-white rounded shadow-sm align-items-center">
             <div class="col-sm-6 p-0">
                 <div class="welcome-text">
-                    <h4 class="text-primary fw-bold fs-20">{{ __('institute.institute_management') }}</h4>
-                    <p class="mb-0 text-muted fs-14">{{ __('institute.manage_list_subtitle') }}</p>
+                    <h4 class="text-primary fw-bold fs-20">
+                        @if(!empty($filter) && $filter === 'expired')
+                            {{ __('sidebar.expired_institution') }}
+                        @else
+                            {{ __('institute.institute_management') }}
+                        @endif
+                    </h4>
+                    <p class="mb-0 text-muted fs-14">
+                        @if(!empty($filter) && $filter === 'expired')
+                            {{ __('institute.expired_subscriptions_subtitle') }}
+                        @else
+                            {{ __('institute.manage_list_subtitle') }}
+                        @endif
+                    </p>
                 </div>
             </div>
             <div class="col-sm-6 p-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
@@ -202,7 +214,12 @@
         const table = $('#instituteTable').DataTable({
             processing: true,
             serverSide: true,
-            ajax: "{{ route('institutes.index') }}",
+            ajax: {
+                url: "{{ route('institutes.index') }}",
+                data: function (d) {
+                    d.filter = @json($filter ?? null);
+                }
+            },
             dom: '<"row me-2"<"col-md-2"<"me-3"l>><"col-md-10"<"dt-action-buttons text-xl-end text-lg-start text-md-end text-start d-flex align-items-center justify-content-end flex-md-row flex-column mb-3 mb-md-0"fB>>>t<"row mx-2"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
             buttons: [
                 {

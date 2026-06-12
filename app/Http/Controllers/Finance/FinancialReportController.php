@@ -13,12 +13,14 @@ use App\Models\FeeStructure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Student;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class FinancialReportController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index']);
         $this->setPageTitle(__('finance.class_financial_report'));
     }
 

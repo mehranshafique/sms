@@ -13,22 +13,22 @@ use Illuminate\Support\Facades\Auth;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class RolesController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':role.viewAny')->only(['index', 'show', 'test']);
+        $this->middleware(PermissionMiddleware::class . ':role.create')->only(['create', 'store']);
+        $this->middleware(PermissionMiddleware::class . ':role.update')->only(['edit', 'update']);
+        $this->middleware(PermissionMiddleware::class . ':role.delete')->only(['destroy']);
         $this->setPageTitle(__('roles.page_title'));
     }
 
     public function index(Request $request)
     {
-        // 1. Auth Check
-        if (!Auth::user()->can('role.viewAny') && !Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value)) {
-            abort(403, __('roles.messages.unauthorized_action'));
-        }
-
         $user = Auth::user();
         $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
         $institutionId = $this->getInstitutionId();

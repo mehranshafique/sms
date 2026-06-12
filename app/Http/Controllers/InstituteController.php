@@ -31,8 +31,14 @@ class InstituteController extends BaseController
 
     public function index(Request $request)
     {
+        $filter = $request->get('filter');
+
         if ($request->ajax()) {
             $data = Institution::with('cityRelation')->select('institutions.*');
+
+            if ($filter === 'expired') {
+                $data->withExpiredSubscription();
+            }
             
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -93,8 +99,16 @@ class InstituteController extends BaseController
         $activeInstitutes = Institution::where('is_active', true)->count();
         $inactiveInstitutes = Institution::where('is_active', false)->count();
         $newInstitutes = Institution::where('created_at', '>=', now()->subMonth())->count();
+        $expiredInstitutes = Institution::withExpiredSubscription()->count();
 
-        return view('institutions.index', compact('totalInstitutes', 'activeInstitutes', 'inactiveInstitutes', 'newInstitutes'));
+        return view('institutions.index', compact(
+            'totalInstitutes',
+            'activeInstitutes',
+            'inactiveInstitutes',
+            'newInstitutes',
+            'expiredInstitutes',
+            'filter'
+        ));
     }
 
     public function create()

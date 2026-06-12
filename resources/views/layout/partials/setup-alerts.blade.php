@@ -1,26 +1,39 @@
 @if(!empty($setupAlerts) && count($setupAlerts) > 0)
-<div class="container-fluid px-3 pt-3" id="setup-alerts-wrap">
-    @foreach($setupAlerts as $alert)
-        <div class="alert alert-warning alert-dismissible fade show setup-config-alert shadow-sm border-0 mb-2"
-             role="alert"
-             data-alert-key="{{ $alert['key'] }}">
-            <div class="d-flex align-items-start gap-3">
-                <div class="flex-shrink-0 mt-1">
-                    <i class="fa fa-exclamation-triangle fa-lg text-warning"></i>
-                </div>
-                <div class="flex-grow-1">
-                    <strong class="d-block mb-1">{{ __('configuration.setup_alert_title') }}</strong>
-                    <span>{{ $alert['message'] }}</span>
-                    @if(!empty($alert['url']))
-                        <a href="{{ $alert['url'] }}" class="alert-link ms-1 fw-bold">{{ __('configuration.setup_alert_fix_now') }}</a>
-                    @endif
+<div class="setup-alerts-inner" id="setup-alerts-wrap">
+    <div class="container-fluid px-3 pt-2 pb-0">
+        <div class="alert alert-warning border-0 shadow-sm mb-2 setup-config-alert-summary" role="alert">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa fa-exclamation-triangle text-warning"></i>
+                    <strong>{{ __('configuration.setup_alerts_summary', ['count' => count($setupAlerts)]) }}</strong>
                 </div>
                 <button type="button"
-                        class="btn-close setup-alert-dismiss"
-                        data-alert-key="{{ $alert['key'] }}"
-                        aria-label="{{ __('configuration.dismiss') }}"></button>
+                        class="btn btn-sm btn-outline-warning"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#setup-alerts-list"
+                        aria-expanded="false"
+                        aria-controls="setup-alerts-list">
+                    {{ __('configuration.setup_alerts_show') }}
+                </button>
+            </div>
+            <div class="collapse mt-2" id="setup-alerts-list">
+                @foreach($setupAlerts as $alert)
+                    <div class="setup-config-alert d-flex align-items-start gap-2 py-2 border-top border-warning border-opacity-25"
+                         data-alert-key="{{ $alert['key'] }}">
+                        <div class="flex-grow-1">
+                            <span>{{ $alert['message'] }}</span>
+                            @if(!empty($alert['url']))
+                                <a href="{{ $alert['url'] }}" class="alert-link ms-1 fw-bold">{{ __('configuration.setup_alert_fix_now') }}</a>
+                            @endif
+                        </div>
+                        <button type="button"
+                                class="btn-close btn-close-sm setup-alert-dismiss flex-shrink-0"
+                                data-alert-key="{{ $alert['key'] }}"
+                                aria-label="{{ __('configuration.dismiss') }}"></button>
+                    </div>
+                @endforeach
             </div>
         </div>
-    @endforeach
+    </div>
 </div>
 @endif

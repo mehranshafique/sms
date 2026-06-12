@@ -89,6 +89,21 @@ class Institution extends Model
         return $this->hasMany(Student::class);
     }
 
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function scopeWithExpiredSubscription($query)
+    {
+        return $query
+            ->whereHas('subscriptions')
+            ->whereDoesntHave('subscriptions', function ($q) {
+                $q->where('status', 'active')
+                    ->whereDate('end_date', '>=', now());
+            });
+    }
+
     // --- Location Relationships ---
     
     public function cityRelation()

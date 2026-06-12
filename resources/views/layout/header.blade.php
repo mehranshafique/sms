@@ -50,6 +50,25 @@
         .content-body {
             padding-bottom: 5rem;
         }
+        /* Pages wrap their own .content-body — keep alerts + page in one column */
+        .content-body > .content-body {
+            margin-left: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
+            padding-bottom: 0;
+        }
+        .setup-alerts-inner .container-fluid {
+            padding-top: 0.75rem;
+            padding-bottom: 0;
+        }
+        .setup-alerts-inner + .content-body > .container-fluid,
+        .setup-alerts-inner + .content-body > .container {
+            padding-top: 0.5rem;
+        }
+        .dlabnav .nav-text {
+            white-space: normal;
+            word-break: break-word;
+        }
         .select2-selection{
             border: 1px solid #d9dee3 !important;
             border-radius: 4px !important;
@@ -97,6 +116,171 @@
             justify-content: center; 
             font-weight: bold;
             font-size: 14px;
+        }
+
+        /* Pro plan — Google-style gradient ring on avatar */
+        .profile-avatar-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 2px;
+            background: transparent;
+        }
+        .profile-avatar-wrap.is-pro {
+            padding: 3px;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 25%, #7c3aed 55%, #2563eb 100%);
+            box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.15), 0 4px 14px rgba(124, 58, 237, 0.25);
+        }
+        .profile-avatar-wrap.is-pro::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: -1px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border: 2px solid #fff;
+            box-shadow: 0 1px 4px rgba(0,0,0,.15);
+            z-index: 2;
+        }
+        .profile-avatar-inner {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .profile-avatar-inner img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        .profile-avatar-inner .profile-initials {
+            width: 100%;
+            height: 100%;
+            font-size: 14px;
+        }
+
+        /* Header plan pill (visible without opening dropdown) */
+        .header-plan-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: transform .15s, box-shadow .15s;
+        }
+        .header-plan-pill:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+        }
+        .header-plan-pill.is-pro {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 40%, #ddd6fe 100%);
+            color: #5b21b6;
+            border: 1px solid rgba(124, 58, 237, 0.2);
+        }
+        .header-plan-pill.is-pro i.la-crown {
+            color: #d97706;
+        }
+        .header-plan-pill.is-standard {
+            background: #eef2ff;
+            color: #3730a3;
+            border: 1px solid #c7d2fe;
+        }
+        .header-plan-pill.is-expired {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .header-pro-badge {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #7c3aed, #2563eb);
+            color: #fff;
+            margin-left: 2px;
+        }
+
+        /* Mobile header menu panel (opens under header toggle area) */
+        .header-mobile-panel {
+            min-width: 280px;
+            max-width: min(320px, 92vw);
+            padding: 0.75rem;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(0,0,0,.12);
+            margin-top: 0.35rem;
+        }
+        .header-mobile-panel__plan {
+            display: block;
+            padding: 0.65rem 0.75rem;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+        .header-mobile-panel__plan.is-pro {
+            background: linear-gradient(135deg, #fef3c7, #ddd6fe);
+            color: #5b21b6;
+        }
+        .header-mobile-panel__item {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.55rem 0.75rem;
+            border-radius: 8px;
+            color: inherit;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .header-mobile-panel__item:hover { background: #f3f4f6; }
+
+        @media (max-width: 991.98px) {
+            .header-item-desktop-only { display: none !important; }
+            .dashboard_bar {
+                font-size: 1rem;
+                max-width: 42vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            /* Sidebar slides in directly under the fixed header bar */
+            [data-sidebar-style="overlay"] .dlabnav {
+                top: var(--dz-header-height) !important;
+                height: calc(100dvh - var(--dz-header-height)) !important;
+                width: min(290px, 88vw) !important;
+                z-index: 10001 !important;
+            }
+            #main-wrapper.menu-toggle::after {
+                content: '';
+                position: fixed;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                top: var(--dz-header-height);
+                background: rgba(15, 23, 42, 0.45);
+                z-index: 10000;
+            }
+            .header .header-content {
+                padding-left: 5rem;
+            }
+        }
+        @media (min-width: 992px) {
+            .header-mobile-menu-btn { display: none !important; }
         }
 
         /* School Switcher Search */
@@ -428,9 +612,60 @@
                                 }
                             @endphp
 
+                            @php
+                                $planCtx = $planCtx ?? [];
+                                $headerPlanName = $planCtx['plan_name'] ?? null;
+                                $headerPlanActive = $planCtx['is_active'] ?? false;
+                                $headerIsPro = $planCtx['is_pro'] ?? false;
+                                $headerIsSchoolAdmin = Auth::user()->hasAnyRole([
+                                    \App\Enums\RoleEnum::SCHOOL_ADMIN->value,
+                                    \App\Enums\RoleEnum::HEAD_OFFICER->value,
+                                ]);
+                                $headerIsSuperAdmin = Auth::user()->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value);
+                            @endphp
+
+                            {{-- Mobile quick menu (plan, language, profile links) --}}
+                            <li class="nav-item dropdown header-mobile-menu-btn d-lg-none">
+                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" aria-label="{{ __('header.mobile_menu') }}">
+                                    <i class="fa fa-ellipsis-v"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end header-mobile-panel">
+                                    @if($headerPlanName && ($headerIsSchoolAdmin || $headerIsSuperAdmin))
+                                        <a href="{{ route('plan.index') }}"
+                                           class="header-mobile-panel__plan {{ ($headerIsPro && $headerPlanActive) ? 'is-pro' : '' }}">
+                                            <i class="la la-crown"></i> {{ $headerPlanName }}
+                                            @if($headerIsPro && $headerPlanActive)<span class="header-pro-badge">PRO</span>@endif
+                                        </a>
+                                    @endif
+                                    @if($currentSessionTitle)
+                                        <div class="header-mobile-panel__item text-muted">
+                                            <i class="fa fa-calendar text-warning"></i> {{ $currentSessionTitle }}
+                                        </div>
+                                    @endif
+                                    <a href="{{ route('profile.index') }}" class="header-mobile-panel__item">
+                                        <i class="fa fa-user text-primary"></i> {{ __('header.my_profile') }}
+                                    </a>
+                                    @if($headerIsSchoolAdmin)
+                                        <a href="{{ route('plan.index') }}" class="header-mobile-panel__item">
+                                            <i class="fa fa-gem text-info"></i> {{ __('plan.my_plan') }}
+                                        </a>
+                                    @elseif($headerIsSuperAdmin)
+                                        <a href="{{ route('plan.requests') }}" class="header-mobile-panel__item">
+                                            <i class="fa fa-arrow-up text-info"></i> {{ __('plan.upgrade_requests') }}
+                                        </a>
+                                    @endif
+                                    <a href="{{ url('/change-language?language=en') }}" class="header-mobile-panel__item">
+                                        <i class="fas fa-globe text-secondary"></i> English
+                                    </a>
+                                    <a href="{{ url('/change-language?language=fr') }}" class="header-mobile-panel__item">
+                                        <i class="fas fa-globe text-secondary"></i> Français
+                                    </a>
+                                </div>
+                            </li>
+
                             {{-- Current Session Display --}}
                             @if($currentSessionTitle)
-                            <li class="nav-item d-flex align-items-center me-3 d-none d-sm-flex">
+                            <li class="nav-item d-flex align-items-center me-3 d-none d-sm-flex header-item-desktop-only">
                                 <span class="badge badge-warning light text-warning fs-12 font-w600 shadow-sm">
                                     <i class="fa fa-calendar me-1"></i> {{ $currentSessionTitle }}
                                 </span>
@@ -439,21 +674,17 @@
 
                             {{-- In-App Notifications --}}
                             <li class="nav-item dropdown notification_dropdown">
-                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" title="{{ __('header.notifications') }}">
+                                <a class="nav-link bell ai-icon" href="#" role="button" data-bs-toggle="dropdown" title="{{ __('header.notifications') }}" id="inAppNotifBell">
                                     <i class="fa fa-bell"></i>
-                                    @if(($inAppUnreadCount ?? 0) > 0)
-                                        <div class="pulse-css"></div>
-                                        <span class="badge bg-danger rounded-circle text-white in-app-unread-badge" style="position: absolute; top: 0px; right: 0px; font-size: 10px; padding: 3px 5px;">{{ $inAppUnreadCount }}</span>
-                                    @endif
+                                    <div class="pulse-css in-app-pulse" style="{{ ($inAppUnreadCount ?? 0) > 0 ? '' : 'display:none;' }}"></div>
+                                    <span class="badge bg-danger rounded-circle text-white in-app-unread-badge" style="position: absolute; top: 0px; right: 0px; font-size: 10px; padding: 3px 5px; {{ ($inAppUnreadCount ?? 0) > 0 ? '' : 'display:none;' }}">{{ $inAppUnreadCount ?? 0 }}</span>
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end p-0" style="min-width: 340px;">
                                     <div class="p-3 border-bottom bg-light rounded-top d-flex justify-content-between align-items-center">
                                         <h6 class="mb-0 text-black fw-bold">{{ __('header.notifications') }}</h6>
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="badge bg-primary text-white in-app-unread-label">{{ $inAppUnreadCount ?? 0 }} {{ __('header.new') }}</span>
-                                            @if(($inAppUnreadCount ?? 0) > 0)
-                                                <button type="button" id="markAllNotifications" class="btn btn-link btn-sm p-0 fs-11 text-primary">{{ __('header.mark_all_read') }}</button>
-                                            @endif
+                                            <button type="button" id="markAllNotifications" class="btn btn-link btn-sm p-0 fs-11 text-primary" style="{{ ($inAppUnreadCount ?? 0) > 0 ? '' : 'display:none;' }}">{{ __('header.mark_all_read') }}</button>
                                         </div>
                                     </div>
                                     <div class="widget-media dz-scroll p-3" style="height:auto; max-height:380px; overflow-y:auto;">
@@ -462,8 +693,9 @@
                                                 <li>
                                                     <a href="{{ $notif->link ?? '#' }}"
                                                        class="notification-link in-app-notif-link {{ $notif->isUnread() ? '' : 'opacity-75' }}"
-                                                       data-id="{{ $notif->id }}">
-                                                        <div class="timeline-panel rounded p-2 mb-2 border {{ $notif->isUnread() ? 'border-primary border-opacity-25' : '' }}">
+                                                       data-id="{{ $notif->id }}"
+                                                       data-unread="{{ $notif->isUnread() ? '1' : '0' }}">
+                                                        <div class="timeline-panel in-app-notif-panel rounded p-2 mb-2 border {{ $notif->isUnread() ? 'border-primary border-opacity-25' : '' }}">
                                                             <div class="media me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #f8f9fa; border-radius: 50%;">
                                                                 <i class="fa {{ $notif->icon }} fs-20"></i>
                                                             </div>
@@ -540,7 +772,7 @@
                             @endif
 
                             {{-- Language Selector --}}
-							<li class="nav-item dropdown notification_dropdown">
+							<li class="nav-item dropdown notification_dropdown header-item-desktop-only">
                                 <a class="nav-link bell ai-icon text-muted" href="#" role="button" data-bs-toggle="dropdown">
                                     <i class="fas fa-globe"></i>
                                 </a>
@@ -555,53 +787,99 @@
 							</li>
                             
                             {{-- Theme Toggle --}}
-                            <li class="nav-item dropdown notification_dropdown">
+                            <li class="nav-item dropdown notification_dropdown header-item-desktop-only">
                                <a class="nav-link bell dlab-theme-mode p-0" href="javascript:void(0);">
 									<i id="icon-light" class="fas fa-sun"></i>
                                    <i id="icon-dark" class="fas fa-moon"></i>
                                </a>
 							</li>
 
+                            {{-- Current plan pill (desktop header bar) --}}
+                            @if($headerPlanName && ($headerIsSchoolAdmin || $headerIsSuperAdmin))
+                            <li class="nav-item d-none d-lg-flex align-items-center me-2">
+                                <a href="{{ $headerIsSuperAdmin && !($planCtx['institution_id'] ?? null) ? route('plan.requests') : route('plan.index') }}"
+                                   class="header-plan-pill {{ !$headerPlanActive ? 'is-expired' : ($headerIsPro ? 'is-pro' : 'is-standard') }}"
+                                   title="{{ __('plan.current_plan') }}">
+                                    <i class="la la-crown"></i>
+                                    <span>{{ $headerPlanName }}</span>
+                                    @if($headerIsPro && $headerPlanActive)
+                                        <span class="header-pro-badge">PRO</span>
+                                    @endif
+                                </a>
+                            </li>
+                            @endif
+
                             {{-- User Profile --}}
                             <li class="nav-item dropdown header-profile">
-                                <a class="nav-link" href="javascript:void(0);" role="button" data-bs-toggle="dropdown">
-                                    <div class="header-info me-2 d-flex align-items-center">
-                                        <span class="text-black font-w600"></span>
-                                    </div>
-                                    @if(Auth::user()->profile_picture)
-                                        <img src="{{ asset('storage/'.Auth::user()->profile_picture) }}" width="35" alt="Profile" style="object-fit: cover; border-radius: 50%;"/>
-                                    @else
-                                        <div class="profile-initials">
-                                            {{ substr(Auth::user()->name, 0, 1) }}
+                                <a class="nav-link d-flex align-items-center p-0" href="javascript:void(0);" role="button" data-bs-toggle="dropdown">
+                                    <div class="profile-avatar-wrap {{ ($headerIsPro && $headerPlanActive) ? 'is-pro' : '' }}">
+                                        <div class="profile-avatar-inner">
+                                            @if(Auth::user()->profile_picture)
+                                                <img src="{{ asset('storage/'.Auth::user()->profile_picture) }}" alt="Profile"/>
+                                            @else
+                                                <div class="profile-initials">
+                                                    {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                                                </div>
+                                            @endif
                                         </div>
-                                    @endif
+                                    </div>
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end">
                                     <div class="dropdown-header text-center border-bottom pb-3">
-                                        @if(Auth::user()->profile_picture)
-                                            <div class="mb-2">
-                                                <img src="{{ asset('storage/'.Auth::user()->profile_picture) }}" width="60" height="60" alt="Profile" style="object-fit: cover; border-radius: 50%; border: 2px solid #eee;"/>
+                                        <div class="d-flex justify-content-center mb-2">
+                                            <div class="profile-avatar-wrap {{ ($headerIsPro && $headerPlanActive) ? 'is-pro' : '' }}" style="padding:4px;">
+                                                <div class="profile-avatar-inner" style="width:60px;height:60px;">
+                                                    @if(Auth::user()->profile_picture)
+                                                        <img src="{{ asset('storage/'.Auth::user()->profile_picture) }}" alt="Profile"/>
+                                                    @else
+                                                        <div class="profile-initials" style="font-size:22px;">
+                                                            {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                                                        </div>
+                                                    @endif
+                                                </div>
                                             </div>
-                                        @endif
+                                        </div>
                                         <h6 class="text-black font-w600 mb-0">{{ Auth::user()->name }}</h6>
                                         <span class="fs-12 text-muted">{{ Auth::user()->email }}</span>
                                         <div class="fs-11 text-primary mt-1">{{ Auth::user()->roles->pluck('name')->first() ?? 'User' }}</div>
+                                        @if($headerPlanName)
+                                            <a href="{{ route('plan.index') }}" class="badge {{ $headerPlanActive ? ($headerIsPro ? 'bg-warning text-dark' : 'bg-success') : 'bg-danger' }} mt-2 text-decoration-none">
+                                                <i class="fa fa-crown me-1"></i> {{ $headerPlanName }}
+                                                @if($headerIsPro && $headerPlanActive)
+                                                    <span class="ms-1 fw-bold">PRO</span>
+                                                @endif
+                                            </a>
+                                        @endif
                                     </div>
                                     
                                     <a href="{{ route('profile.index') }}" class="dropdown-item ai-icon">
                                         <i class="fa fa-user text-primary me-2"></i>
                                         <span class="ms-2">{{ __('header.my_profile') ?? 'My Profile' }}</span>
                                     </a>
+
+                                    @if($headerIsSchoolAdmin)
+                                    <a href="{{ route('plan.index') }}" class="dropdown-item ai-icon">
+                                        <i class="fa fa-gem text-info me-2"></i>
+                                        <span class="ms-2">{{ __('plan.my_plan') }}</span>
+                                    </a>
+                                    @elseif($headerIsSuperAdmin)
+                                    <a href="{{ route('plan.requests') }}" class="dropdown-item ai-icon">
+                                        <i class="fa fa-arrow-up text-info me-2"></i>
+                                        <span class="ms-2">{{ __('plan.upgrade_requests') }}</span>
+                                    </a>
+                                    @endif
                                     
                                     <a href="#" class="dropdown-item ai-icon">
                                         <i class="fa fa-envelope text-success me-2"></i>
                                         <span class="ms-2">{{ __('header.inbox') ?? 'Inbox' }}</span>
                                     </a>
                                     
+                                    @if(auth()->user()->can('setting.view') || auth()->user()->can('setting.manage'))
                                     <a href="{{ route('settings.index') }}" class="dropdown-item ai-icon">
                                         <i class="fa fa-cog text-warning me-2"></i>
                                         <span class="ms-2">{{ __('header.settings') ?? 'Settings' }}</span>
                                     </a>
+                                    @endif
 
                                     <div class="dropdown-divider"></div>
 
@@ -623,6 +901,20 @@
         {{-- INLINE SCRIPT FOR SEARCH --}}
         <script>
             document.addEventListener("DOMContentLoaded", function() {
+                // Mobile: close sidebar when tapping outside (under the header bar)
+                document.addEventListener('click', function(e) {
+                    if (window.innerWidth >= 992) return;
+                    var wrapper = document.getElementById('main-wrapper');
+                    if (!wrapper || !wrapper.classList.contains('menu-toggle')) return;
+                    var dlabnav = document.querySelector('.dlabnav');
+                    var navControl = document.querySelector('.nav-control');
+                    if (navControl && navControl.contains(e.target)) return;
+                    if (dlabnav && dlabnav.contains(e.target)) return;
+                    wrapper.classList.remove('menu-toggle');
+                    var ham = document.querySelector('.hamburger');
+                    if (ham) ham.classList.remove('is-active');
+                });
+
                 const searchInput = document.getElementById('schoolSearchInput');
                 if(searchInput){
                     searchInput.addEventListener('keyup', function(e) {
@@ -785,35 +1077,115 @@
 
                 // In-App Notifications
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-                const markReadUrl = @json(url('/notifications'));
+                const markReadBase = @json(url('/notifications'));
+                const markAllUrl = @json(route('notifications.read_all'));
                 const markAllBtn = document.getElementById('markAllNotifications');
+                const notifBell = document.getElementById('inAppNotifBell');
+                const unreadBadge = notifBell ? notifBell.querySelector('.in-app-unread-badge') : document.querySelector('.in-app-unread-badge');
+                const unreadLabel = document.querySelector('.in-app-unread-label');
+                const unreadPulse = notifBell ? notifBell.querySelector('.in-app-pulse') : document.querySelector('.in-app-pulse');
+                const newLabelText = @json(__('header.new'));
+                let localUnreadCount = {{ (int) ($inAppUnreadCount ?? 0) }};
 
-                document.querySelectorAll('.in-app-notif-link').forEach(link => {
-                    link.addEventListener('click', function() {
-                        const id = this.dataset.id;
-                        if (!id || !csrfToken) return;
-                        fetch(`${markReadUrl}/${id}/read`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': csrfToken,
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
+                function setInAppUnreadCount(count) {
+                    localUnreadCount = Math.max(0, parseInt(count, 10) || 0);
+                    if (unreadBadge) {
+                        unreadBadge.textContent = localUnreadCount;
+                        unreadBadge.style.display = localUnreadCount > 0 ? '' : 'none';
+                    }
+                    if (unreadLabel) {
+                        unreadLabel.textContent = localUnreadCount + ' ' + newLabelText;
+                    }
+                    if (unreadPulse) {
+                        unreadPulse.style.display = localUnreadCount > 0 ? '' : 'none';
+                    }
+                    if (markAllBtn) {
+                        markAllBtn.style.display = localUnreadCount > 0 ? '' : 'none';
+                    }
+                }
+
+                function markNotificationItemRead(link) {
+                    if (!link || link.dataset.unread !== '1') return;
+                    link.dataset.unread = '0';
+                    link.classList.add('opacity-75');
+                    const panel = link.querySelector('.in-app-notif-panel');
+                    if (panel) {
+                        panel.classList.remove('border-primary', 'border-opacity-25');
+                    }
+                }
+
+                function postMarkRead(id) {
+                    return fetch(markReadBase + '/' + id + '/read', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    }).then(function(res) {
+                        if (!res.ok) throw new Error('mark_read_failed');
+                        return res.json();
                     });
-                });
+                }
+
+                const notifList = document.getElementById('inAppNotificationsList');
+                if (notifList && csrfToken) {
+                    notifList.addEventListener('click', function(e) {
+                        const link = e.target.closest('.in-app-notif-link');
+                        if (!link) return;
+
+                        const id = link.dataset.id;
+                        const href = link.getAttribute('href') || '#';
+                        const isUnread = link.dataset.unread === '1';
+
+                        if (!id || !isUnread) return;
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        markNotificationItemRead(link);
+                        setInAppUnreadCount(localUnreadCount - 1);
+
+                        postMarkRead(id)
+                            .then(function(data) {
+                                if (typeof data.unread_count !== 'undefined') {
+                                    setInAppUnreadCount(data.unread_count);
+                                }
+                                if (href && href !== '#') {
+                                    window.location.assign(href);
+                                }
+                            })
+                            .catch(function() {
+                                if (href && href !== '#') {
+                                    window.location.assign(href);
+                                }
+                            });
+                    });
+                }
 
                 if (markAllBtn && csrfToken) {
                     markAllBtn.addEventListener('click', function(e) {
                         e.preventDefault();
-                        fetch(`${markReadUrl}/read-all`, {
+                        e.stopPropagation();
+                        document.querySelectorAll('.in-app-notif-link[data-unread="1"]').forEach(markNotificationItemRead);
+                        setInAppUnreadCount(0);
+
+                        fetch(markAllUrl, {
                             method: 'POST',
+                            credentials: 'same-origin',
                             headers: {
                                 'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json',
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
-                        }).then(() => window.location.reload());
+                        })
+                        .then(function(res) { return res.ok ? res.json() : Promise.reject(); })
+                        .then(function(data) {
+                            if (typeof data.unread_count !== 'undefined') {
+                                setInAppUnreadCount(data.unread_count);
+                            }
+                        });
                     });
                 }
             });

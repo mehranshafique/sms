@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\ExamRecord;
 use App\Models\Assignment;
 use App\Models\StudentRequest;
+use App\Models\PaymentProofSubmission;
 use App\Models\AcademicSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -18,9 +19,19 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Services\LmdCalculationService;
+use App\Services\PaymentMethodService;
+use App\Services\PaymentGateways\PaymentGatewayConfigService;
+use App\Services\PaymentGateways\PaymentGatewayManager;
+use App\Services\PaymentProofService;
 
 class StudentPortalApiController extends Controller
 {
+    public function __construct(
+        protected PaymentMethodService $paymentMethodService,
+        protected PaymentGatewayConfigService $gatewayConfigService,
+        protected PaymentGatewayManager $gatewayManager,
+        protected PaymentProofService $paymentProofService
+    ) {}
     /**
      * Helper to get the student securely for both Students AND Guardians
      */
@@ -91,26 +102,48 @@ class StudentPortalApiController extends Controller
     {
         try {
             $student = $this->getStudent($request);
-            
+
             $invoices = Invoice::where('student_id', $student->id)->latest()->get();
             $totalFees = $invoices->sum('total_amount');
             $paidFees = $invoices->sum('paid_amount');
             $outstanding = max(0, $totalFees - $paidFees);
 
-            $invoiceList = $invoices->map(function($inv) {
+            $institutionId = $student->institution_id;
+            $onlineEnabled = $this->paymentMethodService->isOnlineEnabled($institutionId);
+            $gatewayActive = $this->gatewayConfigService->isGatewayActive($institutionId);
+            $manualProofEnabled = $this->gatewayConfigService->isManualProofEnabled($institutionId);
+
+            $pendingProofIds = PaymentProofSubmission::whereIn('invoice_id', $invoices->pluck('id'))
+                ->where('status', 'pending')
+                ->pluck('invoice_id')
+                ->flip();
+
+            $invoiceList = $invoices->map(function ($inv) use ($onlineEnabled, $gatewayActive, $manualProofEnabled, $pendingProofIds) {
+                if (empty($inv->payment_token)) {
+                    $inv->update(['payment_token' => Str::random(48)]);
+                }
+
+                $balance = max(0, (float) $inv->total_amount - (float) $inv->paid_amount);
+                $canPay = $onlineEnabled && $balance > 0.01 && !in_array($inv->status, ['paid', 'cancelled'], true);
+
                 return [
                     'id' => $inv->id,
                     'invoice_number' => $inv->invoice_number,
                     'total' => number_format($inv->total_amount, 2),
                     'paid' => number_format($inv->paid_amount, 2),
-                    'due' => number_format($inv->total_amount - $inv->paid_amount, 2),
+                    'due' => number_format($balance, 2),
+                    'due_amount' => $balance,
                     'due_date' => $inv->due_date ? Carbon::parse($inv->due_date)->format('d M, Y') : 'N/A',
                     'status' => ucfirst($inv->status),
-                    'color' => $inv->status === 'paid' ? '#10B981' : '#DC2626'
+                    'color' => $inv->status === 'paid' ? '#10B981' : '#DC2626',
+                    'pay_url' => $canPay ? route('pay.show', $inv->payment_token) : null,
+                    'can_pay_online' => $canPay,
+                    'gateway_active' => $gatewayActive,
+                    'manual_proof_enabled' => $manualProofEnabled,
+                    'has_pending_proof' => $pendingProofIds->has($inv->id),
                 ];
             });
 
-            // Safe fallback for currency to prevent Enum crashes
             $currency = config('app.currency_symbol', '$');
 
             return response()->json([
@@ -120,11 +153,136 @@ class StudentPortalApiController extends Controller
                     'paid_fees' => number_format($paidFees, 2),
                     'outstanding' => number_format($outstanding, 2),
                     'currency' => $currency,
-                    'invoices' => $invoiceList
-                ]
+                    'online_enabled' => $onlineEnabled,
+                    'gateway_active' => $gatewayActive,
+                    'manual_proof_enabled' => $manualProofEnabled,
+                    'invoices' => $invoiceList,
+                ],
             ]);
         } catch (\Exception $e) {
             Log::error("Student API Fees Error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Payment methods and options for a specific invoice (mobile pay / proof flow).
+     */
+    public function getPaymentOptions(Request $request)
+    {
+        try {
+            $student = $this->getStudent($request);
+            $request->validate(['invoice_id' => 'required|integer']);
+
+            $invoice = Invoice::where('student_id', $student->id)
+                ->where('id', $request->invoice_id)
+                ->firstOrFail();
+
+            if (empty($invoice->payment_token)) {
+                $invoice->update(['payment_token' => Str::random(48)]);
+            }
+
+            $institutionId = $invoice->institution_id;
+            $methods = $this->paymentMethodService->getEnabledMethods($institutionId);
+            $gatewayActive = $this->gatewayConfigService->isGatewayActive($institutionId);
+            $manualProofEnabled = $this->gatewayConfigService->isManualProofEnabled($institutionId);
+            $balance = max(0, (float) $invoice->total_amount - (float) $invoice->paid_amount);
+
+            $methodList = [];
+            foreach ($methods as $key => $method) {
+                $supportsGateway = $gatewayActive && $this->gatewayManager->supportsMethod($institutionId, $key);
+                $methodList[] = [
+                    'key' => $key,
+                    'label' => __('payment.' . $key),
+                    'is_mobile' => (bool) ($method['is_mobile'] ?? false),
+                    'supports_gateway' => $supportsGateway,
+                    'merchant_code' => $method['merchant_code'] ?? null,
+                    'bank_name' => $method['bank_name'] ?? null,
+                    'account_name' => $method['account_name'] ?? null,
+                    'account_number' => $method['account_number'] ?? null,
+                    'instructions' => $method['instructions'] ?? null,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'balance_due' => number_format($balance, 2, '.', ''),
+                    'pay_url' => route('pay.show', $invoice->payment_token),
+                    'gateway_active' => $gatewayActive,
+                    'manual_proof_enabled' => $manualProofEnabled,
+                    'methods' => $methodList,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Student API Payment Options Error: ' . $e->getMessage());
+
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Submit manual payment proof from the mobile app.
+     */
+    public function submitPaymentProof(Request $request)
+    {
+        try {
+            $student = $this->getStudent($request);
+
+            $request->validate([
+                'invoice_id' => 'required|integer',
+                'amount' => 'required|numeric|min:0.01',
+                'method' => 'required|string|max:50',
+                'payer_name' => 'required|string|max:100',
+                'payer_phone' => 'required|string|max:30',
+                'paid_at' => 'required|date',
+                'transaction_reference' => 'required|string|max:120',
+                'receipt' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
+                'notes' => 'nullable|string|max:500',
+            ]);
+
+            $invoice = Invoice::where('student_id', $student->id)
+                ->where('id', $request->invoice_id)
+                ->firstOrFail();
+
+            if (!$this->gatewayConfigService->isManualProofEnabled($invoice->institution_id)) {
+                return response()->json(['success' => false, 'message' => __('payment_proof.disabled')], 422);
+            }
+
+            $enabledKeys = $this->paymentMethodService->enabledMethodKeys($invoice->institution_id);
+            if (!in_array($request->method, $enabledKeys, true)) {
+                return response()->json(['success' => false, 'message' => __('payment.method_not_enabled')], 422);
+            }
+
+            $proof = $this->paymentProofService->submit($invoice, [
+                'payer_name' => $request->payer_name,
+                'payer_phone' => $request->payer_phone,
+                'method' => $request->method,
+                'amount' => $request->amount,
+                'paid_at' => $request->paid_at,
+                'transaction_reference' => $request->transaction_reference,
+                'notes' => $request->notes,
+            ], $request->file('receipt'));
+
+            return response()->json([
+                'success' => true,
+                'message' => __('payment_proof.submitted'),
+                'data' => [
+                    'proof_id' => $proof->id,
+                    'status' => $proof->status,
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Student API Payment Proof Error: ' . $e->getMessage());
+
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

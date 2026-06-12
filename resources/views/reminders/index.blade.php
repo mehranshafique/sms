@@ -48,12 +48,31 @@
                             </div>
                             <div class="mb-4">
                                 <label class="form-label fw-bold">{{ __('reminders.delivery_channel') }}</label>
-                                <select name="channel" class="form-control default-select" required>
+                                <select name="channel" id="fee_channel" class="form-control default-select" required>
                                     <option value="sms">{{ __('reminders.standard_sms') }}</option>
                                     <option value="whatsapp">{{ __('reminders.whatsapp') }}</option>
                                     <option value="email">{{ __('reminders.email') ?? 'Email' }}</option>
                                 </select>
                             </div>
+                            @if(!empty($planCtx['has_ai']))
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('ai.preview_message') }}</label>
+                                <textarea id="fee_message_preview" class="form-control" rows="3" placeholder="{{ __('ai.btn_draft_reminder') }}…"></textarea>
+                                <div class="mt-2">
+                                    @include('ai.partials.embed-button', [
+                                        'tool' => 'draft_fee_reminder',
+                                        'params' => [],
+                                        'fields' => [
+                                            'class_section_id' => '#feeReminderForm select[name=class_section_id]',
+                                            'fee_structure_id' => '#feeReminderForm select[name=fee_structure_id]',
+                                            'channel' => '#fee_channel',
+                                        ],
+                                        'label' => __('ai.btn_draft_reminder'),
+                                        'target' => '#fee_message_preview',
+                                    ])
+                                </div>
+                            </div>
+                            @endif
                             <button type="submit" class="btn btn-primary submit-btn w-100 shadow"><i class="fa fa-paper-plane me-2"></i> {{ __('reminders.send_fee_reminders') }}</button>
                         </form>
                     </div>
@@ -84,12 +103,30 @@
 
                             <div class="mb-4 mt-2">
                                 <label class="form-label fw-bold">{{ __('reminders.delivery_channel') }}</label>
-                                <select name="channel" class="form-control default-select" required>
+                                <select name="channel" id="exam_channel" class="form-control default-select" required>
                                     <option value="sms">{{ __('reminders.standard_sms') }}</option>
                                     <option value="whatsapp">{{ __('reminders.whatsapp') }}</option>
                                     <option value="email">{{ __('reminders.email') ?? 'Email' }}</option>
                                 </select>
                             </div>
+                            @if(!empty($planCtx['has_ai']))
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('ai.preview_message') }}</label>
+                                <textarea id="exam_message_preview" class="form-control" rows="3"></textarea>
+                                <div class="mt-2">
+                                    @include('ai.partials.embed-button', [
+                                        'tool' => 'draft_exam_reminder',
+                                        'params' => [],
+                                        'fields' => [
+                                            'class_section_id' => '#examReminderForm select[name=class_section_id]',
+                                            'channel' => '#exam_channel',
+                                        ],
+                                        'label' => __('ai.btn_draft_reminder'),
+                                        'target' => '#exam_message_preview',
+                                    ])
+                                </div>
+                            </div>
+                            @endif
                             <div class="alert alert-info light border-info mb-4">
                                 <i class="fa fa-info-circle me-2 fs-16"></i> {{ __('reminders.exam_info') }}
                             </div>
@@ -159,7 +196,14 @@
 
                 Swal.fire({
                     title: lang.initiateBroadcast,
-                    text: lang.broadcastWarning,
+                    html: (function () {
+                        var previewId = formId === '#feeReminderForm' ? '#fee_message_preview' : (formId === '#examReminderForm' ? '#exam_message_preview' : null);
+                        var preview = previewId ? $(previewId).val() : '';
+                        if (preview && preview.trim()) {
+                            return lang.broadcastWarning + '<hr><p class="text-start small fw-bold mb-1">{{ __('ai.preview_message') }}</p><div class="text-start small border rounded p-2 bg-light" style="white-space:pre-wrap">' + $('<div>').text(preview).html() + '</div>';
+                        }
+                        return lang.broadcastWarning;
+                    })(),
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#3085d6',

@@ -12,8 +12,9 @@ class PermissionController extends BaseController
 {
     public function __construct()
     {
+        $this->middleware('auth');
         $this->setPageTitle(__('roles.permissions_page_title'));
-        $this->middleware(RoleMiddleware::class . ':Super Admin')->only(['store', 'update', 'destroy']);
+        $this->middleware(RoleMiddleware::class . ':Super Admin')->only(['index', 'edit', 'store', 'update', 'destroy']);
     }
 
     public function index($moduleId)

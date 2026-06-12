@@ -39,6 +39,29 @@
 
                             <div class="mb-3 col-md-12">
                                 <label class="form-label">{{ __('notice.content') }} <span class="text-danger">*</span></label>
+                                @if(!empty($planCtx['has_ai']))
+                                <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+                                    <input type="text" id="ai-notice-topic" class="form-control form-control-sm" style="max-width:280px" placeholder="{{ __('notice.title') }}…">
+                                    @include('ai.partials.embed-button', [
+                                        'tool' => 'draft_notice',
+                                        'params' => ['tone' => 'professional'],
+                                        'fields' => ['topic' => '#ai-notice-topic', 'audience' => 'select[name=audience]'],
+                                        'label' => __('ai.btn_draft_notice'),
+                                        'target' => 'textarea[name=content]',
+                                        'panel' => '#ai-notice-draft-panel',
+                                        'confirm' => true,
+                                    ])
+                                    @include('ai.partials.embed-button', [
+                                        'tool' => 'translate',
+                                        'params' => ['target_lang' => app()->getLocale() === 'fr' ? 'French' : 'English'],
+                                        'fields' => ['text' => 'textarea[name=content]'],
+                                        'label' => __('ai.btn_translate_notice'),
+                                        'target' => 'textarea[name=content]',
+                                        'confirm' => true,
+                                    ])
+                                </div>
+                                <div class="ai-embed-panel" id="ai-notice-draft-panel"></div>
+                                @endif
                                 <textarea name="content" class="form-control" rows="5" required>{{ old('content', $notice->content ?? '') }}</textarea>
                             </div>
 

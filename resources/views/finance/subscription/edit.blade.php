@@ -6,7 +6,7 @@
         <div class="row page-titles mx-0">
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
-                    <h4>{{ __('subscription.edit_package') }}</h4> {{-- Or 'Edit Subscription' --}}
+                    <h4>{{ __('subscription.edit_subscription') }}</h4>
                     <p class="mb-0">{{ __('subscription.institution') }}: <strong>{{ $subscription->institution->name }}</strong></p>
                 </div>
             </div>

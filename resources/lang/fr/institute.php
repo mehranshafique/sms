@@ -9,6 +9,7 @@ return [
     ],
     'institute_management' => 'Gestion des instituts',
     'manage_list_subtitle' => 'Gérez votre liste d\'instituts',
+    'expired_subscriptions_subtitle' => 'Établissements dont l\'abonnement a expiré',
     'create_new' => 'Créer nouveau',
     'total_institutes' => 'Total des instituts',
     'active_institutes' => 'Instituts actifs',

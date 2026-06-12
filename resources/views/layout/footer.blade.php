@@ -56,13 +56,13 @@
             }
 
             // 3. Configure Bootstrap Select (Global Fallback)
-            if (jQuery().selectpicker) {
+            if (typeof jQuery.fn.selectpicker !== 'undefined' && jQuery.fn.selectpicker.defaults) {
                 jQuery.fn.selectpicker.defaults.noneSelectedText = '';
                 jQuery.fn.selectpicker.defaults.noneResultsText = 'No results found';
             }
 
             setTimeout(function() {
-                if(jQuery().selectpicker) {
+                if (typeof jQuery.fn.selectpicker !== 'undefined') {
                     jQuery('.default-select').selectpicker({
                         liveSearch: true,
                         size: 10
@@ -188,7 +188,7 @@
                 $alert.fadeOut(200, function() {
                     $(this).remove();
                     if ($('#setup-alerts-wrap .setup-config-alert').length === 0) {
-                        $('#setup-alerts-wrap').remove();
+                        $('#setup-alerts-wrap').fadeOut(150, function() { $(this).remove(); });
                     }
                 });
                 $.post('{{ route('configuration.setup_alert.dismiss') }}', {
@@ -225,6 +225,11 @@
     @endif
 
     @yield('js')
+
+    @if(!empty($planCtx['has_ai']))
+        @include('ai.partials.floating-widget')
+        @include('ai.partials.embed-scripts')
+    @endif
     
 </body>
 </html>

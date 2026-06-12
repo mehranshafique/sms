@@ -438,6 +438,25 @@ class DashboardController extends BaseController
         $presentCount = (clone $todaysAttendance)->where('status', 'present')->count();
         $absentCount = (clone $todaysAttendance)->where('status', 'absent')->count();
         $lateCount = (clone $todaysAttendance)->where('status', 'late')->count();
+        $attendanceMarked = $presentCount + $absentCount + $lateCount;
+        $attendanceRate = $attendanceMarked > 0
+            ? round((($presentCount + $lateCount) / $attendanceMarked) * 100)
+            : 0;
+        $collectionRate = $expectedTotal > 0 ? round(($collectedTotal / $expectedTotal) * 100, 1) : 0;
+
+        // Recent payments for an at-a-glance activity feed
+        $recentPayments = Payment::with(['invoice.student'])
+            ->where('institution_id', $institutionId)
+            ->orderByDesc('created_at')
+            ->take(5)
+            ->get();
+
+        // Latest published notices
+        $recentNotices = Notice::where('institution_id', $institutionId)
+            ->where('is_published', true)
+            ->orderByDesc('created_at')
+            ->take(4)
+            ->get();
 
         $startDate = Carbon::now()->subDays(6);
         $endDate = Carbon::now();
@@ -463,7 +482,8 @@ class DashboardController extends BaseController
             'institution',
             'totalStudents', 'totalTeachers', 'totalStaff', 'totalCampuses', 'totalInstitutes',
             'chartLabels', 'chartValues', 'currentSession',
-            'presentCount', 'absentCount', 'lateCount',
+            'presentCount', 'absentCount', 'lateCount', 'attendanceRate', 'attendanceMarked',
+            'collectionRate', 'recentPayments', 'recentNotices',
             'totalEnrollment', 'newComers',
             'expectedTotal', 'collectedTotal', 'remainingToCollect', 'paidCount', 'unpaidCount', 'installmentStats',
             'budgetSpend', 'budgetRest', 'totalCourses', 'totalResults', 'totalTimetables', 'totalCommunication'
@@ -477,8 +497,11 @@ class DashboardController extends BaseController
         $myStudentsCount = Student::where('institution_id', $institutionId)->count(); 
         $today = strtolower(now()->format('l'));
         $todayClasses = collect();
+        $weekClasses = collect();
         $myCoursesCount = 0;
         $myTotalClasses = 0;
+        $myClassesCount = 0;
+        $weeklyClassesCount = 0;
 
         if ($staffId) {
             $todayClasses = Timetable::with(['classSection', 'subject'])
@@ -486,13 +509,37 @@ class DashboardController extends BaseController
                 ->where('day_of_week', $today)
                 ->orderBy('start_time')
                 ->get();
+            $weekClasses = Timetable::where('teacher_id', $staffId)
+                ->select('day_of_week', DB::raw('count(*) as count'))
+                ->groupBy('day_of_week')
+                ->pluck('count', 'day_of_week');
             $myCoursesCount = Timetable::where('teacher_id', $staffId)->distinct('subject_id')->count('subject_id');
             $myTotalClasses = Timetable::where('teacher_id', $staffId)->count();
+            $myClassesCount = Timetable::where('teacher_id', $staffId)->distinct('class_section_id')->count('class_section_id');
+            $weeklyClassesCount = $myTotalClasses;
         }
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         $institution = Institution::find($institutionId);
 
-        return view('dashboard.teacher', compact('myStudentsCount', 'todayClasses', 'currentSession', 'myCoursesCount', 'myTotalClasses', 'institution'));
+        // Weekly distribution (Mon..Sun) for a small bar chart
+        $weekDayKeys = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        $weekChartLabels = [];
+        $weekChartValues = [];
+        foreach ($weekDayKeys as $dayKey) {
+            $weekChartLabels[] = ucfirst(substr($dayKey, 0, 3));
+            $weekChartValues[] = (int) ($weekClasses[$dayKey] ?? 0);
+        }
+
+        $recentNotices = Notice::where('institution_id', $institutionId)
+            ->where('is_published', true)
+            ->orderByDesc('created_at')
+            ->take(4)
+            ->get();
+
+        return view('dashboard.teacher', compact(
+            'myStudentsCount', 'todayClasses', 'currentSession', 'myCoursesCount', 'myTotalClasses',
+            'myClassesCount', 'weeklyClassesCount', 'weekChartLabels', 'weekChartValues', 'recentNotices', 'institution'
+        ));
     }
 
     private function studentDashboard($user, $institutionId)
@@ -534,6 +581,20 @@ class DashboardController extends BaseController
                 })->distinct('exam_id')->count();
         }
 
-        return view('dashboard.student', compact('student', 'attendancePercentage', 'unpaidInvoices', 'todayClasses', 'totalFees', 'paidFees', 'resultsCount', 'currentSession', 'institution'));
+        $feePercent = $totalFees > 0 ? round(($paidFees / $totalFees) * 100) : 0;
+        $absentDays = max(0, $totalDays - $presentDays);
+
+        // Latest published notices for the student's school
+        $recentNotices = Notice::where('institution_id', $institutionId)
+            ->where('is_published', true)
+            ->orderByDesc('created_at')
+            ->take(4)
+            ->get();
+
+        return view('dashboard.student', compact(
+            'student', 'attendancePercentage', 'unpaidInvoices', 'todayClasses', 'totalFees', 'paidFees',
+            'resultsCount', 'currentSession', 'institution', 'feePercent', 'presentDays', 'absentDays',
+            'totalDays', 'recentNotices'
+        ));
     }
 }

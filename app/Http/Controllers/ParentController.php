@@ -20,8 +20,8 @@ class ParentController extends BaseController
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware(PermissionMiddleware::class . ':student_parent.view')->only(['index']);
-        $this->middleware(PermissionMiddleware::class . ':student_parent.create')->only(['create', 'store']);
+        $this->middleware(PermissionMiddleware::class . ':student_parent.view')->only(['index', 'show']);
+        $this->middleware(PermissionMiddleware::class . ':student_parent.create')->only(['create', 'store', 'check']);
         $this->middleware(PermissionMiddleware::class . ':student_parent.update')->only(['edit', 'update']);
         $this->middleware(PermissionMiddleware::class . ':student_parent.delete')->only(['destroy', 'bulkDelete']);
         $this->setPageTitle(__('parent.page_title'));

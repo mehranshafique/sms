@@ -25,6 +25,12 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\PickupWebController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InAppNotificationController;
+use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\Ai\AiAssistantController;
+use App\Http\Controllers\Ai\AiEmbedController;
+use App\Http\Controllers\Ai\AiStudioController;
+use App\Http\Controllers\Ai\AiSettingsController;
+use App\Http\Controllers\PlanController;
 
 // --- Controllers: Academics ---
 use App\Http\Controllers\GradeLevelController;
@@ -582,6 +588,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('/', [SubscriptionController::class, 'store'])->name('store');
                 Route::get('/{subscription}/edit', [SubscriptionController::class, 'edit'])->name('edit');
                 Route::put('/{subscription}', [SubscriptionController::class, 'update'])->name('update');
+                Route::delete('/{subscription}', [SubscriptionController::class, 'destroy'])->name('destroy');
             });
         });
     });
@@ -601,6 +608,49 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('reminders/exams', [ReminderController::class, 'sendExamReminders'])->name('reminders.exams.send');
         Route::post('reminders/attendance', [ReminderController::class, 'sendAttendanceReports'])->name('reminders.attendance.send');
 
+    });
+
+    // --- SUPPORT TICKETS / CHAT (Digitex Support Desk) ---
+    Route::prefix('support')->name('support.')->group(function () {
+        Route::get('/', [SupportTicketController::class, 'index'])->name('index');
+        Route::get('/create', [SupportTicketController::class, 'create'])->name('create');
+        Route::post('/', [SupportTicketController::class, 'store'])->name('store');
+        Route::get('/{ticket}', [SupportTicketController::class, 'show'])->name('show')->whereNumber('ticket');
+        Route::post('/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('reply')->whereNumber('ticket');
+        Route::get('/{ticket}/messages', [SupportTicketController::class, 'fetchMessages'])->name('messages')->whereNumber('ticket');
+        Route::post('/{ticket}/status', [SupportTicketController::class, 'updateStatus'])->name('status')->whereNumber('ticket');
+    });
+
+    // --- AI ASSISTANT & STUDIO (optional, plan-gated module) ---
+    // The 'ai.access' middleware fully isolates this feature: schools without an
+    // AI plan never enter these routes, and the rest of the system is untouched.
+    Route::prefix('ai')->name('ai.')->middleware('ai.access')->group(function () {
+        Route::get('/assistant', [AiAssistantController::class, 'index'])->name('assistant');
+        Route::post('/assistant/send', [AiAssistantController::class, 'send'])->name('assistant.send');
+        Route::delete('/assistant/{conversation}', [AiAssistantController::class, 'destroy'])->name('assistant.destroy')->whereNumber('conversation');
+
+        Route::get('/studio', [AiStudioController::class, 'index'])->name('studio');
+        Route::post('/studio/generate', [AiStudioController::class, 'generate'])->name('studio.generate');
+
+        Route::get('/embed/tools', [AiEmbedController::class, 'tools'])->name('embed.tools');
+        Route::post('/embed', [AiEmbedController::class, 'run'])->name('embed.run');
+    });
+
+    // AI platform settings (Super Admin only; not behind ai.access so usage is
+    // always viewable). Authorization is enforced inside the controller.
+    Route::prefix('ai/settings')->name('ai.settings.')->group(function () {
+        Route::get('/', [AiSettingsController::class, 'index'])->name('index');
+        Route::post('/', [AiSettingsController::class, 'update'])->name('update');
+        Route::post('/clear-key', [AiSettingsController::class, 'clearKey'])->name('clear');
+    });
+
+    // --- PLAN / SUBSCRIPTION (school view + upgrade requests) ---
+    Route::prefix('plan')->name('plan.')->group(function () {
+        Route::get('/', [PlanController::class, 'index'])->name('index');
+        Route::post('/request-upgrade', [PlanController::class, 'requestUpgrade'])->name('upgrade.request');
+        // Super Admin inbox of upgrade requests
+        Route::get('/requests', [PlanController::class, 'requests'])->name('requests');
+        Route::post('/requests/{planRequest}/handle', [PlanController::class, 'handleRequest'])->name('requests.handle')->whereNumber('planRequest');
     });
 
     // --- CHATBOT SETTINGS ---

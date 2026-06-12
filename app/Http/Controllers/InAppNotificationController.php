@@ -15,15 +15,18 @@ class InAppNotificationController extends Controller
 
     public function markRead(int $id)
     {
-        $this->notifications->markAsRead($id, Auth::id());
+        $result = $this->notifications->markAsRead($id, Auth::id());
 
-        return response()->json(['success' => true]);
+        return response()->json($result);
     }
 
     public function markAllRead()
     {
-        $count = $this->notifications->markAllAsRead(Auth::id());
+        $this->notifications->markAllAsRead(Auth::id());
 
-        return response()->json(['success' => true, 'count' => $count]);
+        return response()->json([
+            'success'      => true,
+            'unread_count' => $this->notifications->getUnreadCount(Auth::id()),
+        ]);
     }
 }

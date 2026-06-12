@@ -89,6 +89,8 @@ Route::prefix('v1/student')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/attendance', [StudentPortalApiController::class, 'getAttendance']);
     Route::get('/attendance-summary', [StudentPortalApiController::class, 'getAttendanceSummary']);
     Route::get('/fees', [StudentPortalApiController::class, 'getFees']);
+    Route::get('/payment-options', [StudentPortalApiController::class, 'getPaymentOptions']);
+    Route::post('/payment-proof', [StudentPortalApiController::class, 'submitPaymentProof']);
     Route::get('/homework', [StudentPortalApiController::class, 'getHomework']);
     Route::get('/results', [StudentPortalApiController::class, 'getResults']);
     Route::get('/lmd-transcript', [StudentPortalApiController::class, 'getLmdTranscript']);

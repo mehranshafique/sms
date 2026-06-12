@@ -70,6 +70,31 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">{{ __('subscription.ai_features') }}</label>
+                            <div class="border rounded p-3 bg-light">
+                                <div class="row align-items-center">
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" name="ai_enabled" value="1" id="aiEnabledEdit" {{ $package->ai_enabled ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="aiEnabledEdit">{{ __('subscription.ai_enabled') }}</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" name="ai_unlimited" value="1" id="aiUnlimitedEdit" {{ $package->ai_unlimited ? 'checked' : '' }}>
+                                            <label class="form-check-label" for="aiUnlimitedEdit">{{ __('subscription.ai_unlimited') }}</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small mb-1">{{ __('subscription.ai_monthly_limit') }}</label>
+                                        <input type="number" name="ai_monthly_limit" class="form-control" value="{{ $package->ai_monthly_limit }}" min="0" placeholder="{{ config('ai.default_monthly_limit') }}">
+                                    </div>
+                                </div>
+                                <small class="text-muted d-block mt-2">{{ __('subscription.ai_help') }}</small>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="text-end">

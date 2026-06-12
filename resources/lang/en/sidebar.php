@@ -45,7 +45,6 @@ return [
     'budget_allocation' => 'Budget Allocation', 
     'fund_requests' => 'Fund Requests', 
     'budget_categories' => 'Budget Categories', 
-    'programs' => 'Programs',
     'communication' => 'Communication',
     'notices' => [
         'title' => 'Notices Board',
@@ -63,7 +62,13 @@ return [
     'my_elections' => 'My Elections',
 
     'attendance_analytics' => 'Attendance Analytics',
+    'my_attendance_analytics' => 'My Attendance Analytics',
     'children_attendance' => 'Children Attendance',
+    'security' => 'Security',
+    'pickup_system' => 'Pickup System',
+    'programs' => [
+        'title' => 'Programs',
+    ],
     // School Admin Keys
     'academics' => 'Academics',
     'sessions' => [
@@ -94,7 +99,10 @@ return [
         'title' => 'Exams'
     ],
     'marks' => [
-        'title' => 'Marks'
+        'title' => 'Marks',
+        'enter_marks' => 'Enter Marks',
+        'my_marks' => 'My Marks',
+        'my_results' => 'My Results',
     ],
     'results' => 'Result Cards',
     'academic_reports' => 'Reports (PDF)',
@@ -182,4 +190,11 @@ return [
     'transport' => 'Transport',
     'operations' => 'Operations',
     'guardian_portal' => 'Guardian Portal',
+    'support_section' => 'Help Center',
+    'support' => 'Help & Support',
+    'support_inbox' => 'Support Inbox',
+    'ai_section' => 'Artificial Intelligence',
+    'ai_assistant' => 'AI Assistant',
+    'ai_studio' => 'AI Studio',
+    'ai_settings' => 'AI Settings',
 ];

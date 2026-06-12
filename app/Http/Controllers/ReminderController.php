@@ -19,12 +19,18 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use App\Enums\CurrencySymbol;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class ReminderController extends BaseController
 {
     public function __construct(
         protected NotificationPreferenceService $preferences
     ) {
+        $this->middleware('auth');
+        $this->middleware(PermissionMiddleware::class . ':reminder.view')->only(['index']);
+        $this->middleware(PermissionMiddleware::class . ':reminder.create')->only([
+            'sendFeeReminders', 'sendExamReminders', 'sendAttendanceReports',
+        ]);
         $this->setPageTitle(__('reminders.page_title'));
     }
 

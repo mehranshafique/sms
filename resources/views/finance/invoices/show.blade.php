@@ -54,6 +54,25 @@
         @endphp
 
         <div class="row">
+            @if(!empty($planCtx['has_ai']) && in_array($invoice->status, ['unpaid', 'partial', 'overdue']))
+            <div class="col-lg-12 mb-3">
+                <div class="ai-copilot-card">
+                    <div class="ai-copilot-card__head">
+                        <div>
+                            <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.invoice_insights') }}</strong>
+                            <div class="text-muted small">{{ __('ai.tools.invoice_insights_desc') }}</div>
+                        </div>
+                        @include('ai.partials.embed-button', [
+                            'tool' => 'invoice_insights',
+                            'params' => ['invoice_id' => $invoice->id],
+                            'label' => __('ai.btn_invoice_insights'),
+                            'panel' => '#ai-invoice-insights',
+                        ])
+                    </div>
+                    <div class="ai-embed-panel" id="ai-invoice-insights"></div>
+                </div>
+            </div>
+            @endif
             <div class="col-lg-12">
                 <div class="card mt-3 border-0 shadow-sm">
                     <!-- Modern Header -->

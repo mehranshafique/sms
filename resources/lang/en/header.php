@@ -6,6 +6,7 @@ return [
     'my_institute' => 'My Institute',
     'global_view' => 'Global View',
     'global_dashboard' => 'Global Dashboard',
+    'mobile_menu' => 'Menu',
     
     // Search
     'search_school' => 'Search school...',

@@ -11,6 +11,7 @@ return [
     // Header & Stats
     'institute_management' => 'Institute Management',
     'manage_list_subtitle' => 'Manage your institute list',
+    'expired_subscriptions_subtitle' => 'Institutions whose subscription has expired',
     'create_new' => 'Create New',
     'total_institutes' => 'Total Institutes',
     'active_institutes' => 'Active Institutes',

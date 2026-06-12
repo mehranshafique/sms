@@ -148,6 +148,8 @@ return [
 
     'setup_alert_title' => 'Configuration requise',
     'setup_alert_fix_now' => 'Corriger',
+    'setup_alerts_summary' => ':count élément(s) de configuration nécessitent votre attention',
+    'setup_alerts_show' => 'Voir les détails',
     'alert_smtp_missing' => 'SMTP non configuré. Les emails aux parents et au personnel peuvent échouer.',
     'alert_school_hours_missing' => 'Les heures de début/fin ne sont pas définies. La présence au portail peut être incorrecte.',
     'alert_academic_dates_missing' => 'Les dates de session académique manquent. Veuillez définir l\'année scolaire.',

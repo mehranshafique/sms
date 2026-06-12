@@ -157,6 +157,8 @@ return [
 
     'setup_alert_title' => 'Configuration required',
     'setup_alert_fix_now' => 'Fix now',
+    'setup_alerts_summary' => ':count configuration item(s) need your attention',
+    'setup_alerts_show' => 'View details',
     'alert_smtp_missing' => 'SMTP email is not configured. Parents and staff may not receive email notifications.',
     'alert_school_hours_missing' => 'School start/end times are not set. Gate attendance and late marking may be incorrect.',
     'alert_academic_dates_missing' => 'Academic session dates are missing. Please set the school year.',
