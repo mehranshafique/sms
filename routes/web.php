@@ -162,7 +162,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/global-search', [GlobalSearchController::class, 'suggest'])->name('global-search.suggest');
 
     Route::prefix('notifications')->name('notifications.')->group(function () {
-        Route::post('/{id}/read', [InAppNotificationController::class, 'markRead'])->name('read');
+        Route::get('/feed', [InAppNotificationController::class, 'feed'])->name('feed');
+        Route::get('/unread-count', [InAppNotificationController::class, 'unreadCount'])->name('unread_count');
+        Route::post('/{id}/read', [InAppNotificationController::class, 'markRead'])->whereNumber('id')->name('read');
         Route::post('/read-all', [InAppNotificationController::class, 'markAllRead'])->name('read_all');
     });
 
@@ -276,11 +278,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware([CheckModuleAccess::class . ':timetables'])->group(function () {
         // Helper Routes
         Route::get('timetables/check-availability', [TimetableController::class, 'checkAvailability'])->name('timetables.check_availability');
+        Route::get('timetables/get-grade-levels', [TimetableController::class, 'getGradeLevels'])->name('timetables.get_grade_levels');
         Route::get('timetables/get-allocated-subjects', [TimetableController::class, 'getAllocatedSubjects'])->name('timetables.get_allocated_subjects');
         
         Route::get('timetables/print-filtered', [TimetableController::class, 'printFiltered'])->name('timetables.print_filtered');
         Route::get('timetables/routine', [TimetableController::class, 'classRoutine'])->name('timetables.routine');
         Route::post('timetables/bulk-delete', [TimetableController::class, 'bulkDelete'])->name('timetables.bulkDelete');
+        Route::post('timetables/bulk-store', [TimetableController::class, 'bulkStore'])->name('timetables.bulkStore');
         Route::get('timetables/{timetable}/print', [TimetableController::class, 'print'])->name('timetables.print');
         Route::get('timetables/{timetable}/download', [TimetableController::class, 'downloadPdf'])->name('timetables.download');
         Route::resource('timetables', TimetableController::class);

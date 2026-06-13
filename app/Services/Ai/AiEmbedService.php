@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Models\Exam;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +13,8 @@ class AiEmbedService
     public function __construct(
         protected AiManager $ai,
         protected AiContextResolver $context,
+        protected ScheduleBuilderService $scheduler,
+        protected AiPlaceholderService $placeholders,
     ) {}
 
     /** @return array<string, array{label: string, description: string, params: array<string, string>}> */
@@ -78,6 +81,16 @@ class AiEmbedService
                 'description' => __('ai.tools.quick_chat_desc'),
                 'params'      => ['message', 'page_title', 'route_name'],
             ],
+            'generate_exam_datesheet' => [
+                'label'       => __('ai.tools.generate_exam_datesheet'),
+                'description' => __('ai.tools.generate_exam_datesheet_desc'),
+                'params'      => ['exam_id', 'class_section_id', 'period_days'],
+            ],
+            'generate_timetable' => [
+                'label'       => __('ai.tools.generate_timetable'),
+                'description' => __('ai.tools.generate_timetable_desc'),
+                'params'      => ['class_section_id', 'period_minutes'],
+            ],
         ];
     }
 
@@ -96,11 +109,11 @@ class AiEmbedService
         $institutionId = $this->context->institutionId($user);
 
         return match ($tool) {
-            'draft_notice'         => $this->draftNotice($params, $institutionId),
+            'draft_notice'         => $this->draftNotice($params, $institutionId, $user),
             'translate'            => $this->translate($params),
             'bulk_report_comments' => $this->bulkReportComments($params, $institutionId, $user),
-            'draft_fee_reminder'   => $this->draftFeeReminder($params, $institutionId),
-            'draft_exam_reminder'  => $this->draftExamReminder($params, $institutionId),
+            'draft_fee_reminder'   => $this->draftFeeReminder($params, $institutionId, $user),
+            'draft_exam_reminder'  => $this->draftExamReminder($params, $institutionId, $user),
             'support_reply'        => $this->supportReply($params, $user),
             'dashboard_briefing'   => $this->dashboardBriefing($institutionId, $user),
             'invoice_insights'     => $this->invoiceInsights($params, $institutionId, $user),
@@ -108,11 +121,13 @@ class AiEmbedService
             'student_summary'      => $this->studentSummary($params, $institutionId, $user),
             'page_help'            => $this->pageHelp($params),
             'quick_chat'           => $this->quickChat($params, $user, $institutionId),
+            'generate_exam_datesheet' => $this->generateExamDatesheet($params, $institutionId, $user),
+            'generate_timetable'   => $this->generateTimetable($params, $institutionId, $user),
             default                => throw ValidationException::withMessages(['tool' => __('ai.unknown_tool')]),
         };
     }
 
-    protected function draftNotice(array $params, ?int $institutionId): array
+    protected function draftNotice(array $params, ?int $institutionId, User $user): array
     {
         $v = Validator::make($params, [
             'topic'    => 'required|string|max:500',
@@ -125,9 +140,18 @@ class AiEmbedService
 
         $prompt = "Draft a school notice for parents and staff.\n"
             . "Topic: {$v['topic']}\nAudience: {$audience}\nTone: {$tone}\n"
-            . "Include a clear title line on the first line, then the body. Keep it concise and actionable.";
+            . "Include a clear title line on the first line, then the body. Keep it concise and actionable.\n\n"
+            . $this->placeholders->promptBlock($user, $institutionId);
 
-        $text = $this->runPrompt('embed:draft_notice', 'You are a school communications assistant.', $prompt, $institutionId);
+        $text = $this->runPrompt(
+            'embed:draft_notice',
+            'You are a school communications assistant. Never use bracket placeholders in sign-offs — use the real values provided.',
+            $prompt,
+            $institutionId,
+            [],
+            $user,
+            true
+        );
 
         return ['text' => $text, 'type' => 'notice_draft'];
     }
@@ -185,7 +209,7 @@ class AiEmbedService
         ];
     }
 
-    protected function draftFeeReminder(array $params, ?int $institutionId): array
+    protected function draftFeeReminder(array $params, ?int $institutionId, User $user): array
     {
         $v = Validator::make($params, [
             'class_section_id'  => 'nullable|integer',
@@ -205,14 +229,24 @@ class AiEmbedService
         $prompt = "Write a {$channel} fee reminder message for parents.\n"
             . "Overdue invoices: {$summary['count']}, total due approx {$summary['total_due']}.\n"
             . "Sample students: " . json_encode($summary['sample']) . "\n"
-            . "Keep under {$limit} characters. Polite but clear. Include placeholder [Student Name] and [Amount].";
+            . "Keep under {$limit} characters. Polite but clear.\n"
+            . "You may use [Student Name] and [Amount] for per-recipient merge fields only.\n\n"
+            . $this->placeholders->promptBlock($user, $institutionId);
 
-        $text = $this->runPrompt('embed:draft_fee_reminder', 'You draft parent fee reminder messages.', $prompt, $institutionId);
+        $text = $this->runPrompt(
+            'embed:draft_fee_reminder',
+            'You draft parent fee reminder messages. Use the real school sign-off values provided — no bracket placeholders for sender or school.',
+            $prompt,
+            $institutionId,
+            [],
+            $user,
+            true
+        );
 
         return ['text' => $text, 'type' => 'fee_reminder', 'stats' => $summary];
     }
 
-    protected function draftExamReminder(array $params, ?int $institutionId): array
+    protected function draftExamReminder(array $params, ?int $institutionId, User $user): array
     {
         $v = Validator::make($params, [
             'exam_id'          => 'nullable|integer',
@@ -225,9 +259,18 @@ class AiEmbedService
 
         $prompt = "Write a {$channel} exam reminder for parents.\n"
             . "Exam ID: {$v['exam_id']}, class section ID: " . ($v['class_section_id'] ?? 'all') . ".\n"
-            . "Keep under {$limit} chars. Mention date/time placeholders [Exam Date], [Subject].";
+            . "Keep under {$limit} chars. You may use [Exam Date] and [Subject] as merge fields for per-student data.\n\n"
+            . $this->placeholders->promptBlock($user, $institutionId);
 
-        $text = $this->runPrompt('embed:draft_exam_reminder', 'You draft parent exam reminder messages.', $prompt, $institutionId);
+        $text = $this->runPrompt(
+            'embed:draft_exam_reminder',
+            'You draft parent exam reminder messages. Use the real school sign-off values provided — no bracket placeholders for sender or school.',
+            $prompt,
+            $institutionId,
+            [],
+            $user,
+            true
+        );
 
         return ['text' => $text, 'type' => 'exam_reminder'];
     }
@@ -245,12 +288,22 @@ class AiEmbedService
         }
 
         $extra = $v['instruction'] ?? 'Be helpful and professional.';
+        $institutionId = $this->context->institutionId($user);
         $prompt = "Draft a support reply for Digitex School Management.\n"
             . "Subject: {$thread['subject']}\nStatus: {$thread['status']}\n"
             . "Thread:\n" . collect($thread['messages'])->map(fn ($m) => "{$m['from']}: {$m['body']}")->implode("\n")
-            . "\n\nInstruction: {$extra}\nReturn only the reply body.";
+            . "\n\nInstruction: {$extra}\nReturn only the reply body.\n\n"
+            . $this->placeholders->promptBlock($user, $institutionId);
 
-        $text = $this->runPrompt('embed:support_reply', 'You are Digitex support staff drafting helpful replies.', $prompt);
+        $text = $this->runPrompt(
+            'embed:support_reply',
+            'You are Digitex support staff drafting helpful replies. Use real sign-off values — no bracket placeholders.',
+            $prompt,
+            $institutionId,
+            [],
+            $user,
+            true
+        );
 
         return ['text' => $text, 'type' => 'support_reply'];
     }
@@ -296,6 +349,8 @@ class AiEmbedService
         $v = Validator::make($params, [
             'exam_id'          => 'required|integer',
             'class_section_id' => 'required|integer',
+            'live_marks'       => 'nullable|array',
+            'subject_name'     => 'nullable|string|max:200',
         ])->validate();
 
         $data = $this->context->examClassMarks(
@@ -305,7 +360,11 @@ class AiEmbedService
             $user
         );
 
-        if (!$data) {
+        if (!empty($v['live_marks']) && is_array($v['live_marks'])) {
+            $data = $this->mergeLiveMarks($data, $v['live_marks'], $v['subject_name'] ?? null, (int) $v['exam_id'], $institutionId);
+        }
+
+        if (!$data || empty($data['students'])) {
             throw ValidationException::withMessages(['exam_id' => __('ai.no_marks_data')]);
         }
 
@@ -319,9 +378,161 @@ class AiEmbedService
         $text = $this->runPrompt('embed:exam_at_risk', 'You analyze student exam performance for teachers.', $prompt, $institutionId);
 
         return [
-            'text'        => $text,
-            'type'        => 'exam_at_risk',
+            'text'          => $text,
+            'type'          => 'exam_at_risk',
             'at_risk_count' => $atRisk->count(),
+        ];
+    }
+
+    /** @param array<int, array<string, mixed>> $liveMarks */
+    protected function mergeLiveMarks(?array $data, array $liveMarks, ?string $subjectName, int $examId, ?int $institutionId): ?array
+    {
+        $exam = Exam::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))->find($examId);
+        if (!$exam) {
+            return $data;
+        }
+
+        if (!$data) {
+            $data = ['exam' => $exam->name, 'students' => []];
+        }
+
+        $byId = collect($data['students'])->keyBy('student_id');
+
+        foreach ($liveMarks as $row) {
+            $sid = (int) ($row['student_id'] ?? 0);
+            if (!$sid) {
+                continue;
+            }
+            $student = $byId->get($sid) ?? [
+                'student_id' => $sid,
+                'name'       => $row['name'] ?? "Student {$sid}",
+                'marks'      => [],
+                'average'    => null,
+            ];
+
+            if (!empty($row['is_absent'])) {
+                $markVal = null;
+            } else {
+                $markVal = isset($row['marks']) && $row['marks'] !== '' && $row['marks'] !== null
+                    ? (float) $row['marks']
+                    : null;
+            }
+
+            if ($subjectName && $markVal !== null) {
+                $marks = collect($student['marks'] ?? [])->reject(fn ($m) => ($m['subject'] ?? '') === $subjectName)->values()->all();
+                $marks[] = ['subject' => $subjectName, 'marks' => $markVal];
+                $student['marks'] = $marks;
+                $student['average'] = collect($marks)->filter(fn ($m) => $m['marks'] !== null)->avg('marks');
+                if ($student['average'] !== null) {
+                    $student['average'] = round($student['average'], 1);
+                }
+            } elseif ($subjectName && !empty($row['is_absent'])) {
+                $marks = collect($student['marks'] ?? [])->reject(fn ($m) => ($m['subject'] ?? '') === $subjectName)->values()->all();
+                $marks[] = ['subject' => $subjectName, 'marks' => null];
+                $student['marks'] = $marks;
+            }
+
+            $byId->put($sid, $student);
+        }
+
+        $data['students'] = $byId->values()->all();
+
+        return $data;
+    }
+
+    protected function generateExamDatesheet(array $params, ?int $institutionId, User $user): array
+    {
+        if (!$user->hasAnyRole(['Super Admin', 'Head Officer', 'School Admin', 'Teacher'])) {
+            throw ValidationException::withMessages(['auth' => __('ai.not_authenticated')]);
+        }
+
+        $v = Validator::make($params, [
+            'exam_id'          => 'required|integer',
+            'class_section_id' => 'required|integer',
+            'period_days'      => 'nullable|integer|min:1|max:30',
+        ])->validate();
+
+        $options = [];
+        if (!empty($v['period_days'])) {
+            $options['period_days'] = (int) $v['period_days'];
+        }
+
+        $built = $this->scheduler->buildExamDatesheet(
+            (int) $v['exam_id'],
+            (int) $v['class_section_id'],
+            $institutionId,
+            $options
+        );
+
+        $summaryLines = collect($built['schedule'])->map(function ($item, $subjectId) {
+            return "- {$item['subject_name']}: {$item['date']} {$item['start_time']}-{$item['end_time']} @ {$item['room_number']}";
+        })->implode("\n");
+
+        $prompt = "Summarize this exam date sheet for a school admin in 3-5 bullet points. "
+            . "Mention that times are within school hours ({$built['meta']['school_start']}-{$built['meta']['school_end']}) "
+            . "and rooms use a pool of {$built['meta']['rooms_count']} rooms.\n\n"
+            . "Exam: {$built['meta']['exam']}, Class: {$built['meta']['class']}\n"
+            . "Window: {$built['meta']['exam_start']} to {$built['meta']['exam_end']}\n\n"
+            . "Schedule:\n{$summaryLines}";
+
+        $text = $this->runPrompt('embed:generate_exam_datesheet', 'You help school admins plan exam schedules.', $prompt, $institutionId);
+
+        return [
+            'text'     => $text,
+            'type'     => 'exam_datesheet',
+            'schedule' => $built['schedule'],
+            'meta'     => $built['meta'],
+        ];
+    }
+
+    protected function generateTimetable(array $params, ?int $institutionId, User $user): array
+    {
+        if (!$user->can('timetable.create') && !$user->hasAnyRole(['Super Admin', 'Head Officer', 'School Admin'])) {
+            throw ValidationException::withMessages(['auth' => __('ai.not_authenticated')]);
+        }
+
+        $v = Validator::make($params, [
+            'class_section_id' => 'required|integer',
+            'period_minutes'   => 'nullable|integer|min:30|max:120',
+        ])->validate();
+
+        $options = ['ignore_same_class' => true];
+        if (!empty($v['period_minutes'])) {
+            $options['period_minutes'] = (int) $v['period_minutes'];
+        }
+
+        $built = $this->scheduler->buildClassTimetable((int) $v['class_section_id'], $institutionId, $options);
+
+        if (empty($built['slots'])) {
+            $reason = ($built['meta']['error'] ?? null) === 'no_session'
+                ? __('timetable.no_active_session')
+                : __('ai.no_timetable_data');
+            throw ValidationException::withMessages(['class_section_id' => $reason]);
+        }
+
+        $existingCount = (int) ($built['meta']['existing_class_slots'] ?? 0);
+
+        $summaryLines = collect($built['slots'])->map(function ($slot) {
+            return "- {$slot['day_of_week']} {$slot['start_time']}-{$slot['end_time']}: {$slot['subject_name']} ({$slot['room_number']})";
+        })->implode("\n");
+
+        $prompt = "Summarize this weekly class timetable for a school admin in 3-5 bullet points. "
+            . "Note conflicts were avoided for teachers and rooms (other classes) within school hours "
+            . "({$built['meta']['school_start']}-{$built['meta']['school_end']}) using {$built['meta']['rooms_count']} rooms.\n\n"
+            . "Class: {$built['meta']['class']}\n"
+            . ($existingCount > 0 ? "Note: this class already has {$existingCount} existing slot(s); applying will replace them.\n\n" : "\n")
+            . $summaryLines;
+
+        $text = $this->runPrompt('embed:generate_timetable', 'You help school admins build conflict-free timetables.', $prompt, $institutionId);
+
+        return [
+            'text'  => $text,
+            'type'  => 'timetable_plan',
+            'slots' => $built['slots'],
+            'meta'  => array_merge($built['meta'], [
+                'replace_existing'     => $existingCount > 0,
+                'existing_class_slots' => $existingCount,
+            ]),
         ];
     }
 
@@ -381,8 +592,15 @@ class AiEmbedService
         return ['text' => $text, 'type' => 'quick_chat'];
     }
 
-    protected function runPrompt(string $feature, string $system, string $userPrompt, ?int $institutionId = null, array $opts = []): string
-    {
+    protected function runPrompt(
+        string $feature,
+        string $system,
+        string $userPrompt,
+        ?int $institutionId = null,
+        array $opts = [],
+        ?User $user = null,
+        bool $resolvePlaceholders = false,
+    ): string {
         $messages = [
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $userPrompt],
@@ -394,7 +612,13 @@ class AiEmbedService
             throw ValidationException::withMessages(['ai' => $this->errorMessage($result['error'])]);
         }
 
-        return trim((string) ($result['content'] ?? ''));
+        $text = trim((string) ($result['content'] ?? ''));
+
+        if ($resolvePlaceholders) {
+            $text = $this->placeholders->apply($text, $user ?? Auth::user(), $institutionId);
+        }
+
+        return $text;
     }
 
     protected function errorMessage(?string $error): string

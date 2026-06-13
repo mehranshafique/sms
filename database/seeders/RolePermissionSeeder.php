@@ -5,11 +5,8 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use App\Models\Permission; 
-use App\Models\User;
 use App\Models\Module;
 use App\Enums\RoleEnum;
-use App\Enums\UserType;
-use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Support\Str;
 
@@ -171,19 +168,7 @@ class RolePermissionSeeder extends Seeder
         });
         $schoolAdminRole->syncPermissions($schoolAdminPermissions);
 
-        // 6. Setup Initial System User
-        $user = User::updateOrCreate(
-            ['email' => 'admin@digitex.com'],
-            [
-                'name' => 'Digitex Super Admin',
-                'password' => Hash::make('password'),
-                'user_type' => UserType::SUPER_ADMIN->value,
-                'is_active' => true,
-                'institute_id' => null, // Global
-            ]
-        );
-
-        $user->assignRole($superAdminRole);
+        $this->call(PlatformSuperAdminSeeder::class);
 
         $this->command->info('Success: Modules initialized, Permissions generated, and Scoped Roles configured.');
     }

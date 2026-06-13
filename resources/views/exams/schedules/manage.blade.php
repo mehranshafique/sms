@@ -83,6 +83,34 @@
             </div>
         </div>
 
+        @if(has_ai_access())
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card shadow-sm border-primary border-opacity-25">
+                    <div class="card-body ai-copilot-card mb-0">
+                        <div class="ai-copilot-card__head">
+                            <div>
+                                <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.generate_exam_datesheet') }}</strong>
+                                <div class="text-muted small">{{ __('ai.tools.generate_exam_datesheet_desc') }}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <input type="number" id="ai_period_days" class="form-control form-control-sm" style="width:5rem" min="1" max="30" placeholder="{{ __('ai.period_days') }}" title="{{ __('ai.period_days') }}">
+                                <button type="button" class="ai-embed-btn" id="ai-datesheet-btn"
+                                    data-ai-tool="generate_exam_datesheet"
+                                    data-ai-params="{}"
+                                    data-ai-fields='{"exam_id":"#exam_id","class_section_id":"#class_section_id"}'
+                                    data-ai-panel="#ai-datesheet-panel">
+                                    <i class="la la-magic"></i> {{ __('ai.btn_generate_datesheet') }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ai-embed-panel" id="ai-datesheet-panel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
         {{-- Hidden Form for Print/Download --}}
         <form action="{{ route('exam-schedules.download-admit-cards') }}" method="POST" target="_blank" id="printForm" class="d-none">
             @csrf

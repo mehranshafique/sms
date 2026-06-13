@@ -54,9 +54,9 @@
                                     <option value="email">{{ __('reminders.email') ?? 'Email' }}</option>
                                 </select>
                             </div>
-                            @if(!empty($planCtx['has_ai']))
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">{{ __('ai.preview_message') }}</label>
+                            @if(has_ai_access())
+                            <div class="mb-3 p-3 rounded" style="background:#faf5ff;border:1px dashed #c4b5fd;">
+                                <label class="form-label fw-bold"><i class="la la-magic text-primary"></i> {{ __('ai.preview_message') }}</label>
                                 <textarea id="fee_message_preview" class="form-control" rows="3" placeholder="{{ __('ai.btn_draft_reminder') }}…"></textarea>
                                 <div class="mt-2">
                                     @include('ai.partials.embed-button', [
@@ -109,9 +109,9 @@
                                     <option value="email">{{ __('reminders.email') ?? 'Email' }}</option>
                                 </select>
                             </div>
-                            @if(!empty($planCtx['has_ai']))
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">{{ __('ai.preview_message') }}</label>
+                            @if(has_ai_access())
+                            <div class="mb-3 p-3 rounded" style="background:#faf5ff;border:1px dashed #c4b5fd;">
+                                <label class="form-label fw-bold"><i class="la la-magic text-primary"></i> {{ __('ai.preview_message') }}</label>
                                 <textarea id="exam_message_preview" class="form-control" rows="3"></textarea>
                                 <div class="mt-2">
                                     @include('ai.partials.embed-button', [

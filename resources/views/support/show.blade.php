@@ -52,7 +52,7 @@
                                 </label>
                                 <div class="flex-grow-1">
                                     <span class="sp-attach-name" id="sp-attach-name"></span>
-                                    @if(!empty($planCtx['has_ai']))
+                                    @if(has_ai_access())
                                     <div class="mb-1">
                                         @include('ai.partials.embed-button', [
                                             'tool' => 'support_reply',

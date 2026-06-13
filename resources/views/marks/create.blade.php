@@ -69,10 +69,11 @@
             </div>
         </div>
 
-        @if(!empty($planCtx['has_ai']))
+        @if(has_ai_access())
         <div class="row mt-2">
             <div class="col-12">
-                <div class="ai-copilot-card">
+                <div class="card shadow-sm border-primary border-opacity-25">
+                    <div class="card-body ai-copilot-card mb-0" style="margin-bottom:0">
                     <div class="ai-copilot-card__head">
                         <div>
                             <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.exam_at_risk') }}</strong>
@@ -81,12 +82,13 @@
                         <button type="button" class="ai-embed-btn" id="ai-at-risk-btn"
                             data-ai-tool="exam_at_risk"
                             data-ai-params="{}"
-                            data-ai-fields='{"exam_id":"#exam_select","class_section_id":"#section_select"}'
+                            data-ai-fields='{"exam_id":"#exam_select,#form_exam_id","class_section_id":"#section_select,#form_section_id"}'
                             data-ai-panel="#ai-at-risk-panel">
                             <i class="la la-magic"></i> {{ __('ai.btn_exam_at_risk') }}
                         </button>
                     </div>
                     <div class="ai-embed-panel" id="ai-at-risk-panel"></div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -119,6 +119,8 @@ return [
     'school_hours' => 'School Hours',
     'school_start_time' => 'Start Time',
     'school_end_time' => 'End Time',
+    'school_rooms_count' => 'Number of rooms',
+    'school_rooms_count_help' => 'Used for exam date sheets and AI timetable generation (Room 1 … Room N).',
     
     'module_management' => 'Module Management',
     'module_name' => 'Module Name',

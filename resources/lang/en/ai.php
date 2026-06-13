@@ -141,7 +141,29 @@ return [
         'page_help_desc'         => 'How-to help for the current screen.',
         'quick_chat'             => 'Quick chat',
         'quick_chat_desc'        => 'Context-aware chat on any page.',
+        'generate_exam_datesheet'=> 'AI exam date sheet',
+        'generate_exam_datesheet_desc' => 'Auto-build exam schedule within school hours and room limits.',
+        'generate_timetable'     => 'AI timetable builder',
+        'generate_timetable_desc'=> 'Generate a weekly class timetable avoiding conflicts.',
     ],
+
+    'period_days'            => 'Exam days',
+    'apply_schedule'         => 'Apply schedule to form?',
+    'apply_timetable'        => 'Apply timetable',
+    'apply_timetable_confirm'=> 'Create these timetable slots in the system?',
+    'no_timetable_data'      => 'Could not build a timetable for this class.',
+    'timetable_bulk_created' => ':created slot(s) created, :skipped skipped due to conflicts.',
+
+    'default_sender_name'     => 'School Administrator',
+    'default_sender_position' => 'Administrator',
+    'contact_phone'           => 'Tel: :phone',
+    'contact_email'           => 'Email: :email',
+    'contact_not_set'         => 'Contact the school office',
+    'select_class_first'      => 'Please select a grade and class in the filters above first.',
+    'override_timetable'      => 'Replace existing timetable?',
+    'override_timetable_confirm' => 'This class already has :count timetable slot(s). Applying the AI plan will delete them and create the new schedule. Continue?',
+    'yes_override'            => 'Yes, replace timetable',
+    'timetable_bulk_replaced' => ':replaced old slot(s) removed, :created created, :skipped skipped.',
 
     // Module embed button labels
     'btn_draft_notice'       => 'AI draft',
@@ -152,5 +174,7 @@ return [
     'btn_invoice_insights'   => 'Explain with AI',
     'btn_student_summary'    => 'AI 360° summary',
     'btn_exam_at_risk'       => 'AI at-risk scan',
+    'btn_generate_datesheet' => 'AI build date sheet',
+    'btn_generate_timetable' => 'AI build timetable',
     'preview_message'        => 'Message preview (edit before sending)',
 ];

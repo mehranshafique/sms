@@ -25,19 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/payments/*',
         ]);
 
-        // Register the "web" middleware group
+        // Append only app-specific middleware (Laravel registers defaults separately).
         $middleware->web(append: [
-            \Illuminate\Cookie\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            // ADD THIS LINE HERE:
-            \App\Http\Middleware\LoadInstitutionSettings::class, 
-            \App\Http\Middleware\CheckSubscription::class, 
-            \App\Http\Middleware\CheckModuleAccess::class,
-            // Your locale middleware (language switch)
+            \App\Http\Middleware\LoadInstitutionSettings::class,
+            \App\Http\Middleware\CheckSubscription::class,
             SetLocale::class,
         ]);
 

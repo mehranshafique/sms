@@ -4,14 +4,18 @@ namespace App\Http\Controllers\Ai;
 
 use App\Http\Controllers\BaseController;
 use App\Services\Ai\AiManager;
+use App\Services\Ai\AiPlaceholderService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AiStudioController extends BaseController
 {
     protected array $tools = ['draft_notice', 'report_comment', 'translate', 'summarize', 'improve', 'support_reply'];
 
-    public function __construct(protected AiManager $ai)
-    {
+    public function __construct(
+        protected AiManager $ai,
+        protected AiPlaceholderService $placeholders,
+    ) {
         parent::__construct();
         $this->middleware('auth');
     }
@@ -41,13 +45,18 @@ class AiStudioController extends BaseController
             return response()->json(['ok' => false, 'message' => __('ai.error_generic')], 422);
         }
 
+        $institutionId = $this->getInstitutionId();
+        if (in_array($data['tool'], ['draft_notice', 'support_reply'], true)) {
+            $data['text'] .= "\n\n" . $this->placeholders->promptBlock(Auth::user(), $institutionId);
+        }
+
         $built = $this->ai->buildToolMessages($data['tool'], $data);
         if (!$built) {
             return response()->json(['ok' => false, 'message' => __('ai.error_generic')], 422);
         }
 
         [$messages, $opts] = $built;
-        $opts['institution_id'] = $this->getInstitutionId();
+        $opts['institution_id'] = $institutionId;
 
         $result = $this->ai->ask('studio:' . $data['tool'], $messages, $opts);
 
@@ -59,10 +68,15 @@ class AiStudioController extends BaseController
             ], 200);
         }
 
+        $content = (string) ($result['content'] ?? '');
+        if (in_array($data['tool'], ['draft_notice', 'support_reply'], true)) {
+            $content = $this->placeholders->apply($content, Auth::user(), $opts['institution_id'] ?? null);
+        }
+
         return response()->json([
             'ok'        => true,
-            'content'   => $result['content'],
-            'html'      => nl2br(e($result['content'])),
+            'content'   => $content,
+            'html'      => nl2br(e($content)),
             'remaining' => $result['remaining'],
         ]);
     }

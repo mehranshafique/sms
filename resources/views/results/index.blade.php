@@ -68,7 +68,7 @@
             </div>
         </div>
 
-        @if(!empty($planCtx['has_ai']))
+        @if(has_ai_access())
         <div class="row mt-3">
             <div class="col-xl-12">
                 <div class="card shadow-sm border-0">
@@ -196,7 +196,7 @@
             }
         });
 
-        @if(!empty($planCtx['has_ai']))
+        @if(has_ai_access())
         $('#ai_bulk_exam').on('change', function() {
             let examId = $(this).val();
             let classSelect = $('#ai_bulk_class');

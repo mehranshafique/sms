@@ -67,6 +67,7 @@ return [
     'fund_request_desc' => 'Your request :ticket was :status.',
 
     'mark_all_read' => 'Mark all read',
+    'notif_mark_failed' => 'Could not update notifications. Please refresh the page.',
 
     // In-app notification messages
     'notif_unknown_student' => 'Student',

@@ -1,4 +1,4 @@
-@if(!empty($planCtx['has_ai']))
+@if(has_ai_access())
 <div class="ai-copilot-card" id="ai-dashboard-copilot">
     <div class="ai-copilot-card__head">
         <div>

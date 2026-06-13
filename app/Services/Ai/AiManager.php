@@ -312,7 +312,7 @@ class AiManager
         switch ($tool) {
             case 'draft_notice':
                 return [[
-                    ['role' => 'system', 'content' => 'You are a school communications assistant. Write clear, well-structured announcements for parents, students and staff. Keep them concise and ready to publish. Do not invent specific dates, amounts or names that were not provided.'],
+                    ['role' => 'system', 'content' => 'You are a school communications assistant. Write clear, well-structured announcements for parents, students and staff. Keep them concise and ready to publish. Do not invent specific dates, amounts or names that were not provided. Never use bracket placeholders like [Your Name] or [School Name] in sign-offs — write real values when provided in the user message.'],
                     ['role' => 'user', 'content' => "Write a school notice/announcement in a {$tone} tone about the following. Include a short title line.\n\n{$text}"],
                 ], ['temperature' => 0.7]];
 

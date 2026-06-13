@@ -52,3 +52,21 @@ if(!function_exists('authorize')){
         return true;
     }
 }
+
+if (!function_exists('has_ai_access')) {
+    /**
+     * Whether the current user can use embedded AI tools (plan + platform switch).
+     */
+    function has_ai_access(): bool
+    {
+        if (! Auth::check()) {
+            return false;
+        }
+
+        try {
+            return (bool) (app(\App\Services\PlanContextService::class)->snapshot()['has_ai'] ?? false);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+}

@@ -54,6 +54,12 @@ use App\Services\IdGeneratorService;
 
 class BulkDummyDataSeeder extends Seeder
 {
+    /** Dummy inbox domain for all seeded user accounts (https://yopmail.com). */
+    private function yopmail(string $username): string
+    {
+        return strtolower($username) . '@yopmail.com';
+    }
+
     public function run()
     {
         // Disable mass assignment protection
@@ -66,27 +72,34 @@ class BulkDummyDataSeeder extends Seeder
         // 0. Global Setup & Cleanup
         // ---------------------------------------------------------
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        
+
+        // Never truncate platform user or location reference data (seeded by other seeders).
         $tables = [
-            'countries', 'states', 'cities', 'institutions', 'users', 'staff', 'students', 
+            'institutions', 'staff', 'students',
             'parents', 'academic_sessions', 'grade_levels', 'class_sections', 'subjects', 'class_subjects',
             'programs', 'academic_units', 'departments', 'student_enrollments', 'invoices', 'invoice_items',
             'payments', 'exam_records', 'timetables', 'student_attendances', 'fee_structures', 'fee_types',
             'budgets', 'budget_categories', 'fund_requests', 'salary_structures', 'payrolls', 'assignments',
-            'exams', 'exam_schedules', 'notices', 'elections', 'election_positions', 'candidates', 'votes'
+            'exams', 'exam_schedules', 'notices', 'elections', 'election_positions', 'candidates', 'votes',
         ];
 
-        foreach($tables as $table) {
-             if(\Illuminate\Support\Facades\Schema::hasTable($table)) {
-                 DB::table($table)->truncate();
-             }
+        foreach ($tables as $table) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                DB::table($table)->truncate();
+            }
         }
-        
-        // Locations
-        $countryId = DB::table('countries')->insertGetId(['sortname' => 'CD', 'name' => 'Congo (DRC)', 'phonecode' => 243, 'created_at' => now(), 'updated_at' => now()]);
-        $stateId = DB::table('states')->insertGetId(['name' => 'Kinshasa', 'country_id' => $countryId, 'created_at' => now(), 'updated_at' => now()]);
-        $cityId = DB::table('cities')->insertGetId(['name' => 'Gombe', 'state_id' => $stateId, 'created_at' => now(), 'updated_at' => now()]);
-        
+
+        $superAdminIds = User::where('user_type', UserType::SUPER_ADMIN->value)->pluck('id');
+        if ($superAdminIds->isNotEmpty()) {
+            DB::table('model_has_roles')
+                ->where('model_type', User::class)
+                ->whereNotIn('model_id', $superAdminIds)
+                ->delete();
+        }
+        User::where('user_type', '!=', UserType::SUPER_ADMIN->value)->delete();
+
+        [$countryId, $stateId, $cityId] = $this->resolveLocationIds();
+
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Packages
@@ -132,8 +145,49 @@ class BulkDummyDataSeeder extends Seeder
             $this->seedInstitution($instData, $faker, $countryId, $stateId, $cityId, $premiumPkg);
         }
 
+        $this->call(PlatformSuperAdminSeeder::class);
+
         Model::reguard();
         $this->command->info('✅ Bulk Seeding Completed Successfully! 4 Institutions created with comprehensive data.');
+    }
+
+    /** @return array{0: int, 1: int, 2: int} */
+    private function resolveLocationIds(): array
+    {
+        $countryId = DB::table('countries')->where('sortname', 'CD')->value('id')
+            ?? DB::table('countries')->value('id');
+
+        if (!$countryId) {
+            $countryId = DB::table('countries')->insertGetId([
+                'sortname' => 'CD',
+                'name' => 'Congo (DRC)',
+                'phonecode' => 243,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $stateId = DB::table('states')->where('country_id', $countryId)->value('id');
+        if (!$stateId) {
+            $stateId = DB::table('states')->insertGetId([
+                'name' => 'Kinshasa',
+                'country_id' => $countryId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $cityId = DB::table('cities')->where('state_id', $stateId)->value('id');
+        if (!$cityId) {
+            $cityId = DB::table('cities')->insertGetId([
+                'name' => 'Gombe',
+                'state_id' => $stateId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return [(int) $countryId, (int) $stateId, (int) $cityId];
     }
 
     /**
@@ -155,7 +209,7 @@ class BulkDummyDataSeeder extends Seeder
             'city' => $cityId,
             'address' => $faker->address,
             'phone' => '+243' . $faker->numerify('#########'),
-            'email' => strtolower($data['acronym']) . '@digitex.com',
+            'email' => $this->yopmail(strtolower($data['acronym'])),
             'is_active' => true,
         ]);
 
@@ -183,14 +237,15 @@ class BulkDummyDataSeeder extends Seeder
         foreach ($roles as $r) Role::firstOrCreate(['name' => $r, 'institution_id' => $institution->id, 'guard_name' => 'web']);
 
         // 4. Admin User
+        $adminUsername = 'admin_' . strtolower($data['acronym']);
         $adminUser = User::create([
             'name' => 'Admin ' . $data['acronym'],
-            'email' => 'admin.' . strtolower($data['acronym']) . '@digitex.com',
+            'email' => $this->yopmail($adminUsername),
             'password' => Hash::make('password'),
             'user_type' => UserType::SCHOOL_ADMIN->value,
             'institute_id' => $institution->id,
             'is_active' => true,
-            'username' => 'admin_'.strtolower($data['acronym']),
+            'username' => $adminUsername,
             'shortcode' => 'ADM-'.$instCode
         ]);
         $adminUser->assignRole(RoleEnum::SCHOOL_ADMIN->value);
@@ -215,14 +270,15 @@ class BulkDummyDataSeeder extends Seeder
         $teachers = [];
         $deptHeads = []; 
         for ($i = 0; $i < 12; $i++) {
+            $teacherUsername = 'stf_' . $i . '_' . strtolower($data['acronym']);
             $tUser = User::create([
                 'name' => $faker->name,
-                'email' => $faker->unique()->userName . '@' . strtolower($data['acronym']) . '.com',
+                'email' => $this->yopmail($teacherUsername),
                 'password' => Hash::make('password'),
                 'user_type' => UserType::STAFF->value,
                 'institute_id' => $institution->id,
                 'is_active' => true,
-                'username' => 'stf_'.$i.'_'.strtolower($data['acronym'])
+                'username' => $teacherUsername,
             ]);
             $tUser->assignRole(RoleEnum::TEACHER->value);
             
@@ -399,20 +455,22 @@ class BulkDummyDataSeeder extends Seeder
         $studentRole = Role::where('name', RoleEnum::STUDENT->value)->where('institution_id', $institution->id)->first();
         
         for ($s = 0; $s < 20; $s++) {
+            $studentUsername = 'std_' . $s . '_' . strtolower($data['acronym']);
             $sUser = User::create([
                 'name' => $faker->firstName . ' ' . $faker->lastName,
-                'email' => $faker->unique()->userName . '@student.' . strtolower($data['acronym']) . '.com',
+                'email' => $this->yopmail($studentUsername),
                 'password' => Hash::make('password'),
                 'user_type' => UserType::STUDENT->value,
                 'institute_id' => $institution->id,
                 'is_active' => true,
-                'username' => 'std_'.$s.'_'.strtolower($data['acronym'])
+                'username' => $studentUsername,
             ]);
             if($studentRole) $sUser->assignRole($studentRole);
 
+            $guardianUsername = 'guardian_' . $s . '_' . strtolower($data['acronym']);
             $parent = StudentParent::firstOrCreate(
                 ['institution_id' => $institution->id, 'father_phone' => '+24399' . $faker->numerify('#######')],
-                ['father_name' => $faker->name('male'), 'guardian_email' => $faker->safeEmail]
+                ['father_name' => $faker->name('male'), 'guardian_email' => $this->yopmail($guardianUsername)]
             );
 
             $admissionNo = IdGeneratorService::generateStudentId($institution, $session);

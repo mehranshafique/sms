@@ -93,6 +93,33 @@
             </div>
         </div>
 
+        @if(has_ai_access())
+        @can('timetable.create')
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card shadow-sm border-primary border-opacity-25">
+                    <div class="card-body ai-copilot-card mb-0">
+                        <div class="ai-copilot-card__head">
+                            <div>
+                                <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.generate_timetable') }}</strong>
+                                <div class="text-muted small">{{ __('ai.tools.generate_timetable_desc') }}</div>
+                            </div>
+                            <button type="button" class="ai-embed-btn" id="ai-timetable-btn"
+                                data-ai-tool="generate_timetable"
+                                data-ai-params="{}"
+                                data-ai-fields='{"class_section_id":"#filter_class"}'
+                                data-ai-panel="#ai-timetable-panel">
+                                <i class="la la-magic"></i> {{ __('ai.btn_generate_timetable') }}
+                            </button>
+                        </div>
+                        <div class="ai-embed-panel" id="ai-timetable-panel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endcan
+        @endif
+
         <div class="row">
             <div class="col-12">
                 <div class="card">
@@ -153,8 +180,11 @@
         // --- CONSTANTS ---
         const LANG_LOADING = "{{ __('timetable.loading') }}";
         const LANG_FILTER_CLASS = "{{ __('timetable.filter_by_class') }}";
+        const LANG_ALL_GRADES = "{{ __('timetable.all_grades') ?? 'All Grades' }}";
         const LANG_NO_OPTIONS = "{{ __('timetable.no_options') }}";
         const LANG_ERROR = "{{ __('timetable.error_loading') }}";
+        const GRADES_URL = "{{ route('timetables.get_grade_levels') }}";
+        const initialGradeId = "{{ request('grade_level_id') }}";
 
         // --- DOM Elements ---
         const gradeFilter = document.getElementById('filter_grade');
@@ -163,67 +193,121 @@
         // Pre-selected value from request (if any)
         const initialClassId = "{{ request('class_section_id') }}";
 
-        // --- HELPER: Refresh UI ---
-        function refreshSelect(element) {
-            if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
-                 $(element).selectpicker('refresh');
+        // --- HELPER: Refresh UI (bootstrap-select aware) ---
+        function getSelectValue(el) {
+            if (!el) return '';
+            if (typeof jQuery !== 'undefined' && jQuery(el).is('select') && jQuery.fn.selectpicker) {
+                var val = jQuery(el).selectpicker('val');
+                if (Array.isArray(val)) return val[0] || '';
+                return val || el.value || '';
             }
+            return el.value || '';
+        }
+
+        function reinitSelectpicker(el, selectedValue) {
+            if (!el) return;
+            if (typeof jQuery !== 'undefined' && jQuery.fn.selectpicker) {
+                var $el = jQuery(el);
+                var val = selectedValue !== undefined && selectedValue !== null
+                    ? String(selectedValue)
+                    : getSelectValue(el);
+                if ($el.data('selectpicker')) {
+                    $el.selectpicker('destroy');
+                }
+                $el.selectpicker({ liveSearch: true, size: 10 });
+                if (val) {
+                    $el.selectpicker('val', val);
+                }
+                $el.selectpicker('refresh');
+            } else if (selectedValue) {
+                el.value = selectedValue;
+            }
+        }
+
+        function refreshSelect(element) {
+            reinitSelectpicker(element);
+        }
+
+        function restoreFilterSelects() {
+            reinitSelectpicker(gradeFilter, getSelectValue(gradeFilter));
+            reinitSelectpicker(classFilter, getSelectValue(classFilter));
+        }
+
+        // --- LOAD GRADES (refresh from server for current school context) ---
+        function loadGrades(preSelectedGradeId = null, thenClassId = null) {
+            if (!gradeFilter) return Promise.resolve();
+
+            return fetch(GRADES_URL, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    var selected = preSelectedGradeId || gradeFilter.value || initialGradeId;
+                    gradeFilter.innerHTML = '<option value="">' + LANG_ALL_GRADES + '</option>';
+
+                    Object.entries(data || {}).forEach(function (entry) {
+                        gradeFilter.add(new Option(entry[1], entry[0]));
+                    });
+
+                    reinitSelectpicker(gradeFilter, selected || '');
+
+                    if (selected) {
+                        loadClasses(selected, thenClassId);
+                    }
+                })
+                .catch(function (error) {
+                    console.error('Grades load error:', error);
+                });
         }
 
         // --- LOAD CLASSES FUNCTION ---
         // Decoupled from event to allow safe calling on Init and Change
         function loadClasses(gradeId, preSelectedId = null) {
-            // 1. UI Loading State
             classFilter.innerHTML = `<option value="">${LANG_LOADING}</option>`;
             classFilter.disabled = true;
-            refreshSelect(classFilter);
+            reinitSelectpicker(classFilter, '');
 
             if (!gradeId) {
-                // Reset if empty
                 classFilter.innerHTML = `<option value="">${LANG_FILTER_CLASS}</option>`;
-                refreshSelect(classFilter);
+                reinitSelectpicker(classFilter, '');
                 if(typeof table !== 'undefined') table.draw();
-                return;
+                return Promise.resolve();
             }
 
-            // 2. Fetch Data
-            fetch(`{{ route('students.get_sections') }}?grade_id=${gradeId}`)
+            return fetch(`{{ route('students.get_sections') }}?grade_id=${gradeId}`)
                 .then(response => response.json())
                 .then(data => {
-                    // Reset
                     classFilter.innerHTML = `<option value="">${LANG_FILTER_CLASS}</option>`;
-                    
-                    // Populate
-                    if(Object.keys(data).length > 0) {
-                        Object.entries(data).forEach(([id, name]) => {
-                            let option = new Option(name, id);
-                            if (String(id) === String(preSelectedId)) {
-                                option.selected = true;
-                            }
-                            classFilter.add(option);
+
+                    var selectedId = (preSelectedId !== null && preSelectedId !== undefined && String(preSelectedId) !== '')
+                        ? String(preSelectedId)
+                        : '';
+
+                    if (Object.keys(data).length > 0) {
+                        Object.entries(data).forEach(function (entry) {
+                            classFilter.add(new Option(entry[1], entry[0]));
                         });
                         classFilter.disabled = false;
+                        reinitSelectpicker(classFilter, selectedId);
                     } else {
                         classFilter.innerHTML = `<option value="">${LANG_NO_OPTIONS}</option>`;
                         classFilter.disabled = true;
+                        reinitSelectpicker(classFilter, '');
                     }
-                    
-                    refreshSelect(classFilter);
-                    
-                    // Reload Table after classes are loaded/selected
+
                     if(typeof table !== 'undefined') table.draw();
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     classFilter.innerHTML = `<option value="">${LANG_ERROR}</option>`;
-                    refreshSelect(classFilter);
+                    reinitSelectpicker(classFilter, '');
                 });
         }
 
         // --- EVENT LISTENER ---
         if(gradeFilter) {
             gradeFilter.addEventListener('change', function() {
-                loadClasses(this.value);
+                loadClasses(getSelectValue(gradeFilter));
             });
         }
 
@@ -233,11 +317,14 @@
             });
         }
 
+        document.addEventListener('ai:error', function () {
+            setTimeout(restoreFilterSelects, 100);
+        });
+
         // --- INITIALIZATION ---
-        // If a grade is already selected (e.g. from server render or back button), load classes.
-        if (gradeFilter && gradeFilter.value) {
-            loadClasses(gradeFilter.value, initialClassId);
-        }
+        loadGrades(initialGradeId, initialClassId).then(function () {
+            setTimeout(restoreFilterSelects, 200);
+        });
 
         // --- DATATABLE CONFIG ---
         const table = $('#timetableTable').DataTable({
@@ -246,8 +333,8 @@
             ajax: {
                 url: "{{ route('timetables.index') }}",
                 data: function(d) {
-                    d.grade_level_id = $('#filter_grade').val();
-                    d.class_section_id = $('#filter_class').val();
+                    d.grade_level_id = getSelectValue(gradeFilter);
+                    d.class_section_id = getSelectValue(classFilter);
                 }
             },
             dom: '<"row me-2"<"col-md-2"<"me-3"l>><"col-md-10"<"dt-action-buttons text-xl-end text-lg-start text-md-end text-start d-flex align-items-center justify-content-end flex-md-row flex-column mb-3 mb-md-0"fB>>>t<"row mx-2"<"col-sm-12 col-md-6"i><"col-sm-12 col-md-6"p>>',
@@ -393,6 +480,83 @@
                 }
             });
         });
+
+        var aiTimetableBtn = document.getElementById('ai-timetable-btn');
+        if (aiTimetableBtn) {
+            aiTimetableBtn.addEventListener('ai:done', function (e) {
+                var detail = e.detail || {};
+                var meta = detail.meta || {};
+                var innerMeta = meta.meta || meta;
+                var slots = meta.slots;
+                if (!slots || !slots.length) {
+                    restoreFilterSelects();
+                    return;
+                }
+
+                var existingCount = parseInt(innerMeta.existing_class_slots || 0, 10);
+                var replaceExisting = !!innerMeta.replace_existing || existingCount > 0;
+                var applyMsg = @json(__('ai.apply_timetable_confirm'));
+                var overrideMsg = @json(__('ai.override_timetable_confirm'));
+                var overrideTitle = @json(__('ai.override_timetable'));
+                var applyLabel = @json(__('ai.apply_timetable'));
+                var bulkUrl = @json(route('timetables.bulkStore'));
+                var csrf = @json(csrf_token());
+
+                function doApply(withReplace) {
+                    fetch(bulkUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            slots: slots,
+                            replace_existing: withReplace
+                        })
+                    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error((res.body && res.body.message) || 'Error');
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({ icon: 'success', title: res.body.message || 'Done' }).then(function () {
+                                table.ajax.reload();
+                                restoreFilterSelects();
+                            });
+                        } else {
+                            table.ajax.reload();
+                            restoreFilterSelects();
+                        }
+                    }).catch(function (err) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({ icon: 'error', text: err.message }).then(restoreFilterSelects);
+                        } else {
+                            restoreFilterSelects();
+                        }
+                    });
+                }
+
+                function confirmApply() {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: replaceExisting ? overrideTitle : applyLabel,
+                            text: replaceExisting ? overrideMsg.replace(':count', String(existingCount)) : applyMsg,
+                            icon: replaceExisting ? 'warning' : 'question',
+                            showCancelButton: true,
+                            confirmButtonText: replaceExisting ? @json(__('ai.yes_override')) : 'Apply',
+                            cancelButtonText: @json(__('timetable.cancel'))
+                        }).then(function (r) {
+                            if (r.isConfirmed) doApply(replaceExisting);
+                            else restoreFilterSelects();
+                        });
+                    } else if (confirm(replaceExisting ? overrideMsg : applyMsg)) {
+                        doApply(replaceExisting);
+                    }
+                }
+
+                confirmApply();
+            });
+        }
     });
 </script>
 @endsection

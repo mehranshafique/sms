@@ -39,7 +39,9 @@
 
                             <div class="mb-3 col-md-12">
                                 <label class="form-label">{{ __('notice.content') }} <span class="text-danger">*</span></label>
-                                @if(!empty($planCtx['has_ai']))
+                                @if(has_ai_access())
+                                <div class="p-3 mb-2 rounded" style="background:#f5f3ff;border:1px solid #ddd6fe;">
+                                    <div class="small fw-bold text-primary mb-2"><i class="la la-magic"></i> {{ __('ai.powered_by') }}</div>
                                 <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
                                     <input type="text" id="ai-notice-topic" class="form-control form-control-sm" style="max-width:280px" placeholder="{{ __('notice.title') }}…">
                                     @include('ai.partials.embed-button', [
@@ -61,6 +63,7 @@
                                     ])
                                 </div>
                                 <div class="ai-embed-panel" id="ai-notice-draft-panel"></div>
+                                </div>
                                 @endif
                                 <textarea name="content" class="form-control" rows="5" required>{{ old('content', $notice->content ?? '') }}</textarea>
                             </div>

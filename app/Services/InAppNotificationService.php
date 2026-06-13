@@ -180,6 +180,33 @@ class InAppNotificationService
             ->count();
     }
 
+    /** @return array{notifications: array<int, array<string, mixed>>, unread_count: int} */
+    public function feedForUser(int $userId, int $limit = 15): array
+    {
+        $notifications = InAppNotification::where('user_id', $userId)
+            ->latest()
+            ->limit($limit)
+            ->get();
+
+        $unreadCount = InAppNotification::where('user_id', $userId)
+            ->whereNull('read_at')
+            ->count();
+
+        return [
+            'notifications' => $notifications->map(fn (InAppNotification $n) => [
+                'id'        => $n->id,
+                'title'     => $n->title,
+                'message'   => $n->message,
+                'link'      => $n->link,
+                'icon'      => $n->icon ?: 'fa-bell',
+                'is_unread' => $n->isUnread(),
+                'time_ago'  => $n->created_at?->diffForHumans() ?? '',
+                'type'      => $n->type,
+            ])->values()->all(),
+            'unread_count'  => $unreadCount,
+        ];
+    }
+
     public function markAsRead(int $notificationId, int $userId): array
     {
         $notification = InAppNotification::where('user_id', $userId)->find($notificationId);
@@ -192,7 +219,13 @@ class InAppNotificationService
         }
 
         $wasUnread = $notification->isUnread();
-        $notification->markAsRead();
+
+        if ($wasUnread) {
+            InAppNotification::where('user_id', $userId)
+                ->where('id', $notificationId)
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
 
         return [
             'success'      => true,

@@ -54,8 +54,8 @@
         @endphp
 
         <div class="row">
-            @if(!empty($planCtx['has_ai']) && in_array($invoice->status, ['unpaid', 'partial', 'overdue']))
-            <div class="col-lg-12 mb-3">
+            @if(has_ai_access() && in_array($invoice->status, ['unpaid', 'partial', 'overdue']))
+            <div class="col-lg-12 mb-3" id="ai-invoice-insights">
                 <div class="ai-copilot-card">
                     <div class="ai-copilot-card__head">
                         <div>
@@ -66,10 +66,10 @@
                             'tool' => 'invoice_insights',
                             'params' => ['invoice_id' => $invoice->id],
                             'label' => __('ai.btn_invoice_insights'),
-                            'panel' => '#ai-invoice-insights',
+                            'panel' => '#ai-invoice-insights-output',
                         ])
                     </div>
-                    <div class="ai-embed-panel" id="ai-invoice-insights"></div>
+                    <div class="ai-embed-panel mt-2" id="ai-invoice-insights-output"></div>
                 </div>
             </div>
             @endif

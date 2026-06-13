@@ -129,26 +129,50 @@ class TimetableController extends BaseController
                 ->make(true);
         }
 
-        $classSections = [];
-        $gradeLevels = [];
+        $classSections = collect();
+        $gradeLevels   = collect();
 
-        if (!$user->hasRole(['Student', 'Teacher'])) {
-            $gradeLevelsQuery = GradeLevel::query();
-            if ($institutionId) {
-                $gradeLevelsQuery->where('institution_id', $institutionId);
-            }
-            $gradeLevels = $gradeLevelsQuery->orderBy('order_index')->pluck('name', 'id');
+        if (!$user->hasRole('Student')) {
+            $gradeLevels = $this->gradeLevelsForSelect($institutionId);
 
             $classSectionsQuery = ClassSection::with('gradeLevel');
             if ($institutionId) {
                 $classSectionsQuery->where('institution_id', $institutionId);
             }
-            $classSections = $classSectionsQuery->get()->mapWithKeys(function($item) {
-                 return [$item->id => $item->name];
+            $classSections = $classSectionsQuery->get()->mapWithKeys(function ($item) {
+                return [$item->id => $item->name];
             });
         }
 
-        return view('timetables.index', compact('classSections', 'gradeLevels'));
+        return view('timetables.index', compact('classSections', 'gradeLevels', 'institutionId'));
+    }
+
+    public function getGradeLevels(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+
+        return response()->json($this->gradeLevelsForSelect($institutionId));
+    }
+
+    /** @return \Illuminate\Support\Collection<int|string, string> */
+    protected function gradeLevelsForSelect(?int $institutionId)
+    {
+        $query = GradeLevel::query()->orderBy('order_index');
+
+        if ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        } else {
+            $query->with('institution');
+        }
+
+        return $query->get()->mapWithKeys(function ($item) use ($institutionId) {
+            $label = $item->name;
+            if (!$institutionId && $item->relationLoaded('institution') && $item->institution) {
+                $label .= ' (' . $item->institution->name . ')';
+            }
+
+            return [$item->id => $label];
+        });
     }
 
     public function classRoutine(Request $request)
@@ -577,6 +601,105 @@ class TimetableController extends BaseController
             return response()->json(['success' => __('timetable.messages.success_delete')]);
         }
         return response()->json(['error' => __('timetable.something_went_wrong')]);
+    }
+
+    public function bulkStore(Request $request)
+    {
+        $this->authorize('create', Timetable::class);
+
+        $request->validate([
+            'slots'            => 'required|array|min:1',
+            'replace_existing' => 'nullable|boolean',
+            'slots.*.class_section_id' => 'required|exists:class_sections,id',
+            'slots.*.subject_id'       => 'required|exists:subjects,id',
+            'slots.*.day_of_week'      => 'required|string',
+            'slots.*.start_time'       => 'required',
+            'slots.*.end_time'         => 'required',
+        ]);
+
+        $institutionId = $this->getInstitutionId();
+        $created = 0;
+        $skipped = 0;
+        $replaced = 0;
+
+        if ($request->boolean('replace_existing')) {
+            $classIds = collect($request->slots)->pluck('class_section_id')->unique()->filter();
+            foreach ($classIds as $classSectionId) {
+                $class = ClassSection::find($classSectionId);
+                if (!$class) {
+                    continue;
+                }
+                $targetInstitutionId = $institutionId ?: $class->institution_id;
+                $session = AcademicSession::where('institution_id', $targetInstitutionId)->where('is_current', true)->first();
+                if (!$session) {
+                    continue;
+                }
+                $deleted = Timetable::where('institution_id', $targetInstitutionId)
+                    ->where('academic_session_id', $session->id)
+                    ->where('class_section_id', $classSectionId)
+                    ->delete();
+                $replaced += $deleted;
+            }
+        }
+
+        foreach ($request->slots as $slot) {
+            $class = ClassSection::find($slot['class_section_id']);
+            if (!$class) {
+                $skipped++;
+                continue;
+            }
+            $targetInstitutionId = $institutionId ?: $class->institution_id;
+
+            if ($institutionId && (int) $class->institution_id !== (int) $institutionId) {
+                $skipped++;
+                continue;
+            }
+
+            $fakeRequest = Request::create('/', 'POST', [
+                'institution_id'   => $targetInstitutionId,
+                'class_section_id' => $slot['class_section_id'],
+                'subject_id'       => $slot['subject_id'],
+                'staff_id'         => $slot['teacher_id'] ?? null,
+                'day'              => strtolower($slot['day_of_week']),
+                'start_time'       => $slot['start_time'],
+                'end_time'         => $slot['end_time'],
+                'room_number'      => $slot['room_number'] ?? null,
+            ]);
+
+            try {
+                $this->validateTimetable($fakeRequest, null, $targetInstitutionId);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $skipped++;
+                continue;
+            }
+
+            $session = AcademicSession::where('institution_id', $targetInstitutionId)->where('is_current', true)->first();
+            if (!$session) {
+                return response()->json(['message' => __('timetable.no_active_session')], 422);
+            }
+
+            Timetable::create([
+                'institution_id'       => $targetInstitutionId,
+                'academic_session_id'  => $session->id,
+                'class_section_id'     => $slot['class_section_id'],
+                'subject_id'           => $slot['subject_id'],
+                'teacher_id'           => $slot['teacher_id'] ?? null,
+                'day_of_week'          => strtolower($slot['day_of_week']),
+                'start_time'           => $slot['start_time'],
+                'end_time'             => $slot['end_time'],
+                'room_number'          => $slot['room_number'] ?? null,
+            ]);
+            $created++;
+        }
+
+        return response()->json([
+            'message' => $replaced > 0
+                ? __('ai.timetable_bulk_replaced', ['replaced' => $replaced, 'created' => $created, 'skipped' => $skipped])
+                : __('ai.timetable_bulk_created', ['created' => $created, 'skipped' => $skipped]),
+            'created'  => $created,
+            'skipped'  => $skipped,
+            'replaced' => $replaced,
+        ]);
     }
 
     private function validateTimetable(Request $request, $ignoreId = null, $institutionId = null)

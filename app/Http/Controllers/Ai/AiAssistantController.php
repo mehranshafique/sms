@@ -7,6 +7,7 @@ use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Services\Ai\AiAssistantPrompt;
 use App\Services\Ai\AiManager;
+use App\Services\Ai\AiPlaceholderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -16,6 +17,7 @@ class AiAssistantController extends BaseController
     public function __construct(
         protected AiManager $ai,
         protected AiAssistantPrompt $promptBuilder,
+        protected AiPlaceholderService $placeholders,
     ) {
         parent::__construct();
         $this->middleware('auth');
@@ -125,10 +127,16 @@ class AiAssistantController extends BaseController
             ], 200);
         }
 
+        $replyContent = $this->placeholders->apply(
+            (string) ($result['content'] ?? ''),
+            Auth::user(),
+            $institutionId
+        );
+
         $reply = AiMessage::create([
             'ai_conversation_id' => $conversation->id,
             'role'               => 'assistant',
-            'content'            => $result['content'],
+            'content'            => $replyContent,
         ]);
 
         $conversation->touch();

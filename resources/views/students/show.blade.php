@@ -19,19 +19,24 @@
         </div>
 
         <div class="row">
-            @if(!empty($planCtx['has_ai']))
+            @if(has_ai_access())
             <div class="col-xl-12 mb-3">
-                <div class="ai-copilot-card">
-                    <div class="ai-copilot-card__head">
-                        <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.student_summary') }}</strong>
-                        @include('ai.partials.embed-button', [
-                            'tool' => 'student_summary',
-                            'params' => ['student_id' => $student->id],
-                            'label' => __('ai.btn_student_summary'),
-                            'panel' => '#ai-student-summary-panel',
-                        ])
+                <div class="card border-0 shadow-sm" style="background:linear-gradient(135deg,#faf5ff,#eff6ff);border:1px solid #ddd6fe !important;">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div>
+                                <h5 class="mb-1"><i class="la la-magic text-primary"></i> {{ __('ai.tools.student_summary') }}</h5>
+                                <p class="text-muted small mb-0">{{ __('ai.tools.student_summary_desc') }}</p>
+                            </div>
+                            @include('ai.partials.embed-button', [
+                                'tool' => 'student_summary',
+                                'params' => ['student_id' => $student->id],
+                                'label' => __('ai.btn_student_summary'),
+                                'panel' => '#ai-student-summary-panel',
+                            ])
+                        </div>
+                        <div class="ai-embed-panel mt-2" id="ai-student-summary-panel"></div>
                     </div>
-                    <div class="ai-embed-panel" id="ai-student-summary-panel"></div>
                 </div>
             </div>
             @endif

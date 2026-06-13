@@ -258,6 +258,11 @@
                                     <div class="row">
                                         <div class="col-md-6 mb-3"><label class="form-label">{{ __('configuration.school_start_time') }}</label><div class="input-group clockpicker"><input type="text" name="school_start_time" class="form-control" value="{{ $schoolYear['start_time'] }}" required><span class="input-group-text"><i class="far fa-clock"></i></span></div></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">{{ __('configuration.school_end_time') }}</label><div class="input-group clockpicker"><input type="text" name="school_end_time" class="form-control" value="{{ $schoolYear['end_time'] }}" required><span class="input-group-text"><i class="far fa-clock"></i></span></div></div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">{{ __('configuration.school_rooms_count') }}</label>
+                                            <input type="number" name="school_rooms_count" class="form-control" value="{{ $schoolYear['rooms_count'] }}" min="1" max="200" required>
+                                            <small class="text-muted">{{ __('configuration.school_rooms_count_help') }}</small>
+                                        </div>
                                     </div>
                                     
                                     <h5 class="text-primary mb-3 mt-2"><i class="fa fa-fingerprint me-2"></i>{{ __('configuration.attendance_hardware') ?? 'Attendance & Hardware Settings' }}</h5>

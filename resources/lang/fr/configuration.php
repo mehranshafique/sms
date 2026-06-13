@@ -118,6 +118,8 @@ return [
     'school_hours' => 'Heures de cours',
     'school_start_time' => 'Heure début',
     'school_end_time' => 'Heure fin',
+    'school_rooms_count' => 'Nombre de salles',
+    'school_rooms_count_help' => 'Utilisé pour les examens et l’emploi du temps IA (Salle 1 … Salle N).',
     
     'module_management' => 'Gestion des Modules',
     'module_name' => 'Nom du module',

@@ -7,11 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\InstitutionSetting;
 use App\Models\Institution;
-use Symfony\Component\HttpFoundation\Response;
-
 class LoadInstitutionSettings
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next)
     {
         if (Auth::check()) {
             $user = Auth::user();

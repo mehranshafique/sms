@@ -2,38 +2,43 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     *
+     * Production: run only the seeders under "Required for production".
+     * Skip BulkDummyDataSeeder (and usually LmdProgramTemplateSeeder) on live servers.
      */
     public function run(): void
     {
-        // 1. Disable Foreign Key Checks to prevent constraint errors during refresh
         Schema::disableForeignKeyConstraints();
 
-        // 2. Truncate Tables (Optional if using migrate:fresh, but good for safety)
-        // DB::table('users')->truncate();
-        // DB::table('roles')->truncate();
-        // ... other tables
-
-        // 3. Run Seeders in Order
         $this->call([
-            // RolePermissionSeeder::class, // Creates Super Admin & Roles
-            // BulkDummyDataSeeder::class,
-            SmsTemplateSeeder::class,
-            // LocationSeeder::class,
-            // Add other seeders here if you have them
-            // InstitutionSeeder::class, 
+            // -----------------------------------------------------------------
+            // Required for production (fresh install / migrate:fresh --seed)
+            // -----------------------------------------------------------------
+            RolePermissionSeeder::class, // Roles, permissions, modules, Super Admin (digitex-admin@yopmail.com — change password after deploy)
+            LocationSeeder::class,       // Countries, states, and cities reference data (address dropdowns)
+            SmsTemplateSeeder::class,    // Default SMS templates (payment, welcome, notices, etc.)
+
+            // -----------------------------------------------------------------
+            // Not required for production — dev, demo, and local staging only
+            // -----------------------------------------------------------------
+            BulkDummyDataSeeder::class,  // Fake institutions, students, staff, invoices, exams, etc. (Faker data)
+
+            // -----------------------------------------------------------------
+            // Optional — not required for production unless you deploy LMD universities
+            // -----------------------------------------------------------------
+            LmdProgramTemplateSeeder::class, // Licence/Master LMD program templates; skips if no university-type institution exists
+
+            // Always last — guarantees Super Admin exists even if a prior seeder cleared users
+            PlatformSuperAdminSeeder::class,
         ]);
 
-        // 4. Re-enable Foreign Key Checks
         Schema::enableForeignKeyConstraints();
     }
 }

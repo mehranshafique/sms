@@ -224,9 +224,13 @@
     </script>
     @endif
 
+    @auth
+        @include('layout.partials.in-app-notification-scripts')
+    @endauth
+
     @yield('js')
 
-    @if(!empty($planCtx['has_ai']))
+    @if(has_ai_access())
         @include('ai.partials.floating-widget')
         @include('ai.partials.embed-scripts')
     @endif

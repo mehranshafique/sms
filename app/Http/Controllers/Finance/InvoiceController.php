@@ -98,6 +98,10 @@ class InvoiceController extends BaseController
                     if(auth()->user()->can('invoice.view')) {
                         $btn .= '<a href="'.route('invoices.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1" title="'.__('invoice.view').'"><i class="fa fa-eye"></i></a>';
                     }
+
+                    if (has_ai_access() && in_array($row->status, ['unpaid', 'partial', 'overdue'], true)) {
+                        $btn .= '<a href="'.route('invoices.show', $row->id).'#ai-invoice-insights" class="btn btn-primary shadow btn-xs sharp me-1" title="'.e(__('ai.btn_invoice_insights')).'"><i class="la la-magic"></i></a>';
+                    }
                     
                     if(auth()->user()->can('payment.create') && $row->status != 'paid') {
                         $btn .= '<a href="'.route('payments.create', ['invoice_id' => $row->id]).'" class="btn btn-success shadow btn-xs sharp me-1" title="'.__('invoice.pay').'"><i class="fa-solid fa-money-bill-wave"></i></a>';

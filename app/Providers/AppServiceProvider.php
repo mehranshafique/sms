@@ -61,18 +61,17 @@ class AppServiceProvider extends ServiceProvider
         }
         // --- Dynamic Policy Registration End ---
 
-        View::composer('layout.header', function ($view) {
+        View::composer('*', function ($view) {
             if (Auth::check()) {
-                $service = app(InAppNotificationService::class);
-                $view->with('inAppNotifications', $service->getRecent(Auth::id(), 12));
-                $view->with('inAppUnreadCount', $service->getUnreadCount(Auth::id()));
                 $view->with('planCtx', app(PlanContextService::class)->snapshot());
             }
         });
 
-        View::composer(['layout.layout', 'layout.footer'], function ($view) {
+        View::composer(['layout.header', 'layout.partials.in-app-notification-scripts'], function ($view) {
             if (Auth::check()) {
-                $view->with('planCtx', app(PlanContextService::class)->snapshot());
+                $service = app(InAppNotificationService::class);
+                $view->with('inAppNotifications', $service->getRecent(Auth::id(), 12));
+                $view->with('inAppUnreadCount', $service->getUnreadCount(Auth::id()));
             }
         });
 

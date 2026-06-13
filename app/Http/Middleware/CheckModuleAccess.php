@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\InstitutionSetting;
 use App\Models\Subscription;
-use Symfony\Component\HttpFoundation\Response;
 
 class CheckModuleAccess
 {
@@ -19,7 +18,7 @@ class CheckModuleAccess
      * @param  string|null  $moduleName  The granular module key to verify (e.g., 'subjects', 'invoices')
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function handle(Request $request, Closure $next, ?string $moduleName = null): Response
+    public function handle(Request $request, Closure $next, ?string $moduleName = null)
     {
         $user = Auth::user();
 

@@ -12,6 +12,20 @@
             </div>
         </div>
 
+        @if(has_ai_access())
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-light border mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-color:#ddd6fe !important;background:#faf5ff;">
+                    <div>
+                        <strong><i class="la la-magic text-primary"></i> {{ __('ai.tools.bulk_report_comments') }}</strong>
+                        <div class="small text-muted">{{ __('ai.tools.bulk_report_comments_desc') }}</div>
+                    </div>
+                    <a href="{{ route('results.index') }}" class="btn btn-primary btn-sm"><i class="la la-magic me-1"></i> {{ __('ai.btn_bulk_comments') }}</a>
+                </div>
+            </div>
+        </div>
+        @endif
+
         <div class="row">
             {{-- 1. Student Bulletin Card --}}
             <div class="col-xl-6 col-lg-6">

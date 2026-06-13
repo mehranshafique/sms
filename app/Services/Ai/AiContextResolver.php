@@ -117,7 +117,10 @@ class AiContextResolver
             $records = ExamRecord::with('subject')
                 ->where('exam_id', $examId)
                 ->where('student_id', $en->student_id)
-                ->where('class_section_id', $classSectionId)
+                ->where(function ($q) use ($classSectionId) {
+                    $q->where('class_section_id', $classSectionId)
+                        ->orWhereNull('class_section_id');
+                })
                 ->get();
 
             $marks = $records->map(fn ($r) => [

@@ -55,6 +55,7 @@ class ConfigurationController extends BaseController
             'end_time' => $settings['school_end_time'] ?? '15:00',
             'late_margin_time' => $settings['late_margin_time'] ?? '0',
             'double_tap_wait_time' => $settings['double_tap_wait_time'] ?? '15',
+            'rooms_count' => $settings['school_rooms_count'] ?? '10',
         ];
         
         $billingSettings = [
@@ -275,7 +276,7 @@ class ConfigurationController extends BaseController
     public function updateSchoolYear(Request $request)
     {
         $institutionId = $this->getInstitutionId();
-        $keys = ['academic_start_date', 'academic_end_date', 'school_start_time', 'school_end_time', 'late_margin_time', 'double_tap_wait_time'];
+        $keys = ['academic_start_date', 'academic_end_date', 'school_start_time', 'school_end_time', 'school_rooms_count', 'late_margin_time', 'double_tap_wait_time'];
         
         foreach($keys as $key) {
             $this->saveSetting($institutionId, $key, $request->input($key), 'academics');
@@ -301,6 +302,9 @@ class ConfigurationController extends BaseController
         $this->saveSetting($institutionId, 'academic_end_date', $request->academic_end_date);
         $this->saveSetting($institutionId, 'school_start_time', $request->school_start_time);
         $this->saveSetting($institutionId, 'school_end_time', $request->school_end_time);
+        if ($request->has('school_rooms_count')) {
+            $this->saveSetting($institutionId, 'school_rooms_count', max(1, (int) $request->school_rooms_count), 'academics');
+        }
         
         // ADDED: Hardware and Attendance Timings
         if ($request->has('late_margin_time')) {
