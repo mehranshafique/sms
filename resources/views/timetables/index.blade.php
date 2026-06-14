@@ -140,6 +140,7 @@
                                         </th>
                                         @endcan
                                         <th>{{ __('timetable.table_no') }}</th>
+                                        <th>{{ __('grade_level.grade_name') }}</th>
                                         <th>{{ __('timetable.class') }}</th>
                                         <th>{{ __('timetable.subject') }}</th>
                                         <th>{{ __('timetable.teacher') }}</th>
@@ -373,6 +374,7 @@
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endcan
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
+                { data: 'grade_name', name: 'classSection.gradeLevel.name' },
                 { data: 'class', name: 'classSection.name' },
                 { data: 'subject', name: 'subject.name' },
                 { data: 'teacher', name: 'teacher.user.name' },

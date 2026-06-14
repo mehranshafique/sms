@@ -87,15 +87,12 @@ class GradeLevelController extends BaseController
     public function create()
     {
         $institutionId = $this->getInstitutionId();
-        
-        $institutes = [];
-        $institutionType = 'mixed'; // Default
+        $institutes = $this->getInstitutesForSelect();
+        $institutionType = 'mixed';
 
         if ($institutionId) {
             $inst = Institution::find($institutionId);
             $institutionType = $inst->type ?? 'mixed';
-        } elseif (auth()->user()->hasRole('Super Admin')) {
-            $institutes = Institution::pluck('name', 'id');
         }
 
         return view('grade_levels.create', compact('institutionId', 'institutes', 'institutionType'));
@@ -158,14 +155,12 @@ class GradeLevelController extends BaseController
             abort(403);
         }
 
-        $institutes = [];
+        $institutes = $this->getInstitutesForSelect();
         $institutionType = 'mixed'; 
 
         if ($institutionId) {
             $inst = Institution::find($institutionId);
             $institutionType = $inst->type ?? 'mixed';
-        } elseif (auth()->user()->hasRole('Super Admin') && !$institutionId) {
-            $institutes = Institution::pluck('name', 'id');
         }
 
         return view('grade_levels.edit', compact('grade_level', 'institutionId', 'institutes', 'institutionType'));

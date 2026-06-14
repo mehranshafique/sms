@@ -40,6 +40,8 @@ return [
     'section_name' => 'Section Name',
     'section_code' => 'Section Code',
     'room_number' => 'Room Number',
+    'select_room' => 'Select room',
+    'room_option' => 'Room :number',
     'capacity' => 'Student Capacity',
     'status_label' => 'Status',
 

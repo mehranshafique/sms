@@ -177,10 +177,26 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        
+        const roomOptions = @json(institution_room_options());
+        const selectRoomLabel = @json(__('class_section.select_room'));
+
+        function buildRoomSelect(fieldName, selected) {
+            let opts = `<option value="">${selectRoomLabel}</option>`;
+            Object.entries(roomOptions).forEach(([val, label]) => {
+                const sel = String(selected) === String(val) ? 'selected' : '';
+                opts += `<option value="${val}" ${sel}>${label}</option>`;
+            });
+            if (selected && !Object.prototype.hasOwnProperty.call(roomOptions, selected)) {
+                opts += `<option value="${selected}" selected>${selected}</option>`;
+            }
+            return `<select name="${fieldName}" class="form-control default-select room-select">${opts}</select>`;
+        }
+
         function refreshSelect(element) {
-            if (typeof $ !== 'undefined' && $(element).is('select')) {
-                if ($.fn.selectpicker) $(element).selectpicker('refresh');
+            if (typeof window.digitexReinitSelectPickers === 'function') {
+                window.digitexReinitSelectPickers();
+            } else if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
+                $(element).selectpicker('refresh');
             }
         }
 
@@ -347,8 +363,7 @@
                                             required>
                                     </td>
                                     <td>
-                                        <input type="text" name="schedules[${row.subject_id}][room_number]" 
-                                            class="form-control" placeholder="Room" value="${row.room_number}">
+                                        ${buildRoomSelect(`schedules[${row.subject_id}][room_number]`, row.room_number || '')}
                                     </td>
                                     <td>
                                         <input type="number" name="schedules[${row.subject_id}][max_marks]" 
@@ -363,6 +378,9 @@
                             });
 
                             initPickers();
+                            if (typeof window.digitexReinitSelectPickers === 'function') {
+                                window.digitexReinitSelectPickers();
+                            }
                         }
 
                         document.getElementById('scheduleContainer').classList.remove('d-none');

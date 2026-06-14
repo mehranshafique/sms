@@ -145,6 +145,8 @@ return [
         'generate_exam_datesheet_desc' => 'Auto-build exam schedule within school hours and room limits.',
         'generate_timetable'     => 'AI timetable builder',
         'generate_timetable_desc'=> 'Generate a weekly class timetable avoiding conflicts.',
+        'draft_assignment'       => 'Draft assignment',
+        'draft_assignment_desc'  => 'Generate an assignment title or description.',
     ],
 
     'period_days'            => 'Exam days',
@@ -176,5 +178,7 @@ return [
     'btn_exam_at_risk'       => 'AI at-risk scan',
     'btn_generate_datesheet' => 'AI build date sheet',
     'btn_generate_timetable' => 'AI build timetable',
+    'btn_draft_assignment'   => 'AI suggest title',
+    'btn_draft_assignment_desc' => 'AI suggest description',
     'preview_message'        => 'Message preview (edit before sending)',
 ];

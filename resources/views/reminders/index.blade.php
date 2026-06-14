@@ -175,7 +175,9 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function() {
-        if($.fn.selectpicker) { $('.default-select').selectpicker('refresh'); }
+        if (typeof window.digitexReinitSelectPickers === 'function') {
+            window.digitexReinitSelectPickers();
+        }
 
         const lang = {
             initiateBroadcast: @json(__('reminders.initiate_broadcast')),

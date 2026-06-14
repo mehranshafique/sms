@@ -548,13 +548,12 @@ class InAppNotificationService
 
         $eventKey = self::EVENT_KEYS['notice'];
         $roles = match ($notice->audience) {
-            'staff' => [RoleEnum::TEACHER->value, RoleEnum::STAFF->value, ...self::ADMIN_ROLES],
+            'staff' => [RoleEnum::TEACHER->value, ...self::ADMIN_ROLES],
             'student' => [RoleEnum::STUDENT->value],
             'parent' => [RoleEnum::GUARDIAN->value],
             default => [
                 RoleEnum::STUDENT->value,
                 RoleEnum::TEACHER->value,
-                RoleEnum::STAFF->value,
                 RoleEnum::GUARDIAN->value,
                 ...self::ADMIN_ROLES,
             ],
@@ -814,7 +813,16 @@ class InAppNotificationService
 
     private function usersForInstitutionRoles(int $institutionId, array $roles): Collection
     {
-        return User::role($roles)
+        $guard = config('auth.defaults.guard', 'web');
+        $existing = array_values(array_filter($roles, function ($role) use ($guard) {
+            return \Spatie\Permission\Models\Role::where('name', $role)->where('guard_name', $guard)->exists();
+        }));
+
+        if ($existing === []) {
+            return collect();
+        }
+
+        return User::role($existing)
             ->where(function ($query) use ($institutionId) {
                 $query->where('institute_id', $institutionId)
                     ->orWhereHas('institutes', fn ($q) => $q->where('institutions.id', $institutionId));

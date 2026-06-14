@@ -53,6 +53,7 @@ return [
     'cycle_primary' => 'Primary',
     'cycle_secondary' => 'Secondary',
     'cycle_lmd' => 'University',
+    'cycle_university' => 'University',
     'cycle_vocational' => 'Vocational',
 
     // Buttons

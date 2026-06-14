@@ -119,11 +119,20 @@ class AiPlaceholderService
         }
 
         // Standalone [Name] only when not part of [Student Name], [Parent Name], etc.
-        $text = preg_replace(
-            '/(?<!(Student |Parent |Guardian |Child |Pupil ))\[Name\]/iu',
-            $ctx['sender_name'],
-            $text
-        ) ?? $text;
+        $protected = [
+            '[Student Name]'  => '%%STUDENT_NAME%%',
+            '[Parent Name]'   => '%%PARENT_NAME%%',
+            '[Guardian Name]' => '%%GUARDIAN_NAME%%',
+            '[Child Name]'    => '%%CHILD_NAME%%',
+            '[Pupil Name]'    => '%%PUPIL_NAME%%',
+        ];
+        foreach ($protected as $token => $placeholder) {
+            $text = str_ireplace($token, $placeholder, $text);
+        }
+        $text = str_ireplace('[Name]', $ctx['sender_name'], $text);
+        foreach ($protected as $token => $placeholder) {
+            $text = str_ireplace($placeholder, $token, $text);
+        }
 
         return $text;
     }

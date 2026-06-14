@@ -117,6 +117,8 @@ class ClassSubjectController extends BaseController
             }
         });
 
-        return back()->with('success', __('class_subject.success_update'));
+        return redirect()
+            ->route('class-subjects.index', ['class_section_id' => $request->class_section_id])
+            ->with('success', __('class_subject.success_update'));
     }
 }

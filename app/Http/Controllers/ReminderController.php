@@ -37,7 +37,11 @@ class ReminderController extends BaseController
     public function index()
     {
         $institutionId = $this->getInstitutionId();
-        
+
+        if (! $institutionId) {
+            return redirect()->route('dashboard')->with('warning', __('configuration.institution_not_found'));
+        }
+
         // Get active fee structures/tranches for the dropdown
         $feeStructures = FeeStructure::where('institution_id', $institutionId)->get();
         

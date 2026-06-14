@@ -95,11 +95,9 @@ class ClassSectionController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        $institutions = [];
-        if ($institutionId) {
-            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id');
-        } elseif (Auth::user()->hasRole('Super Admin')) {
-            $institutions = Institution::where('is_active', true)->pluck('name', 'id');
+        $institutions = $this->getInstitutesForSelect();
+        if ($institutionId && empty($institutions)) {
+            $institutions = Institution::where('id', $institutionId)->pluck('name', 'id')->all();
         }
 
         // Filter Campuses

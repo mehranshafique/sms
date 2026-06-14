@@ -21,7 +21,8 @@
 
 	<!-- STYLESHEETS -->
 	<link rel="stylesheet" href="{{ asset('vendor/jqvmap/css/jqvmap.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('vendor/global/global.min.css') }}">
+	<link rel="stylesheet" href="{{ asset('vendor/global/global.min.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 	<link rel="stylesheet" href="{{ asset('vendor/chartist/css/chartist.min.css') }}">
 
     <link href="{{ asset('vendor/datatables/css/jquery.dataTables.min.css')  }}" rel="stylesheet">

@@ -91,6 +91,11 @@ class AiEmbedService
                 'description' => __('ai.tools.generate_timetable_desc'),
                 'params'      => ['class_section_id', 'period_minutes'],
             ],
+            'draft_assignment' => [
+                'label'       => __('ai.tools.draft_assignment'),
+                'description' => __('ai.tools.draft_assignment_desc'),
+                'params'      => ['class_section_id', 'subject_id', 'mode'],
+            ],
         ];
     }
 
@@ -123,6 +128,7 @@ class AiEmbedService
             'quick_chat'           => $this->quickChat($params, $user, $institutionId),
             'generate_exam_datesheet' => $this->generateExamDatesheet($params, $institutionId, $user),
             'generate_timetable'   => $this->generateTimetable($params, $institutionId, $user),
+            'draft_assignment'     => $this->draftAssignment($params, $institutionId, $user),
             default                => throw ValidationException::withMessages(['tool' => __('ai.unknown_tool')]),
         };
     }
@@ -154,6 +160,61 @@ class AiEmbedService
         );
 
         return ['text' => $text, 'type' => 'notice_draft'];
+    }
+
+    protected function draftAssignment(array $params, ?int $institutionId, User $user): array
+    {
+        $v = Validator::make($params, [
+            'class_section_id' => 'nullable|integer|exists:class_sections,id',
+            'subject_id'       => 'nullable|integer|exists:subjects,id',
+            'mode'             => 'nullable|string|in:title,description,both',
+        ])->validate();
+
+        $mode = $v['mode'] ?? 'both';
+        $classLabel = '';
+        $subjectLabel = '';
+
+        if (! empty($v['class_section_id'])) {
+            $section = \App\Models\ClassSection::with('gradeLevel')->find($v['class_section_id']);
+            if ($section) {
+                $classLabel = trim(($section->gradeLevel->name ?? '') . ' ' . ($section->name ?? ''));
+            }
+        }
+        if (! empty($v['subject_id'])) {
+            $subject = \App\Models\Subject::find($v['subject_id']);
+            $subjectLabel = $subject->name ?? '';
+        }
+
+        $task = match ($mode) {
+            'title'       => 'Write only a short assignment title (one line, no quotes).',
+            'description' => 'Write only the assignment description/instructions (2-4 sentences).',
+            default       => "First line: assignment title only.\nThen a blank line.\nThen the description/instructions (2-4 sentences).",
+        };
+
+        $prompt = "Draft a homework/class assignment.\n"
+            . ($classLabel !== '' ? "Class: {$classLabel}\n" : '')
+            . ($subjectLabel !== '' ? "Subject: {$subjectLabel}\n" : '')
+            . "{$task}\nKeep language appropriate for the class level.\n\n"
+            . $this->placeholders->promptBlock($user, $institutionId);
+
+        $text = $this->runPrompt(
+            'embed:draft_assignment',
+            'You are a teacher assistant. Output plain text only — no markdown headings.',
+            $prompt,
+            $institutionId,
+            [],
+            $user,
+            true
+        );
+
+        if ($mode === 'title') {
+            $text = trim(explode("\n", trim($text))[0] ?? $text);
+        } elseif ($mode === 'description') {
+            $lines = preg_split('/\r\n|\r|\n/', trim($text), 2);
+            $text = trim($lines[1] ?? $lines[0] ?? $text);
+        }
+
+        return ['text' => trim($text), 'type' => 'assignment_draft'];
     }
 
     protected function translate(array $params): array

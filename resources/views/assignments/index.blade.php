@@ -24,55 +24,19 @@
                 <div class="card">
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-responsive-sm">
+                            <table id="assignmentsTable" class="display w-100">
                                 <thead>
                                     <tr>
+                                        <th>#</th>
                                         <th>{{ __('assignment.title') }}</th>
                                         <th>{{ __('assignment.class') }}</th>
                                         <th>{{ __('assignment.subject') }}</th>
                                         <th>{{ __('assignment.deadline') }}</th>
                                         <th>{{ __('assignment.teacher') }}</th>
-                                        <th>{{ __('assignment.action') }}</th>
+                                        <th class="text-end">{{ __('assignment.action') }}</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    @forelse($assignments as $assignment)
-                                    <tr>
-                                        <td>
-                                            <strong>{{ $assignment->title }}</strong>
-                                            @if($assignment->file_path)
-                                                <a href="{{ asset('storage/'.$assignment->file_path) }}" target="_blank" class="text-primary ms-2" title="{{ __('assignment.attachment_view') }}">
-                                                    <i class="fa fa-paperclip"></i>
-                                                </a>
-                                            @endif
-                                        </td>
-                                        <td>{{ $assignment->classSection->gradeLevel->name ?? '' }} {{ $assignment->classSection->name }}</td>
-                                        <td>{{ $assignment->subject->name }}</td>
-                                        <td>
-                                            <span class="badge badge-{{ $assignment->deadline < now() ? 'danger' : 'success' }}">
-                                                {{ $assignment->deadline->format('d M, Y') }}
-                                            </span>
-                                        </td>
-                                        <td>{{ $assignment->teacher->user->name ?? 'Admin' }}</td>
-                                        <td>
-                                            {{-- Delete Button with SweetAlert Class --}}
-                                            @if(auth()->user()->can('delete', $assignment) || auth()->user()->hasRole(['Super Admin', 'Head Officer']))
-                                                <button type="button" class="btn btn-danger shadow btn-xs sharp delete-assignment-btn" 
-                                                        data-id="{{ $assignment->id }}" 
-                                                        data-url="{{ route('assignments.destroy', $assignment->id) }}">
-                                                    <i class="fa fa-trash"></i>
-                                                </button>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                    @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center">{{ __('assignment.no_assignments') }}</td>
-                                    </tr>
-                                    @endforelse
-                                </tbody>
                             </table>
-                            {{ $assignments->links() }}
                         </div>
                     </div>
                 </div>
@@ -85,58 +49,52 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // SweetAlert Delete Logic
-        document.querySelectorAll('.delete-assignment-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const url = this.getAttribute('data-url');
-                
-                Swal.fire({
-                    title: '{{ __("assignment.delete_confirm") }}',
-                    text: "{{ __('assignment.delete_warning') }}", // Ensure this key exists or use a generic warning
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: '{{ __("assignment.yes_delete") }}',
-                    cancelButtonText: '{{ __("assignment.cancel") }}'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        // Create a temporary form to submit the DELETE request
-                        const form = document.createElement('form');
-                        form.method = 'POST';
-                        form.action = url;
-                        
-                        const csrfInput = document.createElement('input');
-                        csrfInput.type = 'hidden';
-                        csrfInput.name = '_token';
-                        csrfInput.value = '{{ csrf_token() }}';
-                        form.appendChild(csrfInput);
-                        
-                        const methodInput = document.createElement('input');
-                        methodInput.type = 'hidden';
-                        methodInput.name = '_method';
-                        methodInput.value = 'DELETE';
-                        form.appendChild(methodInput);
-                        
-                        document.body.appendChild(form);
-                        form.submit();
+    document.addEventListener('DOMContentLoaded', function () {
+        $('#assignmentsTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: '{{ route('assignments.index') }}',
+            columns: [
+                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false },
+                { data: 'title', name: 'title' },
+                { data: 'class_name', name: 'classSection.name' },
+                { data: 'subject.name', name: 'subject.name' },
+                { data: 'deadline', name: 'deadline' },
+                { data: 'teacher_name', name: 'teacher.user.name', orderable: false },
+                { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
+            ],
+            order: [[4, 'desc']]
+        });
+
+        $(document).on('click', '.delete-assignment-btn', function () {
+            const url = $(this).data('url');
+            Swal.fire({
+                title: @json(__('assignment.delete_confirm')),
+                text: @json(__('assignment.delete_warning')),
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: @json(__('assignment.yes_delete')),
+                cancelButtonText: @json(__('assignment.cancel'))
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: { _token: '{{ csrf_token() }}', _method: 'DELETE' },
+                    success: function (res) {
+                        $('#assignmentsTable').DataTable().ajax.reload(null, false);
+                        if (typeof digitexNotifySuccess === 'function') {
+                            digitexNotifySuccess(res.message || @json(__('assignment.success_delete')));
+                        }
+                    },
+                    error: function (xhr) {
+                        Swal.fire({ icon: 'error', title: 'Error', text: xhr.responseJSON?.message || 'Error' });
                     }
                 });
             });
         });
-        
-        // Show success message if redirected back
-        @if(session('success'))
-            Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: "{{ session('success') }}",
-                timer: 3000,
-                showConfirmButton: false
-            });
-        @endif
     });
 </script>
 @endsection

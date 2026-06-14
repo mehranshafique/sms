@@ -179,27 +179,50 @@
         const studentSelect = document.getElementById('studentSelect');
         const classSelect = document.getElementById('classSelect');
 
+        function reinitPickers() {
+            requestAnimationFrame(function () {
+                if (typeof window.digitexReinitSelectPickers === 'function') {
+                    window.digitexReinitSelectPickers();
+                } else if ($.fn.selectpicker) {
+                    $('.default-select').selectpicker('refresh');
+                }
+            });
+        }
+
+        function setPickerEnabled(selectEl, enabled) {
+            if (!selectEl) {
+                return;
+            }
+            selectEl.disabled = !enabled;
+            const $el = $(selectEl);
+            if ($.fn.selectpicker && $el.data('selectpicker')) {
+                enabled ? $el.selectpicker('enable') : $el.selectpicker('disable');
+            }
+        }
+
         function toggleMode() {
             const isBulk = document.getElementById('modeBulk').checked;
             if (isBulk) {
                 studentGroup.classList.add('d-none');
                 classGroup.classList.remove('d-none');
                 studentSelect.required = false;
-                studentSelect.disabled = true;
+                setPickerEnabled(studentSelect, false);
                 studentSelect.value = '';
                 classSelect.required = true;
-                classSelect.disabled = false;
-                if ($.fn.select2) $(studentSelect).val('').trigger('change');
+                setPickerEnabled(classSelect, true);
+                if ($.fn.select2) {
+                    $(studentSelect).val('').trigger('change');
+                }
             } else {
                 classGroup.classList.add('d-none');
                 studentGroup.classList.remove('d-none');
                 classSelect.required = false;
-                classSelect.disabled = true;
+                setPickerEnabled(classSelect, false);
                 classSelect.value = '';
                 studentSelect.required = true;
-                studentSelect.disabled = false;
-                if ($.fn.selectpicker) $(classSelect).selectpicker('refresh');
+                setPickerEnabled(studentSelect, true);
             }
+            reinitPickers();
         }
         toggleMode();
 
@@ -231,9 +254,7 @@
             }
             
             // Refresh select picker
-            if ($.fn.selectpicker) {
-                $('.default-select').selectpicker('refresh');
-            }
+            reinitPickers();
         });
 
         // --- AJAX CHECK: Bulletin Form ---
@@ -241,7 +262,11 @@
         const btnBulletin = document.getElementById('btnBulletin');
 
         if(bulletinForm) {
+            let bulletinReady = false;
             bulletinForm.addEventListener('submit', function(e) {
+                if (bulletinReady) {
+                    return;
+                }
                 e.preventDefault();
                 
                 // Basic HTML validation check
@@ -276,8 +301,10 @@
                             confirmButtonColor: '#d33'
                         });
                     } else {
-                        // Success: Submit form normally to open new tab
-                        bulletinForm.submit();
+                        bulletinReady = true;
+                        HTMLFormElement.prototype.submit.call(bulletinForm);
+                        bulletinReady = false;
+                        reinitPickers();
                     }
                 })
                 .catch(err => {

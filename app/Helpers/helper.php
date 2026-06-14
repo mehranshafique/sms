@@ -127,3 +127,35 @@ if (!function_exists('brand_logo_alt')) {
         return config('app.name', 'Digitex');
     }
 }
+
+if (!function_exists('institution_room_options')) {
+    /**
+     * Room dropdown options from school configuration (Room 1 … Room N).
+     *
+     * @return array<string, string>
+     */
+    function institution_room_options(?int $institutionId = null): array
+    {
+        if (! $institutionId && Auth::check()) {
+            $activeId = session('active_institution_id', Auth::user()->institute_id);
+            if ($activeId && $activeId !== 'global') {
+                $institutionId = (int) $activeId;
+            } elseif (Auth::user()->institute_id) {
+                $institutionId = (int) Auth::user()->institute_id;
+            }
+        }
+
+        if (! $institutionId) {
+            return [];
+        }
+
+        $count = max(1, (int) \App\Models\InstitutionSetting::get($institutionId, 'school_rooms_count', 10));
+        $options = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $label = __('class_section.room_option', ['number' => $i]);
+            $options[$label] = $label;
+        }
+
+        return $options;
+    }
+}

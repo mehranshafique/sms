@@ -78,7 +78,9 @@ class StateExamController extends BaseController
             ['candidate_number' => $data['candidate_number'], 'status' => 'registered']
         );
 
-        return back()->with('success', __('state_exam.candidate_registered'));
+        return redirect()
+            ->route('state-exams.show', $stateExam)
+            ->with('success', __('state_exam.candidate_registered'));
     }
 
     public function updateCandidate(Request $request, StateExam $stateExam, StateExamCandidate $candidate)
@@ -98,7 +100,9 @@ class StateExamController extends BaseController
 
         $candidate->update($data + ['mention' => $mention]);
 
-        return back()->with('success', __('state_exam.candidate_updated'));
+        return redirect()
+            ->route('state-exams.show', $stateExam)
+            ->with('success', __('state_exam.candidate_updated'));
     }
 
     private function authorizeInstitution(?int $institutionId): void

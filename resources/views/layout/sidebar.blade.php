@@ -223,9 +223,12 @@
                     @endif
 
                     {{-- Class & Subject Config Group --}}
-                    <li class="{{ request()->routeIs('class-sections.*', 'subjects.*', 'class-subjects.*', 'timetables.*', 'assignments.*') ? 'mm-active' : '' }}">
-                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-book"></i><span class="nav-text">{{ __('sidebar.class_subjects.title') }}</span></a>
-                        <ul aria-expanded="false">
+                    @php
+                        $classSubjectsMenuOpen = request()->routeIs('class-sections.*', 'subjects.*', 'class-subjects.*', 'timetables.*', 'assignments.*');
+                    @endphp
+                    <li class="{{ $classSubjectsMenuOpen ? 'mm-active' : '' }}">
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="{{ $classSubjectsMenuOpen ? 'true' : 'false' }}"><i class="la la-book"></i><span class="nav-text">{{ __('sidebar.class_subjects.title') }}</span></a>
+                        <ul aria-expanded="{{ $classSubjectsMenuOpen ? 'true' : 'false' }}">
                             @if($hasModule('class_sections') && $user->can('class_section.view'))
                                 <li><a class="{{ request()->routeIs('class-sections.*') ? 'mm-active' : '' }}" href="{{ route('class-sections.index') }}">{{ __('sidebar.class_sections.title') }}</a></li>
                             @endif

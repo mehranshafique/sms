@@ -29,6 +29,47 @@ class AssignmentController extends BaseController
     {
         $user = Auth::user();
         $institutionId = $this->getInstitutionId();
+
+        if ($request->ajax()) {
+            $query = Assignment::with(['classSection.gradeLevel', 'subject', 'teacher.user'])
+                ->where('institution_id', $institutionId)
+                ->latest();
+
+            if ($user->hasRole(RoleEnum::TEACHER->value)) {
+                $staff = $user->staff;
+                if ($staff) {
+                    $query->where('teacher_id', $staff->id);
+                }
+            }
+
+            return \Yajra\DataTables\Facades\DataTables::of($query)
+                ->addIndexColumn()
+                ->editColumn('title', function ($row) {
+                    $html = e($row->title);
+                    if ($row->file_path) {
+                        $html .= ' <a href="'.asset('storage/'.$row->file_path).'" target="_blank" class="text-primary ms-1"><i class="fa fa-paperclip"></i></a>';
+                    }
+                    return $html;
+                })
+                ->addColumn('class_name', function ($row) {
+                    $grade = $row->classSection->gradeLevel->name ?? '';
+                    $section = $row->classSection->name ?? '';
+                    return trim($grade.' '.$section);
+                })
+                ->editColumn('deadline', function ($row) {
+                    $class = $row->deadline < now() ? 'danger' : 'success';
+                    return '<span class="badge badge-'.$class.'">'.$row->deadline->format('d M, Y').'</span>';
+                })
+                ->addColumn('teacher_name', fn ($row) => e($row->teacher->user->name ?? 'Admin'))
+                ->addColumn('action', function ($row) {
+                    if (! auth()->user()->can('delete', $row) && ! auth()->user()->hasRole(['Super Admin', 'Head Officer'])) {
+                        return '';
+                    }
+                    return '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-assignment-btn" data-id="'.$row->id.'" data-url="'.route('assignments.destroy', $row->id).'"><i class="fa fa-trash"></i></button>';
+                })
+                ->rawColumns(['title', 'deadline', 'action'])
+                ->make(true);
+        }
         
         $query = Assignment::with(['classSection.gradeLevel', 'subject', 'teacher.user'])
             ->where('institution_id', $institutionId)
@@ -52,18 +93,9 @@ class AssignmentController extends BaseController
             // Return Specific Student View
             $assignments = $query->paginate(10);
             return view('assignments.student_index', compact('assignments'));
-        } 
-        
-        elseif ($user->hasRole(RoleEnum::TEACHER->value)) {
-            $staff = $user->staff;
-            if ($staff) {
-                $query->where('teacher_id', $staff->id);
-            }
         }
 
-        $assignments = $query->paginate(10);
-
-        return view('assignments.index', compact('assignments'));
+        return view('assignments.index');
     }
 
     public function create()

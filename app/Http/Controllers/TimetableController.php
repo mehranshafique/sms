@@ -89,10 +89,11 @@ class TimetableController extends BaseController
                     }
                     return '';
                 })
+                ->addColumn('grade_name', function($row){
+                    return $row->classSection->gradeLevel->name ?? '—';
+                })
                 ->addColumn('class', function($row){
-                    $gradeName = $row->classSection->gradeLevel->name ?? '';
-                    $sectionName = $row->classSection->name ?? 'N/A';
-                    return ($gradeName ? $gradeName . ' ' : '') . $sectionName;
+                    return $row->classSection->name ?? 'N/A';
                 })
                 ->addColumn('subject', function($row){
                     // UPDATED: Show UE Code if available

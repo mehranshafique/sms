@@ -38,9 +38,13 @@
                                 }
                             @endphp
 
-                            @if($hasContext && !$isSuperAdmin)
+                            @php
+                                $showInstituteSelect = count($institutes) > 0 && (!$hasContext || $isSuperAdmin);
+                            @endphp
+
+                            @if($hasContext && !$showInstituteSelect)
                                 <input type="hidden" name="institution_id" value="{{ $institutionId }}">
-                            @else
+                            @elseif($showInstituteSelect)
                                 <div class="mb-3 col-md-6">
                                     <label class="form-label">{{ __('grade_level.institution') }} <span class="text-danger">*</span></label>
                                     <select name="institution_id" class="form-control default-select" required>

@@ -35,6 +35,8 @@ return [
     'section_name' => 'Nom de la section',
     'section_code' => 'Code de la section',
     'room_number' => 'Numéro de salle',
+    'select_room' => 'Sélectionner la salle',
+    'room_option' => 'Salle :number',
     'capacity' => 'Capacité d\'élèves',
     'status_label' => 'Statut',
     'enter_name' => 'ex: Section A',

@@ -22,4 +22,10 @@ return [
     'candidate_registered' => 'Candidat inscrit.',
     'candidate_updated' => 'Dossier candidat mis à jour.',
     'no_exams' => 'Aucun examen d\'État configuré.',
+    'save' => 'Enregistrer',
+    'no_candidates' => 'Aucun candidat inscrit.',
+    'status_registered' => 'Inscrit',
+    'status_passed' => 'Réussi',
+    'status_failed' => 'Échoué',
+    'status_absent' => 'Absent',
 ];

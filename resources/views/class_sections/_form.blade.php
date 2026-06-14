@@ -81,7 +81,10 @@
 
                             <div class="mb-3 col-md-3">
                                 <label class="form-label">{{ __('class_section.room_number') }}</label>
-                                <input type="text" name="room_number" class="form-control" value="{{ old('room_number', $class_section->room_number ?? '') }}" placeholder="{{ __('class_section.enter_room') }}">
+                                @include('partials.room-number-select', [
+                                    'selected' => old('room_number', $class_section->room_number ?? ''),
+                                    'institutionId' => $institutionId ?? ($class_section->institution_id ?? null),
+                                ])
                             </div>
 
                             <div class="mb-3 col-md-3">

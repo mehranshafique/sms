@@ -74,6 +74,56 @@ class BaseController extends LaravelController
     }
 
     /**
+     * Institutions for admin dropdowns (Super Admin: all active; others: allowed only).
+     *
+     * @return array<int, string>
+     */
+    protected function getInstitutesForSelect(): array
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return [];
+        }
+
+        $query = Institution::query()
+            ->where('is_active', true)
+            ->orderBy('name');
+
+        if ($user->hasRole('Super Admin')) {
+            return $query->pluck('name', 'id')->all();
+        }
+
+        $allowed = $this->getAllowedInstitutionIds($user);
+        if ($allowed === []) {
+            return [];
+        }
+
+        return $query->whereIn('id', $allowed)->pluck('name', 'id')->all();
+    }
+
+    /**
+     * Room labels from school configuration (Room 1 … Room N).
+     *
+     * @return array<string, string>
+     */
+    protected function getRoomOptions(?int $institutionId = null): array
+    {
+        $institutionId = $institutionId ?? $this->getInstitutionId();
+        if (! $institutionId) {
+            return [];
+        }
+
+        $count = max(1, (int) \App\Models\InstitutionSetting::get($institutionId, 'school_rooms_count', 10));
+        $options = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $label = __('class_section.room_option', ['number' => $i]);
+            $options[$label] = $label;
+        }
+
+        return $options;
+    }
+
+    /**
      * Helper: Get list of all IDs user can access.
      */
    protected function getAllowedInstitutionIds($user)

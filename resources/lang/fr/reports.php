@@ -29,6 +29,7 @@ return [
     'error_period_inactive' => 'La période sélectionnée (:period) n\'est pas active.',
     'no_students_in_class' => 'Aucun élève actif trouvé dans la classe.',
     'error_occurred'   => 'Erreur lors de la génération du rapport.',
+    'generic_error'    => 'Une erreur est survenue. Veuillez réessayer.',
     'generation_mode' => 'Mode de génération',
     'single_student' => 'Un seul élève',
     'whole_class' => 'Classe entière',

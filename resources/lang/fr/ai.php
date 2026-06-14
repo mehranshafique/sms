@@ -144,6 +144,8 @@ return [
         'generate_exam_datesheet_desc' => 'Générer le planning dans les heures de cours et les salles disponibles.',
         'generate_timetable'     => 'Emploi du temps IA',
         'generate_timetable_desc'=> 'Créer un emploi du temps hebdomadaire sans conflits.',
+        'draft_assignment'       => 'Devoir IA',
+        'draft_assignment_desc'  => 'Générer un titre ou une description de devoir.',
     ],
 
     'period_days'            => 'Jours d’examens',
@@ -174,5 +176,7 @@ return [
     'btn_exam_at_risk'       => 'Scan à risque IA',
     'btn_generate_datesheet' => 'Générer planning IA',
     'btn_generate_timetable' => 'Générer emploi du temps IA',
+    'btn_draft_assignment'   => 'Titre IA',
+    'btn_draft_assignment_desc' => 'Description IA',
     'preview_message'        => 'Aperçu du message (modifiez avant envoi)',
 ];

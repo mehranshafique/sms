@@ -115,3 +115,13 @@
     </div>
 </div>
 @endsection
+
+@section('js')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof window.digitexReinitSelectPickers === 'function') {
+            window.digitexReinitSelectPickers();
+        }
+    });
+</script>
+@endsection

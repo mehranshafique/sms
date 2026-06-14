@@ -22,4 +22,10 @@ return [
     'candidate_registered' => 'Candidate registered.',
     'candidate_updated' => 'Candidate record updated.',
     'no_exams' => 'No state exams configured yet.',
+    'no_candidates' => 'No candidates registered yet.',
+    'save' => 'Save',
+    'status_registered' => 'Registered',
+    'status_passed' => 'Passed',
+    'status_failed' => 'Failed',
+    'status_absent' => 'Absent',
 ];

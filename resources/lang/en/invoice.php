@@ -27,6 +27,7 @@ return [
     'target_section' => 'Target Section',
     'select_grade' => 'Select Grade',
     'select_section' => 'Select Section',
+    'select_class' => 'Select Class',
     'select_grade_first' => 'Select Grade First',
     
     'select_students' => 'Select Students',

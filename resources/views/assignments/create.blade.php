@@ -40,13 +40,41 @@
                                 {{-- Title --}}
                                 <div class="col-md-12 mb-3">
                                     <label class="form-label">{{ __('assignment.title') }} <span class="text-danger">*</span></label>
-                                    <input type="text" name="title" class="form-control" placeholder="{{ __('assignment.enter_title') }}" required>
+                                    <input type="text" name="title" id="assignment_title" class="form-control" placeholder="{{ __('assignment.enter_title') }}" required>
+                                    @if(has_ai_access())
+                                    <div class="mt-2">
+                                        @include('ai.partials.embed-button', [
+                                            'tool' => 'draft_assignment',
+                                            'params' => ['mode' => 'title'],
+                                            'fields' => [
+                                                'class_section_id' => '#class_section_id',
+                                                'subject_id' => '#subject_id',
+                                            ],
+                                            'label' => __('ai.btn_draft_assignment'),
+                                            'target' => '#assignment_title',
+                                        ])
+                                    </div>
+                                    @endif
                                 </div>
 
                                 {{-- Description --}}
                                 <div class="col-md-12 mb-3">
                                     <label class="form-label">{{ __('assignment.description') }}</label>
-                                    <textarea name="description" class="form-control" rows="4"></textarea>
+                                    <textarea name="description" id="assignment_description" class="form-control" rows="4"></textarea>
+                                    @if(has_ai_access())
+                                    <div class="mt-2">
+                                        @include('ai.partials.embed-button', [
+                                            'tool' => 'draft_assignment',
+                                            'params' => ['mode' => 'description'],
+                                            'fields' => [
+                                                'class_section_id' => '#class_section_id',
+                                                'subject_id' => '#subject_id',
+                                            ],
+                                            'label' => __('ai.btn_draft_assignment_desc'),
+                                            'target' => '#assignment_description',
+                                        ])
+                                    </div>
+                                    @endif
                                 </div>
 
                                 {{-- Deadline --}}

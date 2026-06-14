@@ -14,6 +14,7 @@
 
     <!-- Required vendors -->
     <script src="{{ asset('vendor/global/global.min.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 	<script src="{{ asset('vendor/bootstrap-select/dist/js/bootstrap-select.min.js') }}"></script>
     <script src="{{ asset('vendor/ckeditor/ckeditor.js') }}"></script>
 
@@ -33,12 +34,18 @@
     <script src="{{asset('vendor/pickadate/picker.time.js')}}"></script>
     <script src="{{asset('vendor/pickadate/picker.date.js')}}"></script>
 
+    <style>
+        .bootstrap-select .dropdown-menu { z-index: 1065 !important; }
+        .content-body .card,
+        .content-body .card-body,
+        .content-body .table-responsive { overflow: visible; }
+    </style>
     <!-- Global Init Script -->
     <script>
         $(document).ready(function() {
             // 1. Initialize Material Date Picker
             if(jQuery().bootstrapMaterialDatePicker) {
-                $('.datepicker').bootstrapMaterialDatePicker({
+                jQuery('.datepicker, .datepicker-default').bootstrapMaterialDatePicker({
                     weekStart: 0,
                     time: false,
                     format: 'YYYY-MM-DD'
@@ -56,32 +63,55 @@
             }
 
             // 3. Configure Bootstrap Select (Global Fallback)
+            window.digitexReinitSelectPickers = function() {
+                if (typeof jQuery.fn.selectpicker === 'undefined') {
+                    return;
+                }
+                jQuery('.default-select, .multi-select').each(function() {
+                    var $el = jQuery(this);
+                    if ($el.data('selectpicker')) {
+                        $el.selectpicker('destroy');
+                    }
+                });
+                jQuery('.default-select').selectpicker({
+                    liveSearch: true,
+                    size: 10,
+                    container: 'body',
+                    dropupAuto: false,
+                });
+                jQuery('.multi-select').selectpicker({
+                    liveSearch: true,
+                    size: 10,
+                    width: '100%',
+                    container: 'body',
+                    dropupAuto: false,
+                });
+                jQuery('.default-select, .multi-select').each(function() {
+                    if (!jQuery(this).attr('title')) {
+                        jQuery(this).attr('title', '');
+                    }
+                }).selectpicker('refresh');
+            };
+
             if (typeof jQuery.fn.selectpicker !== 'undefined' && jQuery.fn.selectpicker.defaults) {
                 jQuery.fn.selectpicker.defaults.noneSelectedText = '';
                 jQuery.fn.selectpicker.defaults.noneResultsText = 'No results found';
             }
 
             setTimeout(function() {
-                if (typeof jQuery.fn.selectpicker !== 'undefined') {
-                    jQuery('.default-select').selectpicker({
-                        liveSearch: true,
-                        size: 10
-                    });
-                    
-                    // Also initialize multi-selects globally just in case
-                    jQuery('.multi-select').selectpicker({
-                        liveSearch: true,
-                        size: 10,
-                        width: '100%'
-                    });
-
-                    jQuery('.default-select, .multi-select').each(function() {
-                        if (!jQuery(this).attr('title')) {
-                            jQuery(this).attr('title', '');
-                        }
-                    }).selectpicker('refresh');
+                if (typeof window.digitexReinitSelectPickers === 'function') {
+                    window.digitexReinitSelectPickers();
                 }
             }, 100);
+
+            if (typeof toastr !== 'undefined') {
+                toastr.options = {
+                    closeButton: true,
+                    progressBar: true,
+                    positionClass: 'toast-top-right',
+                    timeOut: 4000,
+                };
+            }
 
             // SweetAlert: close bootstrap-select dropdowns so "Nothing selected" does not appear in modals
             if (typeof Swal !== 'undefined' && Swal.fire) {

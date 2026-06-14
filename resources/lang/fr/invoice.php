@@ -27,6 +27,7 @@ return [
     'target_section' => 'Section cible',
     'select_grade' => 'Sélectionner le niveau',
     'select_section' => 'Sélectionner la section',
+    'select_class' => 'Sélectionner la classe',
     'select_grade_first' => 'Sélectionner le niveau d\'abord',
     
     'select_students' => 'Sélectionner les élèves',

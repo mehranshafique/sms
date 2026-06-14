@@ -89,7 +89,11 @@
                             {{-- Room --}}
                             <div class="mb-3 col-md-12">
                                 <label class="form-label">{{ __('timetable.room_number') }}</label>
-                                <input type="text" name="room_number" id="roomInput" class="form-control" value="{{ old('room_number', isset($timetable) ? $timetable->room_number : '') }}" placeholder="{{ __('timetable.enter_room') }}">
+                                @include('partials.room-number-select', [
+                                    'id' => 'roomInput',
+                                    'selected' => old('room_number', isset($timetable) ? $timetable->room_number : ''),
+                                    'institutionId' => $institutionId ?? null,
+                                ])
                             </div>
 
                             {{-- Time Slots --}}

@@ -43,6 +43,7 @@ return [
     'cycle_primary' => 'Primaire',
     'cycle_secondary' => 'Secondaire',
     'cycle_lmd' => 'Université',
+    'cycle_university' => 'Université',
     'cycle_vocational' => 'Professionnel',
     'save' => 'Enregistrer le niveau',
     'update' => 'Mettre à jour le niveau',

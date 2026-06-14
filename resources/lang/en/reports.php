@@ -35,6 +35,7 @@ return [
     'error_period_inactive' => 'The selected period (:period) is not currently active. Reports cannot be generated.',
     'no_students_in_class' => 'No active students found in the selected class.',
     'error_occurred'   => 'An error occurred while generating the report.',
+    'generic_error'    => 'Something went wrong. Please try again.',
     
     // Bulk & Validation
     'generation_mode' => 'Generation Mode',
