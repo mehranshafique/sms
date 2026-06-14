@@ -104,7 +104,7 @@ class StatsController extends ChatbotBaseController
 
         // --- 3. URL GENERATION ---
         // Generates the exact same PDF view used in the web dashboard, ensuring perfect symmetry.
-        $downloadUrl = URL::signedRoute('reports.bulletin', [
+        $downloadUrl = URL::signedRoute('reports.bulletin.signed', [
             'student_id' => $student->id,
             'mode' => 'single',
             'report_scope' => 'trimester',

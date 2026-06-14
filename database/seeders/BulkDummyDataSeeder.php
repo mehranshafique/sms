@@ -242,12 +242,14 @@ class BulkDummyDataSeeder extends Seeder
             'name' => 'Admin ' . $data['acronym'],
             'email' => $this->yopmail($adminUsername),
             'password' => Hash::make('password'),
+            'username' => $adminUsername,
+            'shortcode' => 'ADM-'.$instCode,
+        ]);
+        $adminUser->forceFill([
             'user_type' => UserType::SCHOOL_ADMIN->value,
             'institute_id' => $institution->id,
             'is_active' => true,
-            'username' => $adminUsername,
-            'shortcode' => 'ADM-'.$instCode
-        ]);
+        ])->save();
         $adminUser->assignRole(RoleEnum::SCHOOL_ADMIN->value);
 
         // 5. Campus & Session
@@ -275,11 +277,13 @@ class BulkDummyDataSeeder extends Seeder
                 'name' => $faker->name,
                 'email' => $this->yopmail($teacherUsername),
                 'password' => Hash::make('password'),
+                'username' => $teacherUsername,
+            ]);
+            $tUser->forceFill([
                 'user_type' => UserType::STAFF->value,
                 'institute_id' => $institution->id,
                 'is_active' => true,
-                'username' => $teacherUsername,
-            ]);
+            ])->save();
             $tUser->assignRole(RoleEnum::TEACHER->value);
             
             $staff = Staff::create([
@@ -460,11 +464,13 @@ class BulkDummyDataSeeder extends Seeder
                 'name' => $faker->firstName . ' ' . $faker->lastName,
                 'email' => $this->yopmail($studentUsername),
                 'password' => Hash::make('password'),
+                'username' => $studentUsername,
+            ]);
+            $sUser->forceFill([
                 'user_type' => UserType::STUDENT->value,
                 'institute_id' => $institution->id,
                 'is_active' => true,
-                'username' => $studentUsername,
-            ]);
+            ])->save();
             if($studentRole) $sUser->assignRole($studentRole);
 
             $guardianUsername = 'guardian_' . $s . '_' . strtolower($data['acronym']);

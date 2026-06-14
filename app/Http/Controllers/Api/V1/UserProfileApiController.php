@@ -71,7 +71,8 @@ class UserProfileApiController extends Controller
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'password' => 'nullable|string|min:8'
+            'password' => 'nullable|string|min:8|confirmed',
+            'current_password' => 'required_with:password|string',
         ]);
 
         if ($request->hasFile('profile_picture')) {
@@ -124,7 +125,13 @@ class UserProfileApiController extends Controller
             }
         }
 
-        if ($request->password) {
+        if ($request->filled('password')) {
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('validation.current_password'),
+                ], 422);
+            }
             $user->password = Hash::make($request->password);
         }
 

@@ -190,11 +190,13 @@ class ExamController extends BaseController
             'category' => 'required|string|max:50', // NEW VALIDATION
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'status' => 'required|in:scheduled,ongoing,completed,published',
+            'status' => 'required|in:scheduled,ongoing,completed',
             'description' => 'nullable|string',
         ]);
 
-        $exam = new Exam($request->all());
+        $exam = new Exam($request->only([
+            'academic_session_id', 'name', 'category', 'start_date', 'end_date', 'status', 'description',
+        ]));
         $exam->institution_id = $session->institution_id;
         $exam->save();
 
@@ -304,7 +306,15 @@ class ExamController extends BaseController
             'description' => 'nullable|string',
         ]);
 
-        $exam->update($request->all());
+        $data = $request->only([
+            'academic_session_id', 'name', 'category', 'start_date', 'end_date', 'status', 'description',
+        ]);
+
+        if (($data['status'] ?? '') === 'published' && !$exam->finalized_at) {
+            unset($data['status']);
+        }
+
+        $exam->update($data);
 
         return response()->json(['message' => __('exam.messages.success_update'), 'redirect' => route('exams.index')]);
     }

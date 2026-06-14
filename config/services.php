@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    'hardware' => [
+        'secret' => env('HARDWARE_SECRET'),
+        /** Comma-separated institution IDs this gate device may access. Empty = disabled cross-tenant header. */
+        'allowed_institution_ids' => array_values(array_filter(array_map(
+            'intval',
+            explode(',', (string) env('HARDWARE_ALLOWED_INSTITUTION_IDS', ''))
+        ))),
+    ],
+
+    'chatbot' => [
+        'twilio_auth_token' => env('TWILIO_AUTH_TOKEN'),
+        'meta_app_secret' => env('META_WHATSAPP_APP_SECRET'),
+        'infobip_api_key' => env('INFOBIP_API_KEY'),
+        'webhook_secret' => env('CHATBOT_WEBHOOK_SECRET'),
+    ],
+
 ];

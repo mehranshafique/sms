@@ -271,11 +271,13 @@ class ParentController extends BaseController
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($plainPassword),
+            'phone' => $phone,
+        ]);
+        $user->forceFill([
             'user_type' => UserType::GUARDIAN->value,
             'institute_id' => $institutionId,
-            'phone' => $phone,
             'is_active' => true,
-        ]);
+        ])->save();
 
         $shortcode = IdGeneratorService::generateParentShortcode($institution, $user->id);
         $username = $request->username ?: $shortcode;

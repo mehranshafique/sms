@@ -57,18 +57,22 @@ class MobileLookupApiController extends Controller
         }
 
         $term = $request->query('query');
-        $institutionId = $user->institute_id;
+        $institutionId = $user->institute_id ?: session('active_institution_id');
+
+        if (!$institutionId || $institutionId === 'global') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Select an institution context before searching students.',
+            ], 422);
+        }
 
         $studentsQuery = Student::query()
+            ->where('institution_id', (int) $institutionId)
             ->where(function ($q) use ($term) {
                 $q->where('admission_number', 'like', "%{$term}%")
                     ->orWhere('first_name', 'like', "%{$term}%")
                     ->orWhere('last_name', 'like', "%{$term}%");
             });
-
-        if ($institutionId) {
-            $studentsQuery->where('institution_id', $institutionId);
-        }
 
         $students = $studentsQuery->limit(20)->get()->map(function ($student) {
             $invoices = Invoice::where('student_id', $student->id)

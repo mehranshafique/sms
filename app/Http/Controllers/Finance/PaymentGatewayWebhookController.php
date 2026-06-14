@@ -18,17 +18,17 @@ class PaymentGatewayWebhookController extends Controller
 
     public function pawapay(Request $request)
     {
-        return $this->handleWebhook('pawapay', $request->all());
+        return $this->handleWebhook('pawapay', $request);
     }
 
     public function cinetpay(Request $request)
     {
-        return $this->handleWebhook('cinetpay', $request->all());
+        return $this->handleWebhook('cinetpay', $request);
     }
 
     public function flutterwave(Request $request)
     {
-        return $this->handleWebhook('flutterwave', $request->all());
+        return $this->handleWebhook('flutterwave', $request);
     }
 
     public function returnUrl(Request $request, string $gateway, string $reference)
@@ -53,13 +53,22 @@ class PaymentGatewayWebhookController extends Controller
         return redirect()->route('pay.lookup')->with('success', __('payment_gateway.payment_pending'));
     }
 
-    private function handleWebhook(string $gateway, array $payload)
+    private function handleWebhook(string $gateway, Request $request)
     {
+        $payload = $request->all();
+
         try {
+            if ($gateway === 'flutterwave' && !$this->verifyFlutterwaveSignature($request)) {
+                Log::warning("Payment webhook {$gateway} rejected: invalid signature");
+
+                return response()->json(['message' => 'invalid signature'], 401);
+            }
+
             $reference = $payload['depositId']
                 ?? $payload['transaction_id']
                 ?? $payload['tx_ref']
                 ?? $payload['cpm_trans_id']
+                ?? data_get($payload, 'data.tx_ref')
                 ?? null;
 
             if (!$reference) {
@@ -78,9 +87,8 @@ class PaymentGatewayWebhookController extends Controller
                 return response()->json(['message' => 'transaction not found'], 404);
             }
 
-            $driver = $this->gatewayManager->driver($transaction->institution_id, $gateway);
-            $result = $driver->parseCallback($payload);
-            $this->completionService->complete($transaction, $result);
+            // Never trust webhook body alone — always verify with the gateway API before completing.
+            $this->completionService->verifyAndComplete($transaction);
 
             return response()->json(['message' => 'ok']);
         } catch (\Throwable $e) {
@@ -88,5 +96,17 @@ class PaymentGatewayWebhookController extends Controller
 
             return response()->json(['message' => 'error'], 500);
         }
+    }
+
+    private function verifyFlutterwaveSignature(Request $request): bool
+    {
+        $secretHash = $request->header('verif-hash');
+        $secretKey = config('payment_gateways.providers.flutterwave.webhook_secret', env('FLUTTERWAVE_WEBHOOK_SECRET'));
+
+        if (empty($secretKey) || empty($secretHash)) {
+            return false;
+        }
+
+        return hash_equals($secretKey, $secretHash);
     }
 }

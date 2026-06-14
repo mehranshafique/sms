@@ -519,7 +519,9 @@ class TimetableController extends BaseController
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
 
         $timetable = new Timetable();
-        $timetable->fill($request->all());
+        $timetable->fill($request->only([
+            'class_section_id', 'subject_id', 'day', 'start_time', 'end_time', 'room_number',
+        ]));
         $timetable->institution_id = $institutionId;
         $timetable->academic_session_id = $currentSession->id;
         $timetable->day_of_week = strtolower($request->day);
@@ -572,7 +574,9 @@ class TimetableController extends BaseController
         $institutionId = $this->getInstitutionId() ?? $timetable->institution_id;
         $this->validateTimetable($request, $timetable->id, $institutionId);
 
-        $timetable->fill($request->all());
+        $timetable->fill($request->only([
+            'class_section_id', 'subject_id', 'day', 'start_time', 'end_time', 'room_number',
+        ]));
         $timetable->day_of_week = strtolower($request->day);
         $timetable->teacher_id = $request->staff_id;
         $timetable->save();

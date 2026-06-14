@@ -341,12 +341,14 @@ class StudentController extends BaseController
                             'email' => $email,
                             'password' => Hash::make($parentPlainPassword),
                             'phone' => $phone,
+                            'shortcode' => $parentShortcode,
+                            'username' => $parentShortcode,
+                        ]);
+                        $newUser->forceFill([
                             'user_type' => UserType::GUARDIAN->value,
                             'institute_id' => $institutionId,
-                            'shortcode' => $parentShortcode, 
-                            'username' => $parentShortcode,  
                             'is_active' => true,
-                        ]);
+                        ])->save();
                         $newUser->assignRole('Guardian'); 
                         $parentUserId = $newUser->id;
                         $parentUserObj = $newUser;
@@ -406,12 +408,14 @@ class StudentController extends BaseController
                     'email' => $studentEmail,
                     'password' => Hash::make($studentPlainPassword),
                     'phone' => $request->mobile_number,
+                    'shortcode' => $admissionNumber,
+                    'username' => $admissionNumber,
+                ]);
+                $studentUser->forceFill([
                     'user_type' => UserType::STUDENT->value,
                     'institute_id' => $institutionId,
-                    'shortcode' => $admissionNumber, 
-                    'username' => $admissionNumber,  
                     'is_active' => ($request->status === 'active'),
-                ]);
+                ])->save();
 
                 $studentRole = Role::where('name', RoleEnum::STUDENT->value)
                                    ->where('institution_id', $institutionId)
@@ -584,13 +588,15 @@ class StudentController extends BaseController
                                 'name' => $parentData['guardian_name'] ?? $parentData['father_name'] ?? 'Parent',
                                 'email' => $parentData['guardian_email'],
                                 'password' => Hash::make($plainPassword),
-                                'phone' => $phone, 
-                                'user_type' => UserType::GUARDIAN->value,
-                                'institute_id' => $student->institution_id,
+                                'phone' => $phone,
                                 'shortcode' => $parentShortcode,
                                 'username' => $parentShortcode,
-                                'is_active' => true,
                             ]);
+                            $newUser->forceFill([
+                                'user_type' => UserType::GUARDIAN->value,
+                                'institute_id' => $student->institution_id,
+                                'is_active' => true,
+                            ])->save();
                             $newUser->assignRole('Guardian');
                             $student->parent->update(['user_id' => $newUser->id]);
                             $parentUser = $newUser;

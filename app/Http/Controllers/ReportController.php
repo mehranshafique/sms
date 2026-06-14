@@ -29,14 +29,29 @@ class ReportController extends BaseController
     
     public function __construct(LmdCalculationService $lmdService)
     {
-        $this->middleware('auth');
+        $this->middleware('auth')->except(['bulletinSigned']);
         $this->middleware(function ($request, $next) {
             $this->denyStudentLikeRoles();
             $this->authorizeAdminOrPermission('academic_report.view');
-            return $next;
+            return $next($request);
         })->only(['index', 'bulletin', 'transcript']);
         $this->setPageTitle(__('reports.page_title'));
         $this->lmdService = $lmdService;
+    }
+
+    public function bulletinSigned(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'trimester' => 'nullable|integer|in:1,2,3',
+            'semester' => 'nullable|integer|in:1,2',
+            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6',
+            'type' => 'nullable|in:period,term',
+        ]);
+
+        $student = Student::findOrFail($request->student_id);
+
+        return $this->renderBulletin($request, (int) $student->institution_id, skipRoleChecks: true);
     }
 
     public function checkFinancialClearance($studentId, $institutionId, $abort = true)
@@ -86,6 +101,13 @@ class ReportController extends BaseController
 
     public function bulletin(Request $request)
     {
+        $institutionId = $this->getInstitutionId();
+
+        return $this->renderBulletin($request, (int) $institutionId, skipRoleChecks: false);
+    }
+
+    protected function renderBulletin(Request $request, int $institutionId, bool $skipRoleChecks = false)
+    {
         $request->validate([
             'student_id' => 'nullable|required_without:class_section_id|exists:students,id',
             'class_section_id' => 'nullable|required_without:student_id|exists:class_sections,id',
@@ -95,9 +117,7 @@ class ReportController extends BaseController
             'type' => 'nullable|in:period,term', 
         ]);
 
-        $institutionId = $this->getInstitutionId();
-
-        if (!Auth::user()->hasRole('Super Admin')) {
+        if (!$skipRoleChecks && Auth::check() && !Auth::user()->hasRole('Super Admin')) {
             $activePeriodsJson = InstitutionSetting::get($institutionId, 'active_periods', '[]');
             $activePeriods = json_decode($activePeriodsJson, true) ?? [];
             

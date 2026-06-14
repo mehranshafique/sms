@@ -38,9 +38,12 @@ class CheckModuleAccess
         
         $institutionId = $activeId ?: $fixedId;
 
-        // FIX: Bypass module/context checks if in Global Dashboard mode
+        // Global dashboard: only Super Admin may bypass module checks without an institution context.
         if ($institutionId === 'global') {
-            return $next($request);
+            if ($user->hasRole('Super Admin')) {
+                return $next($request);
+            }
+            abort(403, 'Select an institution to access this module.');
         }
 
         if (!$institutionId) {

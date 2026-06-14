@@ -105,7 +105,7 @@ class FeeTypeController extends BaseController
             'is_active' => 'boolean',
         ]);
 
-        $feeType->update($request->all());
+        $feeType->update($request->only(['name', 'description', 'is_active']));
 
         return response()->json(['message' => __('finance.success_update_type'), 'redirect' => route('fee-types.index')]);
     }

@@ -22,17 +22,14 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
-        'username',   // <--- Add this
+        'username',
         'shortcode',
         'password',
-        'institute_id', // Useful for non-head officer users
-        'user_type',
         'phone',
         'address',
-        'is_active',
         'language',
-        'profile_picture', // Fixed: Added profile_picture to allowed mass assignment fields
-        'fcm_token' // <--- ADDED FOR PUSH NOTIFICATIONS
+        'profile_picture',
+        'fcm_token',
     ];
 
     /**

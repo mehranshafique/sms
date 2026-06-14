@@ -11,6 +11,7 @@ use App\Models\StudentAttendance;
 use App\Models\StudentEnrollment;
 use App\Models\Timetable;
 use App\Services\Mobile\MobileContextService;
+use App\Services\TeacherAttendanceAuthorization;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,10 @@ class TeacherAttendanceApiController extends Controller
     public function classes(Request $request)
     {
         $user = $request->user();
+        if ($denied = TeacherAttendanceAuthorization::denyUnlessAllowed($user)) {
+            return $denied;
+        }
+
         $institutionId = $user->institute_id;
         $isAdmin = $user->hasRole(['Super Admin', 'Head Officer', 'School Admin']);
 
@@ -66,7 +71,15 @@ class TeacherAttendanceApiController extends Controller
     public function subjects(Request $request, int $classSectionId)
     {
         $user = $request->user();
+        if ($denied = TeacherAttendanceAuthorization::denyUnlessAllowed($user)) {
+            return $denied;
+        }
+
         $classSection = ClassSection::findOrFail($classSectionId);
+        if ($denied = TeacherAttendanceAuthorization::denyUnlessClassAccess($user, $classSection)) {
+            return $denied;
+        }
+
         $institutionId = $classSection->institution_id;
         $isSubjectWise = $this->contextService->isSubjectWise($institutionId);
 
@@ -113,6 +126,15 @@ class TeacherAttendanceApiController extends Controller
 
         $user = $request->user();
         $classSection = ClassSection::findOrFail($request->class_section_id);
+
+        if ($denied = TeacherAttendanceAuthorization::denyUnlessClassAccess(
+            $user,
+            $classSection,
+            $request->filled('subject_id') ? (int) $request->subject_id : null
+        )) {
+            return $denied;
+        }
+
         $institutionId = $classSection->institution_id;
         $isSubjectWise = $this->contextService->isSubjectWise($institutionId);
 
@@ -176,8 +198,9 @@ class TeacherAttendanceApiController extends Controller
     public function mark(Request $request)
     {
         $user = $request->user();
-        $institutionId = $user->institute_id;
-        $isSubjectWise = $this->contextService->isSubjectWise($institutionId);
+        if ($denied = TeacherAttendanceAuthorization::denyUnlessAllowed($user)) {
+            return $denied;
+        }
 
         $rules = [
             'class_section_id' => 'required|exists:class_sections,id',
@@ -186,15 +209,23 @@ class TeacherAttendanceApiController extends Controller
             'attendance.*' => 'in:present,absent,late,excused,half_day',
         ];
 
+        $classSection = ClassSection::findOrFail($request->class_section_id);
+        $targetInstituteId = $classSection->institution_id;
+        $isSubjectWise = $this->contextService->isSubjectWise($targetInstituteId);
+
         if ($isSubjectWise) {
             $rules['subject_id'] = 'required|exists:subjects,id';
         }
 
         $request->validate($rules);
 
-        $classSection = ClassSection::findOrFail($request->class_section_id);
-        $targetInstituteId = $classSection->institution_id;
-        $isSubjectWise = $this->contextService->isSubjectWise($targetInstituteId);
+        if ($denied = TeacherAttendanceAuthorization::denyUnlessClassAccess(
+            $user,
+            $classSection,
+            $request->filled('subject_id') ? (int) $request->subject_id : null
+        )) {
+            return $denied;
+        }
 
         if (!$user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
             $lock = $this->resolveLockState($user, $classSection, Carbon::parse($request->attendance_date));
@@ -211,8 +242,19 @@ class TeacherAttendanceApiController extends Controller
             return response()->json(['success' => false, 'message' => 'No active academic session.'], 422);
         }
 
-        DB::transaction(function () use ($request, $targetInstituteId, $session, $isSubjectWise, $user) {
+        $enrolledStudentIds = StudentEnrollment::where('class_section_id', $request->class_section_id)
+            ->where('academic_session_id', $session->id)
+            ->where('status', 'active')
+            ->pluck('student_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        DB::transaction(function () use ($request, $targetInstituteId, $session, $isSubjectWise, $user, $enrolledStudentIds) {
             foreach ($request->attendance as $studentId => $status) {
+                if (!in_array((string) $studentId, $enrolledStudentIds, true)) {
+                    continue;
+                }
+
                 $match = [
                     'student_id' => $studentId,
                     'attendance_date' => $request->attendance_date,

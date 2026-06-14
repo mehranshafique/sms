@@ -28,7 +28,20 @@ class PickupWebController extends BaseController
      */
     public function guardScanner()
     {
+        $this->ensurePickupScannerRole();
+
         return view('pickups.guard');
+    }
+
+    private function ensurePickupScannerRole(): void
+    {
+        $user = Auth::user();
+        abort_unless($user && $user->hasRole([
+            RoleEnum::GATE_ATTENDANT->value,
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+        ]), 403);
     }
 
     /**
@@ -206,6 +219,8 @@ class PickupWebController extends BaseController
      */
     public function processScan(Request $request)
     {
+        $this->ensurePickupScannerRole();
+
         $request->validate(['qr_code' => 'required|string']);
         $user = Auth::user();
 

@@ -11,18 +11,25 @@ class ChatbotWebhookController extends Controller
 {
     protected $botService;
 
-    public function __construct(ChatbotLogicService $botService)
-    {
+    public function __construct(
+        ChatbotLogicService $botService,
+        protected \App\Services\ChatbotWebhookVerifier $webhookVerifier
+    ) {
         $this->botService = $botService;
     }
 
     public function handle(Request $request, $provider)
     {
         try {
-            // 1. LOG INPUT
+            if (!$this->webhookVerifier->verify($request, (string) $provider)) {
+                Log::warning("Chatbot webhook rejected [$provider]: signature verification failed");
+
+                return response()->json(['status' => 'unauthorized'], 401);
+            }
+
             Log::info("Webhook Hit [$provider]", [
-                'headers' => $request->headers->all(),
-                'payload' => $request->all()
+                'provider' => $provider,
+                'ip' => $request->ip(),
             ]);
 
             $data = null;

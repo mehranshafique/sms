@@ -70,3 +70,60 @@ if (!function_exists('has_ai_access')) {
         }
     }
 }
+
+if (!function_exists('brand_logo_url')) {
+    /**
+     * Resolve the logo shown in the UI: school logo when in institution context, else Digitex default.
+     */
+    function brand_logo_url(): string
+    {
+        $default = asset('images/digitex-logo.png');
+        $user = Auth::user();
+
+        if (! $user) {
+            return $default;
+        }
+
+        $activeId = session('active_institution_id', $user->institute_id);
+
+        if ((! $activeId || $activeId === 'global') && $user->institute_id) {
+            $activeId = $user->institute_id;
+        }
+
+        if ($activeId && $activeId !== 'global') {
+            $institution = \App\Models\Institution::find($activeId);
+            if ($institution?->logo) {
+                return asset('storage/' . $institution->logo);
+            }
+        }
+
+        return $default;
+    }
+}
+
+if (!function_exists('brand_logo_alt')) {
+    /**
+     * Accessible alt text for the resolved brand logo.
+     */
+    function brand_logo_alt(): string
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return config('app.name', 'Digitex');
+        }
+
+        $activeId = session('active_institution_id', $user->institute_id);
+        if ((! $activeId || $activeId === 'global') && $user->institute_id) {
+            $activeId = $user->institute_id;
+        }
+
+        if ($activeId && $activeId !== 'global') {
+            $institution = \App\Models\Institution::find($activeId);
+            if ($institution?->logo) {
+                return $institution->name;
+            }
+        }
+
+        return config('app.name', 'Digitex');
+    }
+}

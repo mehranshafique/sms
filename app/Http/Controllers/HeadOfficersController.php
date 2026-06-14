@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Institution;
 use App\Services\NotificationService;
 use App\Enums\RoleEnum;
+use App\Enums\UserType;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
@@ -100,10 +101,8 @@ class HeadOfficersController extends BaseController
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'user_type' => 2,
             'phone' => $request->phone,
             'address' => $request->address,
-            'is_active' => $request->is_active ?? 1
         ];
 
         if ($request->hasFile('profile_picture')) {
@@ -111,6 +110,10 @@ class HeadOfficersController extends BaseController
         }
 
         $user = User::create($userData);
+        $user->forceFill([
+            'user_type' => UserType::HEAD_OFFICER->value,
+            'is_active' => (bool) ($request->is_active ?? true),
+        ])->save();
         
         $assignedInstitutes = $request->input('institute_ids', []);
 
@@ -158,7 +161,7 @@ class HeadOfficersController extends BaseController
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $updateData = $request->only('name', 'email', 'phone', 'address', 'is_active');
+        $updateData = $request->only('name', 'email', 'phone', 'address');
         
         if($request->filled('password')){
             $updateData['password'] = Hash::make($request->password);
@@ -172,6 +175,10 @@ class HeadOfficersController extends BaseController
         }
 
         $user->update($updateData);
+
+        if ($request->has('is_active')) {
+            $user->forceFill(['is_active' => (bool) $request->is_active])->save();
+        }
         
         $assignedInstitutes = $request->input('institute_ids', []);
         

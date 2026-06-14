@@ -138,9 +138,9 @@ class AttendanceApiController extends Controller
             ->latest('updated_at');
 
         if ($isHardware) {
-            $institutionId = $request->header('X-Institution-Id');
-            if (!$institutionId) {
-                return response()->json(['message' => 'X-Institution-Id header required'], 400);
+            $institutionId = $this->resolveHardwareInstitutionId($request);
+            if ($institutionId instanceof \Illuminate\Http\JsonResponse) {
+                return $institutionId;
             }
             $query->where('institution_id', $institutionId);
         } elseif ($user) {
@@ -1169,6 +1169,32 @@ class AttendanceApiController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * @return int|\Illuminate\Http\JsonResponse
+     */
+    private function resolveHardwareInstitutionId(Request $request)
+    {
+        $allowed = config('services.hardware.allowed_institution_ids', []);
+        $headerId = $request->header('X-Institution-Id');
+
+        if (!empty($allowed)) {
+            if (!$headerId) {
+                return (int) $allowed[0];
+            }
+            if (!in_array((int) $headerId, $allowed, true)) {
+                return response()->json(['message' => 'Institution not authorized for this device'], 403);
+            }
+
+            return (int) $headerId;
+        }
+
+        if (!$headerId) {
+            return response()->json(['message' => 'X-Institution-Id header required'], 400);
+        }
+
+        return (int) $headerId;
     }
 
     private function isValidHardwareRequest(Request $request): bool

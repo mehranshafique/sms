@@ -196,14 +196,15 @@ class InstituteController extends BaseController
                     'name'          => $adminName,
                     'email'         => $request->email,
                     'password'      => Hash::make($request->password),
-                    'institute_id'  => $institute->id,
-                    'shortcode'     => $institute->code, 
+                    'shortcode'     => $institute->code,
                     'username'      => $institute->code,
-                    'user_type'     => UserType::SCHOOL_ADMIN->value, 
                     'phone'         => $adminPhone,
-                    'mobile_number' => $adminPhone,
-                    'is_active'     => true,
                 ]);
+                $adminUser->forceFill([
+                    'institute_id'  => $institute->id,
+                    'user_type'     => UserType::SCHOOL_ADMIN->value,
+                    'is_active'     => true,
+                ])->save();
 
                 $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
                             ->where('institution_id', $institute->id)
@@ -371,6 +372,11 @@ class InstituteController extends BaseController
 
     public function checkEmail(Request $request)
     {
+        abort_unless(
+            Auth::user()?->hasAnyRole(['Super Admin', 'Head Officer', 'School Admin']),
+            403
+        );
+
         $email = $request->input('email');
         $ignoreId = $request->input('id'); 
         

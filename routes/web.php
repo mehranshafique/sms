@@ -121,7 +121,7 @@ Route::get('/help/language/{language}', function (\Illuminate\Http\Request $requ
 // PUBLIC ONLINE PAYMENT (no login required)
 // =========================================================================
 Route::get('/pay', [OnlinePaymentController::class, 'lookup'])->name('pay.lookup');
-Route::post('/pay/find', [OnlinePaymentController::class, 'find'])->name('pay.find');
+Route::post('/pay/find', [OnlinePaymentController::class, 'find'])->middleware('throttle:10,1')->name('pay.find');
 Route::get('/pay/callback/{gateway}/{reference}', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'returnUrl'])->name('pay.gateway.return');
 Route::post('/webhooks/payments/pawapay', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'pawapay'])->name('webhooks.payments.pawapay');
 Route::post('/webhooks/payments/cinetpay', [\App\Http\Controllers\Finance\PaymentGatewayWebhookController::class, 'cinetpay'])->name('webhooks.payments.cinetpay');
@@ -130,6 +130,11 @@ Route::get('/pay/{token}/status/{reference}', [OnlinePaymentController::class, '
 Route::post('/pay/{token}/gateway', [OnlinePaymentController::class, 'initiateGateway'])->name('pay.gateway');
 Route::post('/pay/{token}/proof', [OnlinePaymentController::class, 'submitProof'])->name('pay.proof');
 Route::get('/pay/{token}', [OnlinePaymentController::class, 'show'])->name('pay.show');
+
+// Signed bulletin download (chatbot / external links — no session required)
+Route::get('/reports/bulletin/signed', [ReportController::class, 'bulletinSigned'])
+    ->middleware('signed')
+    ->name('reports.bulletin.signed');
 
 // =========================================================================
 // PUBLIC HELP CENTER, USER MANUAL & COMMUNITY FORUM
@@ -202,7 +207,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Infrastructure Management (Institutes, Campuses)
-    Route::get('institutes/check-email', [App\Http\Controllers\InstituteController::class, 'checkEmail'])->name('institutes.check_email');
+    Route::get('institutes/check-email', [App\Http\Controllers\InstituteController::class, 'checkEmail'])
+        ->middleware('throttle:30,1')
+        ->name('institutes.check_email');
     Route::delete('institutes/bulk-delete', [InstituteController::class, 'bulkDelete'])->name('institutes.bulkDelete');
     Route::resource('institutes', InstituteController::class);
     Route::get('institution/switch/{id}', [InstitutionContextController::class, 'switch'])->name('institution.switch');

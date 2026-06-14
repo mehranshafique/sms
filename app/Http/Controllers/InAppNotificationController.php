@@ -6,11 +6,11 @@ use App\Services\InAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class InAppNotificationController extends Controller
+class InAppNotificationController extends BaseController
 {
     public function __construct(private InAppNotificationService $notifications)
     {
-        $this->middleware('auth');
+        //
     }
 
     public function feed(Request $request)

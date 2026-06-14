@@ -9,6 +9,7 @@ use App\Models\Campus;
 use App\Services\NotificationService;
 use Spatie\Permission\Models\Role;
 use App\Enums\RoleEnum;
+use App\Enums\UserType;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Hash;
@@ -186,10 +187,6 @@ class StaffController extends BaseController
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
-                'mobile_number' => $request->phone, 
-                'user_type' => 4, 
-                'is_active' => true,
-                'institute_id' => $institutionId,
             ];
 
             if ($request->hasFile('profile_picture')) {
@@ -197,6 +194,11 @@ class StaffController extends BaseController
             }
 
             $user = User::create($userData);
+            $user->forceFill([
+                'user_type' => UserType::STAFF->value,
+                'institute_id' => $institutionId,
+                'is_active' => true,
+            ])->save();
             
             $user->assignRole($request->role);
 
