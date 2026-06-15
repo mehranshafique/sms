@@ -75,6 +75,21 @@ class PawaPayGateway implements PaymentGatewayInterface
 
     public function parseCallback(array $payload): array
     {
+        $envelope = strtoupper((string) ($payload['status'] ?? ''));
+
+        // GET /v2/deposits/{id} wraps the deposit: { status: FOUND|NOT_FOUND, data: {...} }
+        if ($envelope === 'NOT_FOUND') {
+            return [
+                'status' => 'failed',
+                'gateway_reference' => data_get($payload, 'data.depositId'),
+                'raw' => $payload,
+            ];
+        }
+
+        if ($envelope === 'FOUND' && is_array($payload['data'] ?? null)) {
+            $payload = $payload['data'];
+        }
+
         $status = strtoupper((string) ($payload['status'] ?? ''));
         $mapped = match ($status) {
             'COMPLETED', 'SUCCESS' => 'completed',
@@ -92,6 +107,10 @@ class PawaPayGateway implements PaymentGatewayInterface
     public function verifyTransaction(PaymentGatewayTransaction $transaction): array
     {
         $creds = $this->configService->credentials($this->institutionId, 'pawapay');
+        if (empty($creds['api_token'])) {
+            return ['status' => 'processing', 'gateway_reference' => $transaction->gateway_reference, 'raw' => []];
+        }
+
         $baseUrl = $this->configService->environment($this->institutionId) === 'production'
             ? config('payment_gateways.providers.pawapay.production_url')
             : config('payment_gateways.providers.pawapay.sandbox_url');
@@ -99,6 +118,14 @@ class PawaPayGateway implements PaymentGatewayInterface
         $response = Http::withToken($creds['api_token'])
             ->acceptJson()
             ->get(rtrim($baseUrl, '/') . '/v2/deposits/' . $transaction->external_id);
+
+        if (!$response->successful()) {
+            return [
+                'status' => 'processing',
+                'gateway_reference' => $transaction->gateway_reference,
+                'raw' => ['http_status' => $response->status(), 'body' => $response->json()],
+            ];
+        }
 
         return $this->parseCallback($response->json() ?? []);
     }
