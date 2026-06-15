@@ -97,6 +97,7 @@ class AuthApiController extends Controller
                 'school_name' => $schoolName,
                 'school_logo' => $schoolLogo,
                 'academic_session_name' => $sessionName,
+                'currency' => $context['currency'],
             ]
         ], 200);
     }

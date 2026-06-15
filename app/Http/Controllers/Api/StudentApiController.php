@@ -10,12 +10,16 @@ use App\Models\StudentAttendance;
 use App\Models\StudentEnrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\CurrencyService;
 
 /**
  * Legacy chatbot / parent-app read endpoints (Sanctum + tenant scoped).
  */
 class StudentApiController extends Controller
 {
+    public function __construct(
+        protected CurrencyService $currencyService
+    ) {}
     public function profile($id)
     {
         $student = $this->findScopedStudent($id);
@@ -59,7 +63,7 @@ class StudentApiController extends Controller
             'success' => true,
             'data' => [
                 'total_due' => $totalDue,
-                'currency' => config('app.currency_symbol', '$'),
+                'currency' => $this->currencyService->apiPayload($student->institution_id),
                 'status' => $totalDue > 0 ? 'Outstanding' : 'Cleared',
                 'pending_invoices' => $invoices->map(fn ($inv) => [
                     'id' => $inv->id,

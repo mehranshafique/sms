@@ -21,8 +21,8 @@
                 </select>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover" id="proofsTable" style="width:100%">
+                <div class="table-responsive digitex-dt-wrap">
+                    <table class="table table-hover w-100" id="proofsTable">
                         <thead>
                             <tr>
                                 <th>{{ __('online_pay.invoice_number') }}</th>
@@ -34,7 +34,7 @@
                                 <th>{{ __('online_pay.mobile_reference') }}</th>
                                 <th>{{ __('payment_proof.receipt') }}</th>
                                 <th>{{ __('payment_proof.status') }}</th>
-                                <th></th>
+                                <th class="text-end dt-actions-col">{{ __('invoice.action') }}</th>
                             </tr>
                         </thead>
                     </table>
@@ -52,6 +52,8 @@ $(function() {
     const table = $('#proofsTable').DataTable({
         processing: true,
         serverSide: true,
+        scrollX: true,
+        autoWidth: false,
         ajax: {
             url: @json(route('payment-proofs.index')),
             data: function(d) { d.status = $('#statusFilter').val(); }
@@ -66,9 +68,12 @@ $(function() {
             { data: 'transaction_reference', name: 'transaction_reference' },
             { data: 'receipt', name: 'receipt', orderable: false, searchable: false },
             { data: 'status_badge', name: 'status', orderable: false },
-            { data: 'action', name: 'action', orderable: false, searchable: false },
+            { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end dt-actions-col' },
         ],
-        order: [[5, 'desc']]
+        order: [[5, 'desc']],
+        columnDefs: [
+            { targets: -1, width: '100px' }
+        ]
     });
 
     $('#statusFilter').on('change', () => table.ajax.reload());

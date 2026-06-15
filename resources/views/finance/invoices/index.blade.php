@@ -26,8 +26,8 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="invoiceTable" class="display" style="width:100%">
+                        <div class="table-responsive digitex-dt-wrap">
+                            <table id="invoiceTable" class="display w-100">
                                 <thead>
                                     <tr>
                                         <th>#</th>
@@ -39,7 +39,7 @@
                                         <th>{{ __('invoice.total') }}</th>
                                         <th>{{ __('invoice.paid') }}</th>
                                         <th>{{ __('invoice.status') }}</th>
-                                        <th class="text-end">{{ __('invoice.action') }}</th>
+                                        <th class="text-end dt-actions-col">{{ __('invoice.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -64,6 +64,8 @@
         var table = $('#invoiceTable').DataTable({
             processing: true,
             serverSide: true,
+            scrollX: true,
+            autoWidth: false,
             ajax: "{{ route('invoices.index') }}",
             columns: [
                 { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
@@ -75,7 +77,10 @@
                 { data: 'total_amount', name: 'total_amount' },
                 { data: 'paid_amount', name: 'paid_amount' },
                 { data: 'status', name: 'status' },
-                { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
+                { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end dt-actions-col' }
+            ],
+            columnDefs: [
+                { targets: -1, width: '120px' }
             ]
         });
 

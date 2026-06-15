@@ -8,9 +8,14 @@ use App\Models\AcademicSession;
 use App\Models\Student;
 use App\Models\StudentParent;
 use App\Models\User;
+use App\Services\CurrencyService;
 
 class MobileContextService
 {
+    public function __construct(
+        protected CurrencyService $currencyService
+    ) {}
+
     public function build(User $user): array
     {
         $roles = $user->getRoleNames()->values()->all();
@@ -88,6 +93,7 @@ class MobileContextService
             'staff_id' => $user->staff?->id,
             'student_id' => $user->student?->id,
             'children' => $children,
+            'currency' => $this->currencyService->apiPayload($institutionId),
             'app_links' => $this->appLinks(),
         ];
     }

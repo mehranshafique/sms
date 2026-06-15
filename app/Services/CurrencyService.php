@@ -90,4 +90,18 @@ class CurrencyService
             $this->applyToConfig($institutionId);
         }
     }
+
+    /** Standard currency block for mobile / chatbot / hardware JSON responses. */
+    public function apiPayload(?int $institutionId): array
+    {
+        $settings = $this->getSettings($institutionId);
+
+        return [
+            'code'     => $settings['code'],
+            'symbol'   => $settings['symbol'],
+            'name'     => $settings['name'],
+            'position' => $settings['position'],
+            'decimals' => $settings['decimals'],
+        ];
+    }
 }

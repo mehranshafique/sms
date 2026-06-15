@@ -65,6 +65,20 @@
         }
     }
 
+    function updateSidebarBadges(badges) {
+        if (!badges || typeof badges !== 'object') return;
+        document.querySelectorAll('[data-sidebar-badge]').forEach(function (el) {
+            var key = el.getAttribute('data-sidebar-badge');
+            var count = parseInt(badges[key], 10) || 0;
+            if (count > 0) {
+                el.textContent = count > 99 ? '99+' : String(count);
+                el.style.display = '';
+            } else {
+                el.style.display = 'none';
+            }
+        });
+    }
+
     function renderItem(n) {
         var unread = n.is_unread ? '1' : '0';
         var link = n.link || '#';
@@ -164,6 +178,7 @@
                 if (state.mutating) return data;
                 if (typeof data.unread_count !== 'undefined') setUnreadCount(data.unread_count);
                 if (data.notifications) renderList(data.notifications);
+                if (data.sidebar_badges) updateSidebarBadges(data.sidebar_badges);
                 return data;
             })
             .catch(function (err) {
@@ -185,6 +200,7 @@
         return postForm(cfg.markReadBase + '/' + id + '/read')
             .then(function (data) {
                 if (typeof data.unread_count !== 'undefined') setUnreadCount(data.unread_count);
+                if (data.sidebar_badges) updateSidebarBadges(data.sidebar_badges);
                 return data;
             })
             .catch(function () {
@@ -208,10 +224,12 @@
             $.list.querySelectorAll('.in-app-notif-link[data-unread="1"]').forEach(markItemReadDom);
         }
         setUnreadCount(0);
+        updateSidebarBadges({});
 
         return postForm(cfg.markAllUrl)
             .then(function (data) {
                 if (typeof data.unread_count !== 'undefined') setUnreadCount(data.unread_count);
+                if (data.sidebar_badges) updateSidebarBadges(data.sidebar_badges);
                 return data;
             })
             .catch(function () {

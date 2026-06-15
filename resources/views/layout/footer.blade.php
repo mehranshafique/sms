@@ -37,8 +37,12 @@
     <style>
         .bootstrap-select .dropdown-menu { z-index: 1065 !important; }
         .content-body .card,
-        .content-body .card-body,
-        .content-body .table-responsive { overflow: visible; }
+        .content-body .card-body { overflow: visible; }
+        .content-body .table-responsive,
+        .digitex-dt-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+        .digitex-dt-wrap .dataTables_wrapper { width: 100%; min-width: 0; }
+        .digitex-dt-wrap table.dataTable { width: 100% !important; margin: 0 !important; }
+        .digitex-dt-wrap .dt-actions-col { white-space: nowrap; min-width: 90px; }
     </style>
     <!-- Global Init Script -->
     <script>

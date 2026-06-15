@@ -18,6 +18,7 @@ use App\Models\Institution;
 use App\Models\Timetable;
 use App\Services\NotificationService;
 use App\Services\InAppNotificationService;
+use App\Services\CurrencyService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -25,16 +26,11 @@ use Illuminate\Support\Facades\Auth;
 
 class AttendanceApiController extends Controller
 {
-    protected NotificationService $notificationService;
-    protected InAppNotificationService $inAppNotifications;
-
     public function __construct(
-        NotificationService $notificationService,
-        InAppNotificationService $inAppNotifications
-    ) {
-        $this->notificationService = $notificationService;
-        $this->inAppNotifications = $inAppNotifications;
-    }
+        protected NotificationService $notificationService,
+        protected InAppNotificationService $inAppNotifications,
+        protected CurrencyService $currencyService
+    ) {}
 
     public function store(Request $request)
     {
@@ -541,7 +537,8 @@ class AttendanceApiController extends Controller
             'remaining_balance' => number_format($remainingBalance, 2),
             'last_payment_date' => $lastPayment ? Carbon::parse($lastPayment->payment_date)->format('d M, Y') : 'N/A',
             'last_payment_amount' => $lastPayment ? number_format($lastPayment->amount, 2) : '0.00',
-            'invoices' => $invoiceBreakdown, 
+            'invoices' => $invoiceBreakdown,
+            'currency_settings' => $this->currencyService->apiPayload($student->institution_id),
             'color' => $totalDue > 0 ? '#dc2626' : '#16a34a'
         ];
 
@@ -634,12 +631,13 @@ class AttendanceApiController extends Controller
             if ($unpaid > 0) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Financial Block: Outstanding balance of $" . number_format($unpaid, 2),
+                    'message' => 'Financial Block: Outstanding balance of ' . $this->currencyService->format($unpaid, $institutionId),
                     'data' => [
                         'student_name' => $student->full_name . ' (' . $admNo . ')',
-                        'color' => '#dc2626'
+                        'color' => '#dc2626',
+                        'currency_settings' => $this->currencyService->apiPayload($institutionId),
                     ]
-                ], 200); 
+                ], 200);
             }
         }
 

@@ -25,7 +25,26 @@ Set the Dest Port to 5000.
 
 Click Set / Save to apply to the reader.
 
-Step 2: The Python Bridge Script
+Step 2: Run the Python bridge
+
+Use `chafon_bridge.py` in this repository on a PC or Raspberry Pi on the same LAN as the reader.
+
+Step 3: Environment variables for the bridge
+
+Set these on the PC or Raspberry Pi running chafon_bridge.py:
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| HARDWARE_SECRET | (from Laravel .env) | Must match `HARDWARE_SECRET` on server |
+| HARDWARE_API_URL | https://your-domain.com/api/v1/hardware/attendance/scan | V1 scan endpoint |
+| HARDWARE_INSTITUTION_ID | 3 | School ID (required if server uses `HARDWARE_ALLOWED_INSTITUTION_IDS`) |
+| HARDWARE_DEVICE_ID | CHAFON_MAIN_GATE_01 | Device label in logs |
+| HARDWARE_PURPOSE | attendance | `attendance`, `fee_check`, `pickup`, `report_card`, `identity_check` |
+| CHAFON_LISTEN_PORT | 5000 | TCP port the reader pushes to |
+
+Run: `python chafon_bridge.py`
+
+The bridge sends JSON with `uid`, `method`, `device_id`, `purpose`, and ISO `timestamp` to Laravel.
 You will run this lightweight Python script on a computer connected to the same local network (this could be the reception PC or a dedicated $30 Raspberry Pi).
 
 This script listens on port 5000 for the raw hex data from the CHAFON reader, extracts the Card ID (EPC), and instantly fires your Laravel Webhook.

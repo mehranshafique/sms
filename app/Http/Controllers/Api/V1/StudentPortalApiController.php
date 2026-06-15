@@ -23,6 +23,7 @@ use App\Services\PaymentMethodService;
 use App\Services\PaymentGateways\PaymentGatewayConfigService;
 use App\Services\PaymentGateways\PaymentGatewayManager;
 use App\Services\PaymentProofService;
+use App\Services\CurrencyService;
 
 class StudentPortalApiController extends Controller
 {
@@ -30,7 +31,8 @@ class StudentPortalApiController extends Controller
         protected PaymentMethodService $paymentMethodService,
         protected PaymentGatewayConfigService $gatewayConfigService,
         protected PaymentGatewayManager $gatewayManager,
-        protected PaymentProofService $paymentProofService
+        protected PaymentProofService $paymentProofService,
+        protected CurrencyService $currencyService
     ) {}
     /**
      * Helper to get the student securely for both Students AND Guardians
@@ -144,7 +146,7 @@ class StudentPortalApiController extends Controller
                 ];
             });
 
-            $currency = config('app.currency_symbol', '$');
+            $currencyPayload = $this->currencyService->apiPayload($institutionId);
 
             return response()->json([
                 'success' => true,
@@ -152,7 +154,9 @@ class StudentPortalApiController extends Controller
                     'total_fees' => number_format($totalFees, 2),
                     'paid_fees' => number_format($paidFees, 2),
                     'outstanding' => number_format($outstanding, 2),
-                    'currency' => $currency,
+                    'currency' => $currencyPayload['symbol'],
+                    'currency_code' => $currencyPayload['code'],
+                    'currency_settings' => $currencyPayload,
                     'online_enabled' => $onlineEnabled,
                     'gateway_active' => $gatewayActive,
                     'manual_proof_enabled' => $manualProofEnabled,
@@ -445,11 +449,11 @@ class StudentPortalApiController extends Controller
 
                 if ($unpaid > 0) {
                     Log::warning("[API Results] Access Denied due to debt. Amount: {$unpaid}");
-                    $currency = config('app.currency_symbol', '$');
                     return response()->json([
                         'success' => false,
                         'is_blocked' => true,
-                        'amount' => $currency . ' ' . number_format($unpaid, 2)
+                        'amount' => $this->currencyService->format($unpaid, $student->institution_id),
+                        'currency_settings' => $this->currencyService->apiPayload($student->institution_id),
                     ]);
                 }
             }

@@ -6,9 +6,14 @@ use App\Models\FeeStructure;
 use App\Models\Student;
 use App\Models\StudentEnrollment;
 use Illuminate\Http\Request;
+use App\Services\CurrencyService;
 
 class FinanceController extends ChatbotBaseController
 {
+    public function __construct(
+        protected CurrencyService $currencyService
+    ) {}
+
     /**
      * Get Miscellaneous/Connexes Fees for the student.
      * Legacy Option 5
@@ -47,14 +52,20 @@ class FinanceController extends ChatbotBaseController
             return $this->sendError(__('chatbot.no_fees_found'), 200);
         }
 
-        $data = $fees->map(function($fee) {
+        $currencyPayload = $this->currencyService->apiPayload($institutionId);
+
+        $data = $fees->map(function ($fee) use ($currencyPayload) {
             return [
                 'name' => $fee->name,
                 'amount' => number_format($fee->amount, 2),
-                'currency' => config('app.currency_symbol', '$')
+                'currency' => $currencyPayload['symbol'],
+                'currency_settings' => $currencyPayload,
             ];
         });
 
-        return $this->sendResponse($data, __('chatbot.fees_retrieved'));
+        return $this->sendResponse([
+            'items' => $data,
+            'currency' => $currencyPayload,
+        ], __('chatbot.fees_retrieved'));
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\InAppNotificationService;
+use App\Services\SidebarMenuBadgeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -23,6 +24,7 @@ class InAppNotificationController extends BaseController
             'ok'            => true,
             'unread_count'  => $data['unread_count'],
             'notifications' => $data['notifications'],
+            'sidebar_badges' => app(SidebarMenuBadgeService::class)->countsForUser($userId),
         ]);
     }
 
@@ -36,13 +38,16 @@ class InAppNotificationController extends BaseController
 
     public function markRead(int $id)
     {
-        $result = $this->notifications->markAsRead($id, Auth::id());
+        $userId = Auth::id();
+        $result = $this->notifications->markAsRead($id, $userId);
 
         if (!$result['success']) {
             return response()->json(array_merge(['ok' => false], $result), 404);
         }
 
-        return response()->json(array_merge(['ok' => true], $result));
+        return response()->json(array_merge(['ok' => true], $result, [
+            'sidebar_badges' => app(SidebarMenuBadgeService::class)->countsForUser($userId),
+        ]));
     }
 
     public function markAllRead()
@@ -54,6 +59,7 @@ class InAppNotificationController extends BaseController
             'success'      => true,
             'marked'       => $marked,
             'unread_count' => $this->notifications->getUnreadCount(Auth::id()),
+            'sidebar_badges' => app(SidebarMenuBadgeService::class)->countsForUser(Auth::id()),
         ]);
     }
 }

@@ -59,9 +59,9 @@ class PaymentProofController extends BaseController
                         return '-';
                     }
 
-                    return '<div class="d-flex gap-1">'
-                        . '<button type="button" class="btn btn-success btn-xs approve-proof" data-id="' . $row->id . '"><i class="fa fa-check"></i></button>'
-                        . '<button type="button" class="btn btn-danger btn-xs reject-proof" data-id="' . $row->id . '"><i class="fa fa-times"></i></button>'
+                    return '<div class="d-flex gap-1 flex-nowrap justify-content-end">'
+                        . '<button type="button" class="btn btn-success btn-xs approve-proof" data-id="' . $row->id . '" title="' . e(__('payment_proof.approve')) . '"><i class="fa fa-check"></i></button>'
+                        . '<button type="button" class="btn btn-danger btn-xs reject-proof" data-id="' . $row->id . '" title="' . e(__('payment_proof.reject')) . '"><i class="fa fa-times"></i></button>'
                         . '</div>';
                 })
                 ->rawColumns(['receipt', 'status_badge', 'action'])

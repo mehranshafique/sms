@@ -16,6 +16,7 @@ use App\Services\Sms\InfobipService;
 use App\Services\Sms\MobishastraService;
 use App\Services\SystemCommunicationConfigService;
 use App\Services\InstitutionSetupAlertService;
+use App\Services\SidebarMenuBadgeService;
 use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
@@ -72,6 +73,15 @@ class AppServiceProvider extends ServiceProvider
                 $service = app(InAppNotificationService::class);
                 $view->with('inAppNotifications', $service->getRecent(Auth::id(), 12));
                 $view->with('inAppUnreadCount', $service->getUnreadCount(Auth::id()));
+            }
+        });
+
+        View::composer(['layout.sidebar'], function ($view) {
+            if (Auth::check()) {
+                $view->with(
+                    'sidebarBadges',
+                    app(SidebarMenuBadgeService::class)->countsForUser(Auth::id())
+                );
             }
         });
 

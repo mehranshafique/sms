@@ -31,7 +31,6 @@ use App\Models\StaffLeave;
 use App\Models\StaffAttendance;
 use App\Models\Budget;
 use App\Models\FundRequest;
-use App\Enums\CurrencySymbol;
 use App\Enums\RoleEnum;
 use App\Enums\InstitutionType;
 use Illuminate\Support\Str;
@@ -46,11 +45,19 @@ use Illuminate\Support\Facades\Auth;
 
 class ChatbotLogicService
 {
-    protected $notificationService;
+    public function __construct(
+        protected NotificationService $notificationService,
+        protected CurrencyService $currencyService
+    ) {}
 
-    public function __construct(NotificationService $notificationService)
+    protected function fmtMoney(float $amount, ?int $institutionId = null): string
     {
-        $this->notificationService = $notificationService;
+        return $this->currencyService->format($amount, $institutionId);
+    }
+
+    protected function currencySymbol(?int $institutionId = null): string
+    {
+        return $this->currencyService->getSettings($institutionId)['symbol'];
     }
 
     /**
@@ -660,7 +667,7 @@ class ChatbotLogicService
         if ($isBlocked == '1') {
             $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
             if ($unpaid > 0) {
-                $currency = CurrencySymbol::default();
+                $currency = $this->currencySymbol($institutionId);
                 $msg = $isEn ? "⛔ Access denied. You have an outstanding balance of " . number_format($unpaid, 2) . $currency . ". Please settle to view results." 
                              : "⛔ Accès refusé. Vous avez un solde impayé de " . number_format($unpaid, 2) . $currency . ". Veuillez régler pour voir vos résultats.";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
@@ -765,7 +772,7 @@ class ChatbotLogicService
                 case '1': 
                     $invoiced = Subscription::sum('price_paid');
                     $msg = $isEn ? "💰 *Global Finance*\nRevenue: " : "💰 *Finance Globale*\nRevenus: ";
-                    return $this->reply($session->phone_number, $msg . number_format($invoiced, 2) . " " . CurrencySymbol::default() . $this->getReturnPrompt($session), $session->institution_id);
+                    return $this->reply($session->phone_number, $msg . number_format($invoiced, 2) . " " . $this->currencySymbol($session->institution_id) . $this->getReturnPrompt($session), $session->institution_id);
                 case '2': 
                     $active = Subscription::where('status', 'active')->where('end_date', '>=', now())->count();
                     $expired = Subscription::where('end_date', '<', now())->count();
@@ -820,7 +827,7 @@ class ChatbotLogicService
                 case '2': 
                     $todayCash = Payment::where('institution_id', $session->institution_id)->whereDate('payment_date', today())->sum('amount');
                     $msg = $isEn ? "💵 *Daily Cash*\nToday's Collection: " : "💵 *Etat Caisse du Jour*\nRecettes du jour: ";
-                    return $this->reply($session->phone_number, $msg . number_format($todayCash, 2) . " " . CurrencySymbol::default() . $this->getReturnPrompt($session), $session->institution_id);
+                    return $this->reply($session->phone_number, $msg . number_format($todayCash, 2) . " " . $this->currencySymbol($session->institution_id) . $this->getReturnPrompt($session), $session->institution_id);
                 case '3': 
                     $debtors = Invoice::where('institution_id', $session->institution_id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->distinct('student_id')->count('student_id');
                     $msg = $isEn ? "🚨 *Debtors List*\nStudents with unpaid invoices: $debtors" : "🚨 *Elèves Débiteurs*\nNombre d'élèves avec factures impayées: $debtors";
@@ -909,7 +916,7 @@ class ChatbotLogicService
         } elseif ($t == '2') {
             $todayCash = Payment::where('institution_id', $s->institution_id)->whereDate('payment_date', today())->sum('amount');
             $msg = $isEn ? "💵 *Daily Cash*: " : "💵 *Caisse du Jour*: ";
-            return $this->reply($s->phone_number, $msg . number_format($todayCash, 2) . CurrencySymbol::default() . $this->getReturnPrompt($s), $s->institution_id);
+            return $this->reply($s->phone_number, $msg . number_format($todayCash, 2) . $this->currencySymbol($s->institution_id) . $this->getReturnPrompt($s), $s->institution_id);
         } elseif ($t == '3') {
             $debtors = Invoice::where('institution_id', $s->institution_id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->distinct('student_id')->count('student_id');
             $msg = $isEn ? "🚨 *Debtors*: $debtors students owe fees." : "🚨 *Elèves Débiteurs*: $debtors élèves avec un solde impayé.";
@@ -979,7 +986,7 @@ class ChatbotLogicService
         $msg = $isEn ? "🏆 *Class Rankings*\n" : "🏆 *Classement des Classes*\n";
         foreach(array_slice($ranking, 0, 10) as $idx => $r) {
             if ($t == '2') {
-                $fmt = number_format($r['val'], 2) . CurrencySymbol::default();
+                $fmt = number_format($r['val'], 2) . $this->currencySymbol($institutionId);
             } else {
                 $fmt = $r['val'] . ($isEn ? " students" : " élèves");
             }
@@ -1122,8 +1129,9 @@ class ChatbotLogicService
         $paid = Payment::whereHas('invoice', fn($q) => $q->where('student_id', $student->id)->where('academic_session_id', $enrollment->academic_session_id))->sum('amount');
         $due = $fees - $paid;
         
-        $dueFmt = number_format($due, 2) . CurrencySymbol::default();
-        $totalFmt = number_format($fees, 2) . CurrencySymbol::default();
+        $instId = $session->institution_id;
+        $dueFmt = number_format($due, 2) . $this->currencySymbol($instId);
+        $totalFmt = number_format($fees, 2) . $this->currencySymbol($instId);
 
         $msg = $isEn ? "💳 *Payment Details*\nTotal Fees: $totalFmt\nRemaining Due: $dueFmt\n\nChoose method:\n1️⃣ Credit/Debit Card\n2️⃣ Mobile Money" 
                      : "💳 *Détails de Paiement*\nFrais Totaux: $totalFmt\nReste à payer: $dueFmt\n\nChoisissez la méthode:\n1️⃣ Carte Bancaire\n2️⃣ Mobile Money";
@@ -1144,7 +1152,7 @@ class ChatbotLogicService
         }
 
         $totalDue = $unpaidInvoices->sum(fn($inv) => $inv->total_amount - $inv->paid_amount);
-        $totalFmt = number_format($totalDue, 2) . " " . CurrencySymbol::default();
+        $totalFmt = number_format($totalDue, 2) . " " . $this->currencySymbol($institutionId);
 
         if ($cmd == '1') {
             $token = base64_encode('checkout-' . $studentId . '-' . time());
@@ -1170,9 +1178,10 @@ class ChatbotLogicService
         $paid = Payment::whereHas('invoice', fn($q) => $q->where('student_id', $student->id)->where('academic_session_id', $enrollment->academic_session_id))->sum('amount');
         $due = $fees - $paid;
         
-        $totalFmt = number_format($fees, 2) . CurrencySymbol::default();
-        $paidFmt = number_format($paid, 2) . CurrencySymbol::default();
-        $dueFmt = number_format($due, 2) . CurrencySymbol::default();
+        $instId = $session->institution_id;
+        $totalFmt = number_format($fees, 2) . $this->currencySymbol($instId);
+        $paidFmt = number_format($paid, 2) . $this->currencySymbol($instId);
+        $dueFmt = number_format($due, 2) . $this->currencySymbol($instId);
 
         $msg = $isEn ? "💰 *Financial Status*\nTotal Fees: $totalFmt\nPaid: $paidFmt\nOutstanding Due: *$dueFmt*" 
                      : "💰 *Statut Financier*\nFrais Totaux: $totalFmt\nPayé: $paidFmt\nReste à payer: *$dueFmt*";
@@ -1192,7 +1201,7 @@ class ChatbotLogicService
         
         $msg = $isEn ? "💵 *My Last Payments*\n" : "💵 *Mes Derniers Paiements*\n";
         foreach($payments as $p) {
-            $msg .= "- " . number_format($p->amount, 2) . CurrencySymbol::default() . ($isEn ? " on " : " le ") . $p->payment_date->format('d/m/Y') . "\n";
+            $msg .= "- " . number_format($p->amount, 2) . $this->currencySymbol($session->institution_id) . ($isEn ? " on " : " le ") . $p->payment_date->format('d/m/Y') . "\n";
         }
         return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
     }
@@ -1261,7 +1270,7 @@ class ChatbotLogicService
                 $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
 
                 if ($unpaid > 0) {
-                    $currency = CurrencySymbol::default();
+                    $currency = $this->currencySymbol($institutionId);
                     $formattedDebt = number_format($unpaid, 2) . ' ' . $currency;
                     $msg = $isEn 
                         ? "⛔ Access denied. You have an outstanding balance of $formattedDebt. Please settle to view results."
@@ -1390,7 +1399,7 @@ class ChatbotLogicService
             return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
         }
         
-        $list = $fees->map(fn($f) => "- {$f->name}: {$f->amount} " . CurrencySymbol::default())->join("\n");
+        $list = $fees->map(fn($f) => "- {$f->name}: {$f->amount} " . $this->currencySymbol($session->institution_id))->join("\n");
         return $this->reply($session->phone_number, ($isEn ? "📋 *Miscellaneous Fees:*\n" : "📋 *Frais Connexes:*\n") . $list . $this->getReturnPrompt($session), $session->institution_id);
     }
     

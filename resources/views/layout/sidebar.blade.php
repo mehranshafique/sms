@@ -258,7 +258,7 @@
                     <li class="nav-label">{{ __('sidebar.people') }}</li>
                     
                     <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*') ? 'mm-active' : '' }}">
-                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span></a>
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'students'])</a>
                         <ul aria-expanded="false">
                             @if($hasModule('students') && $user->can('student.view'))
                                 <li><a class="{{ request()->routeIs('students.*') ? 'mm-active' : '' }}" href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
@@ -291,22 +291,22 @@
                             @endif
                             
                             @if($hasModule('student_request') && $user->can('student_request.view'))
-                            <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}</a></li>
+                            <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
                             @endif
                             
                             @if($user->can('student.view') || $user->hasRole(RoleEnum::TEACHER->value))
-                            <li><a class="{{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</a></li>
+                            <li><a class="{{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}@include('layout.partials.sidebar-badge', ['key' => 'pickups'])</a></li>
                             @endif
                         </ul>
                     </li>
 
                     @if($hasModule('staff') && $user->can('staff.view'))
                         <li class="{{ request()->routeIs('staff.*', 'staff-attendance.*', 'staff-leaves.*') ? 'mm-active' : '' }}">
-                            <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-chalkboard-teacher"></i><span class="nav-text">{{ __('sidebar.staff.title') }}</span></a>
+                            <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-chalkboard-teacher"></i><span class="nav-text">{{ __('sidebar.staff.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'staff'])</a>
                             <ul aria-expanded="false">
                                 <li><a class="{{ request()->routeIs('staff.*') ? 'mm-active' : '' }}" href="{{ route('staff.index') }}">{{ __('sidebar.staff.title') }}</a></li>
                                 @if($hasModule('staff_leaves') && $user->can('staff_leave.view'))
-                                <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}</a></li>
+                                <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}@include('layout.partials.sidebar-badge', ['key' => 'staff-leaves'])</a></li>
                                 @endif
                                 @if($user->can('staff_attendance.view'))
                                     <li><a class="{{ request()->routeIs('staff-attendance.*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
@@ -334,8 +334,8 @@
                     
                     {{-- Fees & Collection --}}
                     @if($hasModule('invoices') && $user->can('invoice.view'))
-                    <li class="{{ request()->routeIs('fee-types.*', 'fees.*', 'invoices.*', 'finance.balances.*', 'finance.reports.*') ? 'mm-active' : '' }}">
-                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fees_collection') }}</span></a>
+                    <li class="{{ request()->routeIs('fee-types.*', 'fees.*', 'invoices.*', 'payment-proofs.*', 'finance.balances.*', 'finance.reports.*', 'payment-methods.*') ? 'mm-active' : '' }}">
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fees_collection') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'fees_collection'])</a>
                         <ul aria-expanded="false">
                             @if($hasModule('fee_types') && $user->can('fee_type.view'))
                                 <li><a class="{{ request()->routeIs('fee-types.*') ? 'mm-active' : '' }}" href="{{ route('fee-types.index') }}">{{ __('sidebar.fee_types.title') }}</a></li>
@@ -347,12 +347,12 @@
                             @if($user->can('invoice.create'))
                                 <li><a class="{{ request()->routeIs('invoices.create') ? 'mm-active' : '' }}" href="{{ route('invoices.create') }}">{{ __('sidebar.invoices.generate') }}</a></li>
                             @endif
-                            <li><a class="{{ request()->routeIs('invoices.index', 'invoices.show', 'invoices.edit') ? 'mm-active' : '' }}" href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}</a></li>
+                            <li><a class="{{ request()->routeIs('invoices.index', 'invoices.show', 'invoices.edit') ? 'mm-active' : '' }}" href="{{ route('invoices.index') }}">{{ __('sidebar.invoices.list') }}@include('layout.partials.sidebar-badge', ['key' => 'invoices'])</a></li>
                             @if($hasModule('payments') && $user->can('invoice.view'))
                                 <li><a class="{{ request()->routeIs('payment-methods.*') ? 'mm-active' : '' }}" href="{{ route('payment-methods.index') }}">{{ __('sidebar.payment_methods') }}</a></li>
                             @endif
                             @if($hasModule('payments') && $user->can('payment.create'))
-                                <li><a class="{{ request()->routeIs('payment-proofs.*') ? 'mm-active' : '' }}" href="{{ route('payment-proofs.index') }}">{{ __('sidebar.payment_proofs') }}</a></li>
+                                <li><a class="{{ request()->routeIs('payment-proofs.*') ? 'mm-active' : '' }}" href="{{ route('payment-proofs.index') }}">{{ __('sidebar.payment_proofs') }}@include('layout.partials.sidebar-badge', ['key' => 'payment-proofs'])</a></li>
                             @endif
                             <li><a class="{{ request()->routeIs('finance.balances.*') ? 'mm-active' : '' }}" href="{{ route('finance.balances.index') }}">{{ __('sidebar.student_balances') }}</a></li>
                             <li><a class="{{ request()->routeIs('finance.reports.*') ? 'mm-active' : '' }}" href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
@@ -363,12 +363,12 @@
                     {{-- Budget & Payroll --}}
                     @if(($hasModule('budgets') && $user->can('budget.view')) || ($hasModule('payrolls') && $user->can('payroll.view')))
                     <li class="{{ request()->routeIs('budgets.*', 'payroll.*', 'salary-structures.*') ? 'mm-active' : '' }}">
-                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-wallet"></i><span class="nav-text">{{ __('sidebar.budget_payroll') }}</span></a>
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-wallet"></i><span class="nav-text">{{ __('sidebar.budget_payroll') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'budget_payroll'])</a>
                         <ul aria-expanded="false">
                             @if($hasModule('budgets'))
                                 <li><a class="{{ request()->routeIs('budgets.categories') ? 'mm-active' : '' }}" href="{{ route('budgets.categories') }}">{{ __('sidebar.budget_categories') }}</a></li>
                                 <li><a class="{{ request()->routeIs('budgets.index', 'budgets.create', 'budgets.edit') ? 'mm-active' : '' }}" href="{{ route('budgets.index') }}">{{ __('sidebar.budget_allocation') }}</a></li>
-                                <li><a class="{{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}">{{ __('sidebar.fund_requests') }}</a></li>
+                                <li><a class="{{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}">{{ __('sidebar.fund_requests') }}@include('layout.partials.sidebar-badge', ['key' => 'fund-requests'])</a></li>
                             @endif
                             @if($hasModule('payrolls'))
                                 <li><a class="{{ request()->routeIs('salary-structures.*') ? 'mm-active' : '' }}" href="{{ route('salary-structures.index') }}">{{ __('sidebar.salary_structures') }}</a></li>
@@ -388,9 +388,9 @@
                 @if($hasModule('exams') && $user->can('exam.view'))
                     <li class="nav-label">{{ __('sidebar.examinations') }}</li>
                     <li class="{{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*') ? 'mm-active' : '' }}">
-                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span></a>
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'examinations'])</a>
                         <ul aria-expanded="false">
-                            <li><a class="{{ request()->routeIs('exams.*') ? 'mm-active' : '' }}" href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}</a></li>
+                            <li><a class="{{ request()->routeIs('exams.*') ? 'mm-active' : '' }}" href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}@include('layout.partials.sidebar-badge', ['key' => 'exams'])</a></li>
                             
                             @if($hasModule('exam_schedules'))
                                 <li><a class="{{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.manage') }}">{{ __('sidebar.exam_schedules.manage') }}</a></li>
@@ -422,7 +422,7 @@
                     
                     @if($hasModule('communication'))
                         @can('notice.view')
-                        <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'notices'])</a></li>
                         @endcan
                         
                         @can('reminder.view')
@@ -495,13 +495,13 @@
                 @endif
 
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'fund-requests'])</a></li>
                 
                 {{-- Teacher Requests/Leaves --}}
-                <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
 
                 <li class="nav-label">{{ __('sidebar.pickup_system') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}"><i class="la la-child"></i><span class="nav-text">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}</span>@include('layout.partials.sidebar-badge', ['key' => 'pickups'])</a></li>
             @endif
 
 
@@ -531,8 +531,8 @@
                 @endif
 
                 <li class="nav-label">{{ __('sidebar.communication') }}</li>
-                <li><a class="ai-icon {{ request()->routeIs('student.notices.*') ? 'mm-active' : '' }}" href="{{ route('student.notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.my_notices') }}</span></a></li>
-                <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('student.notices.*') ? 'mm-active' : '' }}" href="{{ route('student.notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.my_notices') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'notices'])</a></li>
+                <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
                 
                 @if($hasModule('voting'))
                     <li><a class="ai-icon {{ request()->routeIs('student.elections.*') ? 'mm-active' : '' }}" href="{{ route('student.elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.my_elections') }}</span></a></li>
@@ -549,7 +549,7 @@
                     <i class="la la-chart-pie"></i>
                     <span class="nav-text">{{ __('sidebar.children_attendance') ?? 'Children Attendance' }}</span>
                 </a></li>
-                <li><a class="ai-icon {{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span></a></li>
+                <li><a class="ai-icon {{ request()->routeIs('pickups.parent') ? 'mm-active' : '' }}" href="{{ route('pickups.parent') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.page_title') ?? 'Student Pickup' }}</span>@include('layout.partials.sidebar-badge', ['key' => 'pickups'])</a></li>
             @endif
 
             {{-- ============================================================= --}}

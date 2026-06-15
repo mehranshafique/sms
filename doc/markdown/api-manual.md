@@ -82,10 +82,19 @@ The `email` field accepts **email**, **username**, or student **shortcode**.
     "role": "Teacher",
     "institution_id": 3,
     "school_name": "Example High School",
-    "school_logo": "https://..."
+    "school_logo": "https://...",
+    "currency": {
+      "code": "CDF",
+      "symbol": "FC",
+      "name": "Congolese Franc",
+      "position": "before",
+      "decimals": 2
+    }
   }
 }
 ```
+
+After login, refresh context with **GET** `/v1/me/context` (same `currency`, full `capabilities`, guardian `children`).
 
 **Errors:** `401` invalid credentials, `403` inactive account.
 
@@ -105,6 +114,20 @@ Authorization: Bearer 1|plainTextSanctumToken...
 ```json
 { "fcm_token": "firebase-device-token" }
 ```
+
+### 2.3 Mobile Context
+
+**GET** `/v1/me/context`
+
+**Auth:** Sanctum
+
+Returns roles, permissions, module **capabilities**, institution type, academic session, guardian **children**, and **currency** settings (per school).
+
+### 2.4 Logout
+
+**POST** `/v1/logout`
+
+**Auth:** Sanctum — revokes current token.
 
 ---
 

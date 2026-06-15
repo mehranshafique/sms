@@ -11,9 +11,14 @@ use App\Models\InstitutionSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\DB;
+use App\Services\CurrencyService;
 
 class StatsController extends ChatbotBaseController
 {
+    public function __construct(
+        protected CurrencyService $currencyService
+    ) {}
+
     /**
      * Dashboard for Admins
      */
@@ -36,7 +41,8 @@ class StatsController extends ChatbotBaseController
             'student_count' => Student::where('institution_id', $institutionId)->count(),
             'total_invoiced' => number_format($totalInvoiced, 2),
             'total_collected' => number_format($totalPaid, 2),
-            'outstanding' => number_format($totalInvoiced - $totalPaid, 2)
+            'outstanding' => number_format($totalInvoiced - $totalPaid, 2),
+            'currency' => $this->currencyService->apiPayload($institutionId),
         ], __('chatbot.summary_retrieved'));
     }
 
@@ -58,7 +64,8 @@ class StatsController extends ChatbotBaseController
             'student_name' => $student->full_name,
             'total_fees' => number_format($totalInvoiced, 2),
             'paid' => number_format($totalPaid, 2),
-            'balance' => number_format($totalInvoiced - $totalPaid, 2)
+            'balance' => number_format($totalInvoiced - $totalPaid, 2),
+            'currency' => $this->currencyService->apiPayload($institutionId),
         ], __('chatbot.balance_retrieved'));
     }
 
@@ -84,10 +91,8 @@ class StatsController extends ChatbotBaseController
                 ->sum(DB::raw('total_amount - paid_amount'));
                 
             if ($unpaid > 0) {
-                // Return 200 so the chatbot parses the error gracefully as a text reply instead of a system crash
-                $currency = config('app.currency_symbol', '$');
-                $formattedDebt = $currency . ' ' . number_format($unpaid, 2);
-                
+                $formattedDebt = $this->currencyService->format($unpaid, $institutionId);
+
                 return $this->sendError(__('chatbot.financial_restriction_msg', ['amount' => $formattedDebt]), 200);
             }
         }
