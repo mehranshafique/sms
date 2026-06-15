@@ -48,7 +48,8 @@ class PawaPayGateway implements PaymentGatewayInterface
                     'provider' => $provider,
                 ],
             ],
-            'customerMessage' => 'School fees ' . substr($invoice->invoice_number, 0, 12),
+            'clientReferenceId' => (string) $invoice->invoice_number,
+            'customerMessage' => $this->buildCustomerMessage($invoice),
         ];
 
         $response = Http::withToken($creds['api_token'])
@@ -100,5 +101,20 @@ class PawaPayGateway implements PaymentGatewayInterface
             ->get(rtrim($baseUrl, '/') . '/v2/deposits/' . $transaction->external_id);
 
         return $this->parseCallback($response->json() ?? []);
+    }
+
+    /**
+     * PawaPay customerMessage: 4–22 chars, pattern ^[a-zA-Z0-9 ]+$ (shown on parent's MoMo SMS).
+     */
+    private function buildCustomerMessage(Invoice $invoice): string
+    {
+        $ref = preg_replace('/[^a-zA-Z0-9]/', '', (string) $invoice->invoice_number);
+        $message = trim('School fees ' . $ref);
+
+        if (strlen($message) > 22) {
+            $message = substr($message, 0, 22);
+        }
+
+        return strlen($message) >= 4 ? $message : 'School fees';
     }
 }
