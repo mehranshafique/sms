@@ -35,12 +35,10 @@ class CurrencyController extends BaseController
 
     public function update(Request $request)
     {
+        $this->authorizeAdminOrPermission('currency.update');
+
         $institutionId = $this->getInstitutionId();
         $user = Auth::user();
-
-        if (!$user->can('currency.update') && !$this->userIsSchoolAdmin($user)) {
-            abort(403);
-        }
 
         if (!$institutionId && !$user->hasRole('Super Admin')) {
             abort(403, __('currency.select_institution'));

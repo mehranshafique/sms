@@ -28,7 +28,11 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = Auth::user();
+        $firstName = strtok(trim($user->name ?? ''), ' ') ?: ($user->name ?? '');
+
+        return redirect()->intended(route('dashboard', absolute: false))
+            ->with('success', __('messages.login_welcome', ['name' => $firstName]));
     }
 
     /**

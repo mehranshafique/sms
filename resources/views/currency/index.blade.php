@@ -57,7 +57,7 @@
                         <h4 class="card-title mb-0">{{ __('currency.settings_title') }}</h4>
                     </div>
                     <div class="card-body">
-                        <form id="currencyForm">
+                        <form id="currencyForm" method="POST" action="{{ route('currency.update') }}">
                             @csrf
                             <div class="mb-4">
                                 <label class="form-label fw-bold">{{ __('currency.select_currency') }}</label>
@@ -138,7 +138,7 @@
 </div>
 @endsection
 
-@section('scripts')
+@section('js')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('currencyForm');
@@ -155,9 +155,18 @@ document.addEventListener('DOMContentLoaded', function () {
         return checked ? checked.value : 'before';
     }
 
+    function selectedCurrencyOption() {
+        if (typeof jQuery !== 'undefined' && jQuery.fn.selectpicker && jQuery(codeSelect).data('selectpicker')) {
+            const val = jQuery(codeSelect).selectpicker('val');
+            return codeSelect.querySelector('option[value="' + val + '"]') || codeSelect.selectedOptions[0];
+        }
+        return codeSelect.selectedOptions[0];
+    }
+
     function formatPreview() {
         const decimals = parseInt(decimalsSelect.value, 10) || 2;
-        const symbol = symbolInput.value.trim() || codeSelect.selectedOptions[0]?.dataset.symbol || '$';
+        const opt = selectedCurrencyOption();
+        const symbol = symbolInput.value.trim() || opt?.dataset.symbol || '$';
         const formatted = sampleValue.toLocaleString(undefined, {
             minimumFractionDigits: decimals,
             maximumFractionDigits: decimals
@@ -167,22 +176,29 @@ document.addEventListener('DOMContentLoaded', function () {
             ? formatted + ' ' + symbol
             : symbol + ' ' + formatted;
 
-        const opt = codeSelect.selectedOptions[0];
         if (opt) {
             previewMeta.textContent = opt.value + ' — ' + (opt.dataset.name || '');
         }
     }
 
-    codeSelect.addEventListener('change', function () {
-        const opt = this.selectedOptions[0];
+    function onCurrencyChange() {
+        const opt = selectedCurrencyOption();
         if (opt) {
             symbolInput.value = opt.dataset.symbol || '';
         }
         formatPreview();
-    });
+    }
+
+    codeSelect.addEventListener('change', onCurrencyChange);
+    if (typeof jQuery !== 'undefined') {
+        jQuery(codeSelect).on('changed.bs.select', onCurrencyChange);
+    }
 
     symbolInput.addEventListener('input', formatPreview);
     decimalsSelect.addEventListener('change', formatPreview);
+    if (typeof jQuery !== 'undefined') {
+        jQuery(decimalsSelect).on('changed.bs.select', formatPreview);
+    }
     form.querySelectorAll('input[name="currency_position"]').forEach(el => {
         el.addEventListener('change', formatPreview);
     });
@@ -190,27 +206,40 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         saveBtn.disabled = true;
+        const originalHtml = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> {{ __("currency.save") }}';
 
-        fetch(@json(route('currency.update')), {
+        fetch(form.action, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
             },
             body: new FormData(form),
         })
-        .then(r => r.json())
+        .then(async (r) => {
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                throw new Error(data.message || @json(__('currency.save_failed')));
+            }
+            return data;
+        })
         .then(data => {
             if (typeof toastr !== 'undefined') {
                 toastr.success(data.message || @json(__('currency.saved')));
             }
+            formatPreview();
         })
-        .catch(() => {
+        .catch((err) => {
             if (typeof toastr !== 'undefined') {
-                toastr.error(@json(__('currency.save_failed')));
+                toastr.error(err.message || @json(__('currency.save_failed')));
             }
         })
-        .finally(() => { saveBtn.disabled = false; });
+        .finally(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalHtml;
+        });
     });
 
     formatPreview();

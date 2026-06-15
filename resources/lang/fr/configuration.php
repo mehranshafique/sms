@@ -157,4 +157,5 @@ return [
     'alert_academic_dates_missing' => 'Les dates de session académique manquent. Veuillez définir l\'année scolaire.',
     'alert_communication_missing' => 'La configuration SMS/WhatsApp est incomplète. Configurez vos fournisseurs.',
     'alert_no_current_session' => 'Aucune session académique active. Créez-en une ou marquez-la comme actuelle.',
+    'alert_currency_missing' => 'La devise d\'affichage n\'est pas configurée pour cette école. Définissez la monnaie utilisée sur les factures et tableaux de bord.',
 ];

@@ -59,7 +59,7 @@ return [
     'fully_settled' => 'Totalement réglé',
     'unpaid_students' => 'Élèves non payés',
     'pending_dues' => 'Impayés en attente',
-    'financial_health' => 'Santé financière',
+    'financial_health' => 'États Financiers',
     'expected_revenue' => 'Revenu attendu',
     'based_on_enrollment' => 'Basé sur les inscriptions actives',
     'collected_revenue' => 'Revenu perçu',

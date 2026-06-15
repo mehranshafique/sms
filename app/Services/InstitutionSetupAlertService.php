@@ -11,7 +11,7 @@ class InstitutionSetupAlertService
 {
     public function getAlertsForUser(?User $user): array
     {
-        if (!$user || !$user->hasRole(['School Admin', 'Head Officer'])) {
+        if (!$user || !$user->hasRole(['School Admin', 'Head Officer', 'Super Admin'])) {
             return [];
         }
 
@@ -72,6 +72,19 @@ class InstitutionSetupAlertService
                 'academic_session',
                 __('configuration.alert_no_current_session'),
                 route('academic-sessions.index')
+            );
+        }
+
+        $hasCurrencyConfig = InstitutionSetting::where('institution_id', $institutionId)
+            ->where('group', 'currency')
+            ->where('key', 'currency_code')
+            ->exists();
+
+        if (!$hasCurrencyConfig) {
+            $alerts[] = $this->alert(
+                'currency',
+                __('configuration.alert_currency_missing'),
+                route('currency.index')
             );
         }
 

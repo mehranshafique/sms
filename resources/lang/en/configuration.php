@@ -166,4 +166,5 @@ return [
     'alert_academic_dates_missing' => 'Academic session dates are missing. Please set the school year.',
     'alert_communication_missing' => 'SMS/WhatsApp communication setup is incomplete. Configure your messaging providers.',
     'alert_no_current_session' => 'No current academic session is active. Create or mark one as current.',
+    'alert_currency_missing' => 'Display currency is not configured for this school. Set the currency used on invoices and dashboards.',
 ];
