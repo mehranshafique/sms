@@ -56,6 +56,12 @@
         <div class="tab-content">
             @if($gatewayActive && !empty($gatewayMethods))
             <div class="tab-pane fade show active" id="tab-gateway">
+                @if(($gatewayEnvironment ?? 'production') === 'sandbox' && $gatewayProvider === 'pawapay')
+                <div class="alert alert-warning small mb-3">
+                    <strong>{{ __('payment_gateway.sandbox_mode_title') }}</strong><br>
+                    {{ __('payment_gateway.sandbox_pawapay_help', ['success' => '0893456789']) }}
+                </div>
+                @endif
                 <div class="alert alert-light border small mb-3">
                     {{ __('payment_gateway.pay_now_help', ['provider' => config('payment_gateways.providers.'.$gatewayProvider.'.label') ?? $gatewayProvider]) }}
                 </div>

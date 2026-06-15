@@ -22,4 +22,7 @@ return [
     'back_to_invoice' => 'Back to invoice',
     'try_again' => 'Try again',
     'polling_hint' => 'This page refreshes automatically every few seconds.',
+    'sandbox_mode_title' => 'Sandbox testing mode',
+    'sandbox_pawapay_help' => 'PawaPay sandbox does not send real PIN prompts to your Orange line. Use these test numbers instead (Orange Money): :success for success, or 0893456029 / 0893456039 / 0893456049 for failures. The payment completes automatically in sandbox — no real phone prompt.',
+    'sandbox_pawapay_status' => 'Sandbox mode: no real PIN is sent. If you used test number 0893456789, this page should show success within a few seconds. Real Orange numbers (e.g. 089…) only work in Production.',
 ];

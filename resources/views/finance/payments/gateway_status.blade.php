@@ -15,6 +15,11 @@
         <div class="alert alert-danger text-center">{{ __('payment_gateway.payment_failed') }}</div>
         <a href="{{ route('pay.show', $token) }}" class="btn btn-outline-primary w-100">{{ __('payment_gateway.try_again') }}</a>
     @else
+        @if(($gatewayEnvironment ?? 'production') === 'sandbox' && ($gatewayProvider ?? '') === 'pawapay')
+        <div class="alert alert-warning small text-start mb-3">
+            {{ __('payment_gateway.sandbox_pawapay_status') }}
+        </div>
+        @endif
         <div class="alert alert-info text-center" id="statusMessage">
             <i class="fa fa-spinner fa-spin me-2"></i>{{ __('payment_gateway.pawapay_confirm_phone') }}
         </div>
