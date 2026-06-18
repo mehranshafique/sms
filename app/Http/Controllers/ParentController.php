@@ -340,6 +340,8 @@ class ParentController extends BaseController
                 'guardian_name' => $studentParent->guardian_name,
                 'guardian_email' => $studentParent->guardian_email,
                 'guardian_phone' => $studentParent->guardian_phone,
+                'guardian_relation' => $studentParent->guardian_relation,
+                'matched_type' => $this->resolveMatchedGuardianType($studentParent, $phone),
             ]);
         }
 
@@ -359,9 +361,36 @@ class ParentController extends BaseController
                 'guardian_name' => $userParent->name,
                 'guardian_email' => $userParent->email,
                 'guardian_phone' => $userParent->phone,
+                'guardian_relation' => 'guardian',
+                'matched_type' => 'guardian',
             ]);
         }
 
         return response()->json(['exists' => false]);
+    }
+
+    private function resolveMatchedGuardianType(StudentParent $parent, string $phone): ?string
+    {
+        $normalized = preg_replace('/\D+/', '', $phone) ?? '';
+        $matches = function (?string $stored) use ($normalized): bool {
+            if (!$stored) {
+                return false;
+            }
+            $storedNorm = preg_replace('/\D+/', '', $stored) ?? '';
+
+            return $storedNorm !== '' && $storedNorm === $normalized;
+        };
+
+        if ($matches($parent->father_phone)) {
+            return 'father';
+        }
+        if ($matches($parent->mother_phone)) {
+            return 'mother';
+        }
+        if ($matches($parent->guardian_phone)) {
+            return 'guardian';
+        }
+
+        return $parent->guardian_relation;
     }
 }

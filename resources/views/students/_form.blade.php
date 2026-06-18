@@ -376,7 +376,7 @@
                         <!-- UPDATED: Pre-select Primary Guardian -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
-                            <select name="primary_guardian" class="form-control default-select" required>
+                            <select name="primary_guardian" id="primaryGuardianSelect" class="form-control default-select" required>
                                 <option value="">{{ __('student.select_option') }}</option>
                                 <option value="father" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
                                 <option value="mother" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
@@ -487,7 +487,10 @@
         fillRequiredFields: @json(__('student.fill_required_fields') ?? 'Please fill in all required fields before proceeding.'),
         checkForm: @json(__('student.messages.check_form')),
         errorOccurred: @json(__('student.error_occurred')),
-        somethingWentWrong: @json(__('student.something_went_wrong'))
+        somethingWentWrong: @json(__('student.something_went_wrong')),
+        fatherLabel: @json(__('student.father_name')),
+        motherLabel: @json(__('student.mother_name')),
+        guardianLabel: @json(__('student.guardian_name')),
     };
 
     function generateQR() {
@@ -527,6 +530,9 @@
                 // Proceed to next tab
                 let nextTab = document.querySelector(`[data-bs-target="${nextPaneId}"]`);
                 new bootstrap.Tab(nextTab).show();
+                if (nextPaneId === '#parents') {
+                    setTimeout(refreshPrimaryGuardianPicker, 150);
+                }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 Swal.fire({
@@ -543,6 +549,13 @@
             new bootstrap.Tab(prevTab).show();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
+
+        const parentsTabBtn = document.querySelector('[data-bs-target="#parents"]');
+        if (parentsTabBtn) {
+            parentsTabBtn.addEventListener('shown.bs.tab', function() {
+                refreshPrimaryGuardianPicker();
+            });
+        }
 
         // HTML5 global catch-all (in case someone forces submit)
         document.getElementById('studentForm').addEventListener('invalid', function(e) {
@@ -618,7 +631,7 @@
             .then(res => res.json())
             .then(data => {
                 if(data.exists) {
-                    fillParentData(data);
+                    fillParentData(data, type);
                     const statusId = type === 'guardian' && method === 'email' ? 'guardian_email_status' : type + '_status';
                     const statusDiv = document.getElementById(statusId);
                     if(statusDiv) {
@@ -639,17 +652,77 @@
             .catch(err => console.error('Lookup Error:', err));
         }
 
-        function fillParentData(data) {
+        function setPhoneField(type, number) {
+            if (!number) return;
+            const item = inputs.find(i => i.type === type);
+            if (!item) return;
+            if (item.instance) {
+                try {
+                    item.instance.setNumber(number);
+                } catch (e) {
+                    if (item.input) item.input.value = number;
+                }
+            } else if (item.input) {
+                item.input.value = number;
+            }
+            if (item.hidden) item.hidden.value = number;
+        }
+
+        function refreshPrimaryGuardianPicker() {
+            const select = document.getElementById('primaryGuardianSelect');
+            if (!select || typeof $ === 'undefined') return;
+            if ($.fn.selectpicker && $(select).data('selectpicker')) {
+                $(select).selectpicker('destroy');
+            }
+            if (typeof window.digitexReinitSelectPickers === 'function') {
+                window.digitexReinitSelectPickers();
+            } else if ($.fn.selectpicker) {
+                $(select).selectpicker({ liveSearch: false, container: 'body', dropupAuto: false });
+            }
+        }
+
+        function updatePrimaryGuardianOptions(data, preferredType) {
+            const select = document.getElementById('primaryGuardianSelect');
+            if (!select) return;
+
+            const preferred = data.matched_type || data.guardian_relation || preferredType || '';
+            const choices = [
+                { value: 'father', label: LANG.fatherLabel, name: data.father_name, phone: data.father_phone },
+                { value: 'mother', label: LANG.motherLabel, name: data.mother_name, phone: data.mother_phone },
+                { value: 'guardian', label: LANG.guardianLabel, name: data.guardian_name, phone: data.guardian_phone },
+            ];
+
+            let html = `<option value="">${LANG.selectOption}</option>`;
+            let available = 0;
+
+            choices.forEach(function(c) {
+                if (c.name || c.phone) {
+                    available++;
+                    const text = c.name ? `${c.label} (${c.name})` : c.label;
+                    const selected = preferred === c.value ? ' selected' : '';
+                    html += `<option value="${c.value}"${selected}>${text}</option>`;
+                }
+            });
+
+            if (available === 0) {
+                choices.forEach(function(c) {
+                    const selected = preferred === c.value ? ' selected' : '';
+                    html += `<option value="${c.value}"${selected}>${c.label}</option>`;
+                });
+            }
+
+            select.innerHTML = html;
+            refreshPrimaryGuardianPicker();
+        }
+
+        function fillParentData(data, lookupType) {
             const map = {
                 'father_name': data.father_name,
-                'father_phone_input': data.father_phone,
-                'hidden_father_phone': data.father_phone,
                 'mother_name': data.mother_name,
-                'mother_phone_input': data.mother_phone,
-                'hidden_mother_phone': data.mother_phone,
                 'guardian_name': data.guardian_name,
                 'guardian_email': data.guardian_email,
-                'guardian_phone_input': data.guardian_phone,
+                'hidden_father_phone': data.father_phone,
+                'hidden_mother_phone': data.mother_phone,
                 'hidden_guardian_phone': data.guardian_phone,
             };
 
@@ -660,7 +733,25 @@
                     field.classList.add('auto-filled');
                 }
             }
+
+            if (data.father_phone) setPhoneField('father', data.father_phone);
+            if (data.mother_phone) setPhoneField('mother', data.mother_phone);
+            if (data.guardian_phone) setPhoneField('guardian', data.guardian_phone);
+
+            updatePrimaryGuardianOptions(data, lookupType);
         }
+
+        @if(isset($student) && $student->parent)
+        updatePrimaryGuardianOptions({
+            father_name: @json($student->parent->father_name),
+            father_phone: @json($student->parent->father_phone),
+            mother_name: @json($student->parent->mother_name),
+            mother_phone: @json($student->parent->mother_phone),
+            guardian_name: @json($student->parent->guardian_name),
+            guardian_phone: @json($student->parent->guardian_phone),
+            guardian_relation: @json($student->parent->guardian_relation),
+        }, @json($student->parent->guardian_relation));
+        @endif
 
         // --- 4. NFC Reader Logic ---
         const nfcInput = document.getElementById('nfc_input');
