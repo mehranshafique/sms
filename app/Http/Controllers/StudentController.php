@@ -189,8 +189,8 @@ class StudentController extends BaseController
             $sectionsQuery->where('institution_id', $institutionId);
         }
         
-        $data = $sectionsQuery->get()->mapWithKeys(function($item) {
-            return [$item->id => mb_convert_encoding($item->name, 'UTF-8', 'UTF-8')];
+        $data = $sectionsQuery->with('gradeLevel')->get()->mapWithKeys(function ($item) {
+            return [$item->id => mb_convert_encoding(class_section_label($item), 'UTF-8', 'UTF-8')];
         });
 
         return response()->json($data);

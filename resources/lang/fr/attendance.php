@@ -67,6 +67,7 @@ return [
     'error_occurred' => 'Une erreur est survenue',
     'validation_error' => 'Erreur de validation',
     'success' => 'Succès !',
+    'select_subject' => 'Sélectionner la matière',
     'analytics_title' => 'Analytique des présences',
     'comparative_report' => 'Rapport comparatif',
     'this_week' => 'Cette semaine',
@@ -81,4 +82,33 @@ return [
     'summary_days_absent' => 'Jours absents',
     'summary_days_late' => 'Retards',
     'summary_attendance_percentage' => 'Assiduité %',
+
+    'select_student_subtitle' => 'Sélectionnez un élève pour consulter ses performances comparatives de présence.',
+    'admission_no' => 'N° d\'admission',
+    'student_name' => 'Nom de l\'élève',
+    'action' => 'Action',
+    'not_assigned' => 'Non assigné',
+    'view_analytics' => 'Voir l\'analytique',
+
+    'this_quarter' => 'Ce trimestre',
+    'this_semester' => 'Ce semestre',
+    'this_year' => 'Cette année',
+    'period_week' => 'Semaine',
+    'period_month' => 'Mois',
+    'period_quarter' => 'Trimestre',
+    'period_semester' => 'Semestre',
+    'period_year' => 'Année',
+
+    'average_arrival_time' => 'Heure d\'arrivée moyenne',
+    'punctuality_score' => 'Score de ponctualité',
+    'participation_frequency' => 'Fréquence de participation',
+
+    'detailed_logs' => 'Journaux de scan détaillés',
+    'check_in_hardware' => 'Entrée (matériel)',
+    'check_out_hardware' => 'Sortie (matériel)',
+    'on_time' => 'À l\'heure',
+    'no_hardware_logs' => 'Aucun journal matériel/scan trouvé pour cette période.',
+
+    'select_subject_for_analytics' => 'Sélectionnez une matière pour afficher l\'analytique de présence.',
+    'subject_required' => 'Sélection de matière requise',
 ];

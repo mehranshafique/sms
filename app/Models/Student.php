@@ -147,6 +147,20 @@ class Student extends Model
         return "{$this->first_name} {$this->last_name}";
     }
 
+    /**
+     * Formal name for receipts: "Last, Post-name, First".
+     */
+    public function getFormalNameAttribute(): string
+    {
+        $parts = array_filter([
+            trim($this->last_name ?? ''),
+            trim($this->post_name ?? ''),
+            trim($this->first_name ?? ''),
+        ], fn ($part) => $part !== '');
+
+        return $parts ? implode(', ', $parts) : $this->full_name;
+    }
+
     // Helpers to access parent info easily via the relationship
     public function getFatherNameAttribute()
     {

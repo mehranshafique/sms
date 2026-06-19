@@ -130,6 +130,7 @@ Route::get('/pay/{token}/status/{reference}', [OnlinePaymentController::class, '
 Route::post('/pay/{token}/gateway', [OnlinePaymentController::class, 'initiateGateway'])->name('pay.gateway');
 Route::post('/pay/{token}/proof', [OnlinePaymentController::class, 'submitProof'])->name('pay.proof');
 Route::get('/pay/{token}', [OnlinePaymentController::class, 'show'])->name('pay.show');
+Route::get('/verify/receipt/{token}', [\App\Http\Controllers\Finance\ReceiptVerificationController::class, 'show'])->name('receipt.verify');
 
 // Signed bulletin download (chatbot / external links — no session required)
 Route::get('/reports/bulletin/signed', [ReportController::class, 'bulletinSigned'])
@@ -554,6 +555,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware([CheckModuleAccess::class . ':invoices'])->group(function () {
             Route::get('invoices/get-sections', [InvoiceController::class, 'getClassSections'])->name('invoices.get_sections');
             Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+            Route::get('invoices/{invoice}/print-receipt', [InvoiceController::class, 'printReceipt'])->name('invoices.print_receipt');
             Route::get('invoices/{invoice}/download', [InvoiceController::class, 'downloadPdf'])->name('invoices.download');
             Route::resource('invoices', InvoiceController::class);
         });

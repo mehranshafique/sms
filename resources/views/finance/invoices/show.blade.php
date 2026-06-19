@@ -13,6 +13,16 @@
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
                 <a href="{{ route('invoices.index') }}" class="btn btn-outline-dark btn-sm"><i class="fa fa-arrow-left me-1"></i> {{ __('invoice.back') }}</a>
                 <a href="{{ route('invoices.print', $invoice->id) }}" target="_blank" class="btn btn-info btn-sm shadow-sm"><i class="fa fa-print me-1"></i> {{ __('invoice.print_web_view') }}</a>
+                <div class="dropdown">
+                    <button class="btn btn-primary btn-sm shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fa fa-receipt me-1"></i> {{ __('invoice.print_receipt') }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'a4']) }}" target="_blank">A4 PDF</a></li>
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos80']) }}" target="_blank">POS 80mm</a></li>
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos58']) }}" target="_blank">POS 58mm</a></li>
+                    </ul>
+                </div>
                 <a href="{{ route('invoices.download', $invoice->id) }}" class="btn btn-success btn-sm shadow-sm"><i class="fa fa-file-pdf me-1"></i> {{ __('invoice.download_pdf') }}</a>
             </div>
         </div>
@@ -105,7 +115,7 @@
                                     @php
                                         $enrollment = $invoice->student->enrollments()->where('academic_session_id', $invoice->academic_session_id)->first() ?? $invoice->student->enrollments()->latest()->first();
                                     @endphp
-                                    <div><span class="text-muted">{{ __('invoice.class') }}:</span> <strong>{{ $enrollment->classSection->name ?? 'N/A' }}</strong></div>
+                                    <div><span class="text-muted">{{ __('invoice.class') }}:</span> <strong>{{ class_section_label($enrollment?->classSection) }}</strong></div>
                                 </div>
                             </div>
                         </div>
@@ -124,7 +134,7 @@
                                     @foreach($invoice->items as $index => $item)
                                     <tr>
                                         <td class="py-3 text-muted">{{ $index + 1 }}</td>
-                                        <td class="py-3 fw-bold">{{ $item->description }}</td>
+                                        <td class="py-3 fw-bold">{{ localize_invoice_description($item->description) }}</td>
                                         <td class="py-3 text-end text-dark">{{ $currency }} {{ number_format($item->amount, 2) }}</td>
                                     </tr>
                                     @endforeach

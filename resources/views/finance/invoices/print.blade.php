@@ -44,7 +44,9 @@
         $baseLabel = trans()->has('invoice.'.$invoice->status) ? __('invoice.'.$invoice->status) : $invoice->status;
         $label = mb_strtoupper($baseLabel) . $installmentSuffix;
         
-        $enrollment = $invoice->student->enrollments()->where('academic_session_id', $invoice->academic_session_id)->first() ?? $invoice->student->enrollments()->latest()->first();
+        $enrollment = $invoice->student->enrollments
+            ->firstWhere('academic_session_id', $invoice->academic_session_id)
+            ?? $invoice->student->enrollments->sortByDesc('created_at')->first();
 
         // Exact Translation Fallbacks
         $txtReceiptNo = trans()->has('invoice.receipt_no') ? __('invoice.receipt_no') : 'RECEIPT NO.';
@@ -62,6 +64,17 @@
         $txtPaid = trans()->has('invoice.amount_paid') ? __('invoice.amount_paid') : 'Amount paid:';
         $txtDue = trans()->has('invoice.payment_due') ? __('invoice.payment_due') : 'Payment due:';
         $txtThanks = trans()->has('invoice.thank_you') ? __('invoice.thank_you') : 'Thank you for your trust.';
+        $txtPrintDate = __('invoice.print_date');
+        $txtAmountInWords = __('invoice.amount_in_words');
+        $txtInvoiceRef = __('invoice.invoice_ref');
+
+        $displayReceiptNo = receipt_display_number($invoice);
+        $lastPayment = $invoice->payments->last();
+        $amountForWords = $invoice->paid_amount > 0 ? (float) $invoice->paid_amount : (float) $dueAmount;
+        $verifyUrl = $lastPayment?->receipt_verify_token
+            ? route('receipt.verify', $lastPayment->receipt_verify_token)
+            : null;
+        $studentDisplayName = $invoice->student->formal_name;
         
         $cityCountry = ($invoice->institution->city ?? 'Kinshasa');
         $encodedInvoiceNumber = urlencode($invoice->invoice_number);
@@ -236,9 +249,9 @@
                 <div class="w-full border-b border-gray-300 mb-4"></div>
                 
                 <table class="text-[14px] text-left w-full border-collapse">
-                    <tr><td class="py-1 w-32 text-gray-700">{{ $txtStudentName }}</td><td class="py-1 font-bold text-gray-900 w-4">:</td><td class="py-1 font-bold text-gray-900">{{ $invoice->student->full_name }}</td></tr>
+                    <tr><td class="py-1 w-32 text-gray-700">{{ $txtStudentName }}</td><td class="py-1 font-bold text-gray-900 w-4">:</td><td class="py-1 font-bold text-gray-900">{{ $studentDisplayName }}</td></tr>
                     <tr><td class="py-1 text-gray-700">{{ $txtStudentId }}</td><td class="py-1 font-bold text-gray-900 w-4">:</td><td class="py-1 font-bold text-gray-900">{{ $invoice->student->admission_number }}</td></tr>
-                    <tr><td class="py-1 text-gray-700">{{ $txtClass }}</td><td class="py-1 font-bold text-gray-900 w-4">:</td><td class="py-1 font-bold text-gray-900">{{ $enrollment->classSection->name ?? 'N/A' }}</td></tr>
+                    <tr><td class="py-1 text-gray-700">{{ $txtClass }}</td><td class="py-1 font-bold text-gray-900 w-4">:</td><td class="py-1 font-bold text-gray-900">{{ class_section_label($enrollment?->classSection) }}</td></tr>
                     <tr><td class="py-1 text-gray-700">{{ $txtYear }}</td><td class="py-1 font-bold text-gray-900 w-4">:</td><td class="py-1 font-bold text-gray-900">{{ $invoice->academicSession->name ?? 'N/A' }}</td></tr>
                 </table>
             </div>
@@ -246,7 +259,7 @@
             <!-- Right: Receipt Details -->
             <div class="w-[45%] text-left">
                 <table class="text-[14px] text-left border-collapse w-full">
-                    <tr><td class="py-1.5 w-36 font-bold text-gray-900">{{ $txtReceiptNo }}</td><td class="py-1.5 font-bold text-gray-900 w-4">:</td><td class="py-1.5 font-bold text-gray-900"><span class="border border-gray-400 rounded-full px-3 py-0.5 bg-white">{{ $invoice->invoice_number }}</span></td></tr>
+                    <tr><td class="py-1.5 w-36 font-bold text-gray-900">{{ $txtReceiptNo }}</td><td class="py-1.5 font-bold text-gray-900 w-4">:</td><td class="py-1.5 font-bold text-gray-900"><span class="border border-gray-400 rounded-full px-3 py-0.5 bg-white">{{ $displayReceiptNo }}</span><div class="text-xs text-gray-500 font-normal mt-1">{{ $txtInvoiceRef }}: {{ $invoice->invoice_number }}</div></td></tr>
                     <tr><td class="py-1.5 font-bold text-gray-900">{{ $txtPaymentDate }}</td><td class="py-1.5 font-bold text-gray-900 w-4">:</td><td class="py-1.5 text-gray-900 px-2">{{ $lastPaymentDate }}</td></tr>
                     <tr><td class="py-1.5 font-bold text-gray-900">{{ $txtStatus }}</td><td class="py-1.5 font-bold text-gray-900 w-4">:</td><td class="py-1.5 font-bold text-gray-900"><span class="bg-[#083366] text-white px-3 py-1 rounded text-xs uppercase">{{ $label }}</span></td></tr>
                 </table>
@@ -266,7 +279,7 @@
                 @foreach($invoice->items as $index => $item)
                 <tr>
                     <td class="py-3 px-4 text-center border border-gray-300">{{ $index + 1 }}</td>
-                    <td class="py-3 px-4 border border-gray-300 text-left">{{ $item->description }}</td>
+                    <td class="py-3 px-4 border border-gray-300 text-left">{{ localize_invoice_description($item->description) }}</td>
                     <td class="py-3 px-4 text-center border border-gray-300 font-bold">{{ number_format($item->amount, 2) }}</td>
                 </tr>
                 @endforeach
@@ -284,8 +297,12 @@
         </table>
 
         <!-- Summary & Totals -->
-        <div class="flex justify-end mt-6">
-            <div class="w-full sm:w-[350px] text-[14px] text-gray-800">
+        <div class="flex justify-between items-start mt-6 gap-8">
+            <div class="w-[55%] text-[14px] text-gray-700 italic pt-2">
+                <span class="font-semibold not-italic text-gray-800">{{ $txtAmountInWords }}:</span>
+                {{ ucfirst(amount_in_words($amountForWords)) }}
+            </div>
+            <div class="w-full sm:w-[350px] text-[14px] text-gray-800 shrink-0">
                 <div class="flex justify-between items-center py-2">
                     <span class="font-medium pr-4 text-gray-600">{{ $txtSubtotal }} :</span>
                     <span class="font-bold">{{ $currency }} {{ number_format($invoice->total_amount, 2) }}</span>
@@ -306,14 +323,19 @@
                 <div class="w-full border-t border-gray-300 mt-2 mb-2"></div>
                 
                 <div class="flex justify-between items-center py-2 font-bold">
-                    <span>{{ $txtPaymentDate }} :</span>
-                    <span>{{ $lastPaymentDate }}</span>
+                    <span>{{ $txtPrintDate }} :</span>
+                    <span>{{ now()->format('d/m/Y H:i') }}</span>
                 </div>
             </div>
         </div>
 
         <!-- Footer -->
         <footer class="mt-12 text-center relative pb-2 border-t border-gray-300 pt-5">
+            @if($verifyUrl)
+            <div class="mb-4">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ urlencode($verifyUrl) }}" alt="QR" class="inline-block" style="width: 90px; height: 90px;">
+            </div>
+            @endif
             <p class="font-serif italic text-gray-600 text-[15px]">
                 {{ $txtThanks }}
             </p>
@@ -388,13 +410,13 @@
                         
                         <table class="student-info-table">
                             <tr>
-                                <td class="label">{{ $txtStudentName }}</td><td class="colon">:</td><td class="value">{{ $invoice->student->full_name }}</td>
+                                <td class="label">{{ $txtStudentName }}</td><td class="colon">:</td><td class="value">{{ $studentDisplayName }}</td>
                             </tr>
                             <tr>
                                 <td class="label">{{ $txtStudentId }}</td><td class="colon">:</td><td class="value">{{ $invoice->student->admission_number }}</td>
                             </tr>
                             <tr>
-                                <td class="label">{{ $txtClass }}</td><td class="colon">:</td><td class="value">{{ $enrollment->classSection->name ?? 'N/A' }}</td>
+                                <td class="label">{{ $txtClass }}</td><td class="colon">:</td><td class="value">{{ class_section_label($enrollment?->classSection) }}</td>
                             </tr>
                             <tr>
                                 <td class="label">{{ $txtYear }}</td><td class="colon">:</td><td class="value">{{ $invoice->academicSession->name ?? 'N/A' }}</td>
@@ -408,7 +430,7 @@
                         <table class="receipt-info-table">
                             <tr>
                                 <td class="label">{{ $txtReceiptNo }}</td><td class="colon">:</td>
-                                <td><span style="border: 1px solid #9ca3af; border-radius: 12px; padding: 3px 12px; display: inline-block; font-weight: bold;">{{ $invoice->invoice_number }}</span></td>
+                                <td><span style="border: 1px solid #9ca3af; border-radius: 12px; padding: 3px 12px; display: inline-block; font-weight: bold;">{{ $displayReceiptNo }}</span><div style="font-size: 10px; color: #6b7280; margin-top: 4px;">{{ $txtInvoiceRef }}: {{ $invoice->invoice_number }}</div></td>
                             </tr>
                             <tr>
                                 <td class="label" style="padding-top: 10px;">{{ $txtPaymentDate }}</td><td class="colon" style="padding-top: 10px;">:</td>
@@ -436,7 +458,7 @@
                     @foreach($invoice->items as $index => $item)
                     <tr>
                         <td class="text-center">{{ $index + 1 }}</td>
-                        <td>{{ $item->description }}</td>
+                        <td>{{ localize_invoice_description($item->description) }}</td>
                         <td class="text-center amount">{{ number_format($item->amount, 2) }}</td>
                     </tr>
                     @endforeach
@@ -453,7 +475,14 @@
             </table>
 
             <!-- Summary -->
-            <table class="summary-table" cellspacing="0" cellpadding="0">
+            <table width="100%" cellspacing="0" cellpadding="0" style="margin-top: 15px; clear: both;">
+                <tr>
+                    <td width="55%" valign="top" style="padding-right: 24px; font-size: 13px; font-style: italic; color: #374151; line-height: 1.5;">
+                        <span style="font-style: normal; font-weight: bold; color: #111827;">{{ $txtAmountInWords }}:</span><br>
+                        {{ ucfirst(amount_in_words($amountForWords)) }}
+                    </td>
+                    <td width="45%" valign="top">
+                        <table class="summary-table" cellspacing="0" cellpadding="0" style="float: none; width: 100%; margin-top: 0;">
                 <tr>
                     <td class="label">{{ $txtSubtotal }} :</td>
                     <td class="value">{{ $currency }} {{ number_format($invoice->total_amount, 2) }}</td>
@@ -468,14 +497,22 @@
                 </tr>
                 <tr><td colspan="2" style="height: 10px;"></td></tr>
                 <tr class="border-row">
-                    <td class="label font-bold" style="padding-top: 10px;">{{ $txtPaymentDate }} :</td>
-                    <td class="value font-bold" style="padding-top: 10px;">{{ $lastPaymentDate }}</td>
+                    <td class="label font-bold" style="padding-top: 10px;">{{ $txtPrintDate }} :</td>
+                    <td class="value font-bold" style="padding-top: 10px;">{{ now()->format('d/m/Y H:i') }}</td>
+                </tr>
+                        </table>
+                    </td>
                 </tr>
             </table>
             <div style="clear: both;"></div>
 
             <!-- Footer -->
             <div class="footer">
+                @if($verifyUrl)
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($verifyUrl) }}" alt="QR" style="width: 80px; height: 80px;">
+                </div>
+                @endif
                 <div class="footer-thanks">{{ $txtThanks }}</div>
             </div>
         </div>

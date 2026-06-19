@@ -40,8 +40,8 @@
         @if($isSubjectWise && empty($selectedSubjectId))
             <div class="alert alert-info shadow-sm border-0 mt-4 rounded-3 p-4 text-center">
                 <i class="fa fa-book text-info fs-1 mb-3"></i>
-                <h4 class="text-info">{{ __('attendance.subject_required') ?? 'Subject Selection Required' }}</h4>
-                <p class="mb-0">{{ __('attendance.select_subject_for_analytics') ?? 'This institution operates on Subject-Wise attendance. Please select a specific subject from the dropdown above to view the comparative statistics for this student.' }}</p>
+                <h4 class="text-info">{{ __('attendance.subject_required') }}</h4>
+                <p class="mb-0">{{ __('attendance.select_subject_for_analytics') }}</p>
             </div>
         @else
             {{-- Top Insights Cards --}}

@@ -125,9 +125,10 @@ class AttendanceReportController extends BaseController
                     return $row->first_name . ' ' . $row->last_name;
                 })
                 ->addColumn('class', function($row) {
-                    // BUG FIX: Extract class from the active enrollment relation
                     $enrollment = $row->enrollments->first();
-                    return $enrollment && $enrollment->classSection ? $enrollment->classSection->name : __('attendance.not_assigned');
+                    return $enrollment && $enrollment->classSection
+                        ? class_section_label($enrollment->classSection)
+                        : __('attendance.not_assigned');
                 })
                 ->addColumn('action', function($row) {
                     $url = route('attendance.analytics.show', $row->id);

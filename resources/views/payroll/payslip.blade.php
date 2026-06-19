@@ -304,8 +304,8 @@
         <span class="net-value">{{ config('app.currency_symbol', '$') }} {{ number_format($payroll->net_salary, 2) }}</span>
         
         <div class="net-words">
-            @if(class_exists('NumberFormatter'))
-                ({{ __('payroll.amount_in_words') }}: {{ \NumberFormatter::create(app()->getLocale(), \NumberFormatter::SPELLOUT)->format($payroll->net_salary) }} {{ __('payroll.only') }})
+            @if(function_exists('amount_in_words'))
+                ({{ __('payroll.amount_in_words') }}: {{ amount_in_words($payroll->net_salary) }} {{ __('payroll.only') }})
             @endif
         </div>
     </div>

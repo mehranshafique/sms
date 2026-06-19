@@ -148,4 +148,15 @@ return [
     'refresh_link' => 'Régénérer le lien',
     'payment_link_refreshed' => 'Lien de paiement régénéré.',
     'invoice_id_label' => 'N° facture',
+
+    'installment_of_global' => ':installment de :global',
+    'global_fee_fallback' => 'Frais annuel',
+    'payment_mode_global' => ':name (Global)',
+    'payment_mode_installment' => ':name (Tranche)',
+    'amount_in_words' => 'Montant en lettres',
+    'print_date' => 'Date d\'impression',
+    'invoice_ref' => 'Réf. facture',
+    'print_receipt' => 'Imprimer le reçu',
+    'verify_receipt' => 'Vérification du reçu',
+    'receipt_verified' => 'Ce reçu est authentique.',
 ];

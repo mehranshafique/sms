@@ -68,4 +68,7 @@ return [
     'error_occurred' => 'Error Occurred',
     'something_went_wrong' => 'Something went wrong!',
     'validation_error' => 'Validation Error',
+
+    'grade_section' => ':grade :section',
+    'grade_dash_section' => ':grade - :section',
 ];

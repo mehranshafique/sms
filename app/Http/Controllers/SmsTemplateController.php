@@ -6,6 +6,7 @@ use App\Models\SmsTemplate;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class SmsTemplateController extends BaseController
 {

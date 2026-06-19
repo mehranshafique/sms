@@ -137,4 +137,6 @@ return [
     'summary_days_absent' => 'Days absent',
     'summary_days_late' => 'Late arrivals',
     'summary_attendance_percentage' => 'Attendance %',
+
+    'select_subject_for_analytics' => 'Select a subject to view attendance analytics.',
 ];

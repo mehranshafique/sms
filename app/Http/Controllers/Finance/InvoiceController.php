@@ -15,6 +15,7 @@ use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Services\NotificationService;
+use App\Services\Finance\InvoiceDescriptionBuilder;
 use Illuminate\Support\Str;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use PDF;
@@ -26,7 +27,7 @@ class InvoiceController extends BaseController
 
     public function __construct(NotificationService $notificationService)
     {
-        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'show', 'print', 'downloadPdf']);
+        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'show', 'print', 'printReceipt', 'downloadPdf']);
         $this->middleware(PermissionMiddleware::class . ':invoice.create')->only(['create', 'store']);
         $this->middleware(PermissionMiddleware::class . ':invoice.delete')->only(['destroy']);
         $this->setPageTitle(__('invoice.page_title'));
@@ -411,21 +412,15 @@ class InvoiceController extends BaseController
                 ]);
 
                 foreach ($feesToProcess as $fee) {
-                    $description = $fee->name;
-
-                    // DESCRIPTIVE REASON
+                    $parentGlobal = null;
                     if ($fee->payment_mode === 'installment') {
-                        $parentGlobal = $globalFeesCache->filter(function($gFee) use ($fee) {
-                            return $gFee->fee_type_id === $fee->fee_type_id &&
-                                   ($gFee->grade_level_id === $fee->grade_level_id || $gFee->class_section_id === $fee->class_section_id);
+                        $parentGlobal = $globalFeesCache->filter(function ($gFee) use ($fee) {
+                            return $gFee->fee_type_id === $fee->fee_type_id
+                                && ($gFee->grade_level_id === $fee->grade_level_id || $gFee->class_section_id === $fee->class_section_id);
                         })->first();
-
-                        $globalName = $parentGlobal ? $parentGlobal->name : 'Global Fee';
-                        $description = "{$fee->name} of {$globalName}";
-                    } 
-                    else {
-                        $description = "{$fee->name} (" . ucfirst($fee->payment_mode) . ")";
                     }
+
+                    $description = app(InvoiceDescriptionBuilder::class)->forFeeStructure($fee, $parentGlobal);
 
                     InvoiceItem::create([
                         'invoice_id' => $invoice->id,
@@ -491,34 +486,95 @@ class InvoiceController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         $invoice = Invoice::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
-            ->with(['student', 'items', 'institution', 'academicSession', 'payments'])
+            ->with(['student.enrollments.classSection.gradeLevel', 'items', 'institution', 'academicSession', 'payments'])
             ->findOrFail($id);
 
         if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
             abort(403);
         }
 
+        $this->ensurePaymentVerifyTokens($invoice);
+
         $isPdf = false;
         return view('finance.invoices.print', compact('invoice', 'isPdf'));
+    }
+
+    public function printReceipt(Request $request, $id)
+    {
+        $institutionId = $this->getInstitutionId();
+        $invoice = Invoice::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->with(['student.enrollments.classSection.gradeLevel', 'items', 'institution', 'academicSession', 'payments'])
+            ->findOrFail($id);
+
+        if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
+            abort(403);
+        }
+
+        $this->ensurePaymentVerifyTokens($invoice);
+
+        $format = $request->query('format', 'a4');
+
+        if (! class_exists('PDF')) {
+            return redirect()->route('invoices.print', $id);
+        }
+
+        if (in_array($format, ['pos80', 'pos58'], true)) {
+            $view = 'finance.invoices.print_receipt';
+            $paper = $format === 'pos58' ? [0, 0, 164.41, 800] : [0, 0, 226.77, 800];
+            $pdf = PDF::loadView($view, compact('invoice', 'format'));
+            $pdf->setPaper($paper);
+        } else {
+            $isPdf = true;
+            $format = 'a4';
+            $pdf = PDF::loadView('finance.invoices.print', compact('invoice', 'isPdf', 'format'));
+            $pdf->setPaper('a4', 'portrait');
+        }
+
+        $pdf->setOptions(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
+
+        $suffix = $format === 'a4' ? '' : '_' . $format;
+
+        return $pdf->stream('Receipt-' . receipt_display_number($invoice) . $suffix . '.pdf');
     }
 
     public function downloadPdf($id)
     {
         $institutionId = $this->getInstitutionId();
         $invoice = Invoice::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
-            ->with(['student', 'items', 'institution', 'academicSession', 'payments'])
+            ->with(['student.enrollments.classSection.gradeLevel', 'items', 'institution', 'academicSession', 'payments'])
             ->findOrFail($id);
 
         if (!Auth::user()->can('invoice.view') && !Auth::user()->hasRole(['Super Admin', 'School Admin', 'Head Officer', 'Accountant', 'accountant'])) {
             abort(403);
         }
+
+        $this->ensurePaymentVerifyTokens($invoice);
+
         if (class_exists('PDF')) {
-            $isPdf = true; // Tell the view to use the DOMPDF-safe CSS layout
+            $isPdf = true;
             $pdf = \PDF::loadView('finance.invoices.print', compact('invoice', 'isPdf'));
             return $pdf->download('Invoice-'.$invoice->invoice_number.'.pdf');
-        } else {
-            return redirect()->route('invoices.print', $id);
         }
+
+        return redirect()->route('invoices.print', $id);
+    }
+
+    protected function ensurePaymentVerifyTokens(Invoice $invoice): void
+    {
+        foreach ($invoice->payments as $payment) {
+            $updates = [];
+            if (empty($payment->receipt_verify_token)) {
+                $updates['receipt_verify_token'] = Str::random(40);
+            }
+            if (empty($payment->receipt_number)) {
+                $updates['receipt_number'] = \App\Services\PaymentRecordingService::generateReceiptNumber($invoice->institution_id);
+            }
+            if ($updates) {
+                $payment->update($updates);
+            }
+        }
+
+        $invoice->load('payments');
     }
 
     public function destroy($id)

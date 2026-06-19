@@ -14,6 +14,8 @@ class Payment extends Model
         'invoice_id',
         'institution_id',
         'transaction_id',
+        'receipt_number',
+        'receipt_verify_token',
         'payment_date',
         'amount',
         'method', // cash, bank_transfer, card, online, orange_money, airtel_money, mpesa, vodacom

@@ -9,7 +9,7 @@ use App\Models\AcademicSession;
 use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\StudentDebt;
-use App\Models\FeeStructure;
+use App\Services\Finance\AnnualFeeCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Student;
@@ -17,8 +17,9 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class FinancialReportController extends BaseController
 {
-    public function __construct()
-    {
+    public function __construct(
+        protected AnnualFeeCalculator $annualFeeCalculator
+    ) {
         $this->middleware('auth');
         $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index']);
         $this->setPageTitle(__('finance.class_financial_report'));
@@ -32,13 +33,7 @@ class FinancialReportController extends BaseController
         $classes = ClassSection::where('institution_id', $institutionId)
             ->with('gradeLevel')
             ->get()
-            ->mapWithKeys(function ($item) {
-                // Fixed: Format as "Grade Section" (e.g. "1er A")
-                $gradeName = $item->gradeLevel->name ?? '';
-                $name = ($gradeName ? $gradeName . ' ' : '') . $item->name;
-                
-                return [$item->id => $name];
-            });
+            ->mapWithKeys(fn ($item) => [$item->id => class_section_label($item)]);
 
         $reportData = [];
         $totals = [
@@ -59,17 +54,8 @@ class FinancialReportController extends BaseController
             $students = StudentEnrollment::where('class_section_id', $request->class_section_id)
                 ->where('academic_session_id', $currentSession->id)
                 ->where('status', 'active')
-                ->with(['student']) 
+                ->with(['student', 'classSection.gradeLevel'])
                 ->get();
-
-            // 2. Get Fee Structures for this Class
-            $class = ClassSection::find($request->class_section_id);
-            $gradeId = $class->grade_level_id;
-            
-            $gradeFees = FeeStructure::where('institution_id', $institutionId)
-                ->where('academic_session_id', $currentSession->id)
-                ->where('grade_level_id', $gradeId)
-                ->sum('amount');
 
             // 3. Process Each Student
             foreach ($students as $enrollment) {
@@ -93,8 +79,8 @@ class FinancialReportController extends BaseController
                     })
                     ->sum('amount');
 
-                // C. Annual Fee Overview
-                $annualFee = $gradeFees;
+                // C. Annual Fee Overview (per student, with discount)
+                $annualFee = $this->annualFeeCalculator->forEnrollment($enrollment);
 
                 // D. Remaining Fees
                 $remaining = $annualFee - $cumulativePaid;

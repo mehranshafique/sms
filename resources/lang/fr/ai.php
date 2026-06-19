@@ -15,6 +15,7 @@ return [
     'error_not_configured'  => 'L’IA n’est pas encore configurée. Veuillez contacter votre administrateur.',
     'error_provider'        => 'Le fournisseur IA a renvoyé une erreur. Vérifiez la clé API dans les paramètres IA ou réessayez.',
     'unknown_institution'   => 'Votre établissement',
+    'response_language'     => 'Répondez toujours en français sauf si l\'utilisateur écrit dans une autre langue.',
 
     // Assistant
     'assistant_title'    => 'Assistant IA',

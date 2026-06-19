@@ -57,4 +57,7 @@ return [
     'error_occurred' => 'Une erreur est survenue',
     'something_went_wrong' => 'Quelque chose s\'est mal passé !',
     'validation_error' => 'Erreur de validation',
+
+    'grade_section' => ':grade :section',
+    'grade_dash_section' => ':grade - :section',
 ];

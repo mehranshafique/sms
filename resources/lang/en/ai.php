@@ -15,6 +15,7 @@ return [
     'error_not_configured'  => 'AI is not configured yet. Please contact your administrator.',
     'error_provider'        => 'The AI provider returned an error. Please check the API key in AI Settings or try again.',
     'unknown_institution'   => 'Your school',
+    'response_language'     => 'Always respond in English unless the user writes in another language.',
 
     // Assistant
     'assistant_title'    => 'AI Assistant',

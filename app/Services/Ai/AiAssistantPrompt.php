@@ -26,6 +26,7 @@ class AiAssistantPrompt
         $appUrl   = rtrim((string) config('app.url'), '/');
         $loginUrl = $appUrl . '/login';
         $userName = $user?->name ?? 'User';
+        $languageRule = $this->responseLanguageRule();
 
         return <<<PROMPT
 You are Digitex AI, the official in-app assistant for the Digitex School Management System (school ERP platform).
@@ -58,6 +59,13 @@ LIMITS:
 - For school-specific policies you do not know, say so and recommend contacting the school administrator.
 
 STYLE: Clear, professional, friendly. Use short numbered steps for how-to questions. Keep answers focused (usually 2–8 sentences unless steps are needed).
+
+LANGUAGE: {$languageRule}
 PROMPT;
+    }
+
+    protected function responseLanguageRule(): string
+    {
+        return __('ai.response_language');
     }
 }

@@ -159,3 +159,186 @@ if (!function_exists('institution_room_options')) {
         return $options;
     }
 }
+
+if (! function_exists('class_section_label')) {
+    /**
+     * Format a class section for display (grade + section).
+     *
+     * @param  \App\Models\ClassSection|null  $section
+     */
+    function class_section_label(?\App\Models\ClassSection $section, string $format = 'grade_section'): string
+    {
+        if (! $section) {
+            return __('class_section.not_assigned');
+        }
+
+        if (! $section->relationLoaded('gradeLevel')) {
+            $section->loadMissing('gradeLevel');
+        }
+
+        $grade = trim($section->gradeLevel->name ?? '');
+        $sectionName = trim($section->name ?? '');
+
+        return match ($format) {
+            'grade_dash_section' => $grade && $sectionName
+                ? __('class_section.grade_dash_section', ['grade' => $grade, 'section' => $sectionName])
+                : ($grade ?: $sectionName ?: __('class_section.not_assigned')),
+            'section_only' => $sectionName ?: __('class_section.not_assigned'),
+            default => $grade && $sectionName
+                ? __('class_section.grade_section', ['grade' => $grade, 'section' => $sectionName])
+                : ($grade ?: $sectionName ?: __('class_section.not_assigned')),
+        };
+    }
+}
+
+if (! function_exists('localize_invoice_description')) {
+    /**
+     * Display-time fix for legacy invoice rows with hardcoded English " of ".
+     */
+    function localize_invoice_description(?string $description): string
+    {
+        if (! $description || app()->getLocale() !== 'fr') {
+            return $description ?? '';
+        }
+
+        return preg_replace('/\s+of\s+/i', ' de ', $description) ?? $description;
+    }
+}
+
+if (! function_exists('receipt_display_number')) {
+    function receipt_display_number(\App\Models\Invoice $invoice): string
+    {
+        $lastPayment = $invoice->payments->last();
+
+        return $lastPayment?->receipt_number ?? $invoice->invoice_number;
+    }
+}
+
+if (! function_exists('spellout_amount_fallback')) {
+    /**
+     * Fallback when ext-intl / NumberFormatter is unavailable.
+     */
+    function spellout_amount_fallback(int $number): string
+    {
+        if ($number === 0) {
+            return app()->getLocale() === 'fr' ? 'zéro' : 'zero';
+        }
+
+        if (app()->getLocale() === 'fr') {
+            return spellout_french_amount($number);
+        }
+
+        return spellout_english_amount($number);
+    }
+
+    function spellout_english_amount(int $number): string
+    {
+        $ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+            'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+        $tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+        $chunk = function (int $n) use ($ones, $tens): string {
+            if ($n < 20) {
+                return $ones[$n];
+            }
+            if ($n < 100) {
+                return trim($tens[intdiv($n, 10)] . ($n % 10 ? '-' . $ones[$n % 10] : ''));
+            }
+
+            return trim($ones[intdiv($n, 100)] . ' hundred' . ($n % 100 ? ' ' . spellout_english_amount($n % 100) : ''));
+        };
+
+        $parts = [];
+        foreach ([1000000 => 'million', 1000 => 'thousand'] as $unit => $label) {
+            if ($number >= $unit) {
+                $parts[] = trim($chunk(intdiv($number, $unit)) . ' ' . $label);
+                $number %= $unit;
+            }
+        }
+        if ($number > 0) {
+            $parts[] = $chunk($number);
+        }
+
+        return implode(' ', array_filter($parts));
+    }
+
+    function spellout_french_amount(int $number): string
+    {
+        $ones = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix',
+            'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+        $tens = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt'];
+
+        $underHundred = function (int $n) use ($ones, $tens): string {
+            if ($n < 20) {
+                return $ones[$n];
+            }
+            if ($n < 70) {
+                $ten = intdiv($n, 10);
+                $rest = $n % 10;
+
+                return $rest === 1 && $ten !== 8
+                    ? $tens[$ten] . '-et-un'
+                    : trim($tens[$ten] . ($rest ? '-' . $ones[$rest] : ''));
+            }
+            if ($n < 80) {
+                return 'soixante-' . spellout_french_amount($n - 60);
+            }
+            if ($n < 100) {
+                $rest = $n - 80;
+
+                return $rest > 0
+                    ? 'quatre-vingt-' . spellout_french_amount($rest)
+                    : 'quatre-vingts';
+            }
+
+            return '';
+        };
+
+        $chunk = function (int $n) use ($ones, $underHundred): string {
+            if ($n < 100) {
+                return $underHundred($n);
+            }
+            $hundreds = intdiv($n, 100);
+            $rest = $n % 100;
+            $hundredWord = $hundreds === 1 ? 'cent' : $ones[$hundreds] . ' cent' . ($hundreds > 1 && $rest === 0 ? 's' : '');
+
+            return trim($hundredWord . ($rest ? ' ' . $underHundred($rest) : ''));
+        };
+
+        $parts = [];
+        if ($number >= 1000000) {
+            $millions = intdiv($number, 1000000);
+            $parts[] = trim($chunk($millions) . ' million' . ($millions > 1 ? 's' : ''));
+            $number %= 1000000;
+        }
+        if ($number >= 1000) {
+            $thousands = intdiv($number, 1000);
+            $parts[] = trim(($thousands === 1 ? 'mille' : $chunk($thousands) . ' mille'));
+            $number %= 1000;
+        }
+        if ($number > 0) {
+            $parts[] = $chunk($number);
+        }
+
+        return implode(' ', array_filter($parts));
+    }
+}
+
+if (! function_exists('amount_in_words')) {
+    function amount_in_words(float $amount): string
+    {
+        $whole = (int) round($amount);
+
+        if (class_exists(\NumberFormatter::class)) {
+            $formatter = \NumberFormatter::create(app()->getLocale(), \NumberFormatter::SPELLOUT);
+            if ($formatter) {
+                $formatted = $formatter->format($whole);
+                if ($formatted !== false) {
+                    return $formatted;
+                }
+            }
+        }
+
+        return spellout_amount_fallback($whole);
+    }
+}

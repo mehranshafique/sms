@@ -59,6 +59,8 @@ class PaymentRecordingService
                 'payer_phone' => $data['payer_phone'] ?? null,
                 'received_by' => $receivedBy,
                 'transaction_id' => 'TRX-' . strtoupper(Str::random(10)),
+                'receipt_number' => self::generateReceiptNumber($invoice->institution_id),
+                'receipt_verify_token' => Str::random(40),
             ]);
 
             $newPaid = (float) $invoice->paid_amount + $amount;
@@ -72,6 +74,24 @@ class PaymentRecordingService
         });
 
         return $payment->fresh(['invoice.student']);
+    }
+
+    public static function generateReceiptNumber(int $institutionId): string
+    {
+        $year = now()->format('y');
+        $prefix = "RCP-{$year}";
+
+        $last = Payment::where('institution_id', $institutionId)
+            ->where('receipt_number', 'like', $prefix . '%')
+            ->orderByDesc('receipt_number')
+            ->value('receipt_number');
+
+        $sequence = 1;
+        if ($last && preg_match('/(\d{5})$/', $last, $matches)) {
+            $sequence = (int) $matches[1] + 1;
+        }
+
+        return $prefix . str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
     }
 
     public function assertAmountAllowedPublic(Invoice $invoice, float $amount): void

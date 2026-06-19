@@ -148,4 +148,15 @@ return [
     'refresh_link' => 'Regenerate link',
     'payment_link_refreshed' => 'Payment link regenerated.',
     'invoice_id_label' => 'Invoice ID',
+
+    'installment_of_global' => ':installment of :global',
+    'global_fee_fallback' => 'Global Fee',
+    'payment_mode_global' => ':name (Global)',
+    'payment_mode_installment' => ':name (Installment)',
+    'amount_in_words' => 'Amount in words',
+    'print_date' => 'Print Date',
+    'invoice_ref' => 'Invoice Ref',
+    'print_receipt' => 'Print Receipt',
+    'verify_receipt' => 'Receipt Verification',
+    'receipt_verified' => 'This receipt is authentic.',
 ];
