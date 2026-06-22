@@ -20,6 +20,7 @@ class GenerateDocumentationPdfs extends Command
             'mobile-app-user-manual' => 'Mobile App User Manual',
             'developer-manual' => 'Developer Manual',
             'api-manual' => 'REST API Manual (Hardware & Mobile App)',
+            'chafon-hardware-bridge-manual' => 'Chafon Hardware Bridge Manual',
         ];
 
         $markdownDir = base_path('doc/markdown');

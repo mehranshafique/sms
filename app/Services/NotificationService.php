@@ -13,6 +13,7 @@ use App\Mail\InvoiceCreatedMail;
 use App\Mail\UserCredentialsMail; 
 use App\Services\Sms\GatewayFactory;
 use App\Services\Sms\InfobipService; 
+use App\Services\MailSettingsService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
@@ -313,15 +314,36 @@ class NotificationService
         }
     }
 
-    public function sendUserCredentials(User $user, $plainPassword, $roleEnumVal)
-    {
+    public function sendUserCredentials(
+        User $user,
+        $plainPassword,
+        $roleEnumVal,
+        ?Student $student = null,
+        ?\App\Models\StudentParent $parent = null
+    ) {
         $schoolName = $user->institute ? $user->institute->name : config('app.name');
-        $roleLabel = $roleEnumVal; 
+        $roleLabel = $roleEnumVal;
         $institutionId = $user->institute_id;
-        
+
         $eventKey = 'user_welcome';
-        if (stripos($roleEnumVal, 'Student') !== false) $eventKey = 'student_created';
-        elseif (stripos($roleEnumVal, 'Staff') !== false || stripos($roleEnumVal, 'Teacher') !== false) $eventKey = 'staff_created';
+        $templateKey = 'user_welcome';
+
+        if (stripos($roleEnumVal, 'Student') !== false) {
+            $eventKey = 'student_welcome';
+            $templateKey = 'student_welcome';
+        } elseif (stripos($roleEnumVal, 'Teacher') !== false) {
+            $eventKey = 'teacher_welcome';
+            $templateKey = 'teacher_welcome';
+        } elseif (stripos($roleEnumVal, 'Staff') !== false) {
+            $eventKey = 'staff_welcome';
+            $templateKey = 'staff_welcome';
+        } elseif (stripos($roleEnumVal, 'Head Officer') !== false || stripos($roleEnumVal, 'HeadOfficer') !== false) {
+            $eventKey = 'head_officer_welcome';
+            $templateKey = 'head_officer_welcome';
+        } elseif (stripos($roleEnumVal, 'Guardian') !== false || stripos($roleEnumVal, 'Parent') !== false) {
+            $eventKey = 'guardian_welcome';
+            $templateKey = 'guardian_welcome';
+        }
 
         $data = [
             'Name' => $user->name,
@@ -329,7 +351,7 @@ class NotificationService
             'Shortcode' => $user->shortcode ?? 'N/A',
             'Username' => $user->username ?? $user->shortcode ?? 'N/A',
             'Password' => $plainPassword ?? 'Unchanged',
-            'Role' => $roleLabel, 
+            'Role' => $roleLabel,
             'SchoolName' => $schoolName,
             'Url' => route('login'),
             'LoginLink' => route('login'),
@@ -337,36 +359,84 @@ class NotificationService
             'email' => $user->email,
             'password' => $plainPassword ?? 'Unchanged',
             'role' => $roleLabel,
-            'school_name' => $schoolName
+            'school_name' => $schoolName,
         ];
 
-        if ($this->isChannelEnabled($institutionId, $eventKey, 'email') && $user->email) {
+        if ($this->isChannelEnabled($institutionId, $eventKey, 'system')) {
             try {
-                if (class_exists(UserCredentialsMail::class)) {
-                    Mail::to($user->email)->send(new UserCredentialsMail($data));
-                }
-            } catch (\Exception $e) {
-                Log::error("Email Error: " . $e->getMessage());
+                app(InAppNotificationService::class)->notifyUser(
+                    $user,
+                    $eventKey,
+                    'welcome',
+                    __('configuration.welcome_notification_title', ['school' => $schoolName]),
+                    __('configuration.welcome_notification_body', ['name' => $user->name, 'role' => $roleLabel]),
+                    route('login'),
+                    $institutionId,
+                    'fa-user-plus'
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Welcome in-app notification failed: ' . $e->getMessage());
             }
         }
 
-        if ($user->phone) {
-            $templateKey = strtolower(str_replace(' ', '_', $roleEnumVal)) . '_welcome'; 
-            
+        if ($this->isChannelEnabled($institutionId, $eventKey, 'email') && $user->email) {
+            try {
+                if (app(MailSettingsService::class)->applyForInstitution($institutionId) && class_exists(UserCredentialsMail::class)) {
+                    Mail::to($user->email)->send(new UserCredentialsMail($data));
+                } else {
+                    Log::warning('Welcome email skipped: SMTP not configured', ['event' => $eventKey, 'user_id' => $user->id]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Welcome email error: ' . $e->getMessage(), ['event' => $eventKey, 'user_id' => $user->id]);
+            }
+        }
+
+        $phones = $this->resolveWelcomePhones($user, $student, $parent, $roleEnumVal);
+        foreach ($phones as $phone) {
             if ($this->isChannelEnabled($institutionId, $eventKey, 'sms')) {
-                $res = $this->sendNotificationEvent($templateKey, $user->phone, $data, $institutionId, 'sms');
-                if (!$res['success']) {
-                    $this->sendNotificationEvent('user_welcome', $user->phone, $data, $institutionId, 'sms');
+                $res = $this->sendNotificationEvent($templateKey, $phone, $data, $institutionId, 'sms');
+                if (! $res['success']) {
+                    $res = $this->sendNotificationEvent('user_welcome', $phone, $data, $institutionId, 'sms');
+                }
+                if (! $res['success']) {
+                    Log::warning('Welcome SMS failed', ['event' => $eventKey, 'phone' => $phone, 'message' => $res['message'] ?? '']);
                 }
             }
 
             if ($this->isChannelEnabled($institutionId, $eventKey, 'whatsapp')) {
-                $res = $this->sendNotificationEvent($templateKey, $user->phone, $data, $institutionId, 'whatsapp');
-                if (!$res['success']) {
-                    $this->sendNotificationEvent('user_welcome', $user->phone, $data, $institutionId, 'whatsapp');
+                $res = $this->sendNotificationEvent($templateKey, $phone, $data, $institutionId, 'whatsapp');
+                if (! $res['success']) {
+                    $res = $this->sendNotificationEvent('user_welcome', $phone, $data, $institutionId, 'whatsapp');
+                }
+                if (! $res['success']) {
+                    Log::warning('Welcome WhatsApp failed', ['event' => $eventKey, 'phone' => $phone, 'message' => $res['message'] ?? '']);
                 }
             }
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function resolveWelcomePhones(User $user, ?Student $student, ?\App\Models\StudentParent $parent, string $roleEnumVal): array
+    {
+        $phones = [];
+
+        if (! empty($user->phone)) {
+            $phones[] = $user->phone;
+        }
+
+        if (stripos($roleEnumVal, 'Student') !== false) {
+            if ($student?->mobile_number) {
+                $phones[] = $student->mobile_number;
+            }
+
+            if ($parent) {
+                $phones[] = $this->resolveStudentContactPhone($student, $parent);
+            }
+        }
+
+        return array_values(array_unique(array_filter($phones)));
     }
 
     public function sendHeadOfficerCredentials(User $user, $plainPassword)
@@ -417,13 +487,7 @@ class NotificationService
     {
         $template = null;
         if (class_exists(\App\Models\SmsTemplate::class)) {
-            $template = \App\Models\SmsTemplate::where('event_key', $eventKey)
-                ->where(function($q) use ($institutionId) {
-                    $q->where('institution_id', $institutionId)
-                      ->orWhereNull('institution_id');
-                })
-                ->orderByDesc('institution_id') 
-                ->first();
+            $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
         }
 
         if (!$template || !$template->is_active) {

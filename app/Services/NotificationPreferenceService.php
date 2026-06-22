@@ -26,6 +26,8 @@ class NotificationPreferenceService
      */
     public function isChannelEnabled(?int $institutionId, string $eventKey, string $channel): bool
     {
+        $eventKey = $this->normalizeEventKey($eventKey);
+
         if (in_array($eventKey, self::ALWAYS_ENABLED_EVENTS, true)) {
             return true;
         }
@@ -37,6 +39,18 @@ class NotificationPreferenceService
         }
 
         return !empty($prefs[$channel]);
+    }
+
+    /**
+     * Map legacy event keys to SMS template / notification preference keys.
+     */
+    public function normalizeEventKey(string $eventKey): string
+    {
+        return match ($eventKey) {
+            'student_created' => 'student_welcome',
+            'staff_created' => 'staff_welcome',
+            default => $eventKey,
+        };
     }
 
     public function isSystemEnabled(?int $institutionId, string $eventKey): bool
@@ -55,6 +69,7 @@ class NotificationPreferenceService
      */
     public function getEventPreferences(?int $institutionId, string $eventKey): ?array
     {
+        $eventKey = $this->normalizeEventKey($eventKey);
         $settingKey = 'notify_' . $eventKey;
 
         $raw = InstitutionSetting::where('institution_id', $institutionId)

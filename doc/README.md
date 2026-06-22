@@ -12,6 +12,7 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 | `markdown/mobile-app-user-manual.md` | **Mobile app (Digitex Portal)** complete guide for all roles |
 | `markdown/developer-manual.md` | **Module-by-module** technical reference: routes, models, permissions, scoping, integrations |
 | `markdown/api-manual.md` | REST API for hardware scanners and mobile apps |
+| `markdown/chafon-hardware-bridge-manual.md` | **Chafon CF661** bridge: configure, test, run `chafon-script.py` |
 
 ## PDF output
 
@@ -21,6 +22,7 @@ Generated PDFs are written to `pdf/`:
 - `Mobile-App-User-Manual.pdf`
 - `Developer-Manual.pdf`
 - `REST-API-Manual-(Hardware-&-Mobile-App).pdf`
+- `Chafon-Hardware-Bridge-Manual.pdf`
 
 ## Regenerate PDFs
 

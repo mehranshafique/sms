@@ -68,7 +68,16 @@
                     {{-- 1. SMTP --}}
                     <div id="smtp" class="tab-pane fade active show">
                          <div class="card">
-                            <div class="card-header"><h4 class="card-title">{{ __('configuration.smtp') }}</h4></div>
+                            <div class="card-header">
+                                <h4 class="card-title">{{ __('configuration.smtp') }}</h4>
+                                @if($isSuperAdmin && !$institutionId)
+                                    <p class="text-muted mb-0 fs-13">{{ __('configuration.global_smtp_help') }}</p>
+                                @elseif(!$isSuperAdmin)
+                                    <p class="text-muted mb-0 fs-13">{{ __('configuration.school_smtp_help') }}</p>
+                                @elseif($institutionId)
+                                    <div class="alert alert-info py-2 px-3 mb-0 fs-13">{{ __('configuration.global_smtp_institution_hint') }}</div>
+                                @endif
+                            </div>
                             <div class="card-body">
                                 <form action="{{ route('configuration.smtp.update') }}" method="POST" id="smtpForm">
                                     @csrf
@@ -329,10 +338,55 @@
                                     @csrf
                                     <div class="row">
                                         <div class="col-md-4 mb-3"><label class="form-label">{{ __('configuration.type') }}</label><select name="type" id="rechargeType" class="form-control default-select"><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option></select><small class="text-muted mt-2 d-block">{{ __('configuration.balance') }}: <span id="currentBalanceDisplay" class="fw-bold text-primary">0</span></small></div>
-                                        <div class="col-md-4 mb-3"><label class="form-label">{{ __('configuration.enter_amount') }}</label><input type="number" name="amount" class="form-control" min="1" required></div>
-                                        <div class="col-md-4 mb-3"><label class="form-label d-block">&nbsp;</label><button type="submit" class="btn btn-success w-100 submit-btn">{{ __('configuration.recharge') }}</button></div>
+                                        <div class="col-md-3 mb-3"><label class="form-label">{{ __('configuration.enter_amount') }}</label><input type="number" name="amount" class="form-control" min="1" required></div>
+                                        <div class="col-md-3 mb-3"><label class="form-label">{{ __('configuration.recharge_note') }}</label><input type="text" name="note" class="form-control" maxlength="500" placeholder="{{ __('configuration.recharge_note_placeholder') }}"></div>
+                                        <div class="col-md-2 mb-3"><label class="form-label d-block">&nbsp;</label><button type="submit" class="btn btn-success w-100 submit-btn">{{ __('configuration.recharge') }}</button></div>
                                     </div>
                                 </form>
+
+                                @if(isset($creditTransactions) && $creditTransactions->count())
+                                <hr class="my-4">
+                                <h5 class="mb-3">{{ __('configuration.recharge_history') }}</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>{{ __('configuration.date') }}</th>
+                                                <th>{{ __('configuration.type') }}</th>
+                                                <th>{{ __('configuration.amount') }}</th>
+                                                <th>{{ __('configuration.balance') }}</th>
+                                                <th>{{ __('configuration.status') }}</th>
+                                                <th>{{ __('configuration.recharge_note') }}</th>
+                                                <th class="text-end">{{ __('configuration.action') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($creditTransactions as $tx)
+                                            <tr>
+                                                <td>{{ $tx->created_at->format('d/m/Y H:i') }}</td>
+                                                <td>{{ strtoupper($tx->type) }}</td>
+                                                <td class="{{ $tx->amount < 0 ? 'text-danger' : 'text-success' }}">{{ $tx->amount > 0 ? '+' : '' }}{{ number_format($tx->amount) }}</td>
+                                                <td>{{ number_format($tx->balance_after) }}</td>
+                                                <td>
+                                                    <span class="badge {{ $tx->status === 'active' ? 'badge-success' : 'badge-secondary' }}">
+                                                        {{ $tx->status === 'active' ? __('configuration.recharge_status_active') : __('configuration.recharge_status_reversed') }}
+                                                    </span>
+                                                </td>
+                                                <td>{{ $tx->note ?: '—' }}</td>
+                                                <td class="text-end">
+                                                    @if($tx->status === 'active' && $tx->amount > 0 && $tx->action === 'recharge')
+                                                    <button type="button" class="btn btn-xs btn-outline-danger reverse-recharge-btn" data-id="{{ $tx->id }}" data-amount="{{ $tx->amount }}" data-type="{{ strtoupper($tx->type) }}">{{ __('configuration.reverse_recharge') }}</button>
+                                                    <button type="button" class="btn btn-xs btn-outline-warning correct-recharge-btn" data-id="{{ $tx->id }}" data-amount="{{ $tx->amount }}" data-type="{{ strtoupper($tx->type) }}">{{ __('configuration.correct_recharge') }}</button>
+                                                    @else
+                                                    —
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -447,6 +501,56 @@
         handleAjaxForm('#yearForm');
         handleAjaxForm('#modulesForm');
         handleAjaxForm('#rechargeForm');
+
+        $(document).on('click', '.reverse-recharge-btn', function() {
+            const id = $(this).data('id');
+            const amount = $(this).data('amount');
+            const type = $(this).data('type');
+            Swal.fire({
+                title: '{{ __('configuration.reverse_recharge') }}',
+                html: '{{ __('configuration.reverse_recharge_confirm') }}'.replace(':amount', amount).replace(':type', type),
+                input: 'text',
+                inputPlaceholder: '{{ __('configuration.recharge_reason_placeholder') }}',
+                showCancelButton: true,
+                confirmButtonText: '{{ __('configuration.reverse_recharge') }}',
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+                $.post('{{ url('configuration/recharge') }}/' + id + '/reverse', {
+                    _token: '{{ csrf_token() }}',
+                    reason: result.value || ''
+                }).done(function(resp) {
+                    Swal.fire('{{ __('configuration.success') }}', resp.message, 'success').then(() => location.reload());
+                }).fail(function(xhr) {
+                    Swal.fire('{{ __('configuration.error') }}', xhr.responseJSON?.message || '{{ __('configuration.error_occurred') }}', 'error');
+                });
+            });
+        });
+
+        $(document).on('click', '.correct-recharge-btn', function() {
+            const id = $(this).data('id');
+            const amount = $(this).data('amount');
+            const type = $(this).data('type');
+            Swal.fire({
+                title: '{{ __('configuration.correct_recharge') }}',
+                html: '{{ __('configuration.correct_recharge_prompt') }}'.replace(':amount', amount).replace(':type', type),
+                input: 'number',
+                inputAttributes: { min: 1 },
+                inputPlaceholder: '{{ __('configuration.enter_amount') }}',
+                showCancelButton: true,
+                confirmButtonText: '{{ __('configuration.correct_recharge') }}',
+            }).then((result) => {
+                if (!result.isConfirmed || !result.value) return;
+                $.post('{{ url('configuration/recharge') }}/' + id + '/correct', {
+                    _token: '{{ csrf_token() }}',
+                    correct_amount: result.value,
+                    reason: ''
+                }).done(function(resp) {
+                    Swal.fire('{{ __('configuration.success') }}', resp.message, 'success').then(() => location.reload());
+                }).fail(function(xhr) {
+                    Swal.fire('{{ __('configuration.error') }}', xhr.responseJSON?.message || '{{ __('configuration.error_occurred') }}', 'error');
+                });
+            });
+        });
 
         // Test Email
         $('#testEmailForm').submit(function(e) {

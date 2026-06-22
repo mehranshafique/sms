@@ -762,6 +762,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::middleware([RoleMiddleware::class . ':Super Admin'])->group(function () {
                 Route::post('/modules', [ConfigurationController::class, 'updateModules'])->name('configuration.modules.update');
                 Route::post('/recharge', [ConfigurationController::class, 'recharge'])->name('configuration.recharge');
+                Route::post('/recharge/{transaction}/reverse', [ConfigurationController::class, 'reverseRecharge'])->name('configuration.recharge.reverse');
+                Route::post('/recharge/{transaction}/correct', [ConfigurationController::class, 'correctRecharge'])->name('configuration.recharge.correct');
             });
         });
 

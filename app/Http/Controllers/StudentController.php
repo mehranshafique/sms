@@ -454,8 +454,14 @@ class StudentController extends BaseController
                 }
 
                 // 8. SEND NOTIFICATIONS
-                $this->notificationService->sendUserCredentials($studentUser, $studentPlainPassword, RoleEnum::STUDENT->value);
-                
+                $this->notificationService->sendUserCredentials(
+                    $studentUser,
+                    $studentPlainPassword,
+                    RoleEnum::STUDENT->value,
+                    $student,
+                    $parent
+                );
+
                 if ($parentUserObj && $parentPlainPassword) {
                     $this->notificationService->sendUserCredentials($parentUserObj, $parentPlainPassword, RoleEnum::GUARDIAN->value);
                 }

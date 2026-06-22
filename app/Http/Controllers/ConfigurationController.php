@@ -9,6 +9,9 @@ use App\Models\Module;
 use App\Services\Sms\GatewayFactory;
 use App\Services\SystemCommunicationConfigService;
 use App\Services\InstitutionSetupAlertService;
+use App\Services\MailSettingsService;
+use App\Services\Finance\InstitutionCreditService;
+use App\Models\InstitutionCreditTransaction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
@@ -67,6 +70,15 @@ class ConfigurationController extends BaseController
         $enabledModules = isset($settings['enabled_modules']) ? json_decode($settings['enabled_modules'], true) : [];
         $smtp = $this->getSmtpSettings($settings);
 
+        $creditTransactions = [];
+        if ($institutionId && Auth::user()->hasRole('Super Admin')) {
+            $creditTransactions = InstitutionCreditTransaction::with('performer')
+                ->where('institution_id', $institutionId)
+                ->latest()
+                ->limit(25)
+                ->get();
+        }
+
         // --- ONLY ADDED EVENTS LOGIC HERE ---
         $globalTemplates = \App\Models\SmsTemplate::whereNull('institution_id')->get()->keyBy('event_key');
         if ($institutionId) {
@@ -79,7 +91,7 @@ class ConfigurationController extends BaseController
         return view('configuration.index', compact(
             'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 
             'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
-            'allowedSms', 'allowedWa', 'isSuperAdmin', 'events', 'billingSettings'
+            'allowedSms', 'allowedWa', 'isSuperAdmin', 'events', 'billingSettings', 'creditTransactions'
         ));
     }
 
@@ -120,19 +132,19 @@ class ConfigurationController extends BaseController
     /**
      * Test SMTP Connection
      */
-    public function testSmtp(Request $request)
+    public function testSmtp(Request $request, MailSettingsService $mailSettings)
     {
         $request->validate([
             'test_email' => 'required|email'
         ]);
 
         try {
-            // In a real app, you would dynamically set the mail config here before sending
-            // e.g., Config::set('mail.mailers.smtp.host', ...);
+            $institutionId = $this->getInstitutionId();
+            $mailSettings->applyForInstitution($institutionId);
 
-            Mail::raw('This is a test email from the Digitex System Configuration check.', function ($message) use ($request) {
+            Mail::raw(__('configuration.test_email_body'), function ($message) use ($request) {
                 $message->to($request->test_email)
-                        ->subject('SMTP Configuration Test');
+                        ->subject(__('configuration.test_email_subject'));
             });
 
             return response()->json([
@@ -320,28 +332,84 @@ class ConfigurationController extends BaseController
     /**
      * Recharge SMS/WhatsApp (Menu: SMS Recharging / Whatsapp Recharging)
      */
-    public function recharge(Request $request)
+    public function recharge(Request $request, InstitutionCreditService $credits)
     {
         if (!Auth::user()->hasRole('Super Admin')) abort(403, __('configuration.only_super_admin_recharge'));
         
         $institutionId = $this->getInstitutionId();
-        $institution = Institution::findOrFail($institutionId);
+        if (!$institutionId) {
+            abort(422, __('configuration.select_school_for_recharge'));
+        }
 
         $request->validate([
             'type' => 'required|in:sms,whatsapp',
             'amount' => 'required|integer|min:1',
+            'note' => 'nullable|string|max:500',
         ]);
 
-        // Explicitly update and save to ensure database persistence
-        if ($request->type === 'sms') {
-            $institution->sms_credits = (int)$institution->sms_credits + (int)$request->amount;
-        } else {
-            $institution->whatsapp_credits = (int)$institution->whatsapp_credits + (int)$request->amount;
+        $transaction = $credits->recharge(
+            (int) $institutionId,
+            $request->type,
+            (int) $request->amount,
+            $request->note
+        );
+
+        $institution = Institution::findOrFail($institutionId);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => __('configuration.recharge_success'),
+                'new_balance' => $request->type === 'sms' ? $institution->sms_credits : $institution->whatsapp_credits,
+                'transaction_id' => $transaction->id,
+            ]);
         }
-        
-        $institution->save();
 
         return back()->with('success', __('configuration.recharge_success') . ' - ' . __('configuration.balance') . ': ' . ($request->type === 'sms' ? $institution->sms_credits : $institution->whatsapp_credits));
+    }
+
+    public function reverseRecharge(Request $request, InstitutionCreditTransaction $transaction, InstitutionCreditService $credits)
+    {
+        if (!Auth::user()->hasRole('Super Admin')) abort(403, __('configuration.only_super_admin_recharge'));
+
+        $institutionId = $this->getInstitutionId();
+        if (!$institutionId || $transaction->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        $request->validate(['reason' => 'nullable|string|max:500']);
+
+        $credits->reverse($transaction, $request->reason);
+        $institution = Institution::findOrFail($institutionId);
+
+        return response()->json([
+            'message' => __('configuration.recharge_reversed'),
+            'sms_balance' => $institution->fresh()->sms_credits,
+            'whatsapp_balance' => $institution->fresh()->whatsapp_credits,
+        ]);
+    }
+
+    public function correctRecharge(Request $request, InstitutionCreditTransaction $transaction, InstitutionCreditService $credits)
+    {
+        if (!Auth::user()->hasRole('Super Admin')) abort(403, __('configuration.only_super_admin_recharge'));
+
+        $institutionId = $this->getInstitutionId();
+        if (!$institutionId || $transaction->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        $request->validate([
+            'correct_amount' => 'required|integer|min:1',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $credits->correct($transaction, (int) $request->correct_amount, $request->reason);
+        $institution = Institution::findOrFail($institutionId);
+
+        return response()->json([
+            'message' => __('configuration.recharge_corrected_success'),
+            'sms_balance' => $institution->fresh()->sms_credits,
+            'whatsapp_balance' => $institution->fresh()->whatsapp_credits,
+        ]);
     }
 
    /**
@@ -357,14 +425,17 @@ class ConfigurationController extends BaseController
     }
 
     private function getSmtpSettings($settings) {
+        $institutionId = $this->getInstitutionId();
+        $resolved = app(MailSettingsService::class)->resolve($institutionId);
+
         return [
-            'host' => $settings['smtp_host'] ?? '',
-            'port' => $settings['smtp_port'] ?? '',
-            'username' => $settings['smtp_username'] ?? '',
-            'password' => isset($settings['smtp_password']) ? '' : '', // Don't send back encrypted string
-            'encryption' => $settings['smtp_encryption'] ?? 'tls',
-            'from_address' => $settings['smtp_from_address'] ?? '',
-            'from_name' => $settings['smtp_from_name'] ?? '',
+            'host' => $resolved['host'] ?? '',
+            'port' => $resolved['port'] ?? '',
+            'username' => $resolved['username'] ?? '',
+            'password' => isset($settings['smtp_password']) ? '' : '',
+            'encryption' => $resolved['encryption'] ?? 'tls',
+            'from_address' => $resolved['from_address'] ?? '',
+            'from_name' => $resolved['from_name'] ?? '',
             'driver' => 'smtp',
         ];
     }

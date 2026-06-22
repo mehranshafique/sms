@@ -10,7 +10,7 @@ LISTEN_PORT = int(os.environ.get('CHAFON_LISTEN_PORT', '5000'))
 LISTEN_HOST = os.environ.get('CHAFON_LISTEN_HOST', '0.0.0.0')
 API_URL = os.environ.get(
     'HARDWARE_API_URL',
-    'http://127.0.0.1:8000/api/v1/hardware/attendance/scan',
+    'https://account.digitexvx.com/api/v1/hardware/attendance/scan',
 )
 HARDWARE_SECRET = os.environ.get('HARDWARE_SECRET', '')
 INSTITUTION_ID = os.environ.get('HARDWARE_INSTITUTION_ID', '')
