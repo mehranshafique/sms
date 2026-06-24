@@ -170,7 +170,11 @@ return [
 
     'global_smtp_help' => 'Configure the platform-wide SMTP server used as fallback for all schools that do not define their own mail settings.',
     'school_smtp_help' => 'Configure school-specific SMTP. Leave blank fields to inherit the platform global SMTP settings.',
-    'global_smtp_institution_hint' => 'You are editing this school\'s SMTP. To configure platform-wide (global) SMTP, switch to Global View using the building icon in the top bar, then open Configuration → SMTP.',
+    'global_smtp_institution_hint' => 'You are editing this school\'s SMTP. Use the Platform SMTP link in the sidebar (or switch to Global View) to configure platform-wide mail settings.',
+    'platform_smtp' => 'Platform SMTP',
+    'platform_smtp_scope' => 'Platform (Global)',
+    'school_smtp' => 'School SMTP',
+    'global_environment' => 'Global Environment',
 
     'welcome_notification_title' => 'Welcome to :school',
     'welcome_notification_body' => 'Your :role account (:name) has been created. Use the login page to sign in.',
@@ -193,6 +197,8 @@ return [
     'recharge_cannot_reverse_negative' => 'Only positive recharge amounts can be reversed.',
     'only_super_admin_recharge' => 'Only Super Admin can manage SMS/WhatsApp recharges.',
     'select_school_for_recharge' => 'Select a school before recharging credits.',
+    'select_school_for_recharge_hint' => 'Use the school selector in the top header to choose a school, then return to SMS Recharge.',
+    'recharge_history_empty' => 'No recharge history yet for this school.',
     'invalid_credit_type' => 'Invalid credit type.',
     'date' => 'Date',
     'amount' => 'Amount',

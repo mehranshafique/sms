@@ -47,7 +47,7 @@ Set these on the PC or Raspberry Pi running chafon-script.py:
 
 **Note:** `dgtx_live_…` keys are NOT used for hardware. Use `HARDWARE_SECRET` only.
 
-Run: `python chafon-script.py` (after loading `chafon.env` — see manual)
+Run: `python chafon-script.py` (loads `chafon.env` automatically from the same folder)
 
 The bridge sends JSON with `uid`, `method`, `device_id`, `purpose`, and ISO `timestamp` to Laravel.
 You will run this lightweight Python script on a computer connected to the same local network (this could be the reception PC or a dedicated $30 Raspberry Pi).

@@ -25,19 +25,21 @@ class ConfigurationController extends BaseController
         $this->setPageTitle(__('configuration.page_title'));
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $institutionId = $this->getInstitutionId(); 
+        $institutionId = $this->getInstitutionId();
         $user = Auth::user();
-        $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value) && is_null($institutionId);
+        $isSuperAdminUser = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
+        $isGlobalContext = is_null($institutionId);
+        $platformScope = $isSuperAdminUser && ($isGlobalContext || $request->query('scope') === 'global');
 
         $settings = InstitutionSetting::where('institution_id', $institutionId)->pluck('value', 'key')->toArray();
 
-        $globalSettings = [];
-        if (!$isSuperAdmin) {
-            $globalSettings = InstitutionSetting::whereNull('institution_id')->pluck('value', 'key')->toArray();
-        } else {
-            $globalSettings = $settings; 
+        $globalSettings = InstitutionSetting::whereNull('institution_id')->pluck('value', 'key')->toArray();
+        if ($platformScope) {
+            $settings = $globalSettings;
+        } elseif (! $isGlobalContext) {
+            // School context: still expose global for SMS provider defaults
         }
 
         $defaultSms = '["mobishastra","infobip","twilio","signalwire"]';
@@ -65,13 +67,14 @@ class ConfigurationController extends BaseController
             'chatbot_free_interactions' => $settings['chatbot_free_interactions'] ?? '0',
         ];
 
-        $institution = $institutionId ? Institution::find($institutionId) : Auth::user(); 
+        $institution = $institutionId ? Institution::find($institutionId) : null;
         $allModules = Module::all();
         $enabledModules = isset($settings['enabled_modules']) ? json_decode($settings['enabled_modules'], true) : [];
-        $smtp = $this->getSmtpSettings($settings);
+        $smtpInstitutionId = $platformScope ? null : $institutionId;
+        $smtp = $this->getSmtpSettings($settings, $smtpInstitutionId);
 
-        $creditTransactions = [];
-        if ($institutionId && Auth::user()->hasRole('Super Admin')) {
+        $creditTransactions = collect();
+        if ($institutionId && $isSuperAdminUser) {
             $creditTransactions = InstitutionCreditTransaction::with('performer')
                 ->where('institution_id', $institutionId)
                 ->latest()
@@ -79,7 +82,6 @@ class ConfigurationController extends BaseController
                 ->get();
         }
 
-        // --- ONLY ADDED EVENTS LOGIC HERE ---
         $globalTemplates = \App\Models\SmsTemplate::whereNull('institution_id')->get()->keyBy('event_key');
         if ($institutionId) {
             $institutionTemplates = \App\Models\SmsTemplate::where('institution_id', $institutionId)->get()->keyBy('event_key');
@@ -89,9 +91,10 @@ class ConfigurationController extends BaseController
         }
 
         return view('configuration.index', compact(
-            'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 
+            'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms',
             'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
-            'allowedSms', 'allowedWa', 'isSuperAdmin', 'events', 'billingSettings', 'creditTransactions'
+            'allowedSms', 'allowedWa', 'isSuperAdminUser', 'isGlobalContext', 'platformScope',
+            'events', 'billingSettings', 'creditTransactions'
         ));
     }
 
@@ -99,6 +102,9 @@ class ConfigurationController extends BaseController
     public function updateSmtp(Request $request)
     {
         $institutionId = $this->getInstitutionId();
+        if (Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value) && $request->input('scope') === 'global') {
+            $institutionId = null;
+        }
         
         $keys = ['mail_host', 'mail_port', 'mail_username', 'mail_encryption', 'mail_from_address', 'mail_from_name'];
         
@@ -140,6 +146,9 @@ class ConfigurationController extends BaseController
 
         try {
             $institutionId = $this->getInstitutionId();
+            if (Auth::user()->hasRole(RoleEnum::SUPER_ADMIN->value) && $request->input('scope') === 'global') {
+                $institutionId = null;
+            }
             $mailSettings->applyForInstitution($institutionId);
 
             Mail::raw(__('configuration.test_email_body'), function ($message) use ($request) {
@@ -424,8 +433,9 @@ class ConfigurationController extends BaseController
         );
     }
 
-    private function getSmtpSettings($settings) {
-        $institutionId = $this->getInstitutionId();
+    private function getSmtpSettings(array $settings = [], ?int $institutionId = null)
+    {
+        $institutionId = $institutionId ?? $this->getInstitutionId();
         $resolved = app(MailSettingsService::class)->resolve($institutionId);
 
         return [

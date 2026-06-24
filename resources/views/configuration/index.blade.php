@@ -33,7 +33,10 @@
                 </div>
             </div>
             <div class="col-sm-6 p-0 text-end">
-                <span class="badge badge-primary">{{ $institution->name ?? 'Global Environment' }}</span>
+                @if($platformScope ?? false)
+                    <span class="badge badge-dark me-1">{{ __('configuration.platform_smtp_scope') }}</span>
+                @endif
+                <span class="badge badge-primary">{{ $institution->name ?? __('configuration.global_environment') }}</span>
             </div>
         </div>
 
@@ -53,7 +56,16 @@
                                     <i class="fa fa-coins me-2"></i> {{ __('sidebar.currency') }}
                                 </a>
                             @endif
-                            @if(auth()->user()->hasRole('Super Admin'))
+                            @if($isSuperAdminUser ?? auth()->user()->hasRole('Super Admin'))
+                                @if($institutionId && !($platformScope ?? false))
+                                <a href="{{ route('configuration.index', ['scope' => 'global']) }}#smtp" class="nav-link text-warning">
+                                    <i class="fa fa-globe me-2"></i> {{ __('configuration.platform_smtp') }}
+                                </a>
+                                @elseif($platformScope ?? false)
+                                <a href="{{ route('configuration.index') }}#smtp" class="nav-link text-muted">
+                                    <i class="fa fa-school me-2"></i> {{ __('configuration.school_smtp') }}
+                                </a>
+                                @endif
                                 <a href="#modules" data-bs-toggle="pill" class="nav-link"><i class="fa fa-cubes me-2"></i> {{ __('configuration.modules') }}</a>
                                 <a href="#recharge" data-bs-toggle="pill" class="nav-link"><i class="fa fa-credit-card me-2"></i> {{ __('configuration.sms_recharge') }}</a>
                             @endif
@@ -70,17 +82,23 @@
                          <div class="card">
                             <div class="card-header">
                                 <h4 class="card-title">{{ __('configuration.smtp') }}</h4>
-                                @if($isSuperAdmin && !$institutionId)
+                                @if($platformScope ?? false)
                                     <p class="text-muted mb-0 fs-13">{{ __('configuration.global_smtp_help') }}</p>
-                                @elseif(!$isSuperAdmin)
-                                    <p class="text-muted mb-0 fs-13">{{ __('configuration.school_smtp_help') }}</p>
                                 @elseif($institutionId)
-                                    <div class="alert alert-info py-2 px-3 mb-0 fs-13">{{ __('configuration.global_smtp_institution_hint') }}</div>
+                                    <p class="text-muted mb-0 fs-13">{{ __('configuration.school_smtp_help') }}</p>
+                                    @if($isSuperAdminUser ?? false)
+                                    <div class="alert alert-info py-2 px-3 mt-2 mb-0 fs-13">{{ __('configuration.global_smtp_institution_hint') }}</div>
+                                    @endif
+                                @else
+                                    <p class="text-muted mb-0 fs-13">{{ __('configuration.global_smtp_help') }}</p>
                                 @endif
                             </div>
                             <div class="card-body">
                                 <form action="{{ route('configuration.smtp.update') }}" method="POST" id="smtpForm">
                                     @csrf
+                                    @if($platformScope ?? false)
+                                        <input type="hidden" name="scope" value="global">
+                                    @endif
                                     <div class="row">
                                         <div class="col-md-6 mb-3"><label class="form-label">{{ __('configuration.mail_host') }}</label><input type="text" name="mail_host" class="form-control" value="{{ $smtp['host'] }}" required></div>
                                         <div class="col-md-6 mb-3"><label class="form-label">{{ __('configuration.mail_port') }}</label><input type="text" name="mail_port" class="form-control" value="{{ $smtp['port'] }}" required></div>
@@ -104,6 +122,9 @@
                                 <h5 class="text-primary mb-3">{{ __('configuration.test_email_connection') }}</h5>
                                 <form action="{{ route('configuration.smtp.test') }}" method="POST" id="testEmailForm">
                                     @csrf
+                                    @if($platformScope ?? false)
+                                        <input type="hidden" name="scope" value="global">
+                                    @endif
                                     <div class="input-group">
                                         <input type="email" name="test_email" class="form-control" placeholder="{{ __('configuration.enter_test_email') }}" required>
                                         <button type="submit" class="btn btn-outline-primary" id="testEmailBtn"><i class="fa fa-paper-plane me-2"></i> {{ __('configuration.send_test_email') }}</button>
@@ -329,6 +350,13 @@
                         <div class="card">
                             <div class="card-header"><h4 class="card-title">{{ __('configuration.sms_recharge') }} / WhatsApp</h4></div>
                             <div class="card-body">
+                                @if(!$institutionId)
+                                <div class="alert alert-warning mb-0">
+                                    <i class="fa fa-exclamation-triangle me-2"></i>
+                                    <strong>{{ __('configuration.select_school_for_recharge') }}</strong>
+                                    <p class="mb-0 mt-1">{{ __('configuration.select_school_for_recharge_hint') }}</p>
+                                </div>
+                                @else
                                 <div class="row mb-4">
                                     <div class="col-md-6"><div class="widget-stat card bg-primary text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-envelope"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.sms_purchased') }}</p><h3 class="text-white" id="smsBalance">{{ number_format($institution->sms_credits ?? 0) }}</h3></div></div></div></div></div>
                                     <div class="col-md-6"><div class="widget-stat card bg-success text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-whatsapp"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.whatsapp_purchased') }}</p><h3 class="text-white" id="waBalance">{{ number_format($institution->whatsapp_credits ?? 0) }}</h3></div></div></div></div></div>
@@ -344,7 +372,7 @@
                                     </div>
                                 </form>
 
-                                @if(isset($creditTransactions) && $creditTransactions->count())
+                                @if($creditTransactions->isNotEmpty())
                                 <hr class="my-4">
                                 <h5 class="mb-3">{{ __('configuration.recharge_history') }}</h5>
                                 <div class="table-responsive">
@@ -386,6 +414,9 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                @else
+                                <p class="text-muted mb-0">{{ __('configuration.recharge_history_empty') }}</p>
+                                @endif
                                 @endif
                             </div>
                         </div>
