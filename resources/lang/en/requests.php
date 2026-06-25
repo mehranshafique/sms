@@ -66,6 +66,7 @@ return [
     'deleted' => 'Deleted!',
     'success' => 'Success!',
     'no_reason_provided' => 'No reason provided.',
+    'reason_chatbot_fee_extension' => 'Parental fee extension request for :days days (Submitted via Chatbot).',
     
     // Admin Processing Modal
     'student' => 'Student',

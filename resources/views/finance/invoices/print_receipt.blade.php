@@ -66,6 +66,9 @@
 @endphp
 
 <div class="text-center bold" style="font-size: {{ ($format ?? 'pos80') === 'pos58' ? '12px' : '14px' }};">
+    @if($institution?->logo)
+        <img src="{{ asset('storage/' . $institution->logo) }}" alt="Logo" style="max-height:48px;max-width:100%;object-fit:contain;margin-bottom:4px;">
+    @endif
     {{ $institution->name ?? config('app.name') }}
 </div>
 @if($institution?->address || $institution?->phone)
@@ -99,7 +102,7 @@
 <div class="line"></div>
 
 <table>
-    <tr><td>{{ __('invoice.student_name') }}</td><td class="amount-col">{{ $invoice->student->formal_name }}</td></tr>
+    <tr><td>{{ __('invoice.student_name') }}</td><td class="amount-col">{{ $invoice->student->full_name }}</td></tr>
     <tr><td>{{ __('invoice.student_id') }}</td><td class="amount-col">{{ $invoice->student->admission_number }}</td></tr>
     <tr><td>{{ __('invoice.class') }}</td><td class="amount-col">{{ class_section_label($enrollment?->classSection) }}</td></tr>
     <tr><td>{{ __('invoice.school_year') }}</td><td class="amount-col">{{ $invoice->academicSession->name ?? 'N/A' }}</td></tr>

@@ -110,6 +110,9 @@ return [
     
     'add_new_institute' => 'Add New Institute',
     'add_new_institute_subtitle' => 'Fill in the details to register a new institute',
+    'initial_plan' => 'Subscription Plan',
+    'initial_plan_help' => 'An active subscription is created automatically. Change the plan later under Subscriptions if needed.',
+    'plan_days' => 'days',
     'basic_information' => 'Basic Information',
     'location_details'  => 'Location Details',
     'contact_information' => 'Contact Information',

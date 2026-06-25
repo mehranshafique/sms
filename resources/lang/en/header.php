@@ -41,6 +41,7 @@ return [
     'notifications' => 'Notifications',
     'new' => 'New',
     'no_new_notifications' => 'No new notifications',
+    'new_notification_toast' => 'New notification',
 
     // Admin Notifications
     'pending_fund_requests' => 'Pending Fund Requests',

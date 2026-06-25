@@ -1076,7 +1076,7 @@ class ChatbotLogicService
             $percentage = $session->identifier_input;
             $ticket = 'SAL-' . strtoupper(Str::random(4));
             
-            StaffLeave::create([
+            $leave = StaffLeave::create([
                 'institution_id' => $session->institution_id,
                 'staff_id' => optional($user->staff)->id ?? 0,
                 'type' => 'other',
@@ -1084,6 +1084,8 @@ class ChatbotLogicService
                 'start_date' => now(),
                 'status' => 'pending'
             ]);
+
+            app(InAppNotificationService::class)->notifyStaffLeaveSubmitted($leave);
             
             $msg = $isEn ? "✅ Request received successfully.\nTicket: #$ticket\nResponse within 48 hours." : "✅ Demande reçue avec succès.\nTicket: #$ticket\nRéponse sous 48 heures.";
             $session->update(['status' => 'ACTIVE', 'otp' => null, 'identifier_input' => null]);
@@ -1100,7 +1102,7 @@ class ChatbotLogicService
         $user = User::find($session->user_id);
         $ticket = 'REQ-' . strtoupper(Str::random(4));
         
-        StaffLeave::create([
+        $leave = StaffLeave::create([
             'institution_id' => $session->institution_id,
             'staff_id' => optional($user->staff)->id ?? 0,
             'type' => $types[$cmd],
@@ -1109,6 +1111,8 @@ class ChatbotLogicService
             'end_date' => now()->addDay(),
             'status' => 'pending'
         ]);
+
+        app(InAppNotificationService::class)->notifyStaffLeaveSubmitted($leave);
         
         $session->update(['status' => 'ACTIVE']);
         $msg = $isEn ? "✅ Request submitted. Ticket: #$ticket" : "✅ Requête transmise. Ticket: #$ticket";
@@ -1457,18 +1461,23 @@ class ChatbotLogicService
         
         if($student) {
              $enrollment = $student->enrollments()->latest()->first();
-             StudentRequest::create([
+             $created = StudentRequest::create([
                 'institution_id' => $s->institution_id,
                 'student_id' => $student->id,
                 'academic_session_id' => optional($enrollment)->academic_session_id ?? null,
                 'type' => 'fee_extension',
-                'reason' => "Demande de dérogation parentale pour {$days} jours (Soumis via Chatbot).",
+                'reason_key' => 'requests.reason_chatbot_fee_extension',
+                'reason_params' => ['days' => $days],
+                'reason_locale' => $s->locale ?? 'fr',
+                'reason' => __('requests.reason_chatbot_fee_extension', ['days' => $days], $s->locale ?? 'fr'),
                 'start_date' => now(),
                 'end_date' => now()->addDays($days),
                 'status' => 'pending',
                 'ticket_number' => $ticket,
                 'created_by' => $s->user_id 
              ]);
+
+             app(InAppNotificationService::class)->notifyStudentRequestSubmitted($created);
         }
 
         $s->update(['status'=>'ACTIVE']); 
@@ -1501,17 +1510,20 @@ class ChatbotLogicService
              $enrollment = $student->enrollments()->latest()->first();
              if($enrollment) {
                  $ticket = 'REQ-' . strtoupper(Str::random(8));
-                 StudentRequest::create([
+                 $created = StudentRequest::create([
                     'institution_id' => $session->institution_id,
                     'student_id' => $session->user_id,
                     'academic_session_id' => $enrollment->academic_session_id,
                     'type' => $type,
                     'reason' => $text,
+                    'reason_locale' => $session->locale ?? app()->getLocale(),
                     'start_date' => now(), 
                     'status' => 'pending',
                     'ticket_number' => $ticket,
                     'created_by' => $session->user_id
                  ]);
+
+                 app(InAppNotificationService::class)->notifyStudentRequestSubmitted($created);
              }
         }
 

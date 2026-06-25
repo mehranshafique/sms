@@ -6,18 +6,22 @@
                 use App\Enums\RoleEnum;
                 use App\Enums\InstitutionType;
                 use App\Enums\UserType;
-                use App\Models\InstitutionSetting;
-                use App\Models\Subscription;
                 use App\Models\Institution;
+                use App\Services\ActiveRoleService;
+                use App\Services\InstitutionModuleAccessService;
 
                 $user = auth()->user();
+                $activeRoleService = app(ActiveRoleService::class);
+                $moduleAccess = app(InstitutionModuleAccessService::class);
+                $activeRole = $activeRoleService->getActiveRole($user);
+                $roleIs = fn (string|array $roles) => $activeRoleService->userActsAs($user, $roles);
                 
-                // Role Checks using Enums
-                $isSuperAdmin = $user->hasRole(RoleEnum::SUPER_ADMIN->value);
-                $isHeadOfficer = $user->hasRole(RoleEnum::HEAD_OFFICER->value);
-                $isSchoolAdmin = $user->hasRole(RoleEnum::SCHOOL_ADMIN->value);
-                $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
-                $isStudent = $user->hasRole(RoleEnum::STUDENT->value);
+                // Role Checks using active session role (multi-role switcher)
+                $isSuperAdmin = $roleIs(RoleEnum::SUPER_ADMIN->value);
+                $isHeadOfficer = $roleIs(RoleEnum::HEAD_OFFICER->value);
+                $isSchoolAdmin = $roleIs(RoleEnum::SCHOOL_ADMIN->value);
+                $isTeacher = $roleIs(RoleEnum::TEACHER->value);
+                $isStudent = $roleIs(RoleEnum::STUDENT->value);
                 $linkedAsParent = \App\Models\StudentParent::where('user_id', $user->id)->exists();
                 $hasGuardianRole = $user->hasRole(RoleEnum::GUARDIAN->value);
                 $isAdminRole = $isSuperAdmin || $isHeadOfficer || $isSchoolAdmin;
@@ -74,41 +78,26 @@
                 $showStateExams = in_array($instTypeValue, ['primary', 'secondary', 'mixed'], true);
                 $showLmdFeatures = in_array($instTypeValue, ['university', 'mixed', 'vocational'], true);
 
-                // Helper to check module access
-                if (!isset($enabledModules)) {
-                    $enabledModules = [];
-                    if ($activeInstitution) {
-                        $setting = InstitutionSetting::where('institution_id', $activeInstitution->id)
-                            ->where('key', 'enabled_modules')
-                            ->first();
-                        
-                        if ($setting && $setting->value) {
-                            $enabledModules = is_array($setting->value) ? $setting->value : json_decode($setting->value, true);
-                        } else {
-                            $sub = Subscription::with('package')
-                                ->where('institution_id', $activeInstitution->id)
-                                ->where('status', 'active')
-                                ->where('end_date', '>=', now()->startOfDay())
-                                ->latest('created_at')
-                                ->first();
-                                
-                            if ($sub && $sub->package) {
-                                $enabledModules = $sub->package->modules ?? [];
-                            }
-                        }
-                    }
-                }
-                
-                $modules = $enabledModules ?? [];
                 $showStudentNav = $isStudent && !$isAdminRole && !$isTeacher;
                 $showTeacherNav = $isTeacher && !$isAdminRole;
                 $showGuardianNav = $isGuardian && !$isAdminRole && !$isStudent && !$isTeacher;
                 $showManagementNav = !$isGlobalMode && ($isAdminRole || ($isManagement && !$showStudentNav && !$showTeacherNav && !$showGuardianNav));
-                $hasModule = function($slug) use ($modules, $isSuperAdmin) {
-                    if ($isSuperAdmin) return true;
-                    $slug = strtolower(trim($slug));
-                    $cleanModules = array_map(fn($m) => strtolower(trim($m)), $modules);
-                    return in_array($slug, $cleanModules);
+
+                // Helper to check module access (subscription + super-admin module override + package)
+                $institutionIdForModules = ($activeInstitution && !$isGlobalMode) ? (int) $activeInstitution->id : null;
+                $hasActiveSubscription = $institutionIdForModules
+                    ? $moduleAccess->hasActiveSubscription($institutionIdForModules)
+                    : true;
+
+                $hasModule = function ($slug) use ($moduleAccess, $institutionIdForModules, $isSuperAdmin, $hasActiveSubscription) {
+                    if ($isSuperAdmin) {
+                        return true;
+                    }
+                    if (!$institutionIdForModules || !$hasActiveSubscription) {
+                        return false;
+                    }
+
+                    return $moduleAccess->isModuleEnabled($institutionIdForModules, $slug);
                 };
             @endphp
 
@@ -176,6 +165,7 @@
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('configuration.index') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
                         <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
+                        <li><a class="{{ request()->routeIs('platform.queue-monitor.*') ? 'mm-active' : '' }}" href="{{ route('platform.queue-monitor.index') }}">{{ __('sidebar.queue_monitor') }}</a></li>
                         @if($isGlobalMode && ($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])))
                             <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}"><i class="fa fa-coins me-1"></i> {{ __('sidebar.currency') }}</a></li>
                         @endif
@@ -309,7 +299,7 @@
                                 <li><a class="{{ request()->routeIs('promotions.*') ? 'mm-active' : '' }}" href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
                             @endif
                             
-                            @if($hasModule('student_request') && $user->can('student_request.view'))
+                            @if($hasModule('student_requests') && $user->can('student_request.view'))
                             <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
                             @endif
 
@@ -323,15 +313,22 @@
                         </ul>
                     </li>
 
-                    @if($hasModule('staff') && $user->can('staff.view'))
+                    @php
+                        $hasStaffModule = $hasModule('staff') && $user->can('staff.view');
+                        $hasStaffLeavesModule = $hasModule('staff_leaves') && $user->can('staff_leave.view');
+                        $hasStaffAttendanceModule = $hasModule('staff_attendance') && $user->can('staff_attendance.view');
+                    @endphp
+                    @if($hasStaffModule || $hasStaffLeavesModule || $hasStaffAttendanceModule)
                         <li class="{{ request()->routeIs('staff.*', 'staff-attendance.*', 'staff-leaves.*') ? 'mm-active' : '' }}">
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-chalkboard-teacher"></i><span class="nav-text">{{ __('sidebar.staff.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'staff'])</a>
                             <ul aria-expanded="false">
-                                <li><a class="{{ request()->routeIs('staff.*') ? 'mm-active' : '' }}" href="{{ route('staff.index') }}">{{ __('sidebar.staff.title') }}</a></li>
-                                @if($hasModule('staff_leaves') && $user->can('staff_leave.view'))
+                                @if($hasStaffModule)
+                                <li><a class="{{ request()->routeIs('staff.index', 'staff.create', 'staff.edit', 'staff.show') ? 'mm-active' : '' }}" href="{{ route('staff.index') }}">{{ __('sidebar.staff.title') }}</a></li>
+                                @endif
+                                @if($hasStaffLeavesModule)
                                 <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}@include('layout.partials.sidebar-badge', ['key' => 'staff-leaves'])</a></li>
                                 @endif
-                                @if($user->can('staff_attendance.view'))
+                                @if($hasStaffAttendanceModule)
                                     <li><a class="{{ request()->routeIs('staff-attendance.*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
                                 @endif
                             </ul>

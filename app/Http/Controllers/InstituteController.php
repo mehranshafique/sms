@@ -6,6 +6,7 @@ use App\Models\Institution;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\IdGeneratorService;
+use App\Services\InstitutionSubscriptionService;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
 use App\Enums\InstitutionType; // Import Enum
@@ -22,11 +23,15 @@ use Illuminate\Support\Facades\Auth;
 class InstituteController extends BaseController
 {
     protected $notificationService;
+    protected $institutionSubscription;
 
-    public function __construct(NotificationService $notificationService)
-    {
+    public function __construct(
+        NotificationService $notificationService,
+        InstitutionSubscriptionService $institutionSubscription
+    ) {
         $this->authorizeResource(Institution::class, 'institute');
         $this->notificationService = $notificationService;
+        $this->institutionSubscription = $institutionSubscription;
     }
 
     public function index(Request $request)
@@ -113,7 +118,10 @@ class InstituteController extends BaseController
 
     public function create()
     {
-        return view('institutions.create');
+        $packages = $this->institutionSubscription->selectablePackages();
+        $defaultPackageId = $this->institutionSubscription->defaultPackageId();
+
+        return view('institutions.create', compact('packages', 'defaultPackageId'));
     }
 
     public function store(Request $request)
@@ -134,6 +142,7 @@ class InstituteController extends BaseController
             'logo'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
             'password'  => 'required|string|min:6',
+            'package_id' => 'nullable|exists:packages,id',
         ];
 
         $messages = [
@@ -171,6 +180,11 @@ class InstituteController extends BaseController
             }
 
             $institute->save();
+
+            $this->institutionSubscription->assignInitialPlan(
+                $institute,
+                $request->filled('package_id') ? (int) $request->package_id : null
+            );
 
             try {
                 \App\Models\AuditLog::where('user_id', Auth::id())

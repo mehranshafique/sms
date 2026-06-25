@@ -83,7 +83,7 @@ class StudentRequestController extends BaseController
                                     data-id="'.$row->id.'" 
                                     data-ticket="'.$row->ticket_number.'"
                                     data-student="'.($row->student->full_name ?? 'N/A').'"
-                                    data-reason="'.htmlspecialchars($row->reason).'"
+                                    data-reason="'.htmlspecialchars($row->localizedReason()).'"
                                     data-status="'.$row->status.'"
                                     data-note="'.htmlspecialchars($row->admin_note ?? '').'"><i class="fa fa-cogs"></i></button>';
                     }

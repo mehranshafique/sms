@@ -25,4 +25,7 @@ return [
     'delete_confirmation' => 'Supprimer le rôle ?',
     'assign_permissions_to_role' => 'Assigner des permissions au rôle',
     'back' => 'Retour',
+    'switch_role' => 'Changer de rôle',
+    'switched_to' => 'Rôle actif changé pour :role.',
+    'invalid_role_switch' => 'Vous ne pouvez pas passer à ce rôle.',
 ];

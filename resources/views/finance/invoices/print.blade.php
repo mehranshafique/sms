@@ -50,7 +50,7 @@
         $verifyUrl = $lastPayment?->receipt_verify_token
             ? route('receipt.verify', $lastPayment->receipt_verify_token)
             : null;
-        $studentDisplayName = $invoice->student->formal_name;
+        $studentDisplayName = $invoice->student->full_name;
         
         $cityCountry = ($invoice->institution->city ?? 'Kinshasa');
         $encodedInvoiceNumber = urlencode($invoice->invoice_number);

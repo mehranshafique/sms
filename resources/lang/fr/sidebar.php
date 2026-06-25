@@ -134,6 +134,8 @@ return [
         'title' => 'Personnel'
     ],
     'staff_attendance' => 'Présence personnel',
+    'staff_leaves' => 'Congés personnel',
+    'queue_monitor' => 'File d\'attente & Cron',
     'fee_types' => [
         'title' => 'Types de frais'
     ],

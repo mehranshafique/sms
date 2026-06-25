@@ -8,6 +8,8 @@ return [
         'success_marked' => 'Présences enregistrées avec succès.',
     ],
     'attendance_list' => 'Registre des présences',
+    'staff_attendance_title' => 'Présence du personnel',
+    'staff_attendance_list' => 'Liste des présences',
     'mark_attendance' => 'Marquer la présence',
     'view_register' => 'Voir le registre',
     'filter_class' => 'Filtrer par classe',

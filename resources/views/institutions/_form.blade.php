@@ -94,6 +94,23 @@
                                     <option value="0" {{ (old('is_active', $institute->is_active ?? 1) == 0) ? 'selected' : '' }}>{{ __('institute.inactive') }}</option>
                                 </select>
                             </div>
+
+                            @if(!isset($institute) && isset($packages) && $packages->isNotEmpty())
+                            <div class="mb-3 col-md-12">
+                                <label class="form-label">{{ __('institute.initial_plan') }}</label>
+                                <select name="package_id" class="form-control default-select">
+                                    @foreach($packages as $package)
+                                        <option value="{{ $package->id }}"
+                                            {{ (string) old('package_id', $defaultPackageId ?? '') === (string) $package->id ? 'selected' : '' }}>
+                                            {{ $package->name }}
+                                            — {{ number_format((float) $package->price, 2) }}
+                                            ({{ $package->duration_days }} {{ __('institute.plan_days') }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted d-block mt-1">{{ __('institute.initial_plan_help') }}</small>
+                            </div>
+                            @endif
                         </div>
                     </div>
                 </div>

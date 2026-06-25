@@ -767,6 +767,34 @@
                             </li>
                             @endif
 
+                            @php
+                                $switchableRoles = app(\App\Services\ActiveRoleService::class)->availableRoles(Auth::user());
+                                $activeSessionRole = app(\App\Services\ActiveRoleService::class)->getActiveRole(Auth::user());
+                            @endphp
+                            @if($switchableRoles->count() > 1)
+                            <li class="nav-item dropdown header-item-desktop-only me-2">
+                                <a class="nav-link d-flex align-items-center gap-1 px-2 py-1 border rounded" href="javascript:void(0);" role="button" data-bs-toggle="dropdown" title="{{ __('role.switch_role') }}">
+                                    <i class="la la-user-tag"></i>
+                                    <span class="d-none d-xl-inline fs-12">{{ $activeSessionRole }}</span>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:220px;">
+                                    <h6 class="dropdown-header px-2">{{ __('role.switch_role') }}</h6>
+                                    @foreach($switchableRoles as $roleName)
+                                        <form method="POST" action="{{ route('role.switch') }}" class="mb-1">
+                                            @csrf
+                                            <input type="hidden" name="role" value="{{ $roleName }}">
+                                            <button type="submit" class="dropdown-item rounded {{ $roleName === $activeSessionRole ? 'active bg-primary text-white' : '' }}">
+                                                {{ $roleName }}
+                                                @if($roleName === $activeSessionRole)
+                                                    <i class="fa fa-check float-end mt-1"></i>
+                                                @endif
+                                            </button>
+                                        </form>
+                                    @endforeach
+                                </div>
+                            </li>
+                            @endif
+
                             {{-- User Profile --}}
                             <li class="nav-item dropdown header-profile">
                                 <a class="nav-link d-flex align-items-center p-0" href="javascript:void(0);" role="button" data-bs-toggle="dropdown">
@@ -799,7 +827,7 @@
                                         </div>
                                         <h6 class="text-black font-w600 mb-0">{{ Auth::user()->name }}</h6>
                                         <span class="fs-12 text-muted">{{ Auth::user()->email }}</span>
-                                        <div class="fs-11 text-primary mt-1">{{ Auth::user()->roles->pluck('name')->first() ?? 'User' }}</div>
+                                        <div class="fs-11 text-primary mt-1">{{ app(\App\Services\ActiveRoleService::class)->getActiveRole(Auth::user()) ?? (Auth::user()->roles->pluck('name')->first() ?? 'User') }}</div>
                                         @if($headerPlanName)
                                             <a href="{{ route('plan.index') }}" class="badge {{ $headerPlanActive ? ($headerIsPro ? 'bg-warning text-dark' : 'bg-success') : 'bg-danger' }} mt-2 text-decoration-none">
                                                 <i class="fa fa-crown me-1"></i> {{ $headerPlanName }}

@@ -8,6 +8,7 @@ return [
      'title' => 'Subscription Expired',
     'expired_title' => 'Access Restricted',
     'expired_message' => 'Your institution\'s subscription has expired.',
+    'expired_or_missing' => 'Access denied: your institution does not have an active subscription for this module.',
     'contact_admin' => 'Please contact your system administrator or renew your subscription to restore full access to the platform.',
     'go_to_dashboard' => 'Go to Dashboard (Limited Access)',
     'back_to_login' => 'Back to Login',

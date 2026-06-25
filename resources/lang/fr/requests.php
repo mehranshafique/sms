@@ -18,6 +18,7 @@ return [
     'type_sick' => 'Maladie',
     'type_early_exit' => 'Sortie anticipée',
     'type_fee_extension' => 'Dérogation (prolongation des frais)',
+    'reason_chatbot_fee_extension' => 'Demande de dérogation parentale pour :days jours (Soumis via Chatbot).',
     'type_other' => 'Autre',
 
     'status_pending' => 'En attente',

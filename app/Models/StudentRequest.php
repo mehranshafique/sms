@@ -15,6 +15,9 @@ class StudentRequest extends Model
         'academic_session_id',
         'type',             // absence, late, sick, early_exit
         'reason',
+        'reason_key',
+        'reason_params',
+        'reason_locale',
         'admin_note',       // NEW: Admin's response/reason sent to parent
         'start_date',
         'end_date',
@@ -30,6 +33,7 @@ class StudentRequest extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'approved_at' => 'datetime',
+        'reason_params' => 'array',
     ];
 
     /** Student/parent request types (staff leave uses staff_leaves module). */
@@ -59,6 +63,21 @@ class StudentRequest extends Model
         }
 
         return $this->type;
+    }
+
+    public function localizedReason(?string $locale = null): string
+    {
+        $locale = $locale ?? app()->getLocale();
+
+        if ($this->reason_key) {
+            $translated = __($this->reason_key, $this->reason_params ?? [], $locale);
+
+            if ($translated !== $this->reason_key) {
+                return $translated;
+            }
+        }
+
+        return (string) ($this->reason ?? '');
     }
 
     public function student()

@@ -10,6 +10,8 @@ return [
     
     // Index
     'attendance_list' => 'Attendance Log',
+    'staff_attendance_title' => 'Staff Attendance',
+    'staff_attendance_list' => 'Attendance List',
     'mark_attendance' => 'Mark Attendance',
     'view_register' => 'View Register', 
     'filter_class' => 'Filter Class',

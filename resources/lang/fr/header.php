@@ -34,6 +34,7 @@ return [
     'notifications' => 'Notifications',
     'new' => 'Nouveau',
     'no_new_notifications' => 'Aucune notification',
+    'new_notification_toast' => 'Nouvelle notification',
     'mark_all_read' => 'Tout marquer lu',
     'notif_mark_failed' => 'Impossible de mettre à jour les notifications. Veuillez actualiser la page.',
     'notif_unknown_student' => 'Élève',

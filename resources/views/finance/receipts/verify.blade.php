@@ -25,7 +25,7 @@
             <p>{{ __('invoice.verify_receipt') }}</p>
         </div>
         <div class="body">
-            <div class="row"><span class="label">{{ __('invoice.student_name') }}</span><span class="value">{{ $student->formal_name }}</span></div>
+            <div class="row"><span class="label">{{ __('invoice.student_name') }}</span><span class="value">{{ $student->full_name }}</span></div>
             <div class="row"><span class="label">{{ __('invoice.class') }}</span><span class="value">{{ class_section_label($enrollment?->classSection) }}</span></div>
             <div class="row"><span class="label">{{ __('invoice.receipt_no') }}</span><span class="value">{{ $payment->receipt_number ?? $invoice->invoice_number }}</span></div>
             <div class="row"><span class="label">{{ __('invoice.amount_paid') }}</span><span class="value">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($payment->amount, 2) }}</span></div>

@@ -18,7 +18,10 @@
             </div>
         </div>
 
-        @include('institutions._form')
+        @include('institutions._form', [
+            'packages' => $packages ?? collect(),
+            'defaultPackageId' => $defaultPackageId ?? null,
+        ])
     </div>
 </div>
 @endsection

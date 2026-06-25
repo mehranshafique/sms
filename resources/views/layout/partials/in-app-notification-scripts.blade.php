@@ -13,12 +13,16 @@
         emptyText: @json(__('header.no_new_notifications')),
         strings: {
             markFailed: @json(__('header.notif_mark_failed')),
+            newNotification: @json(__('header.new_notification_toast')),
         },
+        pollIntervalMs: 30000,
         initialCount: {{ (int) ($inAppUnreadCount ?? 0) }},
     };
 
     var state = {
         unread: cfg.initialCount,
+        lastKnownUnread: cfg.initialCount,
+        lastToastId: null,
         syncing: false,
         mutating: false,
         syncAbort: null,
@@ -176,7 +180,29 @@
             .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
             .then(function (data) {
                 if (state.mutating) return data;
-                if (typeof data.unread_count !== 'undefined') setUnreadCount(data.unread_count);
+                if (typeof data.unread_count !== 'undefined') {
+                    var prev = state.lastKnownUnread;
+                    setUnreadCount(data.unread_count);
+                    if (
+                        data.unread_count > prev &&
+                        data.notifications &&
+                        data.notifications.length &&
+                        typeof toastr !== 'undefined'
+                    ) {
+                        var latest = data.notifications[0];
+                        if (latest && latest.id !== state.lastToastId) {
+                            state.lastToastId = latest.id;
+                            toastr.info(latest.message, latest.title, {
+                                timeOut: 9000,
+                                closeButton: true,
+                                onclick: function () {
+                                    if (latest.link) window.location.assign(latest.link);
+                                },
+                            });
+                        }
+                    }
+                    state.lastKnownUnread = data.unread_count;
+                }
                 if (data.notifications) renderList(data.notifications);
                 if (data.sidebar_badges) updateSidebarBadges(data.sidebar_badges);
                 return data;
@@ -285,6 +311,18 @@
     function boot() {
         setUnreadCount(cfg.initialCount);
         bindEvents();
+        syncFeed().then(function (data) {
+            if (data && typeof data.unread_count !== 'undefined') {
+                state.lastKnownUnread = data.unread_count;
+            }
+        });
+        if (cfg.pollIntervalMs > 0) {
+            setInterval(function () {
+                if (!state.mutating && document.visibilityState === 'visible') {
+                    syncFeed();
+                }
+            }, cfg.pollIntervalMs);
+        }
     }
 
     window.DigitexNotifications = {

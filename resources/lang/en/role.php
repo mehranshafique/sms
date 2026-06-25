@@ -32,4 +32,7 @@ return [
     'delete_confirmation' => 'Delete role?',
     'assign_permissions_to_role' => 'Assign Permissions to Role',
     'back' => 'Back',
+    'switch_role' => 'Switch Role',
+    'switched_to' => 'Active role switched to :role.',
+    'invalid_role_switch' => 'You cannot switch to that role.',
 ];

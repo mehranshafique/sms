@@ -58,7 +58,7 @@
                     
                     <div class="col-12 mb-4">
                         <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.reason') }}</label>
-                        <p class="p-3 bg-light rounded text-dark border">{{ $request->reason }}</p>
+                        <p class="p-3 bg-light rounded text-dark border">{{ $request->localizedReason() }}</p>
                     </div>
                     
                     @if($request->admin_note)

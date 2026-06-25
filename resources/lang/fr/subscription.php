@@ -7,6 +7,7 @@ return [
     'title' => 'Abonnement expiré',
     'expired_title' => 'Accès restreint',
     'expired_message' => 'L\'abonnement de votre établissement a expiré.',
+    'expired_or_missing' => 'Accès refusé : votre établissement n\'a pas d\'abonnement actif pour ce module.',
     'contact_admin' => 'Veuillez contacter votre administrateur système ou renouveler votre abonnement.',
     'go_to_dashboard' => 'Aller au tableau de bord (Accès limité)',
     'back_to_login' => 'Retour à la connexion',

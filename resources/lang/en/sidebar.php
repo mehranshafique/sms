@@ -150,6 +150,7 @@ return [
     ],
     'staff_attendance' => 'Staff Attendance',
     'staff_leaves' => 'Staff Leaves',
+    'queue_monitor' => 'Queue & Cron Monitor',
     
     'fee_types' => [
         'title' => 'Fee Types'

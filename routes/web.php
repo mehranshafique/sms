@@ -32,6 +32,8 @@ use App\Http\Controllers\Ai\AiEmbedController;
 use App\Http\Controllers\Ai\AiStudioController;
 use App\Http\Controllers\Ai\AiSettingsController;
 use App\Http\Controllers\PlanController;
+use App\Http\Controllers\RoleSwitchController;
+use App\Http\Controllers\QueueMonitorController;
 
 // --- Controllers: Academics ---
 use App\Http\Controllers\GradeLevelController;
@@ -174,6 +176,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{id}/read', [InAppNotificationController::class, 'markRead'])->whereNumber('id')->name('read');
         Route::post('/read-all', [InAppNotificationController::class, 'markAllRead'])->name('read_all');
     });
+
+    Route::post('/role/switch', [RoleSwitchController::class, 'switch'])->name('role.switch');
 
     // =========================================================================
     // 1. CORE SYSTEM & ADMINISTRATION
@@ -400,7 +404,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('salary-structures/{staff}/edit', [SalaryStructureController::class, 'edit'])->name('salary-structures.edit');
         Route::put('salary-structures/{staff}', [SalaryStructureController::class, 'update'])->name('salary-structures.update');
 
-        // Staff Attendance
+    });
+
+    Route::middleware([CheckModuleAccess::class . ':staff_attendance'])->group(function () {
         Route::resource('staff-attendance', StaffAttendanceController::class)->only(['index', 'create', 'store']);
     });
 
@@ -752,6 +758,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [PlatformUserController::class, 'index'])->name('index');
         Route::put('{user}/roles', [PlatformUserController::class, 'updateRoles'])->name('roles.update');
         Route::patch('{user}/status', [PlatformUserController::class, 'toggleStatus'])->name('status');
+    });
+
+    Route::middleware([RoleMiddleware::class . ':Super Admin'])->prefix('platform/queue-monitor')->name('platform.queue-monitor.')->group(function () {
+        Route::get('/', [QueueMonitorController::class, 'index'])->name('index');
+        Route::post('/retry/{id}', [QueueMonitorController::class, 'retry'])->name('retry');
+        Route::post('/retry-all', [QueueMonitorController::class, 'retryAll'])->name('retry_all');
+        Route::post('/test-job', [QueueMonitorController::class, 'dispatchTest'])->name('test');
     });
 
     // Institution Configuration

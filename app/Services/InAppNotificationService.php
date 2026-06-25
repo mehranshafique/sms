@@ -259,7 +259,7 @@ class InAppNotificationService
         $message = __('header.notif_request_new_message', [
             'student' => $studentName,
             'ticket' => $req->ticket_number,
-            'type' => __('requests.type_' . $req->type),
+            'type' => $req->typeLabel(),
         ]);
 
         $this->notifyAdmins(
