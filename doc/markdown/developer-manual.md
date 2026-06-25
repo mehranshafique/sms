@@ -758,11 +758,35 @@ Full request/response examples: **REST API Manual** PDF.
 ### Production commands
 
 ```bash
+# Safe .env update (adds new keys only — never overwrites APP_KEY, DB_*, etc.)
+php artisan env:merge
+
+# Preview what would be added
+php artisan env:merge --dry-run
+
+# Full post-deploy (migrate, permissions, cache)
+php artisan app:deploy
+
+# Deploy + merge new .env keys first
+php artisan app:deploy --env-merge
+
+# Also refresh SMS templates
+php artisan app:deploy --env-merge --seed-templates
+```
+
+Manual steps (same as `app:deploy`):
+
+```bash
 php artisan migrate --force
+php artisan db:seed --class=RolePermissionSeeder --force
+php artisan permission:cache-reset
 php artisan config:cache
 php artisan route:cache
+php artisan view:cache
 php artisan queue:work
 ```
+
+**Do not** run `cp .env.example .env` on an existing server — it replaces your file. Use `php artisan env:merge` instead.
 
 ### Production URL (multi-tenant)
 

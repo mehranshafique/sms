@@ -4,6 +4,8 @@ Use this checklist before opening a school or university on production.
 
 ## Server & database
 
+- [ ] Merge new env keys (keeps existing secrets): `php artisan env:merge`
+- [ ] Or full post-deploy: `php artisan app:deploy --env-merge`
 - [ ] Run migrations: `php artisan migrate --force`
 - [ ] Seed DRC locations (only on fresh DB): `php artisan db:seed --class=LocationSeeder`
 - [ ] Seed SMS templates if needed: `php artisan db:seed --class=SmsTemplateSeeder`
