@@ -48,7 +48,7 @@
                     
                     <div class="col-md-6 mb-4">
                         <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.request_type') }}</label>
-                        <span class="fs-16 text-dark">{{ __('requests.type_' . $request->type) }}</span>
+                        <span class="fs-16 text-dark">{{ $request->typeLabel() }}</span>
                     </div>
                     
                     <div class="col-md-6 mb-4">

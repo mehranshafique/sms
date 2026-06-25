@@ -35,6 +35,7 @@ class StudentRequestController extends BaseController
             $query = StudentRequest::with(['student', 'creator'])
                 ->select('student_requests.*')
                 ->where('student_requests.institution_id', $institutionId)
+                ->whereNotNull('student_requests.student_id')
                 ->latest('student_requests.created_at');
 
             // Student: View Own
@@ -57,7 +58,7 @@ class StudentRequestController extends BaseController
                 ->addColumn('applicant', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('ticket', fn($row) => '<span class="fw-bold">'.$row->ticket_number.'</span>')
-                ->editColumn('type', fn($row) => __('requests.type_' . $row->type))
+                ->editColumn('type', fn ($row) => $row->typeLabel())
                 ->editColumn('created_at', fn($row) => $row->created_at ? $row->created_at->format('d M, Y H:i') : '-') 
                 ->editColumn('status', function($row){
                     $badges = ['pending' => 'warning', 'approved' => 'success', 'partially_approved' => 'info', 'rejected' => 'danger'];
@@ -139,7 +140,7 @@ class StudentRequestController extends BaseController
 
         $request->validate([
             'student_id' => $isAdmin ? 'required|exists:students,id' : 'nullable',
-            'type' => 'required|in:absence,late,sick,early_exit,leave,other',
+            'type' => 'required|in:' . implode(',', StudentRequest::STUDENT_TYPES),
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'reason' => 'required|string',
@@ -287,10 +288,7 @@ class StudentRequestController extends BaseController
                 $statusText = ucfirst(str_replace('_', ' ', $req->status));
             }
 
-            $typeText = __('requests.type_' . $req->type);
-            if ($typeText === 'requests.type_' . $req->type) {
-                $typeText = ucfirst(str_replace('_', ' ', $req->type));
-            }
+            $typeText = $req->typeLabel();
 
             $data = [
                 'StudentName' => $student->first_name,

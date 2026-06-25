@@ -26,14 +26,18 @@
                             {{-- ADMIN: Select Student --}}
                             @if($isAdmin && isset($students))
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">{{ __('requests.request_for') }}</label>
-                                    <select name="student_id" class="form-control default-select" data-live-search="true">
-                                        <option value="">{{ __('requests.myself_staff_leave') }}</option>
+                                    <label class="form-label fw-bold">{{ __('requests.request_for') }} <span class="text-danger">*</span></label>
+                                    <select name="student_id" class="form-control default-select" data-live-search="true" required>
+                                        <option value="">{{ __('requests.select_student') }}</option>
                                         @foreach($students as $id => $name)
                                             <option value="{{ $id }}">{{ $name }}</option>
                                         @endforeach
                                     </select>
-                                    <small class="text-muted">{{ __('requests.request_for_help') }}</small>
+                                    <small class="text-muted d-block">{{ __('requests.request_for_help') }}</small>
+                                    <small class="text-muted">
+                                        {{ __('requests.staff_leave_hint') }}
+                                        <a href="{{ route('staff-leaves.index') }}">{{ __('requests.staff_leave_link') }}</a>
+                                    </small>
                                 </div>
                             @endif
 
@@ -44,12 +48,7 @@
                                     <option value="late">{{ __('requests.type_late') }}</option>
                                     <option value="sick">{{ __('requests.type_sick') }}</option>
                                     <option value="early_exit">{{ __('requests.type_early_exit') }}</option>
-                                    
-                                    {{-- Show 'Leave' option only for Staff/Admin --}}
-                                    @if($isStaff || $isAdmin)
-                                        <option value="leave">{{ __('requests.type_leave') }}</option>
-                                    @endif
-                                    
+                                    <option value="fee_extension">{{ __('requests.type_fee_extension') }}</option>
                                     <option value="other">{{ __('requests.type_other') }}</option>
                                 </select>
                             </div>

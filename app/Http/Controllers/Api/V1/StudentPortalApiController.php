@@ -337,7 +337,7 @@ class StudentPortalApiController extends Controller
     {
         try {
             $request->validate([
-                'type' => 'required|in:absence,late,leave,other',
+                'type' => 'required|in:absence,late,sick,early_exit,fee_extension,other',
                 'reason' => 'required|string|max:500'
             ]);
 

@@ -32,6 +32,35 @@ class StudentRequest extends Model
         'approved_at' => 'datetime',
     ];
 
+    /** Student/parent request types (staff leave uses staff_leaves module). */
+    public const STUDENT_TYPES = [
+        'absence',
+        'late',
+        'sick',
+        'early_exit',
+        'fee_extension',
+        'other',
+    ];
+
+    public function typeLabel(): string
+    {
+        $type = $this->resolvedType();
+        $key = 'requests.type_' . $type;
+        $label = __($key);
+
+        return $label === $key ? ucfirst(str_replace('_', ' ', $type)) : $label;
+    }
+
+    /** Map legacy mis-typed chatbot records to the correct label. */
+    public function resolvedType(): string
+    {
+        if ($this->type === 'leave' && $this->student_id) {
+            return 'fee_extension';
+        }
+
+        return $this->type;
+    }
+
     public function student()
     {
         return $this->belongsTo(Student::class);

@@ -1461,7 +1461,7 @@ class ChatbotLogicService
                 'institution_id' => $s->institution_id,
                 'student_id' => $student->id,
                 'academic_session_id' => optional($enrollment)->academic_session_id ?? null,
-                'type' => 'leave',
+                'type' => 'fee_extension',
                 'reason' => "Demande de dérogation parentale pour {$days} jours (Soumis via Chatbot).",
                 'start_date' => now(),
                 'end_date' => now()->addDays($days),

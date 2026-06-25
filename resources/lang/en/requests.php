@@ -26,7 +26,7 @@ return [
     'type_late' => 'Late Arrival',
     'type_sick' => 'Sick Leave',
     'type_early_exit' => 'Early Exit',
-    'type_leave' => 'Staff Leave',
+    'type_fee_extension' => 'Fee Payment Extension',
     'type_other' => 'Other',
     
     // Statuses
@@ -82,8 +82,10 @@ return [
     
     // Create view
     'request_for' => 'Request For (Student)',
-    'myself_staff_leave' => '-- Myself (Staff Leave) --',
-    'request_for_help' => 'Select a student to create a request on their behalf, or leave empty for your own leave request.',
+    'select_student' => 'Select a student...',
+    'request_for_help' => 'Select the student this request applies to.',
+    'staff_leave_hint' => 'Staff leave requests are managed separately.',
+    'staff_leave_link' => 'Go to Staff Leave',
     
     // Chatbot Specific
     'chatbot_submitted' => '✅ Request submitted successfully. Ticket: :ticket',

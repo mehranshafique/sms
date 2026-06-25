@@ -169,6 +169,7 @@ return [
         'modules' => 'Modules',
         'title' => 'Permissions'
     ],
+    'all_users' => 'All Users',
     'institutes' => [
         'title' => 'Institutes'
     ],

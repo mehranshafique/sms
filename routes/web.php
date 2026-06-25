@@ -22,6 +22,7 @@ use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SmsTemplateController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\PlatformUserController;
 use App\Http\Controllers\PickupWebController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InAppNotificationController;
@@ -745,6 +746,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Audit Logs (Super Admin)
     Route::resource('audit-logs', AuditLogController::class)->only(['index'])->middleware([RoleMiddleware::class . ':Super Admin']);
+
+    // Platform user directory (Super Admin)
+    Route::middleware([RoleMiddleware::class . ':Super Admin'])->prefix('platform/users')->name('platform.users.')->group(function () {
+        Route::get('/', [PlatformUserController::class, 'index'])->name('index');
+        Route::put('{user}/roles', [PlatformUserController::class, 'updateRoles'])->name('roles.update');
+        Route::patch('{user}/status', [PlatformUserController::class, 'toggleStatus'])->name('status');
+    });
 
     // Institution Configuration
     Route::prefix('configuration')

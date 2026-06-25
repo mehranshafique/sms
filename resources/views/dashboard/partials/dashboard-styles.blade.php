@@ -158,5 +158,23 @@
     [data-theme-version="dark"] .dash-stat__value,
     [data-theme-version="dark"] .dash-panel__title,
     [data-theme-version="dark"] .dash-link__value { color: #fff; }
+
+    /* Dashboard: AI copilot sits directly above welcome banner */
+    .dashboard-ai-slot {
+        padding: 30px 30px 0;
+    }
+    @media only screen and (max-width: 575px) {
+        .dashboard-ai-slot { padding: 15px 15px 0; }
+    }
+    .content-body > .content-body > .container-fluid {
+        padding-top: 0;
+    }
+    #ai-dashboard-copilot.ai-copilot-card {
+        margin-bottom: 0.75rem;
+    }
+    .dashboard-welcome-row {
+        margin-top: 0;
+        margin-bottom: 1.25rem;
+    }
 </style>
 @endonce

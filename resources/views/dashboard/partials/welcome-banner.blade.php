@@ -16,7 +16,7 @@
     }
 @endphp
 
-<div class="row mb-4">
+<div class="row dashboard-welcome-row">
     <div class="col-xl-12">
         <div class="dash-hero shadow-sm">
             <div class="d-flex flex-wrap justify-content-between align-items-center p-4" style="position: relative; z-index: 1;">

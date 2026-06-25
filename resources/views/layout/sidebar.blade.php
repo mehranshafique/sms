@@ -18,11 +18,13 @@
                 $isSchoolAdmin = $user->hasRole(RoleEnum::SCHOOL_ADMIN->value);
                 $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
                 $isStudent = $user->hasRole(RoleEnum::STUDENT->value);
-                $isGuardian = $user->hasRole(RoleEnum::GUARDIAN->value)
-                    || \App\Models\StudentParent::where('user_id', $user->id)->exists();
+                $linkedAsParent = \App\Models\StudentParent::where('user_id', $user->id)->exists();
+                $hasGuardianRole = $user->hasRole(RoleEnum::GUARDIAN->value);
+                $isAdminRole = $isSuperAdmin || $isHeadOfficer || $isSchoolAdmin;
+                // Parent profile must not override admin/teacher/student navigation.
+                $isGuardian = ($hasGuardianRole || $linkedAsParent) && !$isAdminRole && !$isTeacher && !$isStudent;
                 
                 // CRITICAL FIX: Group Custom Roles (Finance, Sales, etc.) with Management
-                // If they are not a Teacher, Student, or Guardian, they are treated as a Management/Staff user.
                 $isManagement = !$isTeacher && !$isStudent && !$isGuardian;
                 
                 // Determine Active Context
@@ -98,7 +100,6 @@
                 }
                 
                 $modules = $enabledModules ?? [];
-                $isAdminRole = $isSuperAdmin || $isHeadOfficer || $isSchoolAdmin;
                 $showStudentNav = $isStudent && !$isAdminRole && !$isTeacher;
                 $showTeacherNav = $isTeacher && !$isAdminRole;
                 $showGuardianNav = $isGuardian && !$isAdminRole && !$isStudent && !$isTeacher;
@@ -134,7 +135,7 @@
                     </a>
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
-                        {{-- Modules link removed as requested --}}
+                        <li><a class="{{ request()->routeIs('platform.users.*') ? 'mm-active' : '' }}" href="{{ route('platform.users.index') }}">{{ __('sidebar.all_users') }}</a></li>
                     </ul>
                 </li>
 
@@ -188,7 +189,7 @@
             {{-- ============================================================= --}}
             
             {{-- FIXED: Uses $isManagement logic instead of strictly checking $isSchoolAdmin --}}
-            @if($showManagementNav && !$isGuardian)
+            @if($showManagementNav)
                 
                 {{-- SEPARATOR / HEADER WITH SCHOOL ID --}}
                 <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
