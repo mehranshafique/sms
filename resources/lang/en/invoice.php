@@ -159,4 +159,5 @@ return [
     'print_receipt' => 'Print Receipt',
     'verify_receipt' => 'Receipt Verification',
     'receipt_verified' => 'This receipt is authentic.',
+    'school_fees' => 'School Fees',
 ];

@@ -20,7 +20,7 @@ class SmsTemplateSeeder extends Seeder
                 'event_key' => 'payment_received',
                 'name' => 'Payment Received',
                 'body' => 'Dear Parent, payment of $Amount for $StudentName ($Class, $Session) for $PaymentReason has been received. Remaining Balance: $Balance. Thank you, $SchoolName.',
-                'available_tags' => '$StudentName, $Amount, $Balance, $SchoolName, $Date, $TransactionID, $Class, $Session, $PaymentReason',
+                'available_tags' => '$StudentName, $ParentName, $Amount, $Balance, $RemainingBalance, $SchoolName, $Date, $TransactionID, $Class, $Grade, $Section, $Session, $PaymentReason, $InstallmentName, $DueDate',
                 'is_active' => true,
             ],
             
@@ -87,8 +87,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'invoice_created',
                 'name' => 'Invoice Generated',
-                'body' => 'Dear Parent, invoice #$InvoiceNumber of $Amount for $StudentName is due on $DueDate. Please pay on time. Thank you, $SchoolName.',
-                'available_tags' => '$StudentName, $Amount, $InvoiceNumber, $DueDate, $SchoolName',
+                'body' => 'Dear Parent, invoice #$InvoiceNumber of $Amount for $StudentName ($Class, $Session) — $InstallmentName is due on $DueDate. Outstanding: $OutstandingAmount. $SchoolName.',
+                'available_tags' => '$StudentName, $ParentName, $Amount, $AmountDue, $OutstandingAmount, $InvoiceNumber, $DueDate, $Class, $Grade, $Section, $Session, $InstallmentName, $SchoolName',
                 'is_active' => true,
             ],
             // System Alerts
@@ -110,8 +110,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'fee_reminder',
                 'name' => 'Smart Fee Reminder',
-                'body' => 'Dear $ParentName, this is a reminder that the outstanding fee balance for $StudentName is $Currency $TotalDebt. Please arrange payment at your earliest convenience. Thank you, $SchoolName.',
-                'available_tags' => '$ParentName, $StudentName, $Currency, $TotalDebt, $SchoolName',
+                'body' => 'Dear Parent, your child $StudentName ($Class, $Session) still owes $OutstandingAmount for $InstallmentName. Please pay before $DueDate. Total outstanding: $TotalDebt. — $SchoolName',
+                'available_tags' => '$ParentName, $StudentName, $Class, $Grade, $Section, $Session, $InstallmentName, $OutstandingAmount, $AmountDue, $DueDate, $TotalDebt, $Currency, $SchoolName, $InvoiceNumber',
                 'is_active' => true,
             ],
             [
@@ -250,6 +250,20 @@ Thank you, $SchoolName.',
                 'name' => 'Fund Request Processed',
                 'body' => 'Your fund request "$Title" was $Status.',
                 'available_tags' => '$Title, $Status, $SchoolName',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'budget_consumed',
+                'name' => 'Budget Consumption Alert',
+                'body' => 'Budget line: $BudgetLine. Expense "$ExpenseTitle" recorded: $Amount. Remaining budget: $Remaining. — $SchoolName',
+                'available_tags' => '$BudgetLine, $ExpenseTitle, $Amount, $Remaining, $SchoolName, $Requester',
+                'is_active' => true,
+            ],
+            [
+                'event_key' => 'disciplinary_incident',
+                'name' => 'Disciplinary Incident',
+                'body' => 'Dear Parent, $StudentName has a disciplinary record ($IncidentType): $Title on $Date. Severity: $Severity. Ref: $Reference. Action: $ActionTaken. — $SchoolName',
+                'available_tags' => '$StudentName, $IncidentType, $Title, $Severity, $Date, $Reference, $ActionTaken, $SchoolName',
                 'is_active' => true,
             ],
         ];

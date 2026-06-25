@@ -12,33 +12,18 @@ class SendBudgetNotification implements ShouldQueue
 {
     use InteractsWithQueue;
 
-    protected $notificationService;
+    public function __construct(
+        protected NotificationService $notificationService
+    ) {}
 
-    /**
-     * Create the event listener.
-     *
-     * @return void
-     */
-    public function __construct(NotificationService $notificationService)
-    {
-        $this->notificationService = $notificationService;
-    }
-
-    /**
-     * Handle the event.
-     *
-     * @param  \App\Events\BudgetDeducted  $event
-     * @return void
-     */
-    public function handle(BudgetDeducted $event)
+    public function handle(BudgetDeducted $event): void
     {
         try {
-            $this->notificationService->sendFundRequestProcessedNotification(
-                $event->fundRequest, 
-                $event->fundRequest->institution_id
-            );
+            if ($event->fundRequest->status === 'approved') {
+                $this->notificationService->sendBudgetConsumedNotifications($event->fundRequest);
+            }
         } catch (\Exception $e) {
-            Log::error("Budget Notification Listener Error: " . $e->getMessage());
+            Log::error('Budget consumption notification error: ' . $e->getMessage());
         }
     }
 }

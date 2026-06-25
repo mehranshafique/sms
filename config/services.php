@@ -48,6 +48,9 @@ return [
         'twilio_auth_token' => env('TWILIO_AUTH_TOKEN'),
         'meta_app_secret' => env('META_WHATSAPP_APP_SECRET'),
         'infobip_api_key' => env('INFOBIP_API_KEY'),
+        'infobip_skip_verify' => env('INFOBIP_WEBHOOK_SKIP_VERIFY', false),
+        'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'telegram_skip_verify' => env('TELEGRAM_WEBHOOK_SKIP_VERIFY', false),
         'webhook_secret' => env('CHATBOT_WEBHOOK_SECRET'),
     ],
 

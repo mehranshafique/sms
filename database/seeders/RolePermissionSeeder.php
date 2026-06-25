@@ -51,6 +51,7 @@ class RolePermissionSeeder extends Seeder
             'Student Promotion' => ['view', 'create'],
             'Student Transfers' => ['view', 'create', 'print'],
             'Student Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
+            'Discipline' => ['view', 'create', 'update', 'delete', 'viewAny'],
             'Fund Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
 
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
@@ -117,6 +118,7 @@ class RolePermissionSeeder extends Seeder
                 // Manual fix for 'Staff Leaves' and 'Student Requests' to ensure clean permission names
                 if ($slug === 'staff_leaves') $singularKey = 'staff_leave';
                 if ($slug === 'student_requests') $singularKey = 'student_request';
+                if ($slug === 'discipline') $singularKey = 'discipline';
 
                 $permissionName = "{$singularKey}.{$action}";
 
@@ -167,6 +169,28 @@ class RolePermissionSeeder extends Seeder
             return !Str::startsWith($perm, ['institution.', 'package.', 'subscription.', 'audit_log.', 'module.']);
         });
         $schoolAdminRole->syncPermissions($schoolAdminPermissions);
+
+        $teacherPermissions = array_values(array_filter($allPermissions, function ($perm) {
+            return \Illuminate\Support\Str::startsWith($perm, [
+                'discipline.view',
+                'discipline.create',
+                'discipline.viewAny',
+                'subject.view',
+                'subject.viewAny',
+                'student_attendance.view',
+                'student_attendance.create',
+                'assignment.view',
+                'assignment.create',
+                'assignment.update',
+                'exam_mark.view',
+                'exam_mark.create',
+                'exam_mark.update',
+                'student_request.view',
+                'student_request.create',
+                'student.view',
+            ]);
+        }));
+        $teacherRole->syncPermissions($teacherPermissions);
 
         $this->call(PlatformSuperAdminSeeder::class);
 

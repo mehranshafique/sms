@@ -357,6 +357,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('requests', StudentRequestController::class);
     });
 
+    // Discipline Management
+    Route::middleware([CheckModuleAccess::class . ':discipline'])->group(function () {
+        Route::post('discipline/{discipline}/status', [\App\Http\Controllers\DisciplineController::class, 'updateStatus'])->name('discipline.update_status');
+        Route::resource('discipline', \App\Http\Controllers\DisciplineController::class);
+    });
+
     // Pickup Scanner Routes
     Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () { 
         // Guard View
@@ -494,6 +500,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/results', [GuardianPortalController::class, 'results'])->name('results');
         Route::get('/attendance', [GuardianPortalController::class, 'attendance'])->name('attendance');
         Route::get('/requests', [GuardianPortalController::class, 'requests'])->name('requests');
+        Route::get('/discipline', [GuardianPortalController::class, 'discipline'])->name('discipline');
     });
 
     // =========================================================================

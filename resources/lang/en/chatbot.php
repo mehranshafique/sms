@@ -21,6 +21,9 @@ return [
     'enable_sms' => 'Enable SMS Chatbot',
     'enable_telegram' => 'Enable Telegram Chatbot',
     'channel_help' => 'Toggle to enable/disable automated responses for this channel.',
+    'webhook_urls' => 'Webhook URLs',
+    'webhook_urls_help' => 'Paste these URLs in Infobip, Twilio, Meta, or Telegram. The ?secret= parameter authenticates inbound webhooks when the provider does not send Authorization headers.',
+    'webhook_secret_missing' => 'Set CHATBOT_WEBHOOK_SECRET in your server .env file, then refresh this page to copy secure webhook URLs.',
     
     // Keyword Management
     'keyword_management' => 'Keyword Management',

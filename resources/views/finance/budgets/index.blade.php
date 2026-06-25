@@ -158,6 +158,18 @@
                         <label class="form-label">{{ __('budget.amount') }} <span class="text-danger">*</span></label>
                         <input type="number" name="allocated_amount" class="form-control" placeholder="{{ __('budget.enter_amount') }}" required min="0" step="0.01">
                     </div>
+
+                    {{-- 5. Responsible person --}}
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('budget.responsible_person') }}</label>
+                        <select name="responsible_user_id" class="form-control default-select">
+                            <option value="">{{ __('budget.no_responsible_person') }}</option>
+                            @foreach($staffUsers ?? [] as $staffUser)
+                                <option value="{{ $staffUser->id }}">{{ $staffUser->name }}</option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">{{ __('budget.responsible_person_help') }}</small>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-danger light" data-bs-dismiss="modal">{{ __('budget.cancel') }}</button>
@@ -205,6 +217,16 @@
                         <label class="form-label">{{ __('budget.amount') }} <span class="text-danger">*</span></label>
                         <input type="number" name="allocated_amount" id="edit_allocated_amount" class="form-control" required min="0" step="0.01">
                         <small class="text-warning d-block mt-1">{{ __('budget.allocation_warning') }}</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('budget.responsible_person') }}</label>
+                        <select name="responsible_user_id" id="edit_responsible_user_id" class="form-control default-select">
+                            <option value="">{{ __('budget.no_responsible_person') }}</option>
+                            @foreach($staffUsers ?? [] as $staffUser)
+                                <option value="{{ $staffUser->id }}">{{ $staffUser->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -341,6 +363,8 @@
                 $('#edit_budget_id').val(data.id);
                 $('#edit_allocated_amount').val(data.allocated_amount);
                 $('#edit_period_name').val(data.period_name);
+                $('#edit_responsible_user_id').val(data.responsible_user_id || '');
+                if ($.fn.selectpicker) { $('#edit_responsible_user_id').selectpicker('refresh'); }
                 
                 $('#edit_start_date').val(data.start_date);
                 if($.fn.datepicker) $('#edit_start_date').datepicker('update', data.start_date);

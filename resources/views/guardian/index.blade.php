@@ -14,7 +14,8 @@
                             <a href="{{ route('guardian.fees', ['student_id' => $child->id]) }}" class="btn btn-outline-primary btn-sm d-block mb-2">{{ __('guardian.my_fees') }}</a>
                             <a href="{{ route('guardian.results', ['student_id' => $child->id]) }}" class="btn btn-outline-primary btn-sm d-block mb-2">{{ __('guardian.my_results') }}</a>
                             <a href="{{ route('guardian.attendance', ['student_id' => $child->id]) }}" class="btn btn-outline-primary btn-sm d-block mb-2">{{ __('guardian.my_attendance') }}</a>
-                            <a href="{{ route('guardian.requests', ['student_id' => $child->id]) }}" class="btn btn-outline-primary btn-sm d-block">{{ __('guardian.my_requests') }}</a>
+                            <a href="{{ route('guardian.requests', ['student_id' => $child->id]) }}" class="btn btn-outline-primary btn-sm d-block mb-2">{{ __('guardian.my_requests') }}</a>
+                            <a href="{{ route('guardian.discipline', ['student_id' => $child->id]) }}" class="btn btn-outline-warning btn-sm d-block">{{ __('discipline.guardian_title') }}</a>
                         </div>
                     </div>
                 </div>

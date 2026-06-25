@@ -189,9 +189,11 @@
 
             <div class="digitex-error-footer">
                 @php
-                    $statusCode = 404;
-                    if (isset($exception) && method_exists($exception, 'getStatusCode')) {
-                        $statusCode = $exception->getStatusCode();
+                    $statusCode = trim($__env->yieldContent('status_code'));
+                    if ($statusCode === '') {
+                        $statusCode = (isset($exception) && method_exists($exception, 'getStatusCode'))
+                            ? $exception->getStatusCode()
+                            : 404;
                     }
                 @endphp
                 {{ __('errors.error_code', ['code' => $statusCode]) }}

@@ -47,6 +47,9 @@ class ChatbotWebhookController extends Controller
                 case 'mobishastra':
                     $data = $this->parseMobishastra($request);
                     break;
+                case 'telegram':
+                    $data = $this->parseTelegram($request);
+                    break;
             }
 
             if ($data) {
@@ -198,6 +201,25 @@ class ChatbotWebhookController extends Controller
             $to,
             $request->input('message') ?? $request->input('text'),
             'mobishastra'
+        );
+    }
+
+    private function parseTelegram($request)
+    {
+        $message = $request->input('message');
+        if (!is_array($message)) {
+            return null;
+        }
+
+        $from = $message['from']['id'] ?? null;
+        $body = $message['text'] ?? $message['caption'] ?? null;
+
+        // Telegram user id as "phone" identifier for session lookup
+        return $this->validateAndFormat(
+            $from ? 'tg:' . $from : null,
+            $request->input('bot_id') ?? 'telegram',
+            $body,
+            'telegram'
         );
     }
 }

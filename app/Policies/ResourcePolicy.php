@@ -27,6 +27,13 @@ class ResourcePolicy
         if (!$className) return null;
 
         $baseName = class_basename($className);
+
+        $permissionMap = [
+            'DisciplinaryRecord' => 'discipline',
+        ];
+        if (isset($permissionMap[$baseName])) {
+            return $permissionMap[$baseName];
+        }
         
         // 3. Default: Snake case (e.g. StudentPromotion -> student_promotion)
         // This matches the database seeder logic where permissions are generated 
@@ -69,15 +76,21 @@ class ResourcePolicy
      */
     private function hasAccess(User $user, $permission)
     {
-        // Enforce Enum usage for consistency
-        $superAdminRole = defined('App\Enums\RoleEnum::SUPER_ADMIN') 
-            ? RoleEnum::SUPER_ADMIN->value 
-            : 'Super Admin';
+        $adminRoles = [
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+        ];
 
-        if ($user->hasRole($superAdminRole)) {
+        if ($user->hasRole($adminRoles)) {
             return true;
         }
-        return $user->hasPermissionTo($permission);
+
+        try {
+            return $user->hasPermissionTo($permission);
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+            return false;
+        }
     }
     
     /**

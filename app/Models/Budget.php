@@ -14,6 +14,7 @@ class Budget extends Model
         'institution_id',
         'academic_session_id',
         'budget_category_id',
+        'responsible_user_id',
         'period_name', // Added
         'start_date',  // Added
         'end_date',    // Added
@@ -52,6 +53,16 @@ class Budget extends Model
     public function category()
     {
         return $this->belongsTo(BudgetCategory::class, 'budget_category_id');
+    }
+
+    public function responsibleUser()
+    {
+        return $this->belongsTo(User::class, 'responsible_user_id');
+    }
+
+    public function remainingAmount(): float
+    {
+        return max(0, (float) $this->allocated_amount - (float) $this->spent_amount);
     }
 
     public function fundRequests()

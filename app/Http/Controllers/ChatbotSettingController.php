@@ -53,7 +53,18 @@ class ChatbotSettingController extends BaseController
             'telegram' => $settings['chatbot_enable_telegram'] ?? 0,
         ];
 
-        return view('chatbot.settings', compact('keywords', 'config'));
+        $baseUrl = rtrim(config('app.url'), '/');
+        $secret = config('services.chatbot.webhook_secret');
+        $secretQuery = $secret ? '?secret=' . urlencode($secret) : '';
+        $webhookUrls = [
+            'infobip' => $baseUrl . '/api/v1/chatbot/webhook/infobip' . $secretQuery,
+            'twilio' => $baseUrl . '/api/v1/chatbot/webhook/twilio' . $secretQuery,
+            'meta' => $baseUrl . '/api/v1/chatbot/webhook/meta' . $secretQuery,
+            'telegram' => $baseUrl . '/api/v1/chatbot/webhook/telegram' . $secretQuery,
+            'legacy' => $baseUrl . '/api/v1/chatbot/webhook' . $secretQuery,
+        ];
+
+        return view('chatbot.settings', compact('keywords', 'config', 'webhookUrls'));
     }
 
     public function storeConfig(Request $request)

@@ -55,4 +55,10 @@ return [
     'error_allocation_less_than_spent' => 'Impossible de mettre à jour l\'allocation à un montant inférieur à celui dépensé (:spent).',
     'confirm_approve' => 'Êtes-vous sûr de vouloir approuver cette demande ?',
     'confirm_reject' => 'Êtes-vous sûr de vouloir rejeter cette demande ?',
+
+    'responsible_person' => 'Responsable',
+    'no_responsible_person' => '— Non assigné —',
+    'responsible_person_help' => 'Cette personne reçoit les alertes de consommation budgétaire lorsque des dépenses sont approuvées.',
+    'consumed_email_subject' => 'Dépense budgétaire : :line',
+    'consumed_email_body' => "Ligne budgétaire : :line\nDépense : :title\nMontant dépensé : :amount\nSolde restant : :remaining",
 ];

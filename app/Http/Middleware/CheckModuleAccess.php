@@ -111,7 +111,23 @@ class CheckModuleAccess
             // Direct Granular Check
             // We strictly check if the requested module key exists in the enabled list.
             if (!in_array($moduleName, $enabledModules)) {
-                
+                $permissionBase = \Illuminate\Support\Str::singular($moduleName);
+                $permissionCandidates = [
+                    "{$permissionBase}.view",
+                    "{$permissionBase}.viewAny",
+                    "{$permissionBase}.create",
+                ];
+
+                foreach ($permissionCandidates as $candidate) {
+                    try {
+                        if ($user->can($candidate)) {
+                            return $next($request);
+                        }
+                    } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+                        continue;
+                    }
+                }
+
                 if ($request->ajax() || $request->wantsJson()) {
                     return response()->json(['message' => 'Module access denied.'], 403);
                 }

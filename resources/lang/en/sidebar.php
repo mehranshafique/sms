@@ -144,6 +144,7 @@ return [
         'title' => 'Promotions'
     ],
     'requests' => 'Requests', // Added Request Key
+    'discipline' => 'Discipline',
     'staff' => [
         'title' => 'Staff'
     ],

@@ -88,8 +88,8 @@ class ReminderController extends BaseController
         }
 
         // 3. Find all students in this institution with active debt
-        $studentsQuery = Student::with(['parent', 'invoices' => function($q) {
-            $q->whereIn('status', ['unpaid', 'partial', 'overdue']);
+        $studentsQuery = Student::with(['parent', 'invoices' => function ($q) {
+            $q->whereIn('status', ['unpaid', 'partial', 'overdue'])->with(['items.feeStructure', 'academicSession']);
         }])->where('institution_id', $institutionId);
 
         // Target a specific Class/Option Section
@@ -132,35 +132,41 @@ class ReminderController extends BaseController
         $currency = CurrencySymbol::default();
 
         foreach ($students as $student) {
-            // Calculate real global outstanding balance
-            $totalDebt = $student->invoices->sum(function($inv) {
-                return max(0, $inv->total_amount - $inv->paid_amount);
-            });
+            $unpaidInvoices = $student->invoices->filter(fn ($inv) => max(0, $inv->total_amount - $inv->paid_amount) > 0);
 
-            if ($totalDebt <= 0) continue;
+            if ($feeStructureId) {
+                $unpaidInvoices = $unpaidInvoices->filter(function ($inv) use ($feeStructureId) {
+                    return $inv->items->contains('fee_structure_id', (int) $feeStructureId);
+                });
+            }
+
+            if ($unpaidInvoices->isEmpty()) {
+                continue;
+            }
+
+            $primaryInvoice = $unpaidInvoices->sortBy('due_date')->first();
+            $totalDebt = $unpaidInvoices->sum(fn ($inv) => max(0, $inv->total_amount - $inv->paid_amount));
 
             $parent = $student->parent;
             if (!$parent) continue;
 
             $contactInfo = null;
             
-            // Determine Contact info based on channel
+            // Determine Contact info based on channel (SMS/WhatsApp preferred — many parents have no email)
             if ($channel === 'email') {
-                // Prioritize Guardian Email, fallback to Student Email
                 $contactInfo = $parent->guardian_email ?? $student->email;
             } else {
                 $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
-                $contactInfo = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone;
+                $contactInfo = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone ?? $student->mobile_number;
             }
 
             if (empty($contactInfo)) continue;
 
-            $parentName = $parent->father_name ?? 'Parent';
-            
-            // Build Dynamic Message
-            $search = ['$ParentName', '$StudentName', '$Currency', '$TotalDebt', '$SchoolName'];
-            $replace = [$parentName, $student->first_name, $currency, number_format($totalDebt, 2), $schoolName];
-            $message = str_replace($search, $replace, $template->body);
+            $context = student_notification_context($student, $primaryInvoice);
+            $context['TotalDebt'] = $currency . ' ' . number_format($totalDebt, 2);
+            $context['OutstandingAmount'] = $currency . ' ' . number_format(max(0, $primaryInvoice->total_amount - $primaryInvoice->paid_amount), 2);
+
+            $message = apply_sms_template_tags($template->body, $context);
 
             try {
                 if ($channel === 'email') {

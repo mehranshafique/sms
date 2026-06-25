@@ -62,6 +62,14 @@ class AppServiceProvider extends ServiceProvider
         }
         // --- Dynamic Policy Registration End ---
 
+        Gate::before(function ($user, string $ability) {
+            if ($user && $user->hasRole(\App\Enums\RoleEnum::SUPER_ADMIN->value)) {
+                return true;
+            }
+
+            return null;
+        });
+
         View::composer('*', function ($view) {
             if (Auth::check()) {
                 $view->with('planCtx', app(PlanContextService::class)->snapshot());

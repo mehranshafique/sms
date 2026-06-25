@@ -13,6 +13,7 @@ class ChatbotWebhookVerifier
             'twilio' => $this->verifyTwilio($request),
             'meta' => $this->verifyMeta($request),
             'infobip' => $this->verifyInfobip($request),
+            'telegram' => $this->verifyTelegram($request),
             default => $this->verifySharedSecret($request),
         };
     }
@@ -63,30 +64,80 @@ class ChatbotWebhookVerifier
 
     private function verifyInfobip(Request $request): bool
     {
+        // Infobip inbound webhooks often do NOT send Authorization headers.
+        // Accept: App API key, shared secret header/query, or explicit skip flag.
+
         $apiKey = config('services.chatbot.infobip_api_key');
-        if (empty($apiKey)) {
-            Log::warning('Chatbot Infobip webhook rejected: INFOBIP_API_KEY not configured.');
+        if (!empty($apiKey)) {
+            $provided = $request->header('Authorization', '');
+            if (str_starts_with($provided, 'App ')) {
+                $provided = substr($provided, 4);
+            }
+            if (trim($provided) !== '' && hash_equals($apiKey, trim($provided))) {
+                return true;
+            }
+        }
+
+        if ($this->matchesSharedSecret($request)) {
+            return true;
+        }
+
+        if (config('services.chatbot.infobip_skip_verify', false)) {
+            Log::info('Chatbot Infobip webhook accepted (INFOBIP_WEBHOOK_SKIP_VERIFY=true).');
+            return true;
+        }
+
+        Log::warning('Chatbot Infobip webhook rejected: set INFOBIP_API_KEY, CHATBOT_WEBHOOK_SECRET, or INFOBIP_WEBHOOK_SKIP_VERIFY=true.');
+        return false;
+    }
+
+    private function verifyTelegram(Request $request): bool
+    {
+        $botToken = config('services.chatbot.telegram_bot_token');
+        if (empty($botToken)) {
+            Log::warning('Chatbot Telegram webhook rejected: TELEGRAM_BOT_TOKEN not configured.');
             return false;
         }
 
-        $provided = $request->header('Authorization', '');
-        if (str_starts_with($provided, 'App ')) {
-            $provided = substr($provided, 4);
+        // Telegram does not sign webhooks — use shared secret in URL or header.
+        if ($this->matchesSharedSecret($request)) {
+            return true;
         }
 
-        return hash_equals($apiKey, trim($provided));
+        if (config('services.chatbot.telegram_skip_verify', false)) {
+            return true;
+        }
+
+        Log::warning('Chatbot Telegram webhook rejected: append ?secret=YOUR_CHOTBOT_WEBHOOK_SECRET to the webhook URL.');
+        return false;
     }
 
     private function verifySharedSecret(Request $request): bool
     {
+        if ($this->matchesSharedSecret($request)) {
+            return true;
+        }
+
         $secret = config('services.chatbot.webhook_secret', env('CHATBOT_WEBHOOK_SECRET'));
         if (empty($secret)) {
             Log::warning('Chatbot webhook rejected: CHATBOT_WEBHOOK_SECRET not configured.');
             return false;
         }
 
-        $provided = $request->header('X-Chatbot-Secret', '');
+        return false;
+    }
 
-        return hash_equals($secret, (string) $provided);
+    private function matchesSharedSecret(Request $request): bool
+    {
+        $secret = config('services.chatbot.webhook_secret', env('CHATBOT_WEBHOOK_SECRET'));
+        if (empty($secret)) {
+            return false;
+        }
+
+        $provided = $request->header('X-Chatbot-Secret', '')
+            ?: $request->query('secret', '')
+            ?: $request->input('secret', '');
+
+        return $provided !== '' && hash_equals($secret, (string) $provided);
     }
 }

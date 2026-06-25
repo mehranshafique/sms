@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Exam;
 use App\Models\FundRequest;
+use App\Models\Budget;
+use App\Models\DisciplinaryRecord;
 use App\Models\InAppNotification;
 use App\Models\Invoice;
 use App\Models\Notice;
@@ -34,6 +36,8 @@ class InAppNotificationService
         'staff_leave' => 'staff_leave_updated',
         'fund_request_new' => 'fund_request_submitted',
         'fund_request' => 'fund_request_processed',
+        'budget_consumed' => 'budget_consumed',
+        'disciplinary' => 'disciplinary_incident',
         'payment_proof_submitted' => 'payment_proof_submitted',
         'payment_proof_rejected' => 'payment_proof_rejected',
     ];
@@ -808,6 +812,89 @@ class InAppNotificationService
             route('budgets.requests'),
             $fundRequest->institution_id,
             $fundRequest->status === 'approved' ? 'fa-check-circle' : 'fa-times-circle'
+        );
+    }
+
+    public function notifyBudgetConsumed(FundRequest $fundRequest, string $budgetLine, string $amount, string $remaining): void
+    {
+        $eventKey = self::EVENT_KEYS['budget_consumed'];
+        $fundRequest->loadMissing(['budget.responsibleUser']);
+
+        $title = __('header.notif_budget_consumed_title');
+        $message = __('header.notif_budget_consumed_message', [
+            'line' => $budgetLine,
+            'title' => $fundRequest->title,
+            'amount' => $amount,
+            'remaining' => $remaining,
+        ]);
+
+        $this->notifyFinanceTeam(
+            $fundRequest->institution_id,
+            $eventKey,
+            'budget_consumed',
+            $title,
+            $message,
+            route('budgets.index'),
+            'fa-chart-pie',
+            ['fund_request_id' => $fundRequest->id],
+            $fundRequest->requested_by
+        );
+
+        $responsible = $fundRequest->budget?->responsibleUser;
+        if ($responsible) {
+            $this->notifyUser(
+                $responsible,
+                $eventKey,
+                'budget_consumed',
+                $title,
+                $message,
+                route('budgets.index'),
+                $fundRequest->institution_id,
+                'fa-chart-pie'
+            );
+        }
+    }
+
+    public function notifyDisciplinaryIncident(DisciplinaryRecord $record): void
+    {
+        $record->loadMissing(['student.parent.user', 'student.user']);
+        $student = $record->student;
+        if (!$student) {
+            return;
+        }
+
+        $eventKey = self::EVENT_KEYS['disciplinary'];
+        $title = __('header.notif_discipline_title');
+        $message = __('header.notif_discipline_message', [
+            'student' => $student->full_name,
+            'type' => $record->typeLabel(),
+            'title' => $record->title,
+            'date' => $record->incident_date->format('d/m/Y'),
+        ]);
+
+        if ($record->notify_parents) {
+            $this->notifyStudentAndParent(
+                $student,
+                $eventKey,
+                'disciplinary',
+                $title,
+                $message,
+                route('discipline.show', $record->id),
+                $record->institution_id,
+                'fa-gavel'
+            );
+        }
+
+        $this->notifyAdmins(
+            $record->institution_id,
+            $eventKey,
+            'disciplinary',
+            $title,
+            $message,
+            route('discipline.show', $record->id),
+            'fa-gavel',
+            ['disciplinary_record_id' => $record->id],
+            $record->recorded_by
         );
     }
 

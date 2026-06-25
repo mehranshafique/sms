@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\Budget;
+use App\Models\FundRequest;
+use App\Models\DisciplinaryRecord;
 use App\Models\Institution;
 use App\Models\InstitutionSetting;
 use App\Models\Invoice; 
@@ -48,18 +51,14 @@ class NotificationService
         $phone = $student->mobile_number ?? $student->parent->father_phone ?? $student->parent->guardian_phone ?? null;
 
         if ($phone) {
-            $data = [
-                'StudentName' => $student->full_name,
-                'Amount' => number_format($invoice->total_amount, 2),
-                'InvoiceNumber' => $invoice->invoice_number,
-                'DueDate' => $invoice->due_date->format('d/m/Y'),
-                'SchoolName' => $institution->name,
-                'Currency' => config('app.currency_symbol', '$'),
-                'student_name' => $student->full_name,
-                'school_name' => $institution->name,
-                'invoice_number' => $invoice->invoice_number,
-                'due_date' => $invoice->due_date->format('d/m/Y'),
-            ];
+            $data = array_merge(
+                student_notification_context($student, $invoice),
+                [
+                    'Amount' => \App\Enums\CurrencySymbol::default() . ' ' . number_format($invoice->total_amount, 2),
+                    'InvoiceNumber' => $invoice->invoice_number,
+                    'DueDate' => $invoice->due_date->format('d/m/Y'),
+                ]
+            );
 
             if ($this->isChannelEnabled($institution->id, $eventKey, 'sms')) {
                 $this->sendNotificationEvent($eventKey, $phone, $data, $institution->id, 'sms');
@@ -75,75 +74,42 @@ class NotificationService
     {
         $invoice = $payment->invoice;
         $student = $invoice->student;
-        $parent = $student->parent;
         $institutionId = $payment->institution_id;
-
         $eventKey = 'payment_received';
 
         $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
         $sendWa = $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp');
 
-        if (!$sendSms && !$sendWa) return;
+        if (!$sendSms && !$sendWa) {
+            return;
+        }
 
         $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
-        
-        if (!$template || !$template->is_active) return;
+        if (!$template || !$template->is_active) {
+            return;
+        }
 
-        // Extract Standard Data
         $currency = \App\Enums\CurrencySymbol::default();
-        $amount = $currency . ' ' . number_format($payment->amount, 2);
-        $balance = $currency . ' ' . number_format(max(0, $invoice->total_amount - $invoice->paid_amount), 2);
-        $schoolName = $payment->institution->name ?? 'School';
-        $date = \Carbon\Carbon::parse($payment->payment_date)->format('d M Y');
-        $transactionId = $payment->transaction_id;
+        $remaining = max(0, (float) $invoice->total_amount - (float) $invoice->paid_amount);
 
-        // Extract Context Data
-        $sessionName = $invoice->academicSession->name ?? 'N/A';
-        $enrollment = $student->enrollments()->where('academic_session_id', $invoice->academic_session_id)->first() 
-                    ?? $student->enrollments()->latest()->first();
-        $className = $enrollment && $enrollment->classSection ? $enrollment->classSection->name : 'N/A';
+        $data = array_merge(
+            student_notification_context($student, $invoice, $invoice->academic_session_id),
+            [
+                'Amount' => $currency . ' ' . number_format((float) $payment->amount, 2),
+                'Balance' => $currency . ' ' . number_format($remaining, 2),
+                'RemainingBalance' => $currency . ' ' . number_format($remaining, 2),
+                'Date' => \Carbon\Carbon::parse($payment->payment_date)->format('d M Y'),
+                'TransactionID' => $payment->transaction_id ?? (string) $payment->id,
+                'PaymentReason' => invoice_installment_label($invoice),
+            ]
+        );
 
-        // Extract Payment Reason
-        $reason = $invoice->items->pluck('description')->filter()->implode(', ');
-        
-        if (empty($reason)) {
-            $reason = $invoice->items->map(function($item) {
-                return $item->feeStructure->name ?? '';
-            })->filter()->implode(', ');
+        $message = apply_sms_template_tags($template->body, $data);
+        $phone = $this->resolveStudentContactPhone($student, $student->parent);
+
+        if (empty($phone)) {
+            return;
         }
-        if (empty($reason)) {
-            $reason = 'School Fees';
-        }
-
-        $search = [
-            '$StudentName', 
-            '$Amount', 
-            '$Balance', 
-            '$SchoolName', 
-            '$Date', 
-            '$TransactionID',
-            '$Class',
-            '$Session',
-            '$PaymentReason'
-        ];
-        
-        $replace = [
-            $student->first_name, 
-            $amount, 
-            $balance, 
-            $schoolName, 
-            $date, 
-            $transactionId,
-            $className,
-            $sessionName,
-            $reason
-        ];
-
-        $message = str_replace($search, $replace, $template->body);
-
-        $phone = $this->resolveStudentContactPhone($student, $parent);
-
-        if (empty($phone)) return;
 
         if ($sendSms) {
             $this->dispatchMessage($phone, $message, $institutionId, 'sms');
@@ -695,6 +661,148 @@ class NotificationService
                  Log::error("Fund Request Processed Email Error: " . $e->getMessage());
              }
         }
+    }
+
+    /**
+     * Notify finance team and budget responsible person when an expense is recorded against a budget line.
+     */
+    public function sendBudgetConsumedNotifications(FundRequest $fundRequest): void
+    {
+        if ($fundRequest->status !== 'approved') {
+            return;
+        }
+
+        $fundRequest->loadMissing(['budget.category', 'budget.responsibleUser', 'institution', 'requester']);
+        $budget = $fundRequest->budget;
+        if (!$budget) {
+            return;
+        }
+
+        $institutionId = $fundRequest->institution_id;
+        $institution = $fundRequest->institution;
+        $currency = \App\Enums\CurrencySymbol::default();
+        $amount = $currency . ' ' . number_format((float) $fundRequest->amount, 2);
+        $remaining = $currency . ' ' . number_format($budget->remainingAmount(), 2);
+        $budgetLine = ($budget->category->name ?? __('budget.category')) . ($budget->period_name ? ' (' . $budget->period_name . ')' : '');
+
+        $data = [
+            'BudgetLine' => $budgetLine,
+            'ExpenseTitle' => $fundRequest->title,
+            'Amount' => $amount,
+            'Remaining' => $remaining,
+            'SchoolName' => $institution->name ?? config('app.name'),
+            'Requester' => $fundRequest->requester->name ?? '',
+        ];
+
+        $eventKey = 'budget_consumed';
+        $recipients = $this->budgetConsumptionRecipients($institutionId, $budget);
+
+        foreach ($recipients as $user) {
+            $phone = $user->staff->phone ?? $user->phone ?? null;
+            if ($phone && $this->isChannelEnabled($institutionId, $eventKey, 'sms')) {
+                $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
+            }
+            if ($phone && $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp')) {
+                $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
+            }
+            $email = $user->email ?? null;
+            if ($email && $this->isChannelEnabled($institutionId, $eventKey, 'email')) {
+                $body = __('budget.consumed_email_body', [
+                    'line' => $budgetLine,
+                    'title' => $fundRequest->title,
+                    'amount' => $amount,
+                    'remaining' => $remaining,
+                ]);
+                try {
+                    Mail::raw($body, function ($msg) use ($email, $budgetLine) {
+                        $msg->to($email)->subject(__('budget.consumed_email_subject', ['line' => $budgetLine]));
+                    });
+                } catch (\Exception $e) {
+                    Log::error('Budget consumed email error: ' . $e->getMessage());
+                }
+            }
+        }
+
+        app(InAppNotificationService::class)->notifyBudgetConsumed($fundRequest, $budgetLine, $amount, $remaining);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, \App\Models\User>
+     */
+    private function budgetConsumptionRecipients(int $institutionId, Budget $budget): \Illuminate\Support\Collection
+    {
+        $financeRoles = [
+            \App\Enums\RoleEnum::SUPER_ADMIN->value,
+            \App\Enums\RoleEnum::SCHOOL_ADMIN->value,
+            \App\Enums\RoleEnum::HEAD_OFFICER->value,
+            'Accountant',
+            'accountant',
+        ];
+
+        $guard = config('auth.defaults.guard', 'web');
+        $existingRoles = array_values(array_filter($financeRoles, fn ($role) =>
+            \Spatie\Permission\Models\Role::where('name', $role)->where('guard_name', $guard)->exists()
+        ));
+
+        $users = collect();
+        if ($existingRoles !== []) {
+            $users = User::role($existingRoles)
+                ->where(function ($query) use ($institutionId) {
+                    $query->where('institute_id', $institutionId)
+                        ->orWhereHas('institutes', fn ($q) => $q->where('institutions.id', $institutionId));
+                })
+                ->get();
+        }
+
+        if ($budget->responsible_user_id && $budget->responsibleUser) {
+            $users = $users->push($budget->responsibleUser);
+        }
+
+        return $users->unique('id')->values();
+    }
+
+    /**
+     * Notify parents when a disciplinary incident is recorded.
+     */
+    public function sendDisciplinaryIncidentNotification(DisciplinaryRecord $record): void
+    {
+        if (!$record->notify_parents) {
+            return;
+        }
+
+        $record->loadMissing(['student.parent', 'student.user', 'institution']);
+        $student = $record->student;
+        if (!$student) {
+            return;
+        }
+
+        $parent = $student->parent;
+        $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? $student->mobile_number;
+        if (!$phone) {
+            return;
+        }
+
+        $institutionId = $record->institution_id;
+        $data = [
+            'StudentName' => $student->full_name,
+            'IncidentType' => $record->typeLabel(),
+            'Title' => $record->title,
+            'Severity' => $record->severityLabel(),
+            'Date' => $record->incident_date->format('d/m/Y'),
+            'Reference' => $record->reference_no,
+            'SchoolName' => $record->institution->name ?? config('app.name'),
+            'ActionTaken' => $record->action_taken ?: '—',
+        ];
+
+        $eventKey = 'disciplinary_incident';
+        if ($this->isChannelEnabled($institutionId, $eventKey, 'whatsapp')) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
+        }
+        if ($this->isChannelEnabled($institutionId, $eventKey, 'sms')) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
+        }
+
+        $record->update(['parents_notified_at' => now()]);
     }
 
     // --- NEW: FCM HTTP v1 OAUTH TOKEN GENERATOR ---

@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use App\Services\NotificationService; 
 use App\Enums\RoleEnum; 
 use App\Models\Institution; 
+use App\Models\User;
 use App\Events\BudgetDeducted;
 use Illuminate\Support\Facades\Cache;
 
@@ -141,7 +142,11 @@ class BudgetController extends BaseController
         }
 
         $categories = BudgetCategory::where('institution_id', $institutionId)->get();
-        return view('finance.budgets.index', compact('categories', 'session', 'globalStats'));
+        $staffUsers = User::whereHas('staff', fn ($q) => $q->where('institution_id', $institutionId))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('finance.budgets.index', compact('categories', 'session', 'globalStats', 'staffUsers'));
     }
 
     public function store(Request $request)
@@ -152,6 +157,7 @@ class BudgetController extends BaseController
         $request->validate([
             'budget_category_id' => 'required|exists:budget_categories,id',
             'allocated_amount' => 'required|numeric|min:0',
+            'responsible_user_id' => 'nullable|exists:users,id',
             'period_name' => 'nullable|string|max:100',
             'start_date' => 'nullable|date|after_or_equal:today', // Enforce Future Date
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -161,6 +167,7 @@ class BudgetController extends BaseController
             'institution_id' => $institutionId,
             'academic_session_id' => $session->id,
             'budget_category_id' => $request->budget_category_id,
+            'responsible_user_id' => $request->responsible_user_id,
             'allocated_amount' => $request->allocated_amount,
             'period_name' => $request->period_name,
             'start_date' => $request->start_date,
@@ -179,6 +186,7 @@ class BudgetController extends BaseController
         return response()->json([
             'id' => $budget->id,
             'budget_category_id' => $budget->budget_category_id,
+            'responsible_user_id' => $budget->responsible_user_id,
             'allocated_amount' => $budget->allocated_amount,
             'period_name' => $budget->period_name,
             'start_date' => $budget->start_date ? $budget->start_date->format('Y-m-d') : '',
@@ -192,6 +200,7 @@ class BudgetController extends BaseController
 
         $request->validate([
             'allocated_amount' => 'required|numeric|min:0',
+            'responsible_user_id' => 'nullable|exists:users,id',
             'period_name' => 'nullable|string|max:100',
             'start_date' => 'nullable|date', 
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -206,6 +215,7 @@ class BudgetController extends BaseController
 
         $budget->update([
             'allocated_amount' => $request->allocated_amount,
+            'responsible_user_id' => $request->responsible_user_id,
             'period_name' => $request->period_name,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,

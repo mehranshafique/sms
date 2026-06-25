@@ -159,4 +159,5 @@ return [
     'print_receipt' => 'Imprimer le reçu',
     'verify_receipt' => 'Vérification du reçu',
     'receipt_verified' => 'Ce reçu est authentique.',
+    'school_fees' => 'Frais scolaires',
 ];

@@ -107,6 +107,28 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    <div class="row mt-2">
+                                        <div class="col-12">
+                                            <h5 class="text-primary border-bottom pb-2">{{ __('chatbot.webhook_urls') ?? 'Webhook URLs' }}</h5>
+                                            <p class="text-muted small mb-3">{{ __('chatbot.webhook_urls_help') ?? 'Configure these in your provider dashboard. Append the secret query string for Infobip/Telegram if Authorization is not sent.' }}</p>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered bg-light">
+                                                    <tbody>
+                                                        @foreach($webhookUrls ?? [] as $provider => $url)
+                                                        <tr>
+                                                            <td class="fw-bold text-uppercase" style="width:120px">{{ $provider }}</td>
+                                                            <td><code class="small user-select-all">{{ $url }}</code></td>
+                                                        </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            @if(!config('services.chatbot.webhook_secret'))
+                                            <div class="alert alert-warning py-2 small mb-0">{{ __('chatbot.webhook_secret_missing') ?? 'Set CHATBOT_WEBHOOK_SECRET in .env so webhook URLs include ?secret=…' }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
                                     @can('setting.manage')
                                     <div class="row mt-3">
                                         <div class="col-12 text-end">

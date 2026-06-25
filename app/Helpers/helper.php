@@ -191,6 +191,108 @@ if (! function_exists('class_section_label')) {
     }
 }
 
+if (! function_exists('invoice_installment_label')) {
+    function invoice_installment_label(?\App\Models\Invoice $invoice): string
+    {
+        if (! $invoice) {
+            return __('invoice.school_fees');
+        }
+
+        $invoice->loadMissing(['items.feeStructure']);
+        $names = $invoice->items
+            ->map(fn ($item) => trim($item->feeStructure?->name ?? $item->description ?? ''))
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $names->isNotEmpty() ? $names->implode(', ') : __('invoice.school_fees');
+    }
+}
+
+if (! function_exists('student_notification_context')) {
+    /**
+     * @return array<string, string>
+     */
+    function student_notification_context(
+        \App\Models\Student $student,
+        ?\App\Models\Invoice $invoice = null,
+        ?int $academicSessionId = null
+    ): array {
+        $student->loadMissing(['parent', 'institution']);
+
+        $enrollmentQuery = $student->enrollments()
+            ->with(['classSection.gradeLevel', 'academicSession'])
+            ->where('status', 'active');
+
+        if ($academicSessionId) {
+            $enrollmentQuery->where('academic_session_id', $academicSessionId);
+        } elseif ($invoice?->academic_session_id) {
+            $enrollmentQuery->where('academic_session_id', $invoice->academic_session_id);
+        }
+
+        $enrollment = $enrollmentQuery->latest()->first();
+        $section = $enrollment?->classSection;
+        $classLabel = class_section_label($section);
+        $grade = trim($section?->gradeLevel?->name ?? '');
+        $sectionName = trim($section?->name ?? '');
+        $sessionName = $enrollment?->academicSession?->name
+            ?? $invoice?->academicSession?->name
+            ?? 'N/A';
+
+        $parent = $student->parent;
+        $currency = \App\Enums\CurrencySymbol::default();
+        $schoolName = $student->institution->name ?? config('app.name');
+
+        $installmentName = invoice_installment_label($invoice);
+        $amountDue = '';
+        $outstandingAmount = '';
+        $remainingBalance = '';
+        $dueDate = '';
+
+        if ($invoice) {
+            $invoice->loadMissing(['items.feeStructure', 'academicSession']);
+            $outstanding = max(0, (float) $invoice->total_amount - (float) $invoice->paid_amount);
+            $amountDue = $currency . ' ' . number_format((float) $invoice->total_amount, 2);
+            $outstandingAmount = $currency . ' ' . number_format($outstanding, 2);
+            $remainingBalance = $outstandingAmount;
+            $dueDate = $invoice->due_date ? $invoice->due_date->format('d/m/Y') : '';
+        }
+
+        return [
+            'StudentName' => $student->full_name,
+            'ParentName' => $parent?->father_name ?? $parent?->guardian_name ?? 'Parent',
+            'Class' => $classLabel,
+            'Grade' => $grade,
+            'Section' => $sectionName,
+            'Session' => $sessionName,
+            'SchoolName' => $schoolName,
+            'InstallmentName' => $installmentName,
+            'AmountDue' => $amountDue,
+            'OutstandingAmount' => $outstandingAmount,
+            'RemainingBalance' => $remainingBalance,
+            'Balance' => $remainingBalance,
+            'DueDate' => $dueDate,
+            'Currency' => $currency,
+            'InvoiceNumber' => $invoice?->invoice_number ?? '',
+        ];
+    }
+}
+
+if (! function_exists('apply_sms_template_tags')) {
+    /**
+     * @param  array<string, string|int|float>  $data
+     */
+    function apply_sms_template_tags(string $body, array $data): string
+    {
+        foreach ($data as $key => $value) {
+            $body = str_replace('$' . $key, (string) $value, $body);
+            $body = str_replace('{' . $key . '}', (string) $value, $body);
+        }
+
+        return $body;
+    }
+}
+
 if (! function_exists('localize_invoice_description')) {
     /**
      * Display-time fix for legacy invoice rows with hardcoded English " of ".

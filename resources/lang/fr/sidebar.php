@@ -62,6 +62,7 @@ return [
     ],
     'reminders' => 'Rappels',
     'requests' => 'Demandes',
+    'discipline' => 'Discipline',
     'academics' => 'Académique',
     'sessions' => [
         'title' => 'Sessions'

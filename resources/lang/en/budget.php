@@ -72,5 +72,11 @@ return [
     'success_approved' => 'Fund request approved.',
     'success_rejected' => 'Fund request rejected.',
     'insufficient_funds' => 'Insufficient budget funds for this request.',
-    'error_allocation_less_than_spent' => 'Cannot update. Allocated amount is less than spent amount.'
+    'error_allocation_less_than_spent' => 'Cannot update. Allocated amount is less than spent amount.',
+
+    'responsible_person' => 'Responsible Person',
+    'no_responsible_person' => '— Not assigned —',
+    'responsible_person_help' => 'This person receives budget consumption alerts when expenses are approved against this line.',
+    'consumed_email_subject' => 'Budget expense: :line',
+    'consumed_email_body' => "Budget line: :line\nExpense: :title\nAmount spent: :amount\nRemaining balance: :remaining",
 ];

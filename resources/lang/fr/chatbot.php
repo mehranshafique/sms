@@ -14,6 +14,9 @@ return [
     'enable_whatsapp' => 'Activer le Chatbot WhatsApp',
     'enable_sms' => 'Activer le Chatbot SMS',
     'enable_telegram' => 'Activer le Chatbot Telegram',
+    'webhook_urls' => 'URLs Webhook',
+    'webhook_urls_help' => 'Collez ces URLs dans Infobip, Twilio, Meta ou Telegram. Le paramètre ?secret= authentifie les webhooks entrants.',
+    'webhook_secret_missing' => 'Définissez CHATBOT_WEBHOOK_SECRET dans le fichier .env du serveur.',
     'channel_help' => 'Basculez pour activer/désactiver les réponses automatisées pour ce canal.',
     
     // Keyword Management

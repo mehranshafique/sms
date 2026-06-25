@@ -18,7 +18,8 @@
                 $isSchoolAdmin = $user->hasRole(RoleEnum::SCHOOL_ADMIN->value);
                 $isTeacher = $user->hasRole(RoleEnum::TEACHER->value);
                 $isStudent = $user->hasRole(RoleEnum::STUDENT->value);
-                $isGuardian = $user->hasRole(RoleEnum::GUARDIAN->value);
+                $isGuardian = $user->hasRole(RoleEnum::GUARDIAN->value)
+                    || \App\Models\StudentParent::where('user_id', $user->id)->exists();
                 
                 // CRITICAL FIX: Group Custom Roles (Finance, Sales, etc.) with Management
                 // If they are not a Teacher, Student, or Guardian, they are treated as a Management/Staff user.
@@ -45,6 +46,23 @@
                             $instTypeValue = $activeInstType instanceof InstitutionType
                                 ? $activeInstType->value
                                 : (string) $activeInstType;
+                        }
+                    }
+                }
+
+                $guardianInstitution = $activeInstitution;
+                if ($isGuardian && !$guardianInstitution) {
+                    if ($user->institute) {
+                        $guardianInstitution = $user->institute;
+                    } else {
+                        $parentRecord = \App\Models\StudentParent::where('user_id', $user->id)->first();
+                        if ($parentRecord?->institution_id) {
+                            $guardianInstitution = Institution::find($parentRecord->institution_id);
+                        } elseif ($parentRecord) {
+                            $childInstId = \App\Models\Student::where('parent_id', $parentRecord->id)->value('institution_id');
+                            if ($childInstId) {
+                                $guardianInstitution = Institution::find($childInstId);
+                            }
                         }
                     }
                 }
@@ -170,7 +188,7 @@
             {{-- ============================================================= --}}
             
             {{-- FIXED: Uses $isManagement logic instead of strictly checking $isSchoolAdmin --}}
-            @if($showManagementNav)
+            @if($showManagementNav && !$isGuardian)
                 
                 {{-- SEPARATOR / HEADER WITH SCHOOL ID --}}
                 <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
@@ -257,7 +275,7 @@
                 )
                     <li class="nav-label">{{ __('sidebar.people') }}</li>
                     
-                    <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*') ? 'mm-active' : '' }}">
+                    <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*', 'discipline.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'students'])</a>
                         <ul aria-expanded="false">
                             @if($hasModule('students') && $user->can('student.view'))
@@ -292,6 +310,10 @@
                             
                             @if($hasModule('student_request') && $user->can('student_request.view'))
                             <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
+                            @endif
+
+                            @if($hasModule('discipline') && $user->can('discipline.view'))
+                            <li><a class="{{ request()->routeIs('discipline.*') ? 'mm-active' : '' }}" href="{{ route('discipline.index') }}">{{ __('sidebar.discipline') }}</a></li>
                             @endif
                             
                             @if($user->can('student.view') || $user->hasRole(RoleEnum::TEACHER->value))
@@ -494,6 +516,11 @@
                     <li><a class="ai-icon {{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.index') }}"><i class="la la-calendar-o"></i><span class="nav-text">{{ __('sidebar.exam_schedules.view_schedule') }}</span></a></li>
                 @endif
 
+                @if($hasModule('discipline') && $user->can('discipline.view'))
+                <li class="nav-label">{{ __('sidebar.discipline') }}</li>
+                <li><a class="ai-icon {{ request()->routeIs('discipline.*') ? 'mm-active' : '' }}" href="{{ route('discipline.index') }}"><i class="la la-gavel"></i><span class="nav-text">{{ __('sidebar.discipline') }}</span></a></li>
+                @endif
+
                 <li class="nav-label">{{ __('sidebar.finance') }}</li>
                 <li><a class="ai-icon {{ request()->routeIs('budgets.requests*') ? 'mm-active' : '' }}" href="{{ route('budgets.requests') }}"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fund_requests') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'fund-requests'])</a></li>
                 
@@ -543,7 +570,16 @@
             {{-- PART 5: PARENT / GUARDIAN SECTION --}}
             {{-- ============================================================= --}}
             @if($showGuardianNav)
-                <li class="nav-label first">{{ __('sidebar.main_menu') }}</li>
+                <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                    @if($guardianInstitution ?? null)
+                        {{ $guardianInstitution->name }}
+                        @if($guardianInstitution->code)
+                            <br><span style="font-size: 11px; opacity: 0.7; font-weight: normal; letter-spacing: 1px;">({{ $guardianInstitution->code }})</span>
+                        @endif
+                    @else
+                        {{ __('sidebar.main_menu') }}
+                    @endif
+                </li>
                 <li><a class="ai-icon {{ request()->routeIs('guardian.*') ? 'mm-active' : '' }}" href="{{ route('guardian.index') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.guardian_portal') }}</span></a></li>
                 <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">
                     <i class="la la-chart-pie"></i>

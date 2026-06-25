@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\Invoice;
 use App\Models\ExamRecord;
 use App\Models\StudentRequest;
+use App\Models\DisciplinaryRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -74,6 +75,17 @@ class GuardianPortalController extends BaseController
             ->getComparativeSummaryTable($student->id, $classSectionId, $period, $isSubjectWise);
 
         return view('guardian.attendance', compact('student', 'comparisonTable', 'period'));
+    }
+
+    public function discipline(Request $request)
+    {
+        $student = $this->resolveChild($request);
+        $records = DisciplinaryRecord::where('student_id', $student->id)
+            ->where('institution_id', $student->institution_id)
+            ->latest('incident_date')
+            ->get();
+
+        return view('guardian.discipline', compact('student', 'records'));
     }
 
     private function linkedChildren()
