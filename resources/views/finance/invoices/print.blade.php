@@ -18,31 +18,7 @@
         $lastPaymentDate = $invoice->payments->count() > 0 ? $invoice->payments->last()->payment_date->format('d/m/Y') : $invoice->issue_date->format('d/m/Y');
         
         // Installment Calculation Logic
-        $installmentSuffix = '';
-        $firstItem = $invoice->items->first();
-        if ($firstItem && $firstItem->feeStructure && $firstItem->feeStructure->payment_mode === 'installment') {
-            $currentOrder = $firstItem->feeStructure->installment_order ?: 1;
-            
-            // Find total installments for this specific fee setup
-            $totalInstallments = \App\Models\FeeStructure::where('institution_id', $invoice->institution_id)
-                ->where('academic_session_id', $invoice->academic_session_id)
-                ->where('fee_type_id', $firstItem->feeStructure->fee_type_id)
-                ->where('payment_mode', 'installment')
-                ->where(function($q) use ($firstItem) {
-                    if ($firstItem->feeStructure->class_section_id) {
-                        $q->where('class_section_id', $firstItem->feeStructure->class_section_id);
-                    } else {
-                        $q->where('grade_level_id', $firstItem->feeStructure->grade_level_id);
-                    }
-                })
-                ->count();
-                
-            $total = $totalInstallments > 0 ? $totalInstallments : 1;
-            $installmentSuffix = " ({$currentOrder}/{$total})";
-        }
-
-        $baseLabel = trans()->has('invoice.'.$invoice->status) ? __('invoice.'.$invoice->status) : $invoice->status;
-        $label = mb_strtoupper($baseLabel) . $installmentSuffix;
+        $label = invoice_status_tranche_label($invoice);
         
         $enrollment = $invoice->student->enrollments
             ->firstWhere('academic_session_id', $invoice->academic_session_id)

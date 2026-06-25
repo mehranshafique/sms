@@ -126,6 +126,7 @@ return [
     'no' => 'N°',
     'designation' => 'Désignation',
     'amount_paid' => 'Montant payé',
+    'this_payment' => 'Ce paiement',
     'payment_due' => 'Reste à payer',
 
     // Missing Keys from Blade Views

@@ -308,11 +308,60 @@ if (! function_exists('localize_invoice_description')) {
 }
 
 if (! function_exists('receipt_display_number')) {
-    function receipt_display_number(\App\Models\Invoice $invoice): string
+    function receipt_display_number(\App\Models\Invoice $invoice, ?\App\Models\Payment $payment = null): string
     {
-        $lastPayment = $invoice->payments->last();
+        $payment = $payment ?? $invoice->payments->last();
 
-        return $lastPayment?->receipt_number ?? $invoice->invoice_number;
+        return $payment?->receipt_number ?? $invoice->invoice_number;
+    }
+}
+
+if (! function_exists('invoice_status_tranche_label')) {
+    function invoice_status_tranche_label(\App\Models\Invoice $invoice): string
+    {
+        $invoice->loadMissing(['items.feeStructure']);
+
+        $installmentSuffix = '';
+        $firstItem = $invoice->items->first();
+
+        if ($firstItem && $firstItem->feeStructure && $firstItem->feeStructure->payment_mode === 'installment') {
+            $currentOrder = $firstItem->feeStructure->installment_order ?: 1;
+
+            $totalInstallments = \App\Models\FeeStructure::where('institution_id', $invoice->institution_id)
+                ->where('academic_session_id', $invoice->academic_session_id)
+                ->where('fee_type_id', $firstItem->feeStructure->fee_type_id)
+                ->where('payment_mode', 'installment')
+                ->where(function ($q) use ($firstItem) {
+                    if ($firstItem->feeStructure->class_section_id) {
+                        $q->where('class_section_id', $firstItem->feeStructure->class_section_id);
+                    } else {
+                        $q->where('grade_level_id', $firstItem->feeStructure->grade_level_id);
+                    }
+                })
+                ->count();
+
+            $total = $totalInstallments > 0 ? $totalInstallments : 1;
+            $installmentSuffix = " ({$currentOrder}/{$total})";
+        }
+
+        $baseLabel = trans()->has('invoice.' . $invoice->status)
+            ? __('invoice.' . $invoice->status)
+            : $invoice->status;
+
+        return mb_strtoupper($baseLabel) . $installmentSuffix;
+    }
+}
+
+if (! function_exists('receipt_context_payment')) {
+    function receipt_context_payment(\App\Models\Invoice $invoice, ?\App\Models\Payment $payment = null): ?\App\Models\Payment
+    {
+        $invoice->loadMissing('payments');
+
+        if ($payment) {
+            return $invoice->payments->firstWhere('id', $payment->id) ?? $payment;
+        }
+
+        return $invoice->payments->last();
     }
 }
 

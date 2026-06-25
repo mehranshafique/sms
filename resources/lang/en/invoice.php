@@ -126,6 +126,7 @@ return [
     'no' => 'No.',
     'designation' => 'Designation',
     'amount_paid' => 'Amount Paid',
+    'this_payment' => 'This Payment',
     'payment_due' => 'Payment Due',
 
     // Missing Keys from Blade Views

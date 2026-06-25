@@ -513,6 +513,10 @@ class InvoiceController extends BaseController
         $this->ensurePaymentVerifyTokens($invoice);
 
         $format = $request->query('format', 'a4');
+        $payment = null;
+        if ($request->filled('payment_id')) {
+            $payment = $invoice->payments->firstWhere('id', (int) $request->query('payment_id'));
+        }
 
         if (! class_exists('PDF')) {
             return redirect()->route('invoices.print', $id);
@@ -521,7 +525,7 @@ class InvoiceController extends BaseController
         if (in_array($format, ['pos80', 'pos58'], true)) {
             $view = 'finance.invoices.print_receipt';
             $paper = $format === 'pos58' ? [0, 0, 164.41, 800] : [0, 0, 226.77, 800];
-            $pdf = PDF::loadView($view, compact('invoice', 'format'));
+            $pdf = PDF::loadView($view, compact('invoice', 'format', 'payment'));
             $pdf->setPaper($paper);
         } else {
             $isPdf = true;
