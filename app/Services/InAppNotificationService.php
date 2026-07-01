@@ -841,7 +841,22 @@ class InAppNotificationService
         );
 
         $responsible = $fundRequest->budget?->responsibleUser;
-        if ($responsible) {
+        $recipients = $fundRequest->budget?->allNotificationUsers() ?? collect();
+
+        foreach ($recipients as $user) {
+            $this->notifyUser(
+                $user,
+                $eventKey,
+                'budget_consumed',
+                $title,
+                $message,
+                route('budgets.index'),
+                $fundRequest->institution_id,
+                'fa-chart-pie'
+            );
+        }
+
+        if ($recipients->isEmpty() && $responsible) {
             $this->notifyUser(
                 $responsible,
                 $eventKey,

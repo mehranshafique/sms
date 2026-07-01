@@ -74,13 +74,14 @@
                                 </div>
                                 <div class="col-md-12 mb-3">
                                     <label class="form-label fw-bold">{{ __('sms_template.available_tags') ?? 'Available Tags' }}</label>
-                                    <div class="p-3 bg-light border rounded">
+                                    <div class="p-3 bg-light border rounded mb-2">
                                         <code id="templateTags" class="text-dark"></code>
                                     </div>
+                                    <div id="tagPicker" class="d-flex flex-wrap gap-1"></div>
                                 </div>
                                 <div class="col-md-12 mt-2">
                                     <div class="form-check form-switch custom-switch">
-                                        <input class="form-check-input" style="width: 3.5em; height: 1.75em; cursor: pointer;" type="checkbox" name="is_active" id="templateIsActive" value="1">
+                                        <input class="form-check-input" type="checkbox" name="is_active" id="templateIsActive" value="1">
                                         <label class="form-check-label fw-bold ms-2 mt-1" style="cursor: pointer;" for="templateIsActive">{{ __('sms_template.is_active') ?? 'Active (Enable this notification)' }}</label>
                                     </div>
                                 </div>
@@ -102,6 +103,9 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    const TAG_REGISTRY = @json($variableRegistry ?? []);
+</script>
+<script>
     $(document).ready(function() {
         var table = $('#templateTable').DataTable({
             processing: true,
@@ -122,7 +126,7 @@
             let key = $(this).data('key');
             let name = $(this).data('name');
             let body = $(this).data('body');
-            let tags = $(this).data('tags');
+            let tags = (TAG_REGISTRY[key] || []).map(function(t) { return '$' + t; }).join(', ') || $(this).data('tags');
 
             // Populate Visible (Disabled) Fields
             $('#templateEventKey').val(key);
@@ -133,6 +137,18 @@
             $('#templateEventKeyHidden').val(key);
             $('#templateNameHidden').val(name);
             $('#templateTagsHidden').val(tags);
+
+            const picker = $('#tagPicker').empty();
+            const eventTags = TAG_REGISTRY[key] || [];
+            eventTags.forEach(function(tag) {
+                const btn = $('<button type="button" class="btn btn-xs btn-outline-primary btn-sm"></button>').text('$' + tag);
+                btn.on('click', function() {
+                    const ta = $('#templateBody');
+                    ta.val(ta.val() + '$' + tag);
+                    ta.trigger('input');
+                });
+                picker.append(btn);
+            });
 
             // Populate Editable Fields
             $('#templateBody').val(body);

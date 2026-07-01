@@ -65,4 +65,9 @@ return [
     'yes_delete' => 'Oui, supprimer !',
     'success' => 'Succès !',
     'error_occurred' => 'Une erreur est survenue',
+
+    'status_active' => 'Actif',
+    'status_on_leave' => 'En congé',
+    'status_resigned' => 'Démissionné',
+    'status_terminated' => 'Licencié',
 ];

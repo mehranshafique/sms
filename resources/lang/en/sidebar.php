@@ -38,6 +38,7 @@ return [
     'budget_payroll' => 'Budget & Payroll',
     'billing' => 'Billing',
     'billing_requests' => 'Billing Requests',
+    'agent_payments' => 'Agent Payments',
     'status_billing' => 'Status Billing',
     'financial_reports' => 'Class Report',
     'student_balances' => 'Student Balances', 
@@ -143,7 +144,7 @@ return [
     'promotions' => [
         'title' => 'Promotions'
     ],
-    'requests' => 'Requests', // Added Request Key
+    'requests' => 'Derogation & Request',
     'discipline' => 'Discipline',
     'staff' => [
         'title' => 'Staff'

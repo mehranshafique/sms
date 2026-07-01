@@ -32,6 +32,11 @@ class NotificationService
         return $this->preferences->isChannelEnabled($institutionId, $eventKey, $channel);
     }
 
+    public function channelEnabled($institutionId, $eventKey, $channel): bool
+    {
+        return $this->isChannelEnabled($institutionId, $eventKey, $channel);
+    }
+
     public function sendInvoiceNotification(Invoice $invoice)
     {
         $student = $invoice->student;
@@ -224,17 +229,18 @@ class NotificationService
 
         // Retrieve Parent or Student Phone
         $phoneField = ($parent->primary_guardian ?? 'father') . '_phone';
-        $phone = $parent->$phoneField ?? $parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone ?? $student->mobile_number;
-
-        if (empty($phone)) return;
+        $phone = $parent?->$phoneField ?? $parent?->father_phone ?? $parent?->mother_phone ?? $parent?->guardian_phone ?? $student->mobile_number;
+        $email = $parent?->email ?? $student->email;
 
         $eventKey = 'request_updated';
 
-        // Check School Notification Preferences
         $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
         $sendWa = $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp');
+        $sendEmail = $this->isChannelEnabled($institutionId, $eventKey, 'email');
 
-        if (!$sendSms && !$sendWa) return;
+        if (!$sendSms && !$sendWa && !$sendEmail) {
+            return;
+        }
 
         // Safely Translate
         $statusText = __('requests.status_' . $request->status);
@@ -242,10 +248,7 @@ class NotificationService
             $statusText = ucfirst(str_replace('_', ' ', $request->status));
         }
 
-        $typeText = __('requests.type_' . $request->type);
-        if ($typeText === 'requests.type_' . $request->type) {
-            $typeText = ucfirst(str_replace('_', ' ', $request->type));
-        }
+        $typeText = $request->typeLabel();
 
         // Prepare Dynamic Fields for Template
         $schoolName = $student->institution->name ?? config('app.name');
@@ -270,13 +273,16 @@ class NotificationService
             'SchoolName' => $schoolName,             // Matches $SchoolName
         ];
 
-        // Send over authorized channels using Database Templates
-        if ($sendSms) {
+        if ($sendSms && $phone) {
             $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
         }
 
-        if ($sendWa) {
+        if ($sendWa && $phone) {
             $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
+        }
+
+        if ($sendEmail && $email) {
+            $this->sendEmailTemplate($eventKey, $email, $data, $institutionId);
         }
     }
 
@@ -471,10 +477,54 @@ class NotificationService
         return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel);
     }
 
-    public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms') 
+    public function sendEmailTemplate(string $eventKey, string $to, array $data = [], ?int $institutionId = null): array
+    {
+        if (!$this->isChannelEnabled($institutionId, $eventKey, 'email')) {
+            return ['success' => false, 'message' => 'Email channel disabled'];
+        }
+
+        $template = \App\Models\EmailTemplate::forEvent($eventKey, $institutionId)->first();
+        if (!$template || !$template->is_active) {
+            return ['success' => false, 'message' => "Email template '$eventKey' missing or inactive."];
+        }
+
+        $subject = apply_sms_template_tags($template->subject, $data);
+        $body = apply_sms_template_tags($template->body, $data);
+
+        try {
+            Mail::to($to)->send(new \App\Mail\GenericNotificationMail($subject, $body));
+            return ['success' => true];
+        } catch (\Exception $e) {
+            Log::error('Email template send failed: ' . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function sendTelegramMessage(string $chatId, string $message): array
+    {
+        $token = config('services.chatbot.telegram_bot_token');
+        if (!$token || !$chatId) {
+            return ['success' => false, 'message' => 'Telegram not configured'];
+        }
+
+        try {
+            $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $chatId,
+                'text' => $message,
+                'parse_mode' => 'HTML',
+            ]);
+
+            return ['success' => $response->successful()];
+        } catch (\Exception $e) {
+            Log::error('Telegram send failed: ' . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms')
     {
         $institution = Institution::find($institutionId);
-        
+
         $providerKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
         $selectedProvider = InstitutionSetting::where('institution_id', $institutionId)
             ->where('key', $providerKey)

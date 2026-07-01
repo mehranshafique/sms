@@ -493,3 +493,64 @@ if (! function_exists('amount_in_words')) {
         return spellout_amount_fallback($whole);
     }
 }
+
+if (! function_exists('class_section_short_label')) {
+    function class_section_short_label(?\App\Models\ClassSection $section): string
+    {
+        if (! $section) {
+            return '-';
+        }
+
+        $section->loadMissing('gradeLevel');
+        $grade = preg_replace('/\s+/', '', trim($section->gradeLevel->name ?? ''));
+        $name = preg_replace('/\s+/', '', trim($section->name ?? ''));
+
+        if ($grade && $name) {
+            return $grade . $name;
+        }
+
+        return $grade ?: $name ?: '-';
+    }
+}
+
+if (! function_exists('request_applicant_html')) {
+    function request_applicant_html(?\App\Models\Student $student): string
+    {
+        if (! $student) {
+            return 'N/A';
+        }
+
+        $enrollment = $student->relationLoaded('enrollments')
+            ? $student->enrollments->where('status', 'active')->sortByDesc('id')->first()
+            : $student->enrollments()->where('status', 'active')->latest()->first();
+
+        $classShort = class_section_short_label($enrollment?->classSection);
+        $parent = $student->parent;
+        $parentName = trim($parent?->full_name ?? $parent?->father_name ?? $parent?->mother_name ?? '');
+
+        $subline = $parentName
+            ? e($classShort) . ', ' . e($parentName)
+            : e($classShort);
+
+        return '<div class="fw-bold text-dark">' . e($student->full_name) . '</div>'
+            . '<small class="text-muted">' . $subline . '</small>';
+    }
+}
+
+if (! function_exists('localized_date')) {
+    /**
+     * Format a date using the active application locale (French month names when locale is fr).
+     */
+    function localized_date($date, string $format = 'd M Y'): string
+    {
+        if (empty($date)) {
+            return '-';
+        }
+
+        $carbon = $date instanceof \Carbon\Carbon
+            ? $date->copy()
+            : \Carbon\Carbon::parse($date);
+
+        return $carbon->locale(app()->getLocale())->translatedFormat($format);
+    }
+}

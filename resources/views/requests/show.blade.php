@@ -30,10 +30,15 @@
                         @php 
                             // FIXED: Added 'partially_approved' to the color map to prevent "Undefined array key" crashes
                             $badges = [
-                                'pending' => 'warning', 
+                                'submitted' => 'warning',
+                                'pending' => 'warning',
+                                'under_review' => 'info',
                                 'approved' => 'success', 
                                 'partially_approved' => 'info', 
-                                'rejected' => 'danger'
+                                'rejected' => 'danger',
+                                'additional_info_required' => 'secondary',
+                                'honored' => 'success',
+                                'expired' => 'dark',
                             ]; 
                             $statusClass = $badges[$request->status] ?? 'secondary';
                             
@@ -53,7 +58,7 @@
                     
                     <div class="col-md-6 mb-4">
                         <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.date_submitted') }}</label>
-                        <span class="fs-16 text-dark">{{ $request->created_at->format('d M, Y H:i') }}</span>
+                        <span class="fs-16 text-dark">{{ localized_date($request->created_at, 'd M Y H:i') }}</span>
                     </div>
                     
                     <div class="col-12 mb-4">
@@ -69,7 +74,7 @@
                         </p>
                         <small class="text-muted">
                             <i class="fa fa-user-check me-1"></i> {{ __('requests.processed_by') ?? 'Processed by:' }} <strong>{{ $request->approver->name ?? __('requests.admin') ?? 'Admin' }}</strong> 
-                            {{ __('reports.on_date') ?? 'on' }} {{ $request->approved_at ? $request->approved_at->format('d M, Y H:i') : '' }}
+                            {{ __('reports.on_date') ?? 'on' }} {{ $request->approved_at ? localized_date($request->approved_at, 'd M Y H:i') : '' }}
                         </small>
                     </div>
                     @endif
@@ -84,6 +89,10 @@
                 </div>
             </div>
         </div>
+
+        @if(!empty($dossier))
+            @include('requests.partials.dossier', ['dossier' => $dossier])
+        @endif
     </div>
 </div>
 @endsection

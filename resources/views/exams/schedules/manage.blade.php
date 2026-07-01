@@ -1,5 +1,24 @@
 @extends('layout.layout')
 
+@section('styles')
+<style>
+    .exam-ai-days-wrap {
+        min-width: 9.5rem;
+    }
+    .exam-ai-days-input {
+        width: 9.5rem;
+        min-width: 9.5rem;
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+    .exam-ai-days-input::-webkit-outer-spin-button,
+    .exam-ai-days-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
@@ -93,8 +112,11 @@
                                 <strong><i class="la la-magic me-1"></i> {{ __('ai.tools.generate_exam_datesheet') }}</strong>
                                 <div class="text-muted small">{{ __('ai.tools.generate_exam_datesheet_desc') }}</div>
                             </div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <input type="number" id="ai_period_days" class="form-control form-control-sm" style="width:5rem" min="1" max="30" placeholder="{{ __('ai.period_days') }}" title="{{ __('ai.period_days') }}">
+                            <div class="d-flex align-items-end gap-2 flex-wrap">
+                                <div class="exam-ai-days-wrap">
+                                    <label class="form-label small text-muted mb-1" for="ai_period_days">{{ __('ai.period_days') }}</label>
+                                    <input type="number" id="ai_period_days" class="form-control form-control-sm exam-ai-days-input" min="1" max="30" step="1" placeholder="1–30" title="{{ __('ai.period_days') }}">
+                                </div>
                                 <button type="button" class="ai-embed-btn" id="ai-datesheet-btn"
                                     data-ai-tool="generate_exam_datesheet"
                                     data-ai-params="{}"
@@ -139,11 +161,15 @@
                                 <i class="fa fa-magic me-1"></i> {{ __('exam_schedule.auto_fill') }}
                             </button>
                         </div>
+                        <div class="px-4 pt-2 pb-0">
+                            <small class="text-muted">{{ __('exam_schedule.include_in_exam_help') }}</small>
+                        </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-striped table-bordered verticle-middle mb-0">
                                     <thead class="bg-light">
                                         <tr>
+                                            <th class="text-center" width="8%">{{ __('exam_schedule.include_in_exam') }}</th>
                                             <th class="ps-4">{{ __('exam_schedule.subject') }}</th>
                                             <th width="20%">{{ __('exam_schedule.date') }} <span class="text-danger">*</span></th>
                                             <th width="15%">{{ __('exam_schedule.start_time') }} <span class="text-danger">*</span></th>
@@ -177,6 +203,38 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const periodDaysInput = document.getElementById('ai_period_days');
+        if (periodDaysInput) {
+            const clampPeriodDays = function () {
+                if (periodDaysInput.value === '') {
+                    return;
+                }
+                let value = parseInt(periodDaysInput.value, 10);
+                if (isNaN(value)) {
+                    periodDaysInput.value = '';
+                    return;
+                }
+                periodDaysInput.value = String(Math.min(30, Math.max(1, value)));
+            };
+
+            periodDaysInput.addEventListener('wheel', function (e) {
+                e.preventDefault();
+            }, { passive: false });
+
+            periodDaysInput.addEventListener('change', clampPeriodDays);
+            periodDaysInput.addEventListener('blur', clampPeriodDays);
+
+            periodDaysInput.addEventListener('keydown', function (e) {
+                if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+                    return;
+                }
+                e.preventDefault();
+                const current = parseInt(periodDaysInput.value, 10) || 1;
+                const next = e.key === 'ArrowUp' ? current + 1 : current - 1;
+                periodDaysInput.value = String(Math.min(30, Math.max(1, next)));
+            });
+        }
+
         const roomOptions = @json(institution_room_options());
         const selectRoomLabel = @json(__('class_section.select_room'));
 
@@ -193,12 +251,32 @@
         }
 
         function refreshSelect(element) {
-            if (typeof window.digitexReinitSelectPickers === 'function') {
-                window.digitexReinitSelectPickers();
-            } else if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
+            if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
                 $(element).selectpicker('refresh');
             }
         }
+
+        function applySubjectInclusionState(row) {
+            const toggle = row.querySelector('.subject-examined-toggle');
+            if (!toggle) return;
+            const included = toggle.checked;
+            row.querySelectorAll('.exam-field, select.room-select').forEach(function (el) {
+                el.disabled = !included;
+                if (!included) {
+                    el.removeAttribute('required');
+                } else if (el.classList.contains('exam-date-input') || el.classList.contains('exam-start-input') || el.classList.contains('exam-end-input')) {
+                    el.setAttribute('required', 'required');
+                }
+            });
+            row.classList.toggle('table-secondary', !included);
+            row.classList.toggle('opacity-75', !included);
+        }
+
+        document.addEventListener('change', function (e) {
+            if (e.target.classList.contains('subject-examined-toggle')) {
+                applySubjectInclusionState(e.target.closest('tr'));
+            }
+        });
 
         // Initialize Date/Time Pickers Helper Function
         function initPickers() {
@@ -333,48 +411,60 @@
                         tbody.innerHTML = '';
 
                         if(response.rows.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">{{ __('exam_schedule.no_subjects_found') }}</td></tr>';
+                            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">{{ __('exam_schedule.no_subjects_found') }}</td></tr>';
                         } else {
                             response.rows.forEach(row => {
                                 const tr = document.createElement('tr');
+                                const examined = row.is_examined !== false;
+                                const reqAttr = examined ? 'required' : '';
                                 tr.innerHTML = `
+                                    <td class="text-center align-middle">
+                                        <input type="hidden" name="schedules[${row.subject_id}][is_examined]" value="0">
+                                        <div class="form-check form-switch d-flex justify-content-center mb-0">
+                                            <input type="checkbox" name="schedules[${row.subject_id}][is_examined]" value="1"
+                                                class="form-check-input subject-examined-toggle" ${examined ? 'checked' : ''}>
+                                        </div>
+                                    </td>
                                     <td class="ps-4 align-middle">
                                         <div class="fw-bold text-dark">${row.subject_name}</div>
                                         <div class="small text-muted">${row.subject_code || ''}</div>
-                                        <input type="hidden" name="schedules[${row.subject_id}][id]" value="${row.id || ''}">
                                     </td>
                                     <td>
                                         <input type="text" name="schedules[${row.subject_id}][date]" 
-                                            class="form-control datepicker-default exam-date-input" 
+                                            class="form-control datepicker-default exam-date-input exam-field" 
                                             placeholder="YYYY-MM-DD"
                                             value="${row.date}"
-                                            required>
+                                            ${reqAttr}>
                                     </td>
                                     <td>
                                         <input type="text" name="schedules[${row.subject_id}][start_time]" 
-                                            class="form-control timepicker exam-start-input" 
+                                            class="form-control timepicker exam-start-input exam-field" 
                                             value="${row.start_time}" placeholder="09:00"
-                                            required>
+                                            ${reqAttr}>
                                     </td>
                                     <td>
                                         <input type="text" name="schedules[${row.subject_id}][end_time]" 
-                                            class="form-control timepicker exam-end-input" 
+                                            class="form-control timepicker exam-end-input exam-field" 
                                             value="${row.end_time}" placeholder="12:00"
-                                            required>
+                                            ${reqAttr}>
                                     </td>
                                     <td>
                                         ${buildRoomSelect(`schedules[${row.subject_id}][room_number]`, row.room_number || '')}
                                     </td>
                                     <td>
                                         <input type="number" name="schedules[${row.subject_id}][max_marks]" 
-                                            class="form-control" value="${row.max_marks}">
+                                            class="form-control exam-field" value="${row.max_marks}">
                                     </td>
                                     <td>
                                         <input type="number" name="schedules[${row.subject_id}][pass_marks]" 
-                                            class="form-control" value="${row.pass_marks}">
+                                            class="form-control exam-field" value="${row.pass_marks}">
                                     </td>
                                 `;
                                 tbody.appendChild(tr);
+                                applySubjectInclusionState(tr);
+                                tr.querySelectorAll('select.room-select').forEach(function (sel) {
+                                    sel.classList.add('exam-field', 'default-select');
+                                });
                             });
 
                             initPickers();
@@ -417,6 +507,14 @@
                         autoFillBtn.disabled = true;
 
                         const params = new URLSearchParams({ exam_id: examId, class_section_id: classId });
+                        const enabledIds = [];
+                        document.querySelectorAll('.subject-examined-toggle:checked').forEach(function (toggle) {
+                            const match = toggle.name.match(/schedules\[(\d+)\]/);
+                            if (match) enabledIds.push(match[1]);
+                        });
+                        if (enabledIds.length) {
+                            params.append('subject_ids', enabledIds.join(','));
+                        }
 
                         fetch("{{ route('exam-schedules.auto-generate') }}?" + params.toString())
                             .then(async response => {
@@ -428,9 +526,13 @@
                                 const schedule = data.schedule;
                                 Object.keys(schedule).forEach(subjectId => {
                                     const item = schedule[subjectId];
-                                    
-                                    // Target inputs by name attribute for robustness
                                     const dateInput = document.querySelector(`input[name="schedules[${subjectId}][date]"]`);
+                                    const row = dateInput ? dateInput.closest('tr') : null;
+                                    const toggle = row ? row.querySelector('.subject-examined-toggle') : null;
+                                    if (toggle && !toggle.checked) {
+                                        return;
+                                    }
+
                                     const startInput = document.querySelector(`input[name="schedules[${subjectId}][start_time]"]`);
                                     const endInput = document.querySelector(`input[name="schedules[${subjectId}][end_time]"]`);
 
@@ -468,6 +570,15 @@
         if(scheduleForm) {
             scheduleForm.addEventListener('submit', function(e) {
                 e.preventDefault();
+
+                document.querySelectorAll('#scheduleTableBody tr').forEach(function (row) {
+                    const toggle = row.querySelector('.subject-examined-toggle');
+                    if (toggle && !toggle.checked) {
+                        row.querySelectorAll('.exam-field').forEach(function (el) {
+                            el.disabled = false;
+                        });
+                    }
+                });
                 
                 const btn = this.querySelector('button[type="submit"]');
                 const originalText = btn.innerHTML;

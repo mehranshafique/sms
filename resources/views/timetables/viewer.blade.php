@@ -390,7 +390,7 @@
         // --- HELPER: Refresh UI Library ---
         function refreshSelect(element) {
             if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
-                 $(element).selectpicker('refresh');
+                $(element).selectpicker('refresh');
             }
         }
 

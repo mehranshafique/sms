@@ -194,4 +194,15 @@ return [
     'date' => 'Date',
     'amount' => 'Montant',
     'action' => 'Action',
+
+    'enable_recommended' => 'Activer les paramètres recommandés',
+    'enable_recommended_help' => 'Active les canaux SMS, WhatsApp, e-mail et in-app recommandés pour les événements clés (requêtes, paiements, avis, invitations). Les autres événements ne sont pas modifiés.',
+    'recommended_notifications_enabled' => 'Canaux de notification recommandés activés (système + WhatsApp).',
+    'request_settings_title' => 'Paramètres requêtes & dérogations',
+    'request_settings_help' => 'Configurez les notifications parents, délais de réponse et règles de conformité pour les prolongations de paiement.',
+    'request_notify_parent_on_submit' => 'Notifier le parent à la soumission',
+    'request_submit_whatsapp_only' => 'Confirmation : WhatsApp uniquement (économiser les SMS)',
+    'request_response_hours' => 'Délai de réponse parent (heures)',
+    'block_attendance_expired' => 'Bloquer la présence si dérogation expirée',
+    'block_results_expired' => 'Bloquer les résultats si dérogation expirée',
 ];

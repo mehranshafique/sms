@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
+use App\Services\OtpAuthService;
 use Illuminate\Support\Facades\Hash;
 
 class LoginRequest extends FormRequest
@@ -53,14 +54,9 @@ class LoginRequest extends FormRequest
         $user = null;
 
         if ($field === 'email') {
-            // Standard Email Lookup
             $user = User::where('email', $input)->first();
         } else {
-            // Flexible Lookup: Username OR Shortcode
-            $user = User::where(function ($query) use ($input) {
-                $query->where('username', $input)
-                      ->orWhere('shortcode', $input);
-            })->first();
+            $user = app(OtpAuthService::class)->resolveUser($input);
         }
 
         // 2. Validate User & Password

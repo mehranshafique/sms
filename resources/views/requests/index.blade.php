@@ -14,9 +14,12 @@
                 <select id="statusFilter" class="form-control default-select bg-white shadow-sm w-auto">
                     {{-- FIXED: "All Tickets" is now explicitly the selected default --}}
                     <option value="all" selected>{{ __('requests.status_all') }}</option>
+                    <option value="submitted">{{ __('requests.status_submitted') }}</option>
                     <option value="pending">{{ __('requests.status_pending_only') }}</option>
+                    <option value="under_review">{{ __('requests.status_under_review') }}</option>
                     <option value="approved">{{ __('requests.status_approved') }}</option>
                     <option value="rejected">{{ __('requests.status_rejected') }}</option>
+                    <option value="additional_info_required">{{ __('requests.status_additional_info_required') }}</option>
                 </select>
                 <a href="{{ route('requests.create') }}" class="btn btn-primary shadow-sm">
                     <i class="fa fa-plus me-2"></i> {{ __('requests.create_new') }}
@@ -36,6 +39,7 @@
                                         <th>{{ __('requests.ticket_number') }}</th>
                                         <th>{{ __('requests.applicant') }}</th>
                                         <th>{{ __('requests.request_type') }}</th>
+                                        <th>{{ __('requests.classe') }}</th>
                                         <th>{{ __('requests.date_submitted') }}</th>
                                         <th>{{ __('requests.status') }}</th>
                                         <th class="text-end">{{ __('requests.action') }}</th>
@@ -53,7 +57,7 @@
 
 <!-- Process Ticket Modal -->
 <div class="modal fade" id="processModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary">
                 <h5 class="modal-title text-white"><i class="fa fa-ticket-alt me-2"></i> {{ __('requests.process_ticket') }} <span id="modalTicketNo"></span></h5>
@@ -71,15 +75,24 @@
                         <p id="modalReason" class="text-dark bg-white p-2 rounded border-start border-3 border-primary font-italic"></p>
                     </div>
 
+                    <div id="modalDossierWrap" class="mb-3"></div>
+
                     <!-- Processing Action -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">{{ __('requests.admin_decision') }} <span class="text-danger">*</span></label>
                         <select name="status" id="actionStatus" class="form-control" required>
                             <option value="">{{ __('requests.select_decision') }}</option>
+                            <option value="under_review">🔍 {{ __('requests.status_under_review') }}</option>
                             <option value="approved">✅ {{ __('requests.approve_fully') }}</option>
                             <option value="partially_approved">⚠️ {{ __('requests.partially_approve') }}</option>
                             <option value="rejected">❌ {{ __('requests.reject_request') }}</option>
+                            <option value="additional_info_required">📋 {{ __('requests.decision_additional_info') }}</option>
                         </select>
+                    </div>
+
+                    <div class="mb-3" id="paymentDeadlineDiv" style="display:none;">
+                        <label class="form-label fw-bold">{{ __('requests.payment_deadline') }}</label>
+                        <input type="text" name="payment_deadline" id="payment_deadline_input" class="form-control datepicker-modal" placeholder="YYYY-MM-DD" autocomplete="off">
                     </div>
 
                     <!-- Appears only if Partial is selected -->
@@ -138,11 +151,12 @@
                 { data: 'ticket', name: 'ticket_number' },
                 { data: 'applicant', name: 'student.first_name' },
                 { data: 'type', name: 'type' },
+                { data: 'classe', orderable: false, searchable: false },
                 { data: 'created_at', name: 'created_at' },
                 { data: 'status', name: 'status' },
                 { data: 'action', orderable: false, searchable: false, className: 'text-end' }
             ],
-            order: [[4, 'desc']] // Order natively by date
+            order: [[4, 'desc']]
         });
 
         $('#statusFilter').change(function() {
@@ -153,12 +167,19 @@
         $(document).on('click', '.update-status', function() {
             currentId = $(this).data('id');
             let presetStatus = $(this).data('status');
+            let reqType = $(this).data('type') || '';
             
             $('#modalTicketNo').text($(this).data('ticket'));
             $('#modalStudentName').text($(this).data('student'));
             $('#modalReason').text($(this).data('reason') || LANG.noReason);
+            $('#modalDossierWrap').html('<div class="text-center py-3"><i class="fa fa-spinner fa-spin"></i></div>');
+
+            $.get("{{ url('requests') }}/" + currentId + "/dossier", function(res) {
+                $('#modalDossierWrap').html(res.html || '');
+            });
             
             $('#processForm')[0].reset();
+            $('#processForm').data('type', reqType);
             
             if(presetStatus !== 'pending') {
                 $('#actionStatus').val(presetStatus);
@@ -171,14 +192,44 @@
             $('#processModal').modal('show');
         });
 
+        function initPaymentDeadlinePicker() {
+            const $el = $('#payment_deadline_input');
+            if (!jQuery().bootstrapMaterialDatePicker || !$el.length || !$('#paymentDeadlineDiv').is(':visible')) {
+                return;
+            }
+            if ($el.data('plugin_bootstrapMaterialDatePicker')) {
+                $el.bootstrapMaterialDatePicker('destroy');
+            }
+            $el.bootstrapMaterialDatePicker({
+                weekStart: 0,
+                time: false,
+                format: 'YYYY-MM-DD',
+                triggerEvent: 'click',
+                minDate: moment()
+            });
+        }
+
+        $('#processModal').on('shown.bs.modal', function () {
+            setTimeout(initPaymentDeadlinePicker, 100);
+        });
+
         // Show/Hide Partial Days input
         $('#actionStatus').change(function() {
-            if ($(this).val() === 'partially_approved') {
+            const val = $(this).val();
+            const reqType = $('#processForm').data('type');
+            if (val === 'partially_approved') {
                 $('#partialDaysDiv').slideDown();
                 $('input[name="approved_days"]').prop('required', true);
             } else {
                 $('#partialDaysDiv').slideUp();
                 $('input[name="approved_days"]').prop('required', false);
+            }
+            if ((val === 'approved' || val === 'partially_approved') && reqType === 'fee_extension') {
+                $('#paymentDeadlineDiv').slideDown(function () {
+                    setTimeout(initPaymentDeadlinePicker, 100);
+                });
+            } else {
+                $('#paymentDeadlineDiv').slideUp();
             }
         });
 

@@ -21,6 +21,9 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SmsTemplateController;
+use App\Http\Controllers\EmailTemplateController;
+use App\Http\Controllers\AgentPaymentController;
+use App\Http\Controllers\SchoolEventController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\PlatformUserController;
 use App\Http\Controllers\PickupWebController;
@@ -358,6 +361,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Student Requests
     Route::middleware([CheckModuleAccess::class . ':student_requests'])->group(function () {
+        Route::get('requests/{id}/dossier', [StudentRequestController::class, 'dossier'])->name('requests.dossier');
         Route::post('requests/update-status/{id}', [StudentRequestController::class, 'updateStatus'])->name('requests.update_status');
         Route::resource('requests', StudentRequestController::class);
     });
@@ -386,10 +390,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // --- Unified Attendance Analytics Flow ---
     Route::get('/attendance/analytics', [AttendanceReportController::class, 'index'])->name('attendance.analytics.index');
     Route::get('/attendance/analytics/student/{id?}', [AttendanceReportController::class, 'studentReport'])->name('attendance.analytics.show');
-    // Add to your authenticated routes group
-    Route::prefix('attendance')->group(function () {
-        Route::get('/analytics/show/{id?}', [App\Http\Controllers\AttendanceReportController::class, 'studentReport'])->name('attendance.analytics.show');
-    });
+
     // HR / Staff Management
     Route::middleware([CheckModuleAccess::class . ':staff'])->group(function () {
         Route::resource('staff', StaffController::class);
@@ -626,6 +627,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::middleware([CheckModuleAccess::class . ':notices'])->group(function () {
         Route::resource('notices', NoticeController::class);
+        Route::resource('school-events', SchoolEventController::class)->except(['edit', 'update', 'destroy']);
+        Route::post('school-events/{schoolEvent}/build-invitations', [SchoolEventController::class, 'buildInvitations'])->name('school-events.build-invitations');
+        Route::get('school-events/{schoolEvent}/preview', [SchoolEventController::class, 'preview'])->name('school-events.preview');
+        Route::post('school-events/{schoolEvent}/send', [SchoolEventController::class, 'send'])->name('school-events.send');
         // Student View
         Route::get('my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
         Route::get('my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');
@@ -767,6 +772,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/test-job', [QueueMonitorController::class, 'dispatchTest'])->name('test');
     });
 
+    Route::middleware([RoleMiddleware::class . ':Super Admin'])->prefix('platform/agent-payments')->name('agent-payments.')->group(function () {
+        Route::get('/', [AgentPaymentController::class, 'index'])->name('index');
+        Route::post('/periods', [AgentPaymentController::class, 'storePeriod'])->name('periods.store');
+        Route::post('/', [AgentPaymentController::class, 'storePayment'])->name('store');
+        Route::patch('/{payment}/mark-paid', [AgentPaymentController::class, 'markPaid'])->name('mark-paid');
+    });
+
     // Institution Configuration
     Route::prefix('configuration')
         ->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin']) // Restrict to specific roles
@@ -778,12 +790,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/sms/test', [ConfigurationController::class, 'testSms'])->name('configuration.sms.test');
             Route::post('/school-year', [ConfigurationController::class, 'updateSchoolYear'])->name('configuration.year.update');
             Route::post('/notifications/update', [ConfigurationController::class, 'updateNotifications'])->name('configuration.notifications.update');
+            Route::post('/notifications/recommended', [ConfigurationController::class, 'enableRecommendedNotifications'])->name('configuration.notifications.recommended');
+            Route::post('/requests/settings', [ConfigurationController::class, 'updateRequestSettings'])->name('configuration.requests.update');
             Route::post('/setup-alert/dismiss', [ConfigurationController::class, 'dismissSetupAlert'])->name('configuration.setup_alert.dismiss');
             // SMS Templates
             Route::middleware([CheckModuleAccess::class . ':sms_templates'])->group(function() {
                 Route::get('/sms-templates', [SmsTemplateController::class, 'index'])->name('sms_templates.index');
                 Route::put('/sms-templates/{id}', [SmsTemplateController::class, 'update'])->name('sms_templates.update');
                 Route::post('/sms-templates/override', [SmsTemplateController::class, 'override'])->name('sms_templates.override');
+                Route::get('/email-templates', [EmailTemplateController::class, 'index'])->name('email_templates.index');
+                Route::post('/email-templates/override', [EmailTemplateController::class, 'override'])->name('email_templates.override');
             });
 
             // Super Admin Actions

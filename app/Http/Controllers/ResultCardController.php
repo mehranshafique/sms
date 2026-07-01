@@ -134,7 +134,13 @@ class ResultCardController extends BaseController
             ->get();
 
         if ($records->isEmpty()) {
-             abort(404, __('results.no_marks_found_error'));
+            $message = __('results.no_marks_found_error');
+
+            if ($request->ajax() || $request->boolean('check_only')) {
+                return response()->json(['status' => 'error', 'message' => $message]);
+            }
+
+            return redirect()->route('results.index')->with('error', $message);
         }
 
         $enrollment = StudentEnrollment::with(['classSection.gradeLevel', 'student'])
@@ -156,6 +162,10 @@ class ResultCardController extends BaseController
             'institution' => $exam->institution,
             'type' => $institutionType
         ]);
+
+        if ($request->boolean('check_only')) {
+            return response()->json(['status' => 'success']);
+        }
 
         return view('results.print', $viewData);
     }

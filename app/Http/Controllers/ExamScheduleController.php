@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Exam;
 use App\Models\ExamSchedule;
+use App\Models\ExamClassSubjectSetting;
 use App\Models\ClassSection;
 use App\Models\Subject;
 use App\Models\StudentEnrollment;
@@ -140,16 +141,23 @@ class ExamScheduleController extends BaseController
             return response()->json(['message' => __('exam_schedule.no_subjects_found')], 404);
         }
 
-        // 2. Fetch Existing Schedules
+        // 2. Fetch Existing Schedules & inclusion settings
         $existingSchedules = ExamSchedule::where('exam_id', $exam->id)
             ->where('class_section_id', $classSection->id)
             ->get()
             ->keyBy('subject_id');
 
+        $inclusionSettings = ExamClassSubjectSetting::where('exam_id', $exam->id)
+            ->where('class_section_id', $classSection->id)
+            ->pluck('is_examined', 'subject_id');
+
         // 3. Prepare Data
-        $rows = $subjects->map(function ($subject) use ($existingSchedules, $exam) {
+        $rows = $subjects->map(function ($subject) use ($existingSchedules, $inclusionSettings) {
             $schedule = $existingSchedules->get($subject->id);
-            
+            $isExamined = $inclusionSettings->has($subject->id)
+                ? (bool) $inclusionSettings->get($subject->id)
+                : true;
+
             $maxMarks = $schedule->max_marks ?? $subject->total_marks ?? 20;
             $passMarks = $schedule->pass_marks ?? $subject->passing_marks ?? ($maxMarks * 0.4);
 
@@ -157,13 +165,13 @@ class ExamScheduleController extends BaseController
                 'subject_id' => $subject->id,
                 'subject_name' => $subject->name,
                 'subject_code' => $subject->code,
-                'date' => $schedule ? $schedule->exam_date->format('Y-m-d') : '',
-                'start_time' => $schedule ? $schedule->start_time->format('H:i') : '',
-                'end_time' => $schedule ? $schedule->end_time->format('H:i') : '',
-                'room_number' => $schedule->room_number ?? '',
+                'date' => ($schedule && $isExamined) ? $schedule->exam_date->format('Y-m-d') : '',
+                'start_time' => ($schedule && $isExamined) ? $schedule->start_time->format('H:i') : '',
+                'end_time' => ($schedule && $isExamined) ? $schedule->end_time->format('H:i') : '',
+                'room_number' => ($schedule && $isExamined) ? ($schedule->room_number ?? '') : '',
                 'max_marks' => $maxMarks,
                 'pass_marks' => $passMarks,
-                'is_scheduled' => $schedule ? true : false,
+                'is_examined' => $isExamined,
             ];
         });
 
@@ -203,6 +211,23 @@ class ExamScheduleController extends BaseController
             $subjects = Subject::whereIn('id', $allocatedSubjectIds)->where('is_active', true)->get();
         } else {
             $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)->where('is_active', true)->get();
+        }
+
+        $excludedIds = ExamClassSubjectSetting::where('exam_id', $exam->id)
+            ->where('class_section_id', $classSection->id)
+            ->where('is_examined', false)
+            ->pluck('subject_id');
+
+        $subjects = $subjects->whereNotIn('id', $excludedIds);
+
+        if ($request->filled('subject_ids')) {
+            $allowedIds = collect(explode(',', (string) $request->subject_ids))
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            if (!empty($allowedIds)) {
+                $subjects = $subjects->whereIn('id', $allowedIds);
+            }
         }
 
         $scheduleProposal = [];
@@ -301,6 +326,28 @@ class ExamScheduleController extends BaseController
 
         try {
             foreach ($request->schedules as $subjectId => $data) {
+                $isExamined = is_array($data['is_examined'] ?? null)
+                    ? in_array('1', $data['is_examined'], true) || in_array(1, $data['is_examined'], true)
+                    : filter_var($data['is_examined'] ?? '0', FILTER_VALIDATE_BOOLEAN);
+
+                ExamClassSubjectSetting::updateOrCreate(
+                    [
+                        'exam_id' => $exam->id,
+                        'class_section_id' => $request->class_section_id,
+                        'subject_id' => $subjectId,
+                    ],
+                    ['is_examined' => $isExamined]
+                );
+
+                if (!$isExamined) {
+                    ExamSchedule::where('institution_id', $institutionId)
+                        ->where('exam_id', $exam->id)
+                        ->where('class_section_id', $request->class_section_id)
+                        ->where('subject_id', $subjectId)
+                        ->delete();
+                    continue;
+                }
+
                 if (empty($data['date']) || empty($data['start_time']) || empty($data['end_time'])) {
                     continue;
                 }
@@ -410,6 +457,7 @@ class ExamScheduleController extends BaseController
         $schedulesQuery = ExamSchedule::with('subject')
             ->where('exam_id', $exam->id)
             ->where('class_section_id', $classSection->id)
+            ->whereNotIn('subject_id', $this->excludedSubjectIds($exam->id, $classSection->id))
             ->orderBy('exam_date')
             ->orderBy('start_time');
 
@@ -458,5 +506,15 @@ class ExamScheduleController extends BaseController
         }
         
         return $pdf->download($fileName);
+    }
+
+    /** @return list<int> */
+    private function excludedSubjectIds(int $examId, int $classSectionId): array
+    {
+        return ExamClassSubjectSetting::where('exam_id', $examId)
+            ->where('class_section_id', $classSectionId)
+            ->where('is_examined', false)
+            ->pluck('subject_id')
+            ->all();
     }
 }

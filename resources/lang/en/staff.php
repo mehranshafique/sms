@@ -100,4 +100,9 @@ return [
     'app_access' => 'App Access',
     'active' => 'Active',
     'inactive' => 'Inactive',
+
+    'status_active' => 'Active',
+    'status_on_leave' => 'On Leave',
+    'status_resigned' => 'Resigned',
+    'status_terminated' => 'Terminated',
 ];

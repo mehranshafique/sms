@@ -79,4 +79,9 @@ return [
     'responsible_person_help' => 'This person receives budget consumption alerts when expenses are approved against this line.',
     'consumed_email_subject' => 'Budget expense: :line',
     'consumed_email_body' => "Budget line: :line\nExpense: :title\nAmount spent: :amount\nRemaining balance: :remaining",
+    'requests_subtitle' => 'Manage and monitor all fund requests',
+    'notification_recipients' => 'Alert Recipients',
+    'notification_recipients_help' => 'All selected users receive budget consumption alerts.',
+    'invalid_password' => 'Incorrect password. Fund approval cancelled.',
+    'enter_password' => 'Enter your password to confirm',
 ];

@@ -77,6 +77,22 @@
         }
         .dtp { z-index: 9999 !important; }
 
+        /* Global form-switch: keep knob circular when track is enlarged (ON/OFF) */
+        .form-switch .form-check-input {
+            cursor: pointer;
+            background-repeat: no-repeat !important;
+            background-size: 1em 1em !important;
+            background-position: left center !important;
+        }
+        .form-switch .form-check-input:checked {
+            background-position: right center !important;
+            background-size: 1em 1em !important;
+        }
+        .form-switch .form-check-input:focus,
+        .form-switch .form-check-input:active {
+            background-size: 1em 1em !important;
+        }
+
         /* Hide bootstrap-select bleed-through inside SweetAlert modals */
         body.swal2-shown .bootstrap-select.open,
         body.swal2-shown .bootstrap-select.show,

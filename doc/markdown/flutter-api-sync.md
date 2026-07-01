@@ -1,6 +1,6 @@
 # Flutter / Mobile App — API Sync Guide
 
-The Digitex Portal Flutter app lives in a **separate repository**. This document lists backend changes the mobile team must align with (as of the Laravel SMS codebase).
+The **Digitex Portal** Flutter app lives in `digitex_portal/` inside this repository.
 
 ## Base URL
 
@@ -8,79 +8,108 @@ The Digitex Portal Flutter app lives in a **separate repository**. This document
 {APP_URL}/api/v1/
 ```
 
-Example production: `https://account.digitexvx.com/api/v1/` or `https://e-digitex.com/api/v1/`
+Example: `https://account.digitexvx.com/api/v1/`
 
-## Required client updates
+Configure in `digitex_portal/lib/config/env.dart` or build with:
 
-### 1. Auth & context
-
-| Action | Endpoint | Notes |
-|--------|----------|-------|
-| Login | `POST /v1/login` | Response `user.currency` object added |
-| Refresh context | `GET /v1/me/context` | Use after login; includes `currency`, `capabilities`, `children` |
-| Logout | `POST /v1/logout` | Revoke Sanctum token |
-| FCM | `POST /v1/update-fcm-token` | Unchanged |
-
-**Currency object shape** (login + context + fees):
-
-```json
-{
-  "code": "CDF",
-  "symbol": "FC",
-  "name": "Congolese Franc",
-  "position": "before",
-  "decimals": 2
-}
+```bash
+flutter run --dart-define=API_BASE_URL=https://your-domain.com/api
 ```
 
-Flutter should format amounts with `CurrencyService` rules: symbol before/after based on `position`, `decimals` for fraction digits. Do **not** hardcode `$`.
+---
 
-### 2. Student portal (`/v1/student/*`)
+## What changed (2026 sync with web SMS)
 
-| Endpoint | Change |
-|----------|--------|
-| `GET /v1/student/fees` | Adds `currency_code`, `currency_settings`; use for all fee labels |
-| `GET /v1/student/payment-options` | Unchanged path; ensure app implements pay + proof flow |
-| `POST /v1/student/payment-proof` | Upload offline payment proof |
-| `GET /v1/student/lmd-transcript` | University/LMD schools |
-| `GET /v1/student/requests` | Request history |
+| Feature | API | Flutter |
+|---------|-----|---------|
+| **Subscription / module gating** | `enabled_modules`, `subscription` in context | Menu tiles hidden when module not in plan |
+| **Multi-role switching** | `POST /v1/me/switch-role` | Header role switcher |
+| **Server-driven menu** | `menu.staff_tools`, `menu.student_portal`, `menu.gate_terminal` | Dashboard reads tiles from API |
+| **In-app notifications** | `GET /v1/notifications/feed` | Bell badge + notifications screen (30s poll) |
+| **Plan on institution create** | Web only (Super Admin form) | Mobile reads `subscription.plan_name` |
+| **Localized request reasons** | Student requests API | Show `localized_reason` when added to API |
 
-### 3. Teacher / gate / pickup
+---
 
-| Area | Endpoints |
-|------|-----------|
-| Teacher attendance | `GET/POST /v1/teacher/attendance/*` |
-| Hardware NFC (app) | `POST /v1/hardware/attendance/scan` with Sanctum **or** gate device secret |
-| Pickup | `/v1/pickup/count`, `/pending`, `/approve`, `/scan`, OTP routes |
-| Today scans | `GET /v1/hardware/attendance/today` |
-| Absentees + notify | `GET /v1/hardware/attendance/absentees`, `POST .../notify` |
+## Auth & context
 
-**Capabilities** from context — gate attendants get `gate_mode: true`, hide teacher tools.
+| Action | Endpoint |
+|--------|----------|
+| Login | `POST /v1/login` |
+| Context refresh | `GET /v1/me/context` |
+| Switch role | `POST /v1/me/switch-role` `{ "role": "Guardian" }` |
+| Logout | `POST /v1/logout` |
+| FCM token | `POST /v1/update-fcm-token` |
 
-### 4. Timetable & notices
+**Login / context response** includes:
 
-- `GET /v1/timetable/today`, `/week`
-- `GET /v1/notices`
+- `active_role`, `switchable_roles`
+- `capabilities` (gate_mode, student_portal, teacher_tools, …)
+- `enabled_modules` (from subscription + super-admin override)
+- `subscription` (`plan_name`, `active`, `expires_at`, `days_left`)
+- `menu` (layout + tile list with `id`, `title`, `subtitle`, `icon`, `route`)
+- `features` (`notifications`, `role_switching`, `support_tickets`, `ai_copilot`)
+- `currency`, `children` (guardians)
 
-### 5. Deprecated — do not use
+---
 
-- `GET /api/student/{id}/balance` (legacy chatbot) — use `/v1/student/fees`
-- `POST /attendance/terminal` without `/v1` prefix — prefer `/v1/hardware/attendance/scan`
+## Notifications (mobile)
 
-## Suggested Flutter implementation
+| Action | Endpoint |
+|--------|----------|
+| Feed | `GET /v1/notifications/feed?limit=15` |
+| Mark read | `POST /v1/notifications/{id}/read` |
+| Mark all read | `POST /v1/notifications/read-all` |
 
-1. **ApiClient** — single base URL + `/v1` prefix, Bearer token interceptor.
-2. **AuthRepository** — login → store token → call `/v1/me/context` → cache `currency` + `capabilities`.
-3. **MoneyFormatter** — read from cached `currency_settings`; refresh on context reload.
-4. **ModuleRouter** — show/hide tiles from `capabilities` (student_portal, pickup_management, gate_mode, etc.).
-5. **Guardian flow** — pass `student_id` query param on student APIs when multiple `children`.
+Poll every **30 seconds** while the dashboard is open (matches web bell behaviour).
+
+---
+
+## Student portal
+
+| Endpoint | Notes |
+|----------|-------|
+| `GET /v1/student/fees` | Use `currency_settings` |
+| `GET /v1/student/requests` | Fee extension, absence, etc. |
+| `POST /v1/student/requests` | Submit new request |
+| `GET /v1/student/attendance-summary` | Parent summary |
+
+Pass `?student_id=` for guardians with multiple children.
+
+---
+
+## Flutter project structure
+
+```
+digitex_portal/
+  lib/
+    main.dart                 # App entry + routing
+    config/theme.dart         # Digitex purple theme (matches web)
+    core/api/api_client.dart
+    core/services/session_service.dart
+    core/models/mobile_context.dart
+    features/
+      auth/login_screen.dart
+      dashboard/              # Standard + gate terminal layouts
+      notifications/
+      profile/
+```
+
+Run:
+
+```bash
+cd digitex_portal && flutter pub get && flutter run
+```
+
+---
 
 ## Testing checklist
 
-- [ ] Login shows welcome + loads context
-- [ ] Fees screen uses CDF/FC (or school-configured currency), not hardcoded USD
-- [ ] Gate mode user sees scan UI only
-- [ ] Pickup bell polls `/v1/pickup/count`
-- [ ] Logout clears token and calls `/v1/logout`
+- [ ] Login loads menu from API (not hardcoded tiles)
+- [ ] Premium school without `staff` module — Staff tiles hidden
+- [ ] Multi-role user can switch Guardian ↔ Teacher
+- [ ] Gate attendant sees Gate Terminal grid only
+- [ ] Notification bell updates within 30s after admin event
+- [ ] Subscription expired — warning banner on dashboard
 
 See also: [api-manual.md](./api-manual.md), [mobile-app-user-manual.md](./mobile-app-user-manual.md).

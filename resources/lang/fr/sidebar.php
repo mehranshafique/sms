@@ -32,6 +32,7 @@ return [
     'budget_payroll' => 'Budget & Paie',
     'billing' => 'Facturation',
     'billing_requests' => 'Demandes de facturation',
+    'agent_payments' => 'Paiements agents',
     'status_billing' => 'Statut facturation',
     'financial_reports' => 'Rapport de classe',
     'student_balances' => 'Soldes élèves',
@@ -61,7 +62,7 @@ return [
         'title' => 'Programmes',
     ],
     'reminders' => 'Rappels',
-    'requests' => 'Demandes',
+    'requests' => 'Dérogation & Requête',
     'discipline' => 'Discipline',
     'academics' => 'Académique',
     'sessions' => [

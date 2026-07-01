@@ -85,15 +85,15 @@
                                         <div class="col-md-6 mb-4">
                                             <h5 class="text-primary border-bottom pb-2">{{ __('chatbot.channels') ?? 'Channels' }}</h5>
                                             <div class="form-check form-switch mt-3">
-                                                <input class="form-check-input" style="width: 3em; height: 1.5em; cursor: pointer;" type="checkbox" name="whatsapp" id="whatsappSwitch" value="1" {{ $config['whatsapp'] ? 'checked' : '' }}>
+                                                <input class="form-check-input" type="checkbox" name="whatsapp" id="whatsappSwitch" value="1" {{ $config['whatsapp'] ? 'checked' : '' }}>
                                                 <label class="form-check-label fw-bold ms-2 mt-1" for="whatsappSwitch">{{ __('chatbot.enable_whatsapp') ?? 'Enable WhatsApp' }}</label>
                                             </div>
                                             <div class="form-check form-switch mt-3">
-                                                <input class="form-check-input" style="width: 3em; height: 1.5em; cursor: pointer;" type="checkbox" name="sms" id="smsSwitch" value="1" {{ $config['sms'] ? 'checked' : '' }}>
+                                                <input class="form-check-input" type="checkbox" name="sms" id="smsSwitch" value="1" {{ $config['sms'] ? 'checked' : '' }}>
                                                 <label class="form-check-label fw-bold ms-2 mt-1" for="smsSwitch">{{ __('chatbot.enable_sms') ?? 'Enable SMS' }}</label>
                                             </div>
                                             <div class="form-check form-switch mt-3">
-                                                <input class="form-check-input" style="width: 3em; height: 1.5em; cursor: pointer;" type="checkbox" name="telegram" id="telegramSwitch" value="1" {{ $config['telegram'] ? 'checked' : '' }}>
+                                                <input class="form-check-input" type="checkbox" name="telegram" id="telegramSwitch" value="1" {{ $config['telegram'] ? 'checked' : '' }}>
                                                 <label class="form-check-label fw-bold ms-2 mt-1" for="telegramSwitch">{{ __('chatbot.enable_telegram') ?? 'Enable Telegram' }}</label>
                                             </div>
                                         </div>

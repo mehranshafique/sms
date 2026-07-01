@@ -40,25 +40,29 @@ class SmsTemplateController extends BaseController
 
             return DataTables::of($data)
                 ->addIndexColumn()
+                ->editColumn('available_tags', fn ($row) => \App\Services\TemplateVariableRegistry::displayForEvent($row->event_key))
                 ->editColumn('is_active', function($row){
                     return $row->is_active 
                         ? '<span class="badge badge-success">'.__('sms_template.active').'</span>' 
                         : '<span class="badge badge-danger">'.__('sms_template.inactive').'</span>';
                 })
                 ->addColumn('action', function($row){
+                    $tags = e(\App\Services\TemplateVariableRegistry::displayForEvent($row->event_key));
                     return '<button class="btn btn-primary btn-xs edit-template shadow" 
                         data-id="'.$row->id.'" 
                         data-key="'.$row->event_key.'"
                         data-name="'.$row->name.'"
-                        data-body="'.$row->body.'"
-                        data-tags="'.$row->available_tags.'">
+                        data-body="'.e($row->body).'"
+                        data-tags="'.$tags.'">
                         <i class="fa fa-pencil"></i> '.__('sms_template.edit').'</button>';
                 })
                 ->rawColumns(['is_active', 'action'])
                 ->make(true);
         }
 
-        return view('settings.sms_templates.index');
+        return view('settings.sms_templates.index', [
+            'variableRegistry' => \App\Services\TemplateVariableRegistry::all(),
+        ]);
     }
 
     public function override(Request $request)
@@ -70,13 +74,18 @@ class SmsTemplateController extends BaseController
             'body' => 'required|string',
         ]);
 
+        $unknown = \App\Services\TemplateVariableRegistry::validateBody($request->event_key, $request->body);
+        if (!empty($unknown)) {
+            return response()->json(['message' => __('sms_template.unknown_tags', ['tags' => implode(', ', $unknown)])], 422);
+        }
+
         // Save as an institution-specific template
         $template = SmsTemplate::updateOrCreate(
             ['institution_id' => $institutionId, 'event_key' => $request->event_key],
             [
                 'name' => $request->name, // Inherit or update name
                 'body' => $request->body,
-                'available_tags' => $request->available_tags,
+                'available_tags' => $request->available_tags ?: \App\Services\TemplateVariableRegistry::displayForEvent($request->event_key),
                 'is_active' => $request->has('is_active') ? 1 : 0
             ]
         );

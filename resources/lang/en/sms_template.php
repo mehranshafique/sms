@@ -41,4 +41,5 @@ return [
     'save_changes' => 'Save Changes',
     'close' => 'Close',
     'edit' => 'Edit',
+    'unknown_tags' => 'Unknown template variables: :tags',
 ];

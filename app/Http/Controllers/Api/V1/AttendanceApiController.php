@@ -222,6 +222,14 @@ class AttendanceApiController extends Controller
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student account is inactive.'], 403);
         }
 
+        if (app(\App\Services\DerogationComplianceService::class)->blocksAttendance($student)) {
+            return response()->json([
+                'status' => 'error',
+                'success' => false,
+                'message' => __('requests.attendance_blocked_expired_derogation'),
+            ], 403);
+        }
+
         $institutionId = $student->institution_id;
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
 

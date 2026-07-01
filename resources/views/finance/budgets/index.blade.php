@@ -159,7 +159,18 @@
                         <input type="number" name="allocated_amount" class="form-control" placeholder="{{ __('budget.enter_amount') }}" required min="0" step="0.01">
                     </div>
 
-                    {{-- 5. Responsible person --}}
+                    {{-- 5. Notification recipients --}}
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('budget.notification_recipients') }}</label>
+                        <select name="notify_user_ids[]" class="form-control default-select" multiple>
+                            @foreach($staffUsers ?? [] as $staffUser)
+                                <option value="{{ $staffUser->id }}">{{ $staffUser->name }}</option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">{{ __('budget.notification_recipients_help') }}</small>
+                    </div>
+
+                    {{-- Legacy single responsible (optional) --}}
                     <div class="mb-3">
                         <label class="form-label">{{ __('budget.responsible_person') }}</label>
                         <select name="responsible_user_id" class="form-control default-select">

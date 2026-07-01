@@ -7,7 +7,7 @@
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
                     <h4>{{ __('budget.requests_title') }}</h4>
-                    <p class="mb-0 text-muted">Manage and monitor all fund requests</p>
+                    <p class="mb-0 text-muted">{{ __('budget.requests_subtitle') }}</p>
                 </div>
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
@@ -221,6 +221,38 @@
         });
 
         function updateRequest(id, status) {
+            const needsPassword = status === 'approved';
+            const runUpdate = (password) => {
+                $.ajax({
+                    url: "/finance/budgets/requests/" + id + "/update",
+                    type: 'POST',
+                    data: { _token: '{{ csrf_token() }}', status: status, password: password || '' },
+                    success: function(response) {
+                        Swal.fire('Success', response.message, 'success');
+                        table.ajax.reload();
+                        setTimeout(() => location.reload(), 1500);
+                    },
+                    error: function(xhr) {
+                        Swal.fire('Error', xhr.responseJSON?.message || 'Action failed', 'error');
+                    }
+                });
+            };
+
+            if (needsPassword) {
+                Swal.fire({
+                    title: '{{ __('budget.confirm_approve') }}',
+                    input: 'password',
+                    inputPlaceholder: '{{ __('budget.enter_password') }}',
+                    showCancelButton: true,
+                    confirmButtonText: '{{ __('budget.approve') }}',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        runUpdate(result.value);
+                    }
+                });
+                return;
+            }
+
             Swal.fire({
                 title: '{{ __('budget.confirm_approve') }}',
                 text: "You are about to " + status + " this fund request.",
@@ -230,20 +262,7 @@
                 confirmButtonText: 'Yes, ' + status + ' it!'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    $.ajax({
-                        url: "/finance/budgets/requests/" + id + "/update",
-                        type: 'POST',
-                        data: { _token: '{{ csrf_token() }}', status: status },
-                        success: function(response) {
-                            Swal.fire('Success', response.message, 'success');
-                            table.ajax.reload();
-                            // Reload page to update summary cards
-                            setTimeout(() => location.reload(), 1500);
-                        },
-                        error: function() {
-                            Swal.fire('Error', 'Action failed', 'error');
-                        }
-                    });
+                    runUpdate('');
                 }
             });
         }

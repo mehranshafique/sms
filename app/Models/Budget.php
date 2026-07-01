@@ -60,6 +60,25 @@ class Budget extends Model
         return $this->belongsTo(User::class, 'responsible_user_id');
     }
 
+    public function notificationRecipients()
+    {
+        return $this->belongsToMany(User::class, 'budget_notification_recipients');
+    }
+
+    /** @return \Illuminate\Support\Collection<int, User> */
+    public function allNotificationUsers()
+    {
+        $recipients = $this->relationLoaded('notificationRecipients')
+            ? $this->notificationRecipients
+            : $this->notificationRecipients()->get();
+
+        if ($recipients->isNotEmpty()) {
+            return $recipients;
+        }
+
+        return $this->responsibleUser ? collect([$this->responsibleUser]) : collect();
+    }
+
     public function remainingAmount(): float
     {
         return max(0, (float) $this->allocated_amount - (float) $this->spent_amount);

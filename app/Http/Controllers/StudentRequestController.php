@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Enums\RoleEnum;
 use App\Services\NotificationService;
+use App\Services\StudentRequestContextService;
+use App\Services\StudentRequestNotificationDispatcher;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -32,7 +34,7 @@ class StudentRequestController extends BaseController
         $user = Auth::user();
 
         if ($request->ajax()) {
-            $query = StudentRequest::with(['student', 'creator'])
+            $query = StudentRequest::with(['student.parent', 'student.enrollments.classSection.gradeLevel'])
                 ->select('student_requests.*')
                 ->where('student_requests.institution_id', $institutionId)
                 ->whereNotNull('student_requests.student_id')
@@ -50,18 +52,35 @@ class StudentRequestController extends BaseController
 
             // Server-side Dropdown Filter Applied
             if ($request->filled('status') && $request->status !== 'all') {
-                $query->where('student_requests.status', $request->status);
+                if ($request->status === 'pending') {
+                    $query->whereIn('student_requests.status', ['pending', 'submitted']);
+                } else {
+                    $query->where('student_requests.status', $request->status);
+                }
             }
 
             return DataTables::of($query)
                 ->addIndexColumn()
-                ->addColumn('applicant', fn($row) => $row->student->full_name ?? 'N/A')
+                ->addColumn('applicant', fn ($row) => request_applicant_html($row->student))
+                ->addColumn('classe', function ($row) {
+                    $enrollment = $row->student?->enrollments
+                        ?->where('status', 'active')
+                        ->sortByDesc('id')
+                        ->first();
+
+                    return e(class_section_short_label($enrollment?->classSection));
+                })
                 ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
                 ->addColumn('ticket', fn($row) => '<span class="fw-bold">'.$row->ticket_number.'</span>')
                 ->editColumn('type', fn ($row) => $row->typeLabel())
-                ->editColumn('created_at', fn($row) => $row->created_at ? $row->created_at->format('d M, Y H:i') : '-') 
+                ->editColumn('created_at', fn($row) => $row->created_at ? localized_date($row->created_at, 'd M Y H:i') : '-')
                 ->editColumn('status', function($row){
-                    $badges = ['pending' => 'warning', 'approved' => 'success', 'partially_approved' => 'info', 'rejected' => 'danger'];
+                    $badges = [
+                        'submitted' => 'warning', 'pending' => 'warning', 'under_review' => 'info',
+                        'approved' => 'success', 'partially_approved' => 'info', 'rejected' => 'danger',
+                        'additional_info_required' => 'secondary',
+                        'honored' => 'success', 'expired' => 'dark',
+                    ];
                     $statusClass = $badges[$row->status] ?? 'secondary';
                     $statusText = __('requests.status_' . $row->status);
                     
@@ -82,9 +101,10 @@ class StudentRequestController extends BaseController
                         $btn .= '<button type="button" class="btn btn-sm btn-primary shadow-sm update-status me-1" 
                                     data-id="'.$row->id.'" 
                                     data-ticket="'.$row->ticket_number.'"
-                                    data-student="'.($row->student->full_name ?? 'N/A').'"
+                                    data-student="'.htmlspecialchars($row->student->full_name ?? 'N/A').'"
                                     data-reason="'.htmlspecialchars($row->localizedReason()).'"
                                     data-status="'.$row->status.'"
+                                    data-type="'.$row->resolvedType().'"
                                     data-note="'.htmlspecialchars($row->admin_note ?? '').'"><i class="fa fa-cogs"></i></button>';
                     }
                     
@@ -97,7 +117,7 @@ class StudentRequestController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['ticket', 'status', 'action'])
+                ->rawColumns(['ticket', 'status', 'action', 'applicant'])
                 ->make(true);
         }
 
@@ -169,7 +189,7 @@ class StudentRequestController extends BaseController
             'reason' => $request->reason,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-            'status' => $isAdmin ? 'approved' : 'pending',
+            'status' => $isAdmin ? 'approved' : 'submitted',
             'ticket_number' => 'REQ-' . strtoupper(Str::random(8)),
             'created_by' => $user->id,
             'approved_by' => $isAdmin ? $user->id : null,
@@ -177,8 +197,8 @@ class StudentRequestController extends BaseController
             'file_path' => $path
         ]);
 
-        if ($createdRequest->status === 'pending') {
-            app(\App\Services\InAppNotificationService::class)->notifyStudentRequestSubmitted($createdRequest);
+        if (in_array($createdRequest->status, ['pending', 'submitted'], true)) {
+            app(StudentRequestNotificationDispatcher::class)->onSubmitted($createdRequest);
         }
 
         return redirect()->route('requests.index')->with('success', __('requests.success_create'));
@@ -186,10 +206,33 @@ class StudentRequestController extends BaseController
 
     public function show($id)
     {
-        $request = StudentRequest::with(['student', 'creator'])->findOrFail($id);
+        $request = StudentRequest::with(['student.parent', 'creator', 'approver'])->findOrFail($id);
         if ($this->getInstitutionId() != $request->institution_id) abort(403);
+
+        $dossier = $request->student
+            ? app(StudentRequestContextService::class)->buildDossier($request->student, $request->academic_session_id)
+            : null;
         
-        return view('requests.show', compact('request'));
+        return view('requests.show', compact('request', 'dossier'));
+    }
+
+    public function dossier($id)
+    {
+        $studentRequest = StudentRequest::with('student')->findOrFail($id);
+        if ($this->getInstitutionId() != $studentRequest->institution_id) abort(403);
+
+        if (!$studentRequest->student) {
+            return response()->json(['html' => '']);
+        }
+
+        $dossier = app(StudentRequestContextService::class)->buildDossier(
+            $studentRequest->student,
+            $studentRequest->academic_session_id
+        );
+
+        return response()->json([
+            'html' => view('requests.partials.dossier', compact('dossier'))->render(),
+        ]);
     }
 
     /**
@@ -203,9 +246,10 @@ class StudentRequestController extends BaseController
         }
 
         $request->validate([
-            'status' => 'required|in:approved,partially_approved,rejected',
+            'status' => 'required|in:under_review,approved,partially_approved,rejected,additional_info_required',
             'admin_note' => 'nullable|string|max:500',
-            'approved_days' => 'nullable|integer|min:1'
+            'approved_days' => 'nullable|integer|min:1',
+            'payment_deadline' => 'nullable|date|after_or_equal:today',
         ]);
 
         $institutionId = $this->getInstitutionId();
@@ -220,11 +264,16 @@ class StudentRequestController extends BaseController
             $studentRequest->end_date = Carbon::parse($studentRequest->start_date)->addDays((int) $request->approved_days);
         }
 
+        if (in_array($request->status, ['approved', 'partially_approved'], true)
+            && $studentRequest->resolvedType() === 'fee_extension'
+            && $request->filled('payment_deadline')) {
+            $studentRequest->payment_deadline = $request->payment_deadline;
+        }
+
         $studentRequest->save();
 
         try {
-            $this->notifyParent($studentRequest);
-            app(\App\Services\InAppNotificationService::class)->notifyStudentRequestUpdated($studentRequest);
+            app(StudentRequestNotificationDispatcher::class)->onUpdated($studentRequest);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Request Notification Error: " . $e->getMessage());
         }
@@ -251,7 +300,7 @@ class StudentRequestController extends BaseController
             if (!$studentId || (int) $req->student_id !== (int) $studentId) {
                 abort(403);
             }
-            if ($req->status !== 'pending') {
+            if ($req->status !== 'submitted' && $req->status !== 'pending') {
                 abort(403);
             }
         }

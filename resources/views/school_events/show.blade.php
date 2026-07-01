@@ -1,0 +1,135 @@
+@extends('layout.layout')
+
+@section('content')
+@include('school_events.partials.styles')
+<div class="content-body">
+    <div class="container-fluid">
+
+        <div class="row page-titles mx-0 mb-4 p-4 bg-white rounded shadow-sm align-items-center">
+            <div class="col-sm-7 p-0">
+                <div class="welcome-text">
+                    <h4 class="text-primary fw-bold fs-20 mb-1">{{ $schoolEvent->name }}</h4>
+                    <p class="mb-0 text-muted fs-14">
+                        <i class="la la-calendar me-1"></i>{{ localized_date($schoolEvent->event_date, 'd M Y') }}
+                        @if($schoolEvent->event_time)
+                            · <i class="la la-clock me-1"></i>{{ substr((string) $schoolEvent->event_time, 0, 5) }}
+                        @endif
+                        @if($schoolEvent->venue)
+                            · <i class="la la-map-marker me-1"></i>{{ $schoolEvent->venue }}
+                        @endif
+                    </p>
+                </div>
+            </div>
+            <div class="col-sm-5 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
+                <a href="{{ route('school-events.index') }}" class="btn btn-light">{{ __('school_event.back') }}</a>
+            </div>
+        </div>
+
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show">{{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="se-stat">
+                    <div class="text-muted small">{{ __('school_event.field_status') }}</div>
+                    <h5 class="fw-bold mb-0">
+                        <span class="badge badge-{{ $schoolEvent->status === 'sent' ? 'success' : 'warning' }} light">
+                            {{ __('school_event.status_' . $schoolEvent->status) }}
+                        </span>
+                    </h5>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="se-stat">
+                    <div class="text-muted small">{{ __('school_event.invitation_count') }}</div>
+                    <h5 class="fw-bold mb-0">{{ $schoolEvent->invitations->count() }}</h5>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="se-stat">
+                    <div class="text-muted small">{{ __('school_event.field_audience') }}</div>
+                    <h5 class="fw-bold mb-0">{{ __('school_event.audience_' . $schoolEvent->audience) }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:15px;">
+            <div class="card-header border-0 pt-4 px-4 bg-transparent">
+                <h5 class="card-title fw-bold mb-0">{{ __('school_event.actions_title') }}</h5>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <div class="d-flex flex-wrap gap-2">
+                    <form method="POST" action="{{ route('school-events.build-invitations', $schoolEvent) }}">@csrf
+                        <button class="btn btn-secondary shadow-sm"><i class="la la-users me-1"></i> {{ __('school_event.build_invitations') }}</button>
+                    </form>
+                    <button type="button" class="btn btn-outline-primary shadow-sm" id="previewBtn">
+                        <i class="la la-eye me-1"></i> {{ __('school_event.preview') }}
+                    </button>
+                    <form method="POST" action="{{ route('school-events.send', $schoolEvent) }}" onsubmit="return confirm(@json(__('school_event.confirm_send')));">@csrf
+                        <button class="btn btn-primary shadow-sm"><i class="la la-paper-plane me-1"></i> {{ __('school_event.send_invitations') }}</button>
+                    </form>
+                </div>
+                <div id="previewBox" class="alert alert-light border mt-3 d-none mb-0">
+                    <div class="small text-muted mb-1">{{ __('school_event.preview') }}</div>
+                    <pre class="mb-0 small" id="previewText" style="white-space:pre-wrap;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0" style="border-radius:15px;">
+            <div class="card-header border-0 pt-4 px-4 bg-transparent d-flex justify-content-between align-items-center">
+                <h5 class="card-title fw-bold mb-0">{{ __('school_event.recipients_title') }}</h5>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <div class="table-responsive digitex-dt-wrap">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>{{ __('school_event.recipient') }}</th>
+                                <th>{{ __('school_event.phone') }}</th>
+                                <th>Telegram</th>
+                                <th>{{ __('school_event.field_status') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($schoolEvent->invitations as $inv)
+                            <tr>
+                                <td>{{ $inv->recipient_name }}</td>
+                                <td>{{ $inv->recipient_phone ?: '—' }}</td>
+                                <td>{{ $inv->recipient_telegram_chat_id ?: '—' }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $inv->delivery_status === 'sent' ? 'success' : 'secondary' }} light">
+                                        {{ ucfirst($inv->delivery_status) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">{{ __('school_event.no_recipients') }}</td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('js')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$('#previewBtn').on('click', function(){
+    $.get('{{ route('school-events.preview', $schoolEvent) }}', function(res){
+        $('#previewBox').removeClass('d-none');
+        $('#previewText').text(res.preview || '');
+    }).fail(function(xhr){
+        Swal.fire({ icon: 'warning', title: @json(__('school_event.preview')), text: xhr.responseJSON?.message || 'Error' });
+    });
+});
+</script>
+@endsection

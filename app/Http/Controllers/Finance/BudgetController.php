@@ -158,22 +158,30 @@ class BudgetController extends BaseController
             'budget_category_id' => 'required|exists:budget_categories,id',
             'allocated_amount' => 'required|numeric|min:0',
             'responsible_user_id' => 'nullable|exists:users,id',
+            'notify_user_ids' => 'nullable|array',
+            'notify_user_ids.*' => 'exists:users,id',
             'period_name' => 'nullable|string|max:100',
             'start_date' => 'nullable|date|after_or_equal:today', // Enforce Future Date
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
-        Budget::create([
+        $budget = Budget::create([
             'institution_id' => $institutionId,
             'academic_session_id' => $session->id,
             'budget_category_id' => $request->budget_category_id,
-            'responsible_user_id' => $request->responsible_user_id,
+            'responsible_user_id' => $request->responsible_user_id ?? ($request->notify_user_ids[0] ?? null),
             'allocated_amount' => $request->allocated_amount,
             'period_name' => $request->period_name,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'spent_amount' => 0
         ]);
+
+        if ($request->filled('notify_user_ids')) {
+            $budget->notificationRecipients()->sync($request->notify_user_ids);
+        } elseif ($request->responsible_user_id) {
+            $budget->notificationRecipients()->sync([$request->responsible_user_id]);
+        }
 
         return response()->json(['message' => __('budget.success_allocated')]);
     }
@@ -187,6 +195,7 @@ class BudgetController extends BaseController
             'id' => $budget->id,
             'budget_category_id' => $budget->budget_category_id,
             'responsible_user_id' => $budget->responsible_user_id,
+            'notify_user_ids' => $budget->notificationRecipients()->pluck('users.id'),
             'allocated_amount' => $budget->allocated_amount,
             'period_name' => $budget->period_name,
             'start_date' => $budget->start_date ? $budget->start_date->format('Y-m-d') : '',
@@ -201,6 +210,8 @@ class BudgetController extends BaseController
         $request->validate([
             'allocated_amount' => 'required|numeric|min:0',
             'responsible_user_id' => 'nullable|exists:users,id',
+            'notify_user_ids' => 'nullable|array',
+            'notify_user_ids.*' => 'exists:users,id',
             'period_name' => 'nullable|string|max:100',
             'start_date' => 'nullable|date', 
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -215,11 +226,15 @@ class BudgetController extends BaseController
 
         $budget->update([
             'allocated_amount' => $request->allocated_amount,
-            'responsible_user_id' => $request->responsible_user_id,
+            'responsible_user_id' => $request->responsible_user_id ?? ($request->notify_user_ids[0] ?? $budget->responsible_user_id),
             'period_name' => $request->period_name,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
         ]);
+
+        if ($request->has('notify_user_ids')) {
+            $budget->notificationRecipients()->sync($request->notify_user_ids ?? []);
+        }
 
         return response()->json(['message' => __('budget.success_update')]);
     }
@@ -398,6 +413,16 @@ class BudgetController extends BaseController
              abort(403);
         }
 
+        $request->validate([
+            'status' => 'required|in:approved,rejected',
+            'rejection_reason' => 'nullable|string|max:500',
+            'password' => 'required_if:status,approved|string|nullable',
+        ]);
+
+        if ($request->status === 'approved' && !\Illuminate\Support\Facades\Hash::check((string) $request->password, Auth::user()->password)) {
+            return response()->json(['message' => __('budget.invalid_password')], 422);
+        }
+
         $institutionId = $this->getInstitutionId();
         $fundRequest = FundRequest::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
             ->findOrFail($id);
@@ -431,6 +456,16 @@ class BudgetController extends BaseController
 
         // Keep the event dispatch for broader system reactivity
         BudgetDeducted::dispatch($fundRequest);
+
+        if (class_exists(\App\Services\AuditLogger::class)) {
+            \App\Services\AuditLogger::log(
+                'fund_request.' . $request->status,
+                'Budget',
+                'Fund request #' . $fundRequest->id . ' ' . $request->status,
+                null,
+                ['approved_by' => Auth::id(), 'status' => $request->status]
+            );
+        }
 
         $msg = $request->status == 'approved' ? __('budget.success_approved') : __('budget.success_rejected');
         return response()->json(['message' => $msg]);

@@ -36,6 +36,7 @@
 
     <style>
         .bootstrap-select .dropdown-menu { z-index: 1065 !important; }
+        .dtp, .dtp-content { z-index: 99999 !important; }
         .content-body .card,
         .content-body .card-body { overflow: visible; }
         .content-body .table-responsive,
@@ -49,7 +50,7 @@
         $(document).ready(function() {
             // 1. Initialize Material Date Picker
             if(jQuery().bootstrapMaterialDatePicker) {
-                jQuery('.datepicker, .datepicker-default').bootstrapMaterialDatePicker({
+                jQuery('.datepicker:not(.datepicker-modal), .datepicker-default').bootstrapMaterialDatePicker({
                     weekStart: 0,
                     time: false,
                     format: 'YYYY-MM-DD'
@@ -67,6 +68,17 @@
             }
 
             // 3. Configure Bootstrap Select (Global Fallback)
+            // After AJAX repopulates a <select>, call digitexRefreshSelect(el) — refresh only, never destroy/reinit.
+            window.digitexRefreshSelect = function(element) {
+                if (typeof jQuery === 'undefined' || typeof jQuery.fn.selectpicker === 'undefined') {
+                    return;
+                }
+                var $el = jQuery(element);
+                if ($el.length && $el.data('selectpicker')) {
+                    $el.selectpicker('refresh');
+                }
+            };
+
             window.digitexReinitSelectPickers = function() {
                 if (typeof jQuery.fn.selectpicker === 'undefined') {
                     return;

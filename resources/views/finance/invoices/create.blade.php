@@ -152,7 +152,7 @@
         // --- HELPER: Refresh UI Library (Bootstrap-Select) ---
         function refreshSelect(element) {
             if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
-                 $(element).selectpicker('refresh');
+                $(element).selectpicker('refresh');
             }
         }
 

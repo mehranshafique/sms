@@ -181,8 +181,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         
         function refreshSelect(element) {
-            if (typeof $ !== 'undefined' && $(element).is('select')) {
-                if ($.fn.selectpicker) $(element).selectpicker('refresh');
+            if (typeof $ !== 'undefined' && $(element).is('select') && $.fn.selectpicker) {
+                $(element).selectpicker('refresh');
             }
         }
 

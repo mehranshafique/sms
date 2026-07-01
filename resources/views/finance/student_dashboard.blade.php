@@ -265,7 +265,7 @@
                                                                 <tbody>
                                                                     @forelse($tab['invoice']->payments as $payment)
                                                                         <tr>
-                                                                            <td>{{ $payment->payment_date->format('d M, Y') }}</td>
+                                                                            <td>{{ localized_date($payment->payment_date, 'd M Y') }}</td>
                                                                             <td><span class="badge badge-xs badge-light text-dark border">{{ $payment->transaction_id }}</span></td>
                                                                             <td>{{ ucfirst($payment->method) }}</td>
                                                                             <td class="text-end text-success fw-bold">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($payment->amount, 2) }}</td>

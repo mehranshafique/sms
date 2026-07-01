@@ -12,6 +12,12 @@
         width: 3.5em !important;
         height: 1.75em !important;
         cursor: pointer;
+        background-size: 1em 1em !important;
+        background-position: left center !important;
+    }
+    .form-switch .form-check-input:checked {
+        background-position: right center !important;
+        background-size: 1em 1em !important;
     }
     .cursor-pointer { cursor: pointer; }
     .setup-config-alert { border-left: 4px solid #f59e0b !important; }
@@ -148,9 +154,11 @@
                                 <p class="text-muted mb-0 fs-13">{{ __('configuration.notification_preferences_help') }}</p>
                             </div>
                             <div class="card-body">
+                                    @include('configuration.partials.request_settings')
+
                                 <form action="{{ route('configuration.notifications.update') }}" method="POST" id="notificationsForm">
                                     @csrf
-                                    <div class="d-flex flex-wrap gap-2 mb-3 p-3 bg-light rounded border">
+                                    <div class="d-flex flex-wrap gap-2 mb-3 p-3 bg-light rounded border align-items-start">
                                         <span class="align-self-center fw-bold me-2">{{ __('configuration.select_all_channels') }}:</span>
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input cursor-pointer" type="checkbox" id="selectAllChannels">
@@ -171,6 +179,12 @@
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input cursor-pointer notify-select-all" type="checkbox" id="selectAllSystem" data-channel="system">
                                             <label class="form-check-label cursor-pointer" for="selectAllSystem"><i class="fa fa-bell text-info me-1"></i> {{ __('configuration.select_all_bell') }}</label>
+                                        </div>
+                                        <div class="ms-auto text-end" style="min-width: 220px;">
+                                            <button type="button" class="btn btn-sm btn-outline-success" id="enableRecommendedBtn">
+                                                <i class="fa fa-magic me-1"></i> {{ __('configuration.enable_recommended') }}
+                                            </button>
+                                            <small class="text-muted d-block mt-1 lh-sm">{{ __('configuration.enable_recommended_help') }}</small>
                                         </div>
                                     </div>
                                     <div class="table-responsive">
@@ -451,12 +465,18 @@
         }
 
         function syncNotifySelectAllStates() {
-            ['sms', 'whatsapp', 'email', 'system'].forEach(function(channel) {
+            var channelMap = {
+                sms: '#selectAllSms',
+                whatsapp: '#selectAllWhatsapp',
+                email: '#selectAllEmail',
+                system: '#selectAllSystem'
+            };
+            Object.keys(channelMap).forEach(function(channel) {
                 var $boxes = $('#notificationsForm .notify-channel-' + channel);
                 var allOn = $boxes.length > 0 && $boxes.filter(':checked').length === $boxes.length;
-                $('#selectAll' + channel.charAt(0).toUpperCase() + channel.slice(1)).prop('checked', allOn);
+                $(channelMap[channel]).prop('checked', allOn);
             });
-            var $all = $('#notificationsForm input[type=checkbox].notify-channel-sms, #notificationsForm input[type=checkbox].notify-channel-whatsapp, #notificationsForm input[type=checkbox].notify-channel-email, #notificationsForm input[type=checkbox].notify-channel-system');
+            var $all = $('#notificationsForm input[class*="notify-channel-"]');
             $('#selectAllChannels').prop('checked', $all.length > 0 && $all.filter(':checked').length === $all.length);
         }
 
@@ -473,6 +493,31 @@
 
         $('#notificationsForm').on('change', 'input[class*="notify-channel-"]', syncNotifySelectAllStates);
         syncNotifySelectAllStates();
+
+        $('#enableRecommendedBtn').on('click', function() {
+            const btn = $(this);
+            const original = btn.html();
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i> {{ __('configuration.saving') }}');
+            $.post('{{ route('configuration.notifications.recommended') }}', { _token: '{{ csrf_token() }}' })
+                .done(function(resp) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '{{ __('configuration.success') }}',
+                        text: resp.message || '{{ __('configuration.recommended_notifications_enabled') }}',
+                        confirmButtonText: 'OK'
+                    }).then(function() { location.reload(); });
+                })
+                .fail(function(xhr) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: '{{ __('configuration.error') }}',
+                        text: xhr.responseJSON?.message || '{{ __('configuration.error_occurred') }}'
+                    });
+                })
+                .always(function() {
+                    btn.prop('disabled', false).html(original);
+                });
+        });
 
         // Recharge Balance Logic
         function updateRechargeBalance() {
@@ -497,6 +542,8 @@
                     url: form.attr('action'),
                     type: "POST",
                     data: form.serialize(),
+                    dataType: 'json',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     success: function(response) {
                         btn.prop('disabled', false).html(originalText);
                         Swal.fire({
@@ -528,7 +575,8 @@
         handleAjaxForm('#smtpForm');
         // SMS form logic is now handled inside the partial's JS block, but keeping this for safety
         handleAjaxForm('#smsSettingsForm'); 
-        handleAjaxForm('#notificationsForm'); 
+        handleAjaxForm('#notificationsForm');
+        handleAjaxForm('#requestSettingsForm');
         handleAjaxForm('#yearForm');
         handleAjaxForm('#modulesForm');
         handleAjaxForm('#rechargeForm');

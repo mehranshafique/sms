@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\AppPickupController;
 use App\Http\Controllers\Api\V1\PickupScanController;
 use App\Http\Controllers\Api\V1\UserProfileApiController;
 use App\Http\Controllers\Api\V1\MobileContextApiController;
+use App\Http\Controllers\Api\V1\MobileNotificationApiController;
 use App\Http\Controllers\Api\V1\TimetableApiController;
 use App\Http\Controllers\Api\V1\TeacherAttendanceApiController;
 use App\Http\Controllers\Api\V1\MobileLookupApiController;
@@ -37,10 +38,19 @@ use App\Http\Controllers\Api\V1\Chatbot\PickupController as ChatbotPickupControl
 
 // --- MOBILE APP AUTH & CONTEXT ---
 Route::post('/v1/login', [AuthApiController::class, 'login']);
+Route::post('/v1/auth/otp/request', [AuthApiController::class, 'requestOtp']);
+Route::post('/v1/auth/otp/verify', [AuthApiController::class, 'verifyOtp']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/v1/logout', [MobileContextApiController::class, 'logout']);
     Route::get('/v1/me/context', [MobileContextApiController::class, 'context']);
+    Route::post('/v1/me/switch-role', [MobileContextApiController::class, 'switchRole']);
     Route::post('/v1/update-fcm-token', [AuthApiController::class, 'updateFcmToken']);
+
+    Route::prefix('v1/notifications')->group(function () {
+        Route::get('/feed', [MobileNotificationApiController::class, 'feed']);
+        Route::post('/read-all', [MobileNotificationApiController::class, 'markAllRead']);
+        Route::post('/{id}/read', [MobileNotificationApiController::class, 'markRead'])->whereNumber('id');
+    });
 });
 
 // --- USER PROFILE ---

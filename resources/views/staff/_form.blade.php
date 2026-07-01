@@ -168,10 +168,10 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.status_label') }}</label>
                             <select name="status" class="form-control default-select">
-                                <option value="active" {{ (old('status', $staff->status ?? '') == 'active') ? 'selected' : '' }}>Active</option>
-                                <option value="on_leave" {{ (old('status', $staff->status ?? '') == 'on_leave') ? 'selected' : '' }}>On Leave</option>
-                                <option value="resigned" {{ (old('status', $staff->status ?? '') == 'resigned') ? 'selected' : '' }}>Resigned</option>
-                                <option value="terminated" {{ (old('status', $staff->status ?? '') == 'terminated') ? 'selected' : '' }}>Terminated</option>
+                                <option value="active" {{ (old('status', $staff->status ?? '') == 'active') ? 'selected' : '' }}>{{ __('staff.status_active') }}</option>
+                                <option value="on_leave" {{ (old('status', $staff->status ?? '') == 'on_leave') ? 'selected' : '' }}>{{ __('staff.status_on_leave') }}</option>
+                                <option value="resigned" {{ (old('status', $staff->status ?? '') == 'resigned') ? 'selected' : '' }}>{{ __('staff.status_resigned') }}</option>
+                                <option value="terminated" {{ (old('status', $staff->status ?? '') == 'terminated') ? 'selected' : '' }}>{{ __('staff.status_terminated') }}</option>
                             </select>
                         </div>
 

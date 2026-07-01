@@ -203,4 +203,15 @@ return [
     'date' => 'Date',
     'amount' => 'Amount',
     'action' => 'Action',
+
+    'enable_recommended' => 'Enable recommended defaults',
+    'enable_recommended_help' => 'Applies suggested SMS, WhatsApp, email, and in-app channels for key events (requests, payments, notices, invitations). Existing choices for other events are kept.',
+    'recommended_notifications_enabled' => 'Recommended notification channels enabled (system + WhatsApp, SMS where needed).',
+    'request_settings_title' => 'Request & Derogation Settings',
+    'request_settings_help' => 'Configure parent notifications, response times, and compliance rules for fee extensions.',
+    'request_notify_parent_on_submit' => 'Notify parent when a request is submitted',
+    'request_submit_whatsapp_only' => 'Submit confirmations: WhatsApp only (skip SMS to save cost)',
+    'request_response_hours' => 'Parent response time (hours)',
+    'block_attendance_expired' => 'Block attendance when fee extension expired',
+    'block_results_expired' => 'Block results when fee extension expired',
 ];

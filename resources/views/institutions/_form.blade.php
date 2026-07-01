@@ -229,7 +229,7 @@
             if (typeof $ !== 'undefined' && $(element).is('select')) {
                 if($.fn.niceSelect) {
                     $(element).niceSelect('update');
-                } else if ($.fn.selectpicker) { // Bootstrap select
+                } else if ($.fn.selectpicker) {
                      $(element).selectpicker('refresh');
                 }
             }

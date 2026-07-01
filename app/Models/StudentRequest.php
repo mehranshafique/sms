@@ -21,7 +21,8 @@ class StudentRequest extends Model
         'admin_note',       // NEW: Admin's response/reason sent to parent
         'start_date',
         'end_date',
-        'status',           // pending, approved, partially_approved, rejected
+        'payment_deadline',
+        'status',           // submitted, under_review, approved, partially_approved, rejected, honored, expired
         'ticket_number',
         'created_by',       // User ID of creator (Student or Admin)
         'approved_by',      // User ID of approver
@@ -32,8 +33,21 @@ class StudentRequest extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'payment_deadline' => 'date',
         'approved_at' => 'datetime',
         'reason_params' => 'array',
+    ];
+
+        public const STATUSES = [
+        'submitted',
+        'pending',
+        'under_review',
+        'approved',
+        'partially_approved',
+        'rejected',
+        'additional_info_required',
+        'honored',
+        'expired',
     ];
 
     /** Student/parent request types (staff leave uses staff_leaves module). */

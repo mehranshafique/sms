@@ -108,7 +108,7 @@
                     }
                 @endphp
                 <tr>
-                    <td>{{ $row['date']->format('d M, Y') }}</td>
+                    <td>{{ localized_date($row['date'], 'd M Y') }}</td>
                     <td>{{ $row['desc'] }}</td>
                     <td class="text-right">{{ $debit > 0 ? number_format($debit, 2) : '-' }}</td>
                     <td class="text-right">{{ $credit > 0 ? number_format($credit, 2) : '-' }}</td>

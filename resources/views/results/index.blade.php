@@ -21,7 +21,6 @@
                     <div class="card-body">
                         <form action="{{ route('results.print') }}" method="GET" target="_blank" id="resultForm">
                             <div class="row">
-                                {{-- 1. Select Exam --}}
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label fw-bold">{{ __('results.select_exam') }} <span class="text-danger">*</span></label>
                                     <select name="exam_id" id="exam_select" class="form-control default-select" required>
@@ -38,7 +37,6 @@
                                     </select>
                                 </div>
 
-                                {{-- 2. Select Class --}}
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label fw-bold">{{ __('results.select_class') }} <span class="text-danger">*</span></label>
                                     <select id="class_select" class="form-control default-select" disabled>
@@ -46,7 +44,6 @@
                                     </select>
                                 </div>
 
-                                {{-- 3. Select Student --}}
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label fw-bold">{{ __('results.select_student') }} <span class="text-danger">*</span></label>
                                     <select name="student_id" id="student_select" class="form-control default-select" required disabled>
@@ -116,104 +113,186 @@
 @endsection
 
 @section('js')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    $(document).ready(function() {
-        
-        // --- Helper Function (Matched exactly to _form.blade.php) ---
+    document.addEventListener('DOMContentLoaded', function() {
         function refreshSelect(element) {
-            // Check for jQuery and NiceSelect/Bootstrap Select
             if (typeof $ !== 'undefined' && $(element).is('select')) {
-                if($.fn.niceSelect) {
-                    $(element).niceSelect('update');
-                } else if ($.fn.selectpicker) { 
-                     $(element).selectpicker('refresh');
+                if ($.fn.selectpicker) {
+                    $(element).selectpicker('refresh');
                 }
             }
         }
 
-        // Exam -> Class
-        $('#exam_select').on('change', function() {
-            let examId = $(this).val();
-            let classSelect = $('#class_select');
-            let studentSelect = $('#student_select');
-            
-            // Reset Class Select
-            classSelect.html('<option>{{ __('results.loading') }}</option>').prop('disabled', true);
-            refreshSelect(classSelect);
+        const examSelect = document.getElementById('exam_select');
+        const classSelect = document.getElementById('class_select');
+        const studentSelect = document.getElementById('student_select');
 
-            // Reset Student Select
-            studentSelect.html('<option value="">{{ __('results.select_class_first') }}</option>').prop('disabled', true);
-            refreshSelect(studentSelect);
+        if (examSelect) {
+            examSelect.addEventListener('change', function() {
+                const examId = this.value;
 
-            if(examId) {
-                $.get("{{ route('results.get_classes') }}", { exam_id: examId }, function(data) {
-                    // Clear and add placeholder
-                    classSelect.empty();
-                    classSelect.append('<option value="">{{ __('results.select_class_placeholder') }}</option>');
-                    
-                    $.each(data, function(id, name) {
-                        let safeName = (typeof name === 'object') ? (name.name || JSON.stringify(name)) : name;
-                        // Use standard DOM option creation to ensure compatibility
-                        classSelect.append(new Option(safeName, id));
+                classSelect.innerHTML = `<option value="">${@json(__('results.loading'))}</option>`;
+                classSelect.disabled = true;
+                studentSelect.innerHTML = `<option value="">${@json(__('results.select_class_first'))}</option>`;
+                studentSelect.disabled = true;
+                refreshSelect(classSelect);
+                refreshSelect(studentSelect);
+
+                if (!examId) {
+                    classSelect.innerHTML = `<option value="">${@json(__('results.select_class_first'))}</option>`;
+                    refreshSelect(classSelect);
+                    return;
+                }
+
+                fetch(`{{ route('results.get_classes') }}?exam_id=${encodeURIComponent(examId)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        classSelect.innerHTML = `<option value="">${@json(__('results.select_class_placeholder'))}</option>`;
+                        Object.entries(data).forEach(([id, name]) => {
+                            const safeName = (typeof name === 'object') ? (name.name || JSON.stringify(name)) : name;
+                            classSelect.add(new Option(safeName, id));
+                        });
+                        classSelect.disabled = false;
+                        refreshSelect(classSelect);
+                    })
+                    .catch(() => {
+                        classSelect.innerHTML = `<option value="">${@json(__('results.error_loading_classes'))}</option>`;
+                        refreshSelect(classSelect);
                     });
-                    
-                    classSelect.prop('disabled', false);
-                    refreshSelect(classSelect); // Update UI
-                }).fail(function() {
-                     classSelect.html('<option value="">{{ __('results.error_loading_classes') }}</option>');
-                     refreshSelect(classSelect);
-                });
-            }
-        });
+            });
+        }
 
-        // Class -> Students
-        $('#class_select').on('change', function() {
-            let classId = $(this).val();
-            let examId = $('#exam_select').val();
-            let studentSelect = $('#student_select');
+        if (classSelect) {
+            classSelect.addEventListener('change', function() {
+                const classId = this.value;
+                const examId = examSelect ? examSelect.value : '';
 
-            studentSelect.html('<option>{{ __('results.loading') }}</option>').prop('disabled', true);
-            refreshSelect(studentSelect);
+                studentSelect.innerHTML = `<option value="">${@json(__('results.loading'))}</option>`;
+                studentSelect.disabled = true;
+                refreshSelect(studentSelect);
 
-            if(classId && examId) {
-                let url = "{{ route('results.get_students') }}"; 
-                
-                $.get(url, { exam_id: examId, class_section_id: classId }, function(data) {
-                    studentSelect.empty();
-                    studentSelect.append('<option value="">{{ __('results.select_student_placeholder') }}</option>');
-                    
-                    $.each(data, function(index, student) {
-                        let label = `${student.name} (${student.roll_number})`;
-                        studentSelect.append(new Option(label, student.id));
-                    });
-                    
-                    studentSelect.prop('disabled', false);
-                    refreshSelect(studentSelect); // Update UI
-                }).fail(function() {
-                    studentSelect.html('<option value="">{{ __('results.error_loading_students') }}</option>');
+                if (!classId || !examId) {
+                    studentSelect.innerHTML = `<option value="">${@json(__('results.select_student_first'))}</option>`;
                     refreshSelect(studentSelect);
-                });
-            }
-        });
+                    return;
+                }
+
+                const url = `{{ route('results.get_students') }}?exam_id=${encodeURIComponent(examId)}&class_section_id=${encodeURIComponent(classId)}`;
+                fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(res => res.json())
+                    .then(data => {
+                        studentSelect.innerHTML = `<option value="">${@json(__('results.select_student_placeholder'))}</option>`;
+                        data.forEach(student => {
+                            const label = `${student.name} (${student.roll_number})`;
+                            studentSelect.add(new Option(label, student.id));
+                        });
+                        studentSelect.disabled = false;
+                        refreshSelect(studentSelect);
+                    })
+                    .catch(() => {
+                        studentSelect.innerHTML = `<option value="">${@json(__('results.error_loading_students'))}</option>`;
+                        refreshSelect(studentSelect);
+                    });
+            });
+        }
 
         @if(has_ai_access())
-        $('#ai_bulk_exam').on('change', function() {
-            let examId = $(this).val();
-            let classSelect = $('#ai_bulk_class');
-            classSelect.html('<option>{{ __('results.loading') }}</option>').prop('disabled', true);
-            refreshSelect(classSelect);
-            if (examId) {
-                $.get("{{ route('results.get_classes') }}", { exam_id: examId }, function(data) {
-                    classSelect.empty().append('<option value="">{{ __('results.select_class_placeholder') }}</option>');
-                    $.each(data, function(id, name) {
-                        classSelect.append(new Option(name, id));
+        const aiBulkExam = document.getElementById('ai_bulk_exam');
+        const aiBulkClass = document.getElementById('ai_bulk_class');
+
+        if (aiBulkExam && aiBulkClass) {
+            aiBulkExam.addEventListener('change', function() {
+                const examId = this.value;
+                aiBulkClass.innerHTML = `<option value="">${@json(__('results.loading'))}</option>`;
+                aiBulkClass.disabled = true;
+                refreshSelect(aiBulkClass);
+
+                if (!examId) {
+                    aiBulkClass.innerHTML = `<option value="">${@json(__('results.select_class_first'))}</option>`;
+                    refreshSelect(aiBulkClass);
+                    return;
+                }
+
+                fetch(`{{ route('results.get_classes') }}?exam_id=${encodeURIComponent(examId)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        aiBulkClass.innerHTML = `<option value="">${@json(__('results.select_class_placeholder'))}</option>`;
+                        Object.entries(data).forEach(([id, name]) => {
+                            aiBulkClass.add(new Option(name, id));
+                        });
+                        aiBulkClass.disabled = false;
+                        refreshSelect(aiBulkClass);
                     });
-                    classSelect.prop('disabled', false);
-                    refreshSelect(classSelect);
-                });
-            }
-        });
+            });
+        }
         @endif
+
+        const resultForm = document.getElementById('resultForm');
+        if (resultForm) {
+            let resultReady = false;
+            resultForm.addEventListener('submit', function(e) {
+                if (resultReady) {
+                    return;
+                }
+                e.preventDefault();
+
+                if (!this.checkValidity()) {
+                    this.reportValidity();
+                    return;
+                }
+
+                const submitBtn = this.querySelector('button[type="submit"]');
+                const originalHtml = submitBtn ? submitBtn.innerHTML : '';
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i> {{ __('results.loading') }}';
+                }
+
+                const params = new URLSearchParams(new FormData(this));
+                params.append('check_only', '1');
+
+                fetch(this.action + '?' + params.toString(), {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalHtml;
+                    }
+
+                    if (data.status === 'error') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: @json(__('results.no_results_title')),
+                            text: data.message || @json(__('results.no_marks_found_error')),
+                            confirmButtonColor: '#d33'
+                        });
+                    } else {
+                        resultReady = true;
+                        HTMLFormElement.prototype.submit.call(resultForm);
+                        resultReady = false;
+                    }
+                })
+                .catch(function() {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalHtml;
+                    }
+                    Swal.fire({
+                        icon: 'error',
+                        title: @json(__('results.error_occurred')),
+                        text: @json(__('results.generic_error'))
+                    });
+                });
+            });
+        }
     });
 </script>
 @endsection

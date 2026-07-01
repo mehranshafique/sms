@@ -89,7 +89,7 @@
                     <div class="card-header bg-primary text-white py-4 d-flex justify-content-between align-items-center rounded-top"> 
                         <div>
                             <h3 class="text-white mb-0 fw-bold">{{ mb_strtoupper($invoice->status === 'paid' ? __('invoice.receipt') : __('invoice.invoice')) }}</h3>
-                            <span class="opacity-75">{{ __('invoice.date') }}: {{ $invoice->issue_date->format('d M, Y') }}</span>
+                            <span class="opacity-75">{{ __('invoice.date') }}: {{ localized_date($invoice->issue_date, 'd M Y') }}</span>
                         </div>
                         <div class="text-end">
                             <span class="badge {{ $badgeClass }} fs-14 px-3 py-2 text-uppercase shadow-sm border border-light">
@@ -146,7 +146,7 @@
                         <div class="row">
                             <div class="col-sm-6">
                                 <p class="text-muted small">
-                                    * {{ __('invoice.due_date') }}: <strong>{{ $invoice->due_date->format('d M, Y') }}</strong><br>
+                                    * {{ __('invoice.due_date') }}: <strong>{{ localized_date($invoice->due_date, 'd M Y') }}</strong><br>
                                     * {{ __('invoice.academic_year') }}: <strong>{{ $invoice->academicSession->name ?? 'N/A' }}</strong>
                                 </p>
                             </div>
@@ -232,7 +232,7 @@
                                 <tbody>
                                     @forelse($invoice->payments as $payment)
                                     <tr>
-                                        <td class="py-3">{{ $payment->payment_date->format('d M, Y') }}</td>
+                                        <td class="py-3">{{ localized_date($payment->payment_date, 'd M Y') }}</td>
                                         <td class="py-3"><span class="badge badge-light text-dark border">{{ $payment->transaction_id }}</span></td>
                                         <td class="py-3">{{ ucfirst($payment->method) }}</td>
                                         <td class="py-3">

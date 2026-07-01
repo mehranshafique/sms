@@ -21,7 +21,9 @@ return [
     'room' => 'Room Number',
     'max_marks' => 'Max Marks',
     'pass_marks' => 'Pass Marks',
-    'is_scheduled' => 'Scheduled?',
+    'is_scheduled' => 'Planifié ?',
+    'include_in_exam' => 'Include in Exam',
+    'include_in_exam_help' => 'Disable subjects that are not examined this period.',
     'invigilator_sign' => 'Invigilator Sign',
     
     // Admit Card

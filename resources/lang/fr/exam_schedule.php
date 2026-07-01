@@ -2,10 +2,10 @@
 
 return [
     'title' => 'Planification d\'Examen',
-    'manage_title' => 'Gérer l\'horaire des examens',
+    'manage_title' => 'Gestion des horaires des Epreuves',
     'subtitle' => 'Planifier les dates, heures et salles d\'examen',
-    'select_exam' => 'Sélectionner l\'examen',
-    'select_class' => 'Sélectionner la classe',
+    'select_exam' => 'Sélectionnez la Période/Session',
+    'select_class' => 'Sélectionnez la Classe',
     'load_subjects' => 'Charger les matières',
     'download_admit_card' => 'Télécharger les cartes d\'accès',
     'auto_fill' => 'Remplissage automatique',
@@ -18,6 +18,8 @@ return [
     'max_marks' => 'Note Max',
     'pass_marks' => 'Note de passage',
     'is_scheduled' => 'Planifié ?',
+    'include_in_exam' => 'Inclure à l\'épreuve',
+    'include_in_exam_help' => 'Désactivez les matières non évaluées pour cette période.',
     'invigilator_sign' => 'Signature surveillant',
     'admit_card' => 'Carte d\'accès aux examens',
     'instructions' => 'Instructions importantes',

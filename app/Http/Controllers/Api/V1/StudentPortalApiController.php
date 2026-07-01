@@ -346,17 +346,19 @@ class StudentPortalApiController extends Controller
             $sessionId = $enrollment ? $enrollment->academic_session_id : null;
             $ticket = 'REQ-' . strtoupper(Str::random(8));
 
-            StudentRequest::create([
+            $created = StudentRequest::create([
                 'institution_id' => $student->institution_id,
                 'student_id' => $student->id,
                 'academic_session_id' => $sessionId,
                 'type' => $request->type,
                 'reason' => $request->reason,
                 'start_date' => now(),
-                'status' => 'pending',
+                'status' => 'submitted',
                 'ticket_number' => $ticket,
                 'created_by' => Auth::id()
             ]);
+
+            app(\App\Services\StudentRequestNotificationDispatcher::class)->onSubmitted($created);
 
             return response()->json([
                 'success' => true, 
@@ -552,8 +554,9 @@ class StudentPortalApiController extends Controller
                 ->map(fn ($r) => [
                     'id' => $r->id,
                     'ticket_number' => $r->ticket_number,
-                    'type' => $r->type,
-                    'reason' => $r->reason,
+                    'type' => $r->resolvedType(),
+                    'type_label' => $r->typeLabel(),
+                    'reason' => $r->localizedReason(),
                     'status' => $r->status,
                     'start_date' => $r->start_date ? Carbon::parse($r->start_date)->format('d M, Y') : null,
                     'created_at' => $r->created_at?->format('d M, Y'),

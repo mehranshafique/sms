@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'page_title' => 'Demandes et requêtes',
+    'page_title' => 'Dérogation & Requête',
     'subtitle' => 'Gérer les absences, retards et autorisations spéciales',
     'create_new' => 'Nouvelle requête',
     'request_details' => 'Détails de la requête',
@@ -31,4 +31,27 @@ return [
     'request_for_help' => 'Sélectionnez l\'élève concerné par cette requête.',
     'staff_leave_hint' => 'Les congés du personnel sont gérés séparément.',
     'staff_leave_link' => 'Aller aux congés du personnel',
+
+    'parent' => 'Parent',
+    'class_section' => 'Classe / Section',
+    'classe' => 'Classe',
+    'student_dossier' => 'Dossier décisionnel de l\'élève',
+    'total_fees' => 'Total des frais',
+    'amount_paid' => 'Montant payé',
+    'outstanding' => 'Solde restant',
+    'attendance_summary' => 'Résumé des présences',
+    'attendance_present' => 'Présent',
+    'attendance_absent' => 'Absent',
+    'discipline_incidents' => 'Incidents disciplinaires',
+    'recent_payments' => 'Paiements récents',
+    'previous_requests' => 'Requêtes précédentes',
+    'hours' => 'heures',
+    'payment_deadline' => 'Date limite de paiement',
+    'status_submitted' => 'Soumis',
+    'status_under_review' => 'En cours d\'examen',
+    'status_honored' => 'Honoré',
+    'status_expired' => 'Expiré',
+    'status_additional_info_required' => 'Informations complémentaires requises',
+    'decision_additional_info' => 'Demander des informations complémentaires',
+    'attendance_blocked_expired_derogation' => 'Présence bloquée : dérogation de frais expirée.',
 ];

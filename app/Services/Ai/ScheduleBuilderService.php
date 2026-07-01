@@ -6,6 +6,7 @@ use App\Models\AcademicSession;
 use App\Models\ClassSection;
 use App\Models\ClassSubject;
 use App\Models\Exam;
+use App\Models\ExamClassSubjectSetting;
 use App\Models\InstitutionSetting;
 use App\Models\Subject;
 use App\Models\Timetable;
@@ -37,7 +38,7 @@ class ScheduleBuilderService
         $gapMinutes      = (int) ($options['gap_minutes'] ?? 30);
         $periodDays      = isset($options['period_days']) ? max(1, (int) $options['period_days']) : null;
 
-        $subjects = $this->subjectsForClass($classSection, $exam->academic_session_id);
+        $subjects = $this->subjectsForClass($classSection, $exam->academic_session_id, $examId);
 
         $examStartDate = Carbon::parse($exam->start_date)->startOfDay();
         $examEndDate   = Carbon::parse($exam->end_date)->startOfDay();
@@ -227,19 +228,29 @@ class ScheduleBuilderService
     }
 
     /** @return \Illuminate\Support\Collection<int, Subject> */
-    protected function subjectsForClass(ClassSection $classSection, int $sessionId)
+    protected function subjectsForClass(ClassSection $classSection, int $sessionId, ?int $examId = null)
     {
         $allocatedIds = ClassSubject::where('class_section_id', $classSection->id)
             ->where('academic_session_id', $sessionId)
             ->pluck('subject_id');
 
         if ($allocatedIds->isNotEmpty()) {
-            return Subject::whereIn('id', $allocatedIds)->where('is_active', true)->get();
+            $subjects = Subject::whereIn('id', $allocatedIds)->where('is_active', true)->get();
+        } else {
+            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
+                ->where('is_active', true)
+                ->get();
         }
 
-        return Subject::where('grade_level_id', $classSection->grade_level_id)
-            ->where('is_active', true)
-            ->get();
+        if ($examId) {
+            $excluded = ExamClassSubjectSetting::where('exam_id', $examId)
+                ->where('class_section_id', $classSection->id)
+                ->where('is_examined', false)
+                ->pluck('subject_id');
+            $subjects = $subjects->whereNotIn('id', $excluded);
+        }
+
+        return $subjects->values();
     }
 
     /** @return array<int, array{start: string, end: string}> */

@@ -218,7 +218,7 @@ class ChatbotLogicService
                 'user_id' => null,
                 'locale' => 'fr' 
             ]);
-            return $this->reply($phone, "Bienvenue, veuillez entrer votre identifiant (Shortcode).", null);
+            return $this->reply($phone, "Bienvenue, veuillez entrer votre identifiant (Shortcode, ID employé ou téléphone).", null);
         }
 
         $keyword = ChatbotKeyword::whereRaw('LOWER(keyword) = ?', [$textLower])->first();
@@ -272,7 +272,7 @@ class ChatbotLogicService
         Log::info("Chatbot Auth: Processing Identity", ['input' => $input, 'user_type' => $session->user_type]);
 
         if ($session->user_type === 'staff') {
-            $user = User::where('username', $input)->orWhere('shortcode', $input)->first();
+            $user = app(OtpAuthService::class)->resolveUser($input, $session->institution_id);
             
             if ($user) {
                 $role = 'staff';
@@ -1472,12 +1472,12 @@ class ChatbotLogicService
                 'reason' => __('requests.reason_chatbot_fee_extension', ['days' => $days], $s->locale ?? 'fr'),
                 'start_date' => now(),
                 'end_date' => now()->addDays($days),
-                'status' => 'pending',
+                'status' => 'submitted',
                 'ticket_number' => $ticket,
                 'created_by' => $s->user_id 
              ]);
 
-             app(InAppNotificationService::class)->notifyStudentRequestSubmitted($created);
+             app(\App\Services\StudentRequestNotificationDispatcher::class)->onSubmitted($created);
         }
 
         $s->update(['status'=>'ACTIVE']); 
@@ -1518,12 +1518,12 @@ class ChatbotLogicService
                     'reason' => $text,
                     'reason_locale' => $session->locale ?? app()->getLocale(),
                     'start_date' => now(), 
-                    'status' => 'pending',
+                    'status' => 'submitted',
                     'ticket_number' => $ticket,
                     'created_by' => $session->user_id
                  ]);
 
-                 app(InAppNotificationService::class)->notifyStudentRequestSubmitted($created);
+                 app(\App\Services\StudentRequestNotificationDispatcher::class)->onSubmitted($created);
              }
         }
 

@@ -53,7 +53,7 @@
                             {{-- Single: Student Select --}}
                             <div class="mb-3" id="studentInputGroup">
                                 <label class="form-label">{{ __('reports.select_student') }} <span class="text-danger">*</span></label>
-                                <select class="form-control default-select select2" name="student_id" id="studentSelect">
+                                <select class="form-control default-select" name="student_id" id="studentSelect">
                                     <option value="">{{ __('reports.select_student') }}</option>
                                     @foreach($students as $student)
                                         <option value="{{ $student->id }}">{{ $student->first_name }} {{ $student->last_name }} ({{ $student->admission_number }})</option>
@@ -143,7 +143,7 @@
                         <form action="{{ route('reports.transcript') }}" method="GET" target="_blank" id="transcriptForm">
                             <div class="mb-3">
                                 <label class="form-label">{{ __('reports.select_student') }}</label>
-                                <select class="form-control default-select select2" name="student_id" required>
+                                <select class="form-control default-select" name="student_id" required>
                                     <option value="">{{ __('reports.select_student') }}</option>
                                     @foreach($students as $student)
                                         <option value="{{ $student->id }}">{{ $student->first_name }} {{ $student->last_name }} ({{ $student->admission_number }})</option>
@@ -167,26 +167,23 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Select2
-        if ($.fn.select2) {
-            $('.select2').select2();
-        }
-
-        // Toggle Single vs Bulk Mode
         const modeRadios = document.querySelectorAll('input[name="mode"]');
         const studentGroup = document.getElementById('studentInputGroup');
         const classGroup = document.getElementById('classInputGroup');
         const studentSelect = document.getElementById('studentSelect');
         const classSelect = document.getElementById('classSelect');
+        const reportScope = document.getElementById('reportScope');
+        const periodSelect = document.getElementById('periodSelect');
+        const trimesterSelect = document.getElementById('trimesterSelect');
+        const semesterSelect = document.getElementById('semesterSelect');
 
-        function reinitPickers() {
-            requestAnimationFrame(function () {
-                if (typeof window.digitexReinitSelectPickers === 'function') {
-                    window.digitexReinitSelectPickers();
-                } else if ($.fn.selectpicker) {
-                    $('.default-select').selectpicker('refresh');
-                }
-            });
+        function refreshPicker(selectEl) {
+            if (!selectEl) {
+                return;
+            }
+            if (typeof $ !== 'undefined' && $(selectEl).is('select') && $.fn.selectpicker) {
+                $(selectEl).selectpicker('refresh');
+            }
         }
 
         function setPickerEnabled(selectEl, enabled) {
@@ -197,6 +194,7 @@
             const $el = $(selectEl);
             if ($.fn.selectpicker && $el.data('selectpicker')) {
                 enabled ? $el.selectpicker('enable') : $el.selectpicker('disable');
+                refreshPicker(selectEl);
             }
         }
 
@@ -206,70 +204,76 @@
                 studentGroup.classList.add('d-none');
                 classGroup.classList.remove('d-none');
                 studentSelect.required = false;
-                setPickerEnabled(studentSelect, false);
                 studentSelect.value = '';
+                setPickerEnabled(studentSelect, false);
                 classSelect.required = true;
                 setPickerEnabled(classSelect, true);
-                if ($.fn.select2) {
-                    $(studentSelect).val('').trigger('change');
-                }
+                refreshPicker(classSelect);
             } else {
                 classGroup.classList.add('d-none');
                 studentGroup.classList.remove('d-none');
                 classSelect.required = false;
-                setPickerEnabled(classSelect, false);
                 classSelect.value = '';
+                setPickerEnabled(classSelect, false);
                 studentSelect.required = true;
                 setPickerEnabled(studentSelect, true);
+                refreshPicker(studentSelect);
             }
-            reinitPickers();
+            refreshPicker(reportScope);
+            refreshPicker(periodSelect);
+            refreshPicker(trimesterSelect);
+            refreshPicker(semesterSelect);
         }
         toggleMode();
 
         modeRadios.forEach(radio => radio.addEventListener('change', toggleMode));
 
-        // Dynamic Form Handling (Scope Selection)
-        $('#reportScope').on('change', function() {
-            const scope = $(this).val();
-            
-            // Reset visibility
-            $('#periodGroup, #trimesterGroup, #semesterGroup').addClass('d-none');
-            $('#periodSelect, #trimesterSelect, #semesterSelect').prop('required', false).val('');
-            
-            // Reset Type Input
-            $('#typeInput').val('term'); // Default to term
+        if (reportScope) {
+            reportScope.addEventListener('change', function() {
+                const scope = this.value;
 
-            if (scope === 'period') {
-                $('#periodGroup').removeClass('d-none');
-                $('#periodSelect').prop('required', true);
-                $('#typeInput').val('period'); // Set type to period
-            } 
-            else if (scope === 'trimester') {
-                $('#trimesterGroup').removeClass('d-none');
-                $('#trimesterSelect').prop('required', true);
-            } 
-            else if (scope === 'semester') {
-                $('#semesterGroup').removeClass('d-none');
-                $('#semesterSelect').prop('required', true);
-            }
-            
-            // Refresh select picker
-            reinitPickers();
-        });
+                document.getElementById('periodGroup').classList.add('d-none');
+                document.getElementById('trimesterGroup').classList.add('d-none');
+                document.getElementById('semesterGroup').classList.add('d-none');
+                periodSelect.required = false;
+                trimesterSelect.required = false;
+                semesterSelect.required = false;
+                periodSelect.value = '';
+                trimesterSelect.value = '';
+                semesterSelect.value = '';
+                document.getElementById('typeInput').value = 'term';
+
+                if (scope === 'period') {
+                    document.getElementById('periodGroup').classList.remove('d-none');
+                    periodSelect.required = true;
+                    document.getElementById('typeInput').value = 'period';
+                } else if (scope === 'trimester') {
+                    document.getElementById('trimesterGroup').classList.remove('d-none');
+                    trimesterSelect.required = true;
+                } else if (scope === 'semester') {
+                    document.getElementById('semesterGroup').classList.remove('d-none');
+                    semesterSelect.required = true;
+                }
+
+                refreshPicker(reportScope);
+                refreshPicker(periodSelect);
+                refreshPicker(trimesterSelect);
+                refreshPicker(semesterSelect);
+            });
+        }
 
         // --- AJAX CHECK: Bulletin Form ---
         const bulletinForm = document.getElementById('bulletinForm');
         const btnBulletin = document.getElementById('btnBulletin');
 
-        if(bulletinForm) {
+        if (bulletinForm) {
             let bulletinReady = false;
             bulletinForm.addEventListener('submit', function(e) {
                 if (bulletinReady) {
                     return;
                 }
                 e.preventDefault();
-                
-                // Basic HTML validation check
+
                 if (!this.checkValidity()) {
                     this.reportValidity();
                     return;
@@ -281,12 +285,11 @@
 
                 const formData = new FormData(this);
                 const params = new URLSearchParams(formData);
-                // Append flag to tell controller we only want to check
                 params.append('check_only', '1');
 
                 fetch(this.action + '?' + params.toString(), {
                     method: 'GET',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -296,24 +299,23 @@
                     if (data.status === 'error') {
                         Swal.fire({
                             icon: 'error',
-                            title: '{{ __("reports.error_occurred") }}', // Or generic Title
-                            text: data.message || '{{ __("reports.no_records_found") }}',
+                            title: @json(__('reports.error_occurred')),
+                            text: data.message || @json(__('reports.no_records_found')),
                             confirmButtonColor: '#d33'
                         });
                     } else {
                         bulletinReady = true;
                         HTMLFormElement.prototype.submit.call(bulletinForm);
                         bulletinReady = false;
-                        reinitPickers();
                     }
                 })
-                .catch(err => {
+                .catch(function() {
                     btnBulletin.disabled = false;
                     btnBulletin.innerHTML = originalText;
                     Swal.fire({
                         icon: 'error',
-                        title: 'Error',
-                        text: '{{ __("reports.generic_error") }}'
+                        title: @json(__('reports.error_occurred')),
+                        text: @json(__('reports.generic_error'))
                     });
                 });
             });
@@ -323,10 +325,14 @@
         const transcriptForm = document.getElementById('transcriptForm');
         const btnTranscript = document.getElementById('btnTranscript');
 
-        if(transcriptForm) {
+        if (transcriptForm) {
+            let transcriptReady = false;
             transcriptForm.addEventListener('submit', function(e) {
+                if (transcriptReady) {
+                    return;
+                }
                 e.preventDefault();
-                
+
                 if (!this.checkValidity()) {
                     this.reportValidity();
                     return;
@@ -342,7 +348,7 @@
 
                 fetch(this.action + '?' + params.toString(), {
                     method: 'GET',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -352,21 +358,23 @@
                     if (data.status === 'error') {
                         Swal.fire({
                             icon: 'error',
-                            title: '{{ __("reports.error_occurred") }}',
-                            text: data.message || '{{ __("reports.no_records_found") }}',
+                            title: @json(__('reports.error_occurred')),
+                            text: data.message || @json(__('reports.no_records_found')),
                             confirmButtonColor: '#d33'
                         });
                     } else {
-                        transcriptForm.submit();
+                        transcriptReady = true;
+                        HTMLFormElement.prototype.submit.call(transcriptForm);
+                        transcriptReady = false;
                     }
                 })
-                .catch(err => {
+                .catch(function() {
                     btnTranscript.disabled = false;
                     btnTranscript.innerHTML = originalText;
                     Swal.fire({
                         icon: 'error',
-                        title: 'Error',
-                        text: '{{ __("reports.generic_error") }}'
+                        title: @json(__('reports.error_occurred')),
+                        text: @json(__('reports.generic_error'))
                     });
                 });
             });

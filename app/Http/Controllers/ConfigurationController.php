@@ -290,7 +290,46 @@ class ConfigurationController extends BaseController
             $this->saveSetting($institutionId, "notify_{$event}", json_encode($val), 'notifications');
         }
 
-        return redirect()->back()->with('success', __('configuration.notifications_updated') ?? 'Notifications updated successfully.');
+        return $request->ajax() || $request->wantsJson()
+            ? response()->json(['message' => __('configuration.notifications_updated')])
+            : redirect()->back()->with('success', __('configuration.notifications_updated'));
+    }
+
+    public function updateRequestSettings(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+
+        $this->saveSetting($institutionId, 'request_notify_parent_on_submit', $request->boolean('request_notify_parent_on_submit') ? '1' : '0', 'requests');
+        $this->saveSetting($institutionId, 'request_submit_whatsapp_only', $request->boolean('request_submit_whatsapp_only') ? '1' : '0', 'requests');
+        $this->saveSetting($institutionId, 'request_response_hours', (string) max(1, (int) $request->input('request_response_hours', 24)), 'requests');
+        $this->saveSetting($institutionId, 'block_attendance_on_expired_derogation', $request->boolean('block_attendance_on_expired_derogation') ? '1' : '0', 'requests');
+        $this->saveSetting($institutionId, 'block_results_on_expired_derogation', $request->boolean('block_results_on_expired_derogation') ? '1' : '0', 'requests');
+
+        return $request->ajax() || $request->wantsJson()
+            ? response()->json(['message' => __('configuration.settings_saved')])
+            : redirect()->back()->with('success', __('configuration.settings_saved'));
+    }
+
+    public function enableRecommendedNotifications(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        $recommended = [
+            'request_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
+            'request_submitted_parent' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
+            'request_updated' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
+            'payment_received' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
+            'payment_proof_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
+            'notice_published' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
+            'event_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
+        ];
+
+        foreach ($recommended as $event => $channels) {
+            $this->saveSetting($institutionId, "notify_{$event}", json_encode($channels), 'notifications');
+        }
+
+        return $request->ajax() || $request->wantsJson()
+            ? response()->json(['message' => __('configuration.recommended_notifications_enabled')])
+            : redirect()->back()->with('success', __('configuration.recommended_notifications_enabled'));
     }
 
     // --- 4. SCHOOL YEAR ---

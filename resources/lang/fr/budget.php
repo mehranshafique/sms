@@ -61,4 +61,9 @@ return [
     'responsible_person_help' => 'Cette personne reçoit les alertes de consommation budgétaire lorsque des dépenses sont approuvées.',
     'consumed_email_subject' => 'Dépense budgétaire : :line',
     'consumed_email_body' => "Ligne budgétaire : :line\nDépense : :title\nMontant dépensé : :amount\nSolde restant : :remaining",
+    'requests_subtitle' => 'Gérer et suivre toutes les demandes de fonds',
+    'notification_recipients' => 'Destinataires des alertes',
+    'notification_recipients_help' => 'Tous les utilisateurs sélectionnés reçoivent les alertes de consommation budgétaire.',
+    'invalid_password' => 'Mot de passe incorrect. Approbation annulée.',
+    'enter_password' => 'Entrez votre mot de passe pour confirmer',
 ];
