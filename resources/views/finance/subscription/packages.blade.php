@@ -5,7 +5,8 @@
     .pkg-hero { border-radius:18px; background:linear-gradient(120deg,#0b2a6b 0%,#13386e 50%,#2563eb 100%); }
     .pkg-card { background:#fff; border:1px solid #eef0f4; border-radius:16px; }
     .pkg-table thead th { font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; border-bottom:1px solid #eef0f4; background:#fafbfc; }
-    [data-theme="dark"] .pkg-card { background:#1e2746; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .pkg-card { background:#1e2746; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .pkg-table thead th { background:#243054 !important; color:#e8ebf5 !important; border-color:#2b365c !important; }
 </style>
 <div class="content-body">
     <div class="container-fluid">

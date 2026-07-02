@@ -35,6 +35,8 @@ return [
     'response_message' => 'Response Message',
     'response_placeholder' => 'Enter the automated reply here...',
     'keyword_help' => 'The word that starts the conversation (e.g. "Hi", "Menu", "Balance").',
+    'portal_role' => 'Portal / User Role',
+    'portal_role_help' => 'Only IDs matching this role will be accepted after the keyword is sent.',
     'actions' => 'Actions',
     'no_keywords' => 'No keywords defined yet.',
     'keyword_created' => 'Keyword successfully created.',

@@ -18,8 +18,9 @@ class ChatSession extends Model
         'otp', 
         'otp_expires_at', 
         'attempts', 
-        'status', 
-        'locale', // Added
+        'status',
+        'portal_role',
+        'locale',
         'last_interaction_at', 
         'expires_at'
     ];

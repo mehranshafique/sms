@@ -151,6 +151,7 @@
                                         <thead class="bg-light">
                                             <tr>
                                                 <th>{{ __('chatbot.keyword') ?? 'Keyword' }}</th>
+                                                <th>{{ __('chatbot.portal_role') ?? 'Portal / Role' }}</th>
                                                 <th>{{ __('chatbot.language') ?? 'Language' }}</th>
                                                 <th>{{ __('chatbot.response_message') ?? 'Message' }}</th>
                                                 @can('setting.manage')
@@ -162,6 +163,7 @@
                                             @forelse($keywords as $kw)
                                             <tr>
                                                 <td><span class="badge badge-primary light fw-bold">{{ strtoupper($kw->keyword) }}</span></td>
+                                                <td><span class="badge badge-info light">{{ $portalRoles[$kw->portal_role] ?? ucfirst(str_replace('_', ' ', $kw->portal_role ?? 'student')) }}</span></td>
                                                 <td>{{ strtoupper($kw->language) }}</td>
                                                 <td><small>{{ \Illuminate\Support\Str::limit($kw->welcome_message, 60) }}</small></td>
                                                 @can('setting.manage')
@@ -169,6 +171,7 @@
                                                     <button class="btn btn-info btn-xs shadow edit-keyword" 
                                                         data-id="{{ $kw->id }}" 
                                                         data-keyword="{{ $kw->keyword }}" 
+                                                        data-portal="{{ $kw->portal_role ?? 'student' }}"
                                                         data-lang="{{ $kw->language }}" 
                                                         data-msg="{{ $kw->welcome_message }}">
                                                         <i class="fa fa-pencil"></i>
@@ -182,7 +185,7 @@
                                             </tr>
                                             @empty
                                             <tr>
-                                                <td colspan="4" class="text-center text-muted py-4">{{ __('chatbot.no_keywords') ?? 'No keywords' }}</td>
+                                                <td colspan="5" class="text-center text-muted py-4">{{ __('chatbot.no_keywords') ?? 'No keywords' }}</td>
                                             </tr>
                                             @endforelse
                                         </tbody>
@@ -250,6 +253,15 @@
                                 <input type="text" name="keyword" id="inputKeyword" class="form-control" required placeholder="e.g. Digitex">
                             </div>
                             <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('chatbot.portal_role') ?? 'Portal / Role' }} <span class="text-danger">*</span></label>
+                                <select name="portal_role" id="inputPortalRole" class="form-control default-select" required>
+                                    @foreach($portalRoles as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted">{{ __('chatbot.portal_role_help') ?? 'Only users matching this role can log in with this keyword.' }}</small>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label fw-bold">{{ __('chatbot.language') ?? 'Language' }} <span class="text-danger">*</span></label>
                                 <select name="language" id="inputLang" class="form-control default-select" required>
                                     <option value="en">English (EN)</option>
@@ -291,13 +303,18 @@
         $('.edit-keyword').click(function() {
             let id = $(this).data('id');
             let kw = $(this).data('keyword');
+            let portal = $(this).data('portal');
             let lang = $(this).data('lang');
             let msg = $(this).data('msg');
 
             $('#keywordModalTitle').text("{{ __('chatbot.edit_keyword') ?? 'Edit Keyword' }}");
             $('#inputKeyword').val(kw);
+            $('#inputPortalRole').val(portal).change();
             $('#inputLang').val(lang).change();
-            if($.fn.selectpicker) $('#inputLang').selectpicker('refresh');
+            if($.fn.selectpicker) {
+                $('#inputPortalRole').selectpicker('refresh');
+                $('#inputLang').selectpicker('refresh');
+            }
             $('#inputMsg').val(msg);
 
             let updateUrl = "{{ url('chatbot/keywords') }}/" + id;
@@ -312,7 +329,10 @@
             $('#formMethod').val('POST');
             $('#keywordForm')[0].reset();
             $('#keywordModalTitle').text("{{ __('chatbot.add_keyword') ?? 'Add Keyword' }}");
-            if($.fn.selectpicker) $('#inputLang').selectpicker('refresh');
+            if($.fn.selectpicker) {
+                $('#inputPortalRole').selectpicker('refresh');
+                $('#inputLang').selectpicker('refresh');
+            }
         });
 
         // Chat Sessions DataTable (ScrollX Removed, Responsive + Modal Display Added)

@@ -6,6 +6,8 @@ return [
     'unknown_state_error' => "⚠️ Unknown state. Returning to main menu.",
     'system_error' => "⚠️ An internal error occurred. Please try again later.",
     'admin_welcome_prompt' => "🏢 *Head Office Portal*\n\nPlease enter your Staff ID or Username:",
+    'director_welcome_prompt' => "🏫 *Director Portal*\n\nPlease enter your Staff ID or Username:",
+    'finance_welcome_prompt' => "💰 *Finance Portal*\n\nPlease enter your Staff ID or Username:",
     'teacher_welcome_prompt' => "👨‍🏫 *Teacher Portal*\n\nPlease enter your Staff ID:",
     'student_welcome_prompt' => "🎓 *University Portal*\n\nPlease enter your Student ID:",
     'parent_welcome_prompt' => "👋 *Parent Portal*\n\nPlease enter your Child's Student ID:",

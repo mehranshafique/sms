@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\InstitutionSetting;
 use App\Models\ChatbotKeyword;
+use App\Enums\ChatbotPortalRole;
 use App\Models\ChatSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -64,7 +65,9 @@ class ChatbotSettingController extends BaseController
             'legacy' => $baseUrl . '/api/v1/chatbot/webhook' . $secretQuery,
         ];
 
-        return view('chatbot.settings', compact('keywords', 'config', 'webhookUrls'));
+        $portalRoles = ChatbotPortalRole::options();
+
+        return view('chatbot.settings', compact('keywords', 'config', 'webhookUrls', 'portalRoles'));
     }
 
     public function storeConfig(Request $request)
@@ -290,6 +293,7 @@ class ChatbotSettingController extends BaseController
                 })
             ],
             'language' => 'required|in:en,fr',
+            'portal_role' => ['required', Rule::in(array_column(ChatbotPortalRole::cases(), 'value'))],
             'welcome_message' => 'required|string|max:1000',
         ]);
 
@@ -297,6 +301,7 @@ class ChatbotSettingController extends BaseController
             'institution_id' => $institutionId,
             'keyword' => strtolower(trim($request->keyword)),
             'language' => $request->language,
+            'portal_role' => $request->portal_role,
             'welcome_message' => $request->welcome_message
         ]);
 
@@ -316,12 +321,14 @@ class ChatbotSettingController extends BaseController
                 })->ignore($id)
             ],
             'language' => 'required|in:en,fr',
+            'portal_role' => ['required', Rule::in(array_column(ChatbotPortalRole::cases(), 'value'))],
             'welcome_message' => 'required|string|max:1000',
         ]);
 
         $keyword->update([
             'keyword' => strtolower(trim($request->keyword)),
             'language' => $request->language,
+            'portal_role' => $request->portal_role,
             'welcome_message' => $request->welcome_message
         ]);
 

@@ -13,8 +13,10 @@
     .sub-days.ok { background:#ecfdf5; color:#059669; }
     .sub-days.warn { background:#fffbeb; color:#d97706; }
     .sub-days.expired { background:#fef2f2; color:#dc2626; }
-    [data-theme="dark"] .sub-stat, [data-theme="dark"] .sub-card { background:#1e2746; border-color:#2b365c; color:#e8ebf5; }
-    [data-theme="dark"] .sub-table thead th { background:#151d35; color:#9ca3af; border-color:#2b365c; }
+    [data-theme-version="dark"] .sub-stat, [data-theme-version="dark"] .sub-card { background:#1e2746; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .sub-table thead th { background:#243054 !important; color:#e8ebf5 !important; border-color:#2b365c !important; }
+    [data-theme-version="dark"] .sub-stat h4 { color: #fff !important; }
+    [data-theme-version="dark"] .sub-table tbody tr:hover { background: rgba(255,255,255,.04); }
 </style>
 <div class="content-body">
     <div class="container-fluid">

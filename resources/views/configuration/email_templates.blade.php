@@ -21,7 +21,7 @@
                     <div class="card-body px-4 pb-4">
                         <div class="table-responsive digitex-dt-wrap">
                             <table id="emailTemplatesTable" class="display table table-striped table-hover mb-0" style="width:100%">
-                                <thead class="bg-light">
+                                <thead>
                                     <tr>
                                         <th>#</th>
                                         <th>{{ __('email_template.event_name') }}</th>

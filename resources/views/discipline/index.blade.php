@@ -11,23 +11,23 @@
                 </div>
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
-                <select id="statusFilter" class="form-control default-select bg-white shadow-sm w-auto">
+                <select id="statusFilter" class="form-control default-select shadow-sm w-auto">
                     <option value="all" selected>{{ __('discipline.filter_all') }}</option>
                     @foreach(\App\Models\DisciplinaryRecord::STATUSES as $st)
                         <option value="{{ $st }}">{{ __('discipline.status_' . $st) }}</option>
                     @endforeach
                 </select>
-                <select id="typeFilter" class="form-control default-select bg-white shadow-sm w-auto">
+                <select id="typeFilter" class="form-control default-select shadow-sm w-auto">
                     <option value="all" selected>{{ __('discipline.filter_all') }}</option>
                     @foreach(\App\Models\DisciplinaryRecord::TYPES as $tp)
                         <option value="{{ $tp }}">{{ __('discipline.type_' . $tp) }}</option>
                     @endforeach
                 </select>
-                @can('create', \App\Models\DisciplinaryRecord::class)
+                @if(auth()->user() && (auth()->user()->hasRole(['Super Admin', 'School Admin', 'Head Officer']) || auth()->user()->can('discipline.create')))
                 <a href="{{ route('discipline.create') }}" class="btn btn-primary shadow-sm">
                     <i class="fa fa-plus me-2"></i> {{ __('discipline.create_new') }}
                 </a>
-                @endcan
+                @endif
             </div>
         </div>
 
@@ -37,7 +37,7 @@
                     <div class="card-body">
                         <div class="table-responsive">
                             <table id="disciplineTable" class="display table table-striped table-hover" style="width:100%; min-width: 900px;">
-                                <thead class="bg-light">
+                                <thead>
                                     <tr>
                                         <th>#</th>
                                         <th>{{ __('discipline.reference') }}</th>

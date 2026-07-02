@@ -126,18 +126,20 @@
     }
     .ai-output-list li strong { color: #5b21b6; font-weight: 600; }
 
-    [data-theme="dark"] .ai-output-view { background: linear-gradient(135deg, #1e2746, #172036); border-color: #4c1d95; }
-    [data-theme="dark"] .ai-output-view__body { color: #e8ebf5; }
-    [data-theme="dark"] .ai-output-list li { background: #243054; border-color: #374151; }
-    [data-theme="dark"] .ai-output-list li strong { color: #c4b5fd; }
+    [data-theme-version="dark"] .ai-output-view { background: linear-gradient(135deg, #1e2746, #172036); border-color: #4c1d95; }
+    [data-theme-version="dark"] .ai-output-view__body { color: #e8ebf5; }
+    [data-theme-version="dark"] .ai-output-list li { background: #243054; border-color: #374151; }
+    [data-theme-version="dark"] .ai-output-list li strong { color: #c4b5fd; }
 
-    [data-theme="dark"] .ai-panel,
-    [data-theme="dark"] .ai-sidebar,
-    [data-theme="dark"] .ai-chat,
-    [data-theme="dark"] .ai-tool-card { background:#1e2746; border-color:#2b365c; color:#e8ebf5; }
-    [data-theme="dark"] .ai-thread { background:#172036; }
-    [data-theme="dark"] .ai-msg__bubble { background:#243054; border-color:#2b365c; color:#e8ebf5; }
-    [data-theme="dark"] .ai-msg.user .ai-msg__bubble { background:#1e3a5f; border-color:#27496d; }
-    [data-theme="dark"] .ai-output { background:#172036; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .ai-panel,
+    [data-theme-version="dark"] .ai-sidebar,
+    [data-theme-version="dark"] .ai-chat,
+    [data-theme-version="dark"] .ai-tool-card { background:#1e2746; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .ai-thread { background:#172036; }
+    [data-theme-version="dark"] .ai-msg__bubble { background:#243054; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .ai-msg.user .ai-msg__bubble { background:#1e3a5f; border-color:#27496d; }
+    [data-theme-version="dark"] .ai-output { background:#172036; border-color:#2b365c; color:#e8ebf5; }
+    [data-theme-version="dark"] .ai-tool-card h6,
+    [data-theme-version="dark"] .ai-tool-card .text-dark { color: #e8ebf5 !important; }
 </style>
 @endonce

@@ -9,5 +9,5 @@ class ChatbotKeyword extends Model
 {
     use HasFactory;
     
-    protected $fillable = ['institution_id', 'keyword', 'language', 'welcome_message'];
+    protected $fillable = ['institution_id', 'keyword', 'language', 'portal_role', 'welcome_message'];
 }

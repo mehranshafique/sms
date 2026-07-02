@@ -37,7 +37,9 @@
         color: #fff;
         margin-bottom: 10px;
     }
-    [data-theme="dark"] .ap-stat { background: #1e2746; border-color: #2b365c; color: #e8ebf5; }
+    [data-theme-version="dark"] .ap-stat { background: #1e2746; border-color: #2b365c; color: #e8ebf5; }
+    [data-theme-version="dark"] .ap-stat .text-muted { color: #9ca3af !important; }
+    [data-theme-version="dark"] .ap-stat h4 { color: #fff !important; }
 </style>
 <div class="content-body">
     <div class="container-fluid">

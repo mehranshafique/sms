@@ -29,6 +29,8 @@ return [
     'response_message' => 'Message de Réponse',
     'response_placeholder' => 'Entrez la réponse automatisée ici...',
     'keyword_help' => 'Le mot qui démarre la conversation (ex. "Bonjour", "Menu", "Solde").',
+    'portal_role' => 'Portail / Rôle utilisateur',
+    'portal_role_help' => 'Seuls les identifiants correspondant à ce rôle seront acceptés après l\'envoi du mot-clé.',
     'actions' => 'Actions',
     'no_keywords' => 'Aucun mot-clé défini pour le moment.',
     

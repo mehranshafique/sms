@@ -478,6 +478,7 @@
             .global-search-wrap.is-expanded { width: min(280px, 55vw); }
         }
     </style>
+    @include('layout.partials.theme-dark')
 </head>
 <body>
 
