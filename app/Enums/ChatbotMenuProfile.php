@@ -2,7 +2,7 @@
 
 namespace App\Enums;
 
-enum ChatbotPortalRole: string
+enum ChatbotMenuProfile: string
 {
     case STUDENT = 'student';
     case PARENT = 'parent';
@@ -10,6 +10,7 @@ enum ChatbotPortalRole: string
     case SCHOOL_ADMIN = 'school_admin';
     case HEAD_OFFICER = 'head_officer';
     case FINANCE = 'finance';
+    case SUPER_ADMIN = 'super_admin';
 
     public function label(): string
     {
@@ -20,13 +21,30 @@ enum ChatbotPortalRole: string
             self::SCHOOL_ADMIN => 'Director / School Admin',
             self::HEAD_OFFICER => 'Head Office',
             self::FINANCE => 'Finance',
+            self::SUPER_ADMIN => 'Super Admin',
         };
+    }
+
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
     }
 
     public static function options(): array
     {
         return collect(self::cases())
-            ->mapWithKeys(fn (self $role) => [$role->value => $role->label()])
+            ->mapWithKeys(fn (self $profile) => [$profile->value => $profile->label()])
             ->all();
+    }
+
+    public function isStaffProfile(): bool
+    {
+        return in_array($this->value, [
+            self::TEACHER->value,
+            self::SCHOOL_ADMIN->value,
+            self::HEAD_OFFICER->value,
+            self::FINANCE->value,
+            self::SUPER_ADMIN->value,
+        ], true);
     }
 }

@@ -151,7 +151,8 @@
                                         <thead class="bg-light">
                                             <tr>
                                                 <th>{{ __('chatbot.keyword') ?? 'Keyword' }}</th>
-                                                <th>{{ __('chatbot.portal_role') ?? 'Portal / Role' }}</th>
+                                                <th>{{ __('chatbot.menu_profile') ?? 'Menu Profile' }}</th>
+                                                <th>{{ __('chatbot.allowed_roles') ?? 'Allowed Roles' }}</th>
                                                 <th>{{ __('chatbot.language') ?? 'Language' }}</th>
                                                 <th>{{ __('chatbot.response_message') ?? 'Message' }}</th>
                                                 @can('setting.manage')
@@ -163,7 +164,8 @@
                                             @forelse($keywords as $kw)
                                             <tr>
                                                 <td><span class="badge badge-primary light fw-bold">{{ strtoupper($kw->keyword) }}</span></td>
-                                                <td><span class="badge badge-info light">{{ $portalRoles[$kw->portal_role] ?? ucfirst(str_replace('_', ' ', $kw->portal_role ?? 'student')) }}</span></td>
+                                                <td><span class="badge badge-info light">{{ $menuProfiles[$kw->menu_profile] ?? ucfirst(str_replace('_', ' ', $kw->menu_profile ?? 'student')) }}</span></td>
+                                                <td><small>{{ $kw->allowedRoles->pluck('name')->join(', ') ?: __('chatbot.default_roles') }}</small></td>
                                                 <td>{{ strtoupper($kw->language) }}</td>
                                                 <td><small>{{ \Illuminate\Support\Str::limit($kw->welcome_message, 60) }}</small></td>
                                                 @can('setting.manage')
@@ -171,7 +173,8 @@
                                                     <button class="btn btn-info btn-xs shadow edit-keyword" 
                                                         data-id="{{ $kw->id }}" 
                                                         data-keyword="{{ $kw->keyword }}" 
-                                                        data-portal="{{ $kw->portal_role ?? 'student' }}"
+                                                        data-menu-profile="{{ $kw->menu_profile ?? 'student' }}"
+                                                        data-allowed-roles="{{ $kw->allowedRoles->pluck('id')->join(',') }}"
                                                         data-lang="{{ $kw->language }}" 
                                                         data-msg="{{ $kw->welcome_message }}">
                                                         <i class="fa fa-pencil"></i>
@@ -185,7 +188,7 @@
                                             </tr>
                                             @empty
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted py-4">{{ __('chatbot.no_keywords') ?? 'No keywords' }}</td>
+                                                <td colspan="6" class="text-center text-muted py-4">{{ __('chatbot.no_keywords') ?? 'No keywords' }}</td>
                                             </tr>
                                             @endforelse
                                         </tbody>
@@ -253,13 +256,22 @@
                                 <input type="text" name="keyword" id="inputKeyword" class="form-control" required placeholder="e.g. Digitex">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label fw-bold">{{ __('chatbot.portal_role') ?? 'Portal / Role' }} <span class="text-danger">*</span></label>
-                                <select name="portal_role" id="inputPortalRole" class="form-control default-select" required>
-                                    @foreach($portalRoles as $value => $label)
+                                <label class="form-label fw-bold">{{ __('chatbot.menu_profile') ?? 'Menu Profile' }} <span class="text-danger">*</span></label>
+                                <select name="menu_profile" id="inputMenuProfile" class="form-control default-select" required>
+                                    @foreach($menuProfiles as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
-                                <small class="text-muted">{{ __('chatbot.portal_role_help') ?? 'Only users matching this role can log in with this keyword.' }}</small>
+                                <small class="text-muted">{{ __('chatbot.menu_profile_help') ?? 'Defines which chatbot menu actions are shown after login.' }}</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ __('chatbot.allowed_roles') ?? 'Allowed Roles' }}</label>
+                                <select name="allowed_role_ids[]" id="inputAllowedRoles" class="form-control default-select" multiple data-live-search="true">
+                                    @foreach($assignableRoles as $role)
+                                        <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted">{{ __('chatbot.allowed_roles_help') ?? 'Leave empty to use default system roles for this menu profile. Select school roles (e.g. Account, Accountant) for custom access.' }}</small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">{{ __('chatbot.language') ?? 'Language' }} <span class="text-danger">*</span></label>
@@ -303,16 +315,19 @@
         $('.edit-keyword').click(function() {
             let id = $(this).data('id');
             let kw = $(this).data('keyword');
-            let portal = $(this).data('portal');
+            let menuProfile = $(this).data('menu-profile');
+            let allowedRoles = ($(this).data('allowed-roles') || '').toString().split(',').filter(Boolean);
             let lang = $(this).data('lang');
             let msg = $(this).data('msg');
 
             $('#keywordModalTitle').text("{{ __('chatbot.edit_keyword') ?? 'Edit Keyword' }}");
             $('#inputKeyword').val(kw);
-            $('#inputPortalRole').val(portal).change();
+            $('#inputMenuProfile').val(menuProfile).change();
+            $('#inputAllowedRoles').val(allowedRoles).change();
             $('#inputLang').val(lang).change();
             if($.fn.selectpicker) {
-                $('#inputPortalRole').selectpicker('refresh');
+                $('#inputMenuProfile').selectpicker('refresh');
+                $('#inputAllowedRoles').selectpicker('refresh');
                 $('#inputLang').selectpicker('refresh');
             }
             $('#inputMsg').val(msg);
@@ -330,7 +345,8 @@
             $('#keywordForm')[0].reset();
             $('#keywordModalTitle').text("{{ __('chatbot.add_keyword') ?? 'Add Keyword' }}");
             if($.fn.selectpicker) {
-                $('#inputPortalRole').selectpicker('refresh');
+                $('#inputMenuProfile').selectpicker('refresh');
+                $('#inputAllowedRoles').selectpicker('refresh');
                 $('#inputLang').selectpicker('refresh');
             }
         });

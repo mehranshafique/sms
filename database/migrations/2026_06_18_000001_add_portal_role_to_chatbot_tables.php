@@ -10,11 +10,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('chatbot_keywords', function (Blueprint $table) {
-            $table->string('portal_role', 32)->default('student')->after('language');
+            $table->string('menu_profile', 32)->default('student')->after('language');
         });
 
         Schema::table('chat_sessions', function (Blueprint $table) {
-            $table->string('portal_role', 32)->nullable()->after('status');
+            $table->string('menu_profile', 32)->nullable()->after('status');
         });
 
         $roleMap = [
@@ -47,18 +47,18 @@ return new class extends Migration
 
         foreach (DB::table('chatbot_keywords')->get() as $keyword) {
             $inferred = $roleMap[strtolower($keyword->keyword)] ?? 'student';
-            DB::table('chatbot_keywords')->where('id', $keyword->id)->update(['portal_role' => $inferred]);
+            DB::table('chatbot_keywords')->where('id', $keyword->id)->update(['menu_profile' => $inferred]);
         }
     }
 
     public function down(): void
     {
         Schema::table('chatbot_keywords', function (Blueprint $table) {
-            $table->dropColumn('portal_role');
+            $table->dropColumn('menu_profile');
         });
 
         Schema::table('chat_sessions', function (Blueprint $table) {
-            $table->dropColumn('portal_role');
+            $table->dropColumn('menu_profile');
         });
     }
 };

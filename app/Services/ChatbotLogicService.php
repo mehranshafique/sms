@@ -31,9 +31,10 @@ use App\Models\StaffLeave;
 use App\Models\StaffAttendance;
 use App\Models\Budget;
 use App\Models\FundRequest;
-use App\Enums\RoleEnum;
-use App\Enums\ChatbotPortalRole;
+use App\Enums\ChatbotMenuProfile;
+use App\Enums\ChatbotParticipantType;
 use App\Enums\InstitutionType;
+use App\Services\Chatbot\ChatbotAccessService;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -48,7 +49,8 @@ class ChatbotLogicService
 {
     public function __construct(
         protected NotificationService $notificationService,
-        protected CurrencyService $currencyService
+        protected CurrencyService $currencyService,
+        protected ChatbotAccessService $chatbotAccess
     ) {}
 
     protected function fmtMoney(float $amount, ?int $institutionId = null): string
@@ -209,26 +211,29 @@ class ChatbotLogicService
 
         Log::info("Chatbot Flow: New Session Initiated", ['text_received' => $textLower]);
 
-        $keyword = ChatbotKeyword::whereRaw('LOWER(keyword) = ?', [$textLower])->first();
+        $keyword = ChatbotKeyword::with('allowedRoles')
+            ->whereRaw('LOWER(keyword) = ?', [$textLower])
+            ->first();
 
         if ($keyword) {
             $locale = $keyword->language ?? 'fr';
-            $portalRole = $keyword->portal_role ?? $this->inferPortalRoleFromKeyword($keyword->keyword);
+            $menuProfile = $keyword->menu_profile ?? $this->chatbotAccess->inferMenuProfileFromKeyword($keyword->keyword);
 
-            return $this->startPortalSession(
+            return $this->startKeywordSession(
                 $phone,
-                $portalRole,
+                $menuProfile,
                 $keyword->institution_id,
                 $locale,
-                $keyword->welcome_message
+                $keyword->welcome_message,
+                $keyword->id
             );
         }
 
-        $builtinPortal = $this->resolveBuiltinPortalKeyword($textLower);
-        if ($builtinPortal) {
+        $builtinMenuProfile = $this->chatbotAccess->resolveBuiltinMenuProfile($textLower);
+        if ($builtinMenuProfile) {
             $locale = in_array($textLower, ['hello', 'hi', 'start']) ? 'en' : 'fr';
 
-            return $this->startPortalSession($phone, $builtinPortal, null, $locale);
+            return $this->startKeywordSession($phone, $builtinMenuProfile, null, $locale);
         }
 
         Log::warning("Chatbot Flow: Keyword totally unrecognized", ['text' => $textLower]);
@@ -236,20 +241,23 @@ class ChatbotLogicService
         return $this->reply($phone, $fallbackMsg, null);
     }
 
-    protected function startPortalSession(
+    protected function startKeywordSession(
         string $phone,
-        string $portalRole,
+        string $menuProfile,
         ?int $institutionId,
         string $locale,
-        ?string $welcomeMessage = null
+        ?string $welcomeMessage = null,
+        ?int $chatbotKeywordId = null
     ) {
         app()->setLocale($locale);
 
         ChatSession::create([
             'phone_number' => $phone,
             'institution_id' => $institutionId,
+            'chatbot_keyword_id' => $chatbotKeywordId,
             'status' => 'AWAITING_ID',
-            'portal_role' => $portalRole,
+            'menu_profile' => $menuProfile,
+            'participant_type' => null,
             'locale' => $locale,
             'last_interaction_at' => now(),
             'expires_at' => now()->addMinutes(15),
@@ -257,75 +265,37 @@ class ChatbotLogicService
             'user_type' => null,
         ]);
 
-        $msg = $welcomeMessage ?: $this->defaultWelcomeForPortal($portalRole, $locale);
+        $msg = $welcomeMessage ?: $this->defaultWelcomeForMenuProfile($menuProfile, $locale);
 
         return $this->reply($phone, $msg, $institutionId);
     }
 
-    protected function resolveBuiltinPortalKeyword(string $keyword): ?string
+    protected function getSessionMenuProfile(ChatSession $session): string
     {
-        $map = [
-            'digitex' => ChatbotPortalRole::HEAD_OFFICER->value,
-            'headoffice' => ChatbotPortalRole::HEAD_OFFICER->value,
-            'direction' => ChatbotPortalRole::HEAD_OFFICER->value,
-            'admin' => ChatbotPortalRole::SCHOOL_ADMIN->value,
-            'director' => ChatbotPortalRole::SCHOOL_ADMIN->value,
-            'directeur' => ChatbotPortalRole::SCHOOL_ADMIN->value,
-            'agent' => ChatbotPortalRole::TEACHER->value,
-            'teacher' => ChatbotPortalRole::TEACHER->value,
-            'enseignant' => ChatbotPortalRole::TEACHER->value,
-            'prof' => ChatbotPortalRole::TEACHER->value,
-            'staff' => ChatbotPortalRole::TEACHER->value,
-            'finance' => ChatbotPortalRole::FINANCE->value,
-            'compta' => ChatbotPortalRole::FINANCE->value,
-            'bonjour' => ChatbotPortalRole::PARENT->value,
-            'parent' => ChatbotPortalRole::PARENT->value,
-            'parents' => ChatbotPortalRole::PARENT->value,
-            'portail' => ChatbotPortalRole::STUDENT->value,
-            'student' => ChatbotPortalRole::STUDENT->value,
-            'eleve' => ChatbotPortalRole::STUDENT->value,
-            'etudiant' => ChatbotPortalRole::STUDENT->value,
-            'hello' => ChatbotPortalRole::STUDENT->value,
-            'hi' => ChatbotPortalRole::STUDENT->value,
-            'start' => ChatbotPortalRole::STUDENT->value,
-            'salut' => ChatbotPortalRole::STUDENT->value,
-            'menu' => ChatbotPortalRole::STUDENT->value,
-        ];
-
-        return $map[$keyword] ?? null;
-    }
-
-    protected function inferPortalRoleFromKeyword(string $keyword): string
-    {
-        return $this->resolveBuiltinPortalKeyword(strtolower(trim($keyword)))
-            ?? ChatbotPortalRole::STUDENT->value;
-    }
-
-    protected function getSessionPortalRole(ChatSession $session): string
-    {
-        if ($session->portal_role) {
-            return $session->portal_role;
+        if ($session->menu_profile) {
+            return $session->menu_profile;
         }
 
-        if ($session->user_type === 'staff') {
-            return ChatbotPortalRole::TEACHER->value;
+        if ($session->participant_type === ChatbotParticipantType::PARENT->value
+            || $session->user_type === 'parent') {
+            return ChatbotMenuProfile::PARENT->value;
         }
 
-        if ($session->user_type === 'parent') {
-            return ChatbotPortalRole::PARENT->value;
+        if ($session->participant_type === ChatbotParticipantType::STAFF_USER->value) {
+            return ChatbotMenuProfile::TEACHER->value;
         }
 
-        return ChatbotPortalRole::STUDENT->value;
+        return ChatbotMenuProfile::STUDENT->value;
     }
 
-    protected function defaultWelcomeForPortal(string $portalRole, string $locale): string
+    protected function defaultWelcomeForMenuProfile(string $menuProfile, string $locale): string
     {
-        $key = match ($portalRole) {
-            ChatbotPortalRole::TEACHER->value => 'teacher_welcome_prompt',
-            ChatbotPortalRole::PARENT->value => 'parent_welcome_prompt',
-            ChatbotPortalRole::SCHOOL_ADMIN->value => 'director_welcome_prompt',
-            ChatbotPortalRole::HEAD_OFFICER->value => 'admin_welcome_prompt',
-            ChatbotPortalRole::FINANCE->value => 'finance_welcome_prompt',
+        $key = match ($menuProfile) {
+            ChatbotMenuProfile::TEACHER->value => 'teacher_welcome_prompt',
+            ChatbotMenuProfile::PARENT->value => 'parent_welcome_prompt',
+            ChatbotMenuProfile::SCHOOL_ADMIN->value => 'director_welcome_prompt',
+            ChatbotMenuProfile::HEAD_OFFICER->value => 'admin_welcome_prompt',
+            ChatbotMenuProfile::FINANCE->value => 'finance_welcome_prompt',
             default => 'student_welcome_prompt',
         };
 
@@ -336,20 +306,20 @@ class ChatbotLogicService
 
         $isEn = $locale === 'en';
 
-        return match ($portalRole) {
-            ChatbotPortalRole::TEACHER->value => $isEn
+        return match ($menuProfile) {
+            ChatbotMenuProfile::TEACHER->value => $isEn
                 ? "👨‍🏫 *Teacher Portal*\n\nPlease enter your Staff ID:"
                 : "👨‍🏫 *Portail Enseignant*\n\nSaisissez votre code ID pour commencer.",
-            ChatbotPortalRole::PARENT->value => $isEn
+            ChatbotMenuProfile::PARENT->value => $isEn
                 ? "👋 *Parent Portal*\n\nPlease enter your registered phone number or your child's Student ID:"
                 : "👋 *Portail Parent*\n\nSaisissez votre numéro de téléphone ou le matricule de votre enfant.",
-            ChatbotPortalRole::SCHOOL_ADMIN->value => $isEn
+            ChatbotMenuProfile::SCHOOL_ADMIN->value => $isEn
                 ? "🏫 *Director Portal*\n\nPlease enter your Staff ID or Username:"
                 : "🏫 *Portail Directeur*\n\nSaisissez votre identifiant personnel.",
-            ChatbotPortalRole::HEAD_OFFICER->value => $isEn
+            ChatbotMenuProfile::HEAD_OFFICER->value => $isEn
                 ? "🏢 *Head Office Portal*\n\nPlease enter your Staff ID or Username:"
                 : "🏢 *Portail Direction Générale*\n\nSaisissez votre identifiant personnel.",
-            ChatbotPortalRole::FINANCE->value => $isEn
+            ChatbotMenuProfile::FINANCE->value => $isEn
                 ? "💰 *Finance Portal*\n\nPlease enter your Staff ID or Username:"
                 : "💰 *Portail Finance*\n\nSaisissez votre identifiant personnel.",
             default => $isEn
@@ -361,44 +331,30 @@ class ChatbotLogicService
     protected function processIdentity($session, $input)
     {
         $isEn = $session->locale === 'en';
-        $portalRole = $this->getSessionPortalRole($session);
+        $menuProfile = $this->getSessionMenuProfile($session);
 
         Log::info("Chatbot Auth: Processing Identity", [
             'input' => $input,
-            'portal_role' => $portalRole,
-            'user_type' => $session->user_type,
+            'menu_profile' => $menuProfile,
+            'participant_type' => $session->participant_type,
         ]);
 
-        return match ($portalRole) {
-            ChatbotPortalRole::STUDENT->value => $this->authenticateStudentPortal($session, $input, $isEn),
-            ChatbotPortalRole::PARENT->value => $this->authenticateParentPortal($session, $input, $isEn),
-            ChatbotPortalRole::TEACHER->value => $this->authenticateStaffPortal(
-                $session,
-                $input,
-                $isEn,
-                [RoleEnum::TEACHER->value, RoleEnum::STAFF->value]
-            ),
-            ChatbotPortalRole::SCHOOL_ADMIN->value => $this->authenticateStaffPortal(
-                $session,
-                $input,
-                $isEn,
-                [RoleEnum::SCHOOL_ADMIN->value]
-            ),
-            ChatbotPortalRole::HEAD_OFFICER->value => $this->authenticateStaffPortal(
-                $session,
-                $input,
-                $isEn,
-                [RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value]
-            ),
-            ChatbotPortalRole::FINANCE->value => $this->authenticateFinancePortal($session, $input, $isEn),
+        return match ($menuProfile) {
+            ChatbotMenuProfile::STUDENT->value => $this->authenticateStudentForMenuProfile($session, $input, $isEn),
+            ChatbotMenuProfile::PARENT->value => $this->authenticateParentForMenuProfile($session, $input, $isEn),
+            ChatbotMenuProfile::TEACHER->value,
+            ChatbotMenuProfile::SCHOOL_ADMIN->value,
+            ChatbotMenuProfile::HEAD_OFFICER->value,
+            ChatbotMenuProfile::FINANCE->value,
+            ChatbotMenuProfile::SUPER_ADMIN->value => $this->authenticateStaffUserForMenuProfile($session, $input, $isEn),
             default => $this->incrementAttempts(
                 $session,
-                $isEn ? "Invalid portal configuration." : "Configuration du portail invalide."
+                $isEn ? "Invalid menu profile configuration." : "Configuration du profil menu invalide."
             ),
         };
     }
 
-    protected function authenticateStudentPortal(ChatSession $session, string $input, bool $isEn)
+    protected function authenticateStudentForMenuProfile(ChatSession $session, string $input, bool $isEn)
     {
         $studentQuery = Student::with('parent')
             ->where('admission_number', trim($input));
@@ -408,19 +364,19 @@ class ChatbotLogicService
         }
 
         $student = $studentQuery->first();
-        if (!$student) {
+        if (!$student || !$this->chatbotAccess->assertStudentMatchesMenuProfile($student, $this->getSessionMenuProfile($session))) {
             return $this->incrementAttempts(
                 $session,
                 $isEn
-                    ? "Student ID not found for this portal."
-                    : "Matricule élève introuvable pour ce portail."
+                    ? "Student ID not found for this menu profile."
+                    : "Matricule élève introuvable pour ce profil menu."
             );
         }
 
-        return $this->sendOtp($session, $student, 'student');
+        return $this->sendOtp($session, $student, ChatbotParticipantType::STUDENT->value);
     }
 
-    protected function authenticateParentPortal(ChatSession $session, string $input, bool $isEn)
+    protected function authenticateParentForMenuProfile(ChatSession $session, string $input, bool $isEn)
     {
         $cleanInput = preg_replace('/[^0-9]/', '', $input);
 
@@ -439,8 +395,8 @@ class ChatbotLogicService
             }
 
             $parent = $parentQuery->first();
-            if ($parent) {
-                return $this->sendOtp($session, $parent, 'parent');
+            if ($parent && $this->chatbotAccess->assertParentMatchesMenuProfile($parent, $this->getSessionMenuProfile($session))) {
+                return $this->sendOtp($session, $parent, ChatbotParticipantType::PARENT->value);
             }
         }
 
@@ -450,99 +406,49 @@ class ChatbotLogicService
         }
 
         $student = $studentQuery->first();
-        if ($student?->parent) {
-            return $this->sendOtp($session, $student->parent, 'parent');
+        if ($student?->parent && $this->chatbotAccess->assertParentMatchesMenuProfile($student->parent, $this->getSessionMenuProfile($session))) {
+            return $this->sendOtp($session, $student->parent, ChatbotParticipantType::PARENT->value);
         }
 
         return $this->incrementAttempts(
             $session,
             $isEn
-                ? "Parent phone or child Student ID not found for this portal."
-                : "Numéro parent ou matricule enfant introuvable pour ce portail."
+                ? "Parent phone or child Student ID not found for this menu profile."
+                : "Numéro parent ou matricule enfant introuvable pour ce profil menu."
         );
     }
 
-    protected function authenticateStaffPortal(
-        ChatSession $session,
-        string $input,
-        bool $isEn,
-        array $allowedRoles
-    ) {
-        $user = app(OtpAuthService::class)->resolveUser($input, $session->institution_id);
-
-        if (!$user || !$user->is_active) {
-            return $this->incrementAttempts(
-                $session,
-                $isEn ? "ID not recognized for this portal." : "Identifiant non reconnu pour ce portail."
-            );
-        }
-
-        if (!$user->hasAnyRole($allowedRoles)) {
-            return $this->incrementAttempts(
-                $session,
-                $isEn
-                    ? "This ID is not authorized for this portal. Use the keyword that matches your role."
-                    : "Cet identifiant n'est pas autorisé pour ce portail. Utilisez le mot-clé correspondant à votre profil."
-            );
-        }
-
-        $role = $this->resolveStaffChatRole($user);
-        $session->update(['user_type' => $role]);
-
-        return $this->sendOtp($session, $user, 'staff');
-    }
-
-    protected function authenticateFinancePortal(ChatSession $session, string $input, bool $isEn)
+    protected function authenticateStaffUserForMenuProfile(ChatSession $session, string $input, bool $isEn)
     {
         $user = app(OtpAuthService::class)->resolveUser($input, $session->institution_id);
 
         if (!$user || !$user->is_active) {
             return $this->incrementAttempts(
                 $session,
-                $isEn ? "ID not recognized for this portal." : "Identifiant non reconnu pour ce portail."
+                $isEn ? "ID not recognized for this menu profile." : "Identifiant non reconnu pour ce profil menu."
             );
         }
 
-        if (!$this->userQualifiesForFinancePortal($user)) {
+        $keyword = $session->chatbot_keyword_id
+            ? ChatbotKeyword::with('allowedRoles')->find($session->chatbot_keyword_id)
+            : null;
+
+        $allowed = $keyword
+            ? $this->chatbotAccess->userCanAccessKeyword($user, $keyword)
+            : $this->chatbotAccess->userCanAccessMenuProfile($user, $this->getSessionMenuProfile($session));
+
+        if (!$allowed) {
             return $this->incrementAttempts(
                 $session,
                 $isEn
-                    ? "This ID is not authorized for the Finance portal."
-                    : "Cet identifiant n'est pas autorisé pour le portail Finance."
+                    ? "This ID is not authorized for this menu profile. Use the keyword that matches your role."
+                    : "Cet identifiant n'est pas autorisé pour ce profil menu. Utilisez le mot-clé correspondant à votre profil."
             );
         }
 
-        $role = $this->resolveStaffChatRole($user);
-        $session->update(['user_type' => $role]);
+        $session->update(['participant_type' => ChatbotParticipantType::STAFF_USER->value]);
 
-        return $this->sendOtp($session, $user, 'staff');
-    }
-
-    protected function userQualifiesForFinancePortal(User $user): bool
-    {
-        if ($user->hasRole(RoleEnum::SCHOOL_ADMIN->value)) {
-            return true;
-        }
-
-        return $user->can('payment.view') || $user->can('invoice.view');
-    }
-
-    protected function resolveStaffChatRole(User $user): string
-    {
-        if ($user->hasRole(RoleEnum::SUPER_ADMIN->value)) {
-            return 'super_admin';
-        }
-        if ($user->hasRole(RoleEnum::HEAD_OFFICER->value)) {
-            return 'head_officer';
-        }
-        if ($user->hasRole(RoleEnum::SCHOOL_ADMIN->value)) {
-            return 'school_admin';
-        }
-        if ($user->hasRole(RoleEnum::TEACHER->value)) {
-            return 'teacher';
-        }
-
-        return 'teacher';
+        return $this->sendOtp($session, $user, ChatbotParticipantType::STAFF_USER->value);
     }
 
     protected function sendOtp($session, $model, $type)
@@ -551,14 +457,14 @@ class ChatbotLogicService
         $phone = null;
         $isEn = $session->locale === 'en';
         
-        if ($type === 'student') {
+        if ($type === ChatbotParticipantType::STUDENT->value || $type === 'student') {
             $parent = $model->parent;
             $phone = $parent ? ($parent->father_phone ?? $parent->mother_phone ?? $parent->guardian_phone) : null;
-            $phone = $phone ?: $model->mobile_number; 
-        } elseif ($type === 'parent') {
+            $phone = $phone ?: $model->mobile_number;
+        } elseif ($type === ChatbotParticipantType::PARENT->value || $type === 'parent') {
             $phone = $model->father_phone ?? $model->mother_phone ?? $model->guardian_phone;
         } else {
-            $phone = $model->phone;
+            $phone = $model->phone ?? optional($model->staff)->phone;
         }
 
         if (!$phone) {
@@ -569,10 +475,15 @@ class ChatbotLogicService
 
         $session->update([
             'user_id' => $model->id,
+            'participant_type' => match ($type) {
+                ChatbotParticipantType::PARENT->value, 'parent' => ChatbotParticipantType::PARENT->value,
+                ChatbotParticipantType::STUDENT->value, 'student' => ChatbotParticipantType::STUDENT->value,
+                default => ChatbotParticipantType::STAFF_USER->value,
+            },
             'user_type' => match ($type) {
-                'parent' => 'parent',
-                'student' => 'student',
-                default => $session->user_type,
+                ChatbotParticipantType::PARENT->value, 'parent' => 'parent',
+                ChatbotParticipantType::STUDENT->value, 'student' => 'student',
+                default => 'staff',
             },
             'institution_id' => $model->institution_id ?? $model->institute_id ?? $session->institution_id,
             'otp' => $otp,
@@ -599,7 +510,8 @@ class ChatbotLogicService
         $cleanInput = preg_replace('/[^0-9]/', '', $input);
         
         if ($cleanInput === (string)$session->otp) {
-            if ($session->user_type === 'parent') {
+            if ($session->participant_type === ChatbotParticipantType::PARENT->value
+                || $session->user_type === 'parent') {
                 $session->update(['status' => 'CHILD_SELECT', 'otp' => null]);
                 return $this->processChildSelection($session, null);
             }
@@ -645,6 +557,7 @@ class ChatbotLogicService
             $session->update([
                 'user_id' => $selectedChild->id,
                 'user_type' => 'student',
+                'participant_type' => ChatbotParticipantType::STUDENT->value,
                 'institution_id' => $selectedChild->institution_id,
                 'status' => 'ACTIVE'
             ]);
@@ -660,7 +573,9 @@ class ChatbotLogicService
 
     protected function routeToMainMenu($session)
     {
-        if ($session->user_type === 'student') {
+        $participantType = $session->participant_type ?? $session->user_type;
+
+        if ($participantType === ChatbotParticipantType::STUDENT->value || $participantType === 'student') {
             $student = Student::with('institution')->find($session->user_id);
             if (!$student) return $this->reply($session->phone_number, "⚠️ Profile Error. Please type 'Menu' to restart.", $session->institution_id);
 
@@ -685,7 +600,9 @@ class ChatbotLogicService
             return $this->reply($session->phone_number, $isEn ? "👋 Session closed." : "👋 Session fermée.", $session->institution_id);
         }
 
-        if ($session->user_type === 'student') {
+        $participantType = $session->participant_type ?? $session->user_type;
+
+        if ($participantType === ChatbotParticipantType::STUDENT->value || $participantType === 'student') {
             $student = Student::with('institution')->find($session->user_id);
             if (!$student) return $this->reply($session->phone_number, "⚠️ Profile Error.", $session->institution_id);
             
@@ -965,25 +882,39 @@ class ChatbotLogicService
             $user = User::find($session->user_id);
             if (!$user) return "⚠️ Error: Profile missing.";
             
-            $role = $session->user_type; 
+            $menuProfile = $this->getSessionMenuProfile($session);
             $isEn = $session->locale === 'en';
             
             $name = $this->sanitizeMarkdown($user->name);
             $menu = $isEn ? "👤 *Welcome, " . $name . "*\n\n" : "👤 *Bienvenue, " . $name . "*\n\n";
 
-            if ($role === 'super_admin') {
+            if ($menuProfile === ChatbotMenuProfile::SUPER_ADMIN->value) {
                 $menu .= $isEn ? "🛠 *Super Admin Menu*\n\n1️⃣ Global Finance\n2️⃣ Subscriptions\n3️⃣ Schools\n4️⃣ SMS/WhatsApp Credits"
                                : "🛠 *Menu Super Admin*\n\n1️⃣ Finance Globale\n2️⃣ Subscriptions\n3️⃣ Ecoles\n4️⃣ Crédits SMS/WhatsApp";
             } 
-            elseif ($role === 'head_officer') {
+            elseif ($menuProfile === ChatbotMenuProfile::HEAD_OFFICER->value) {
                 $menu .= $isEn ? "🏢 *Head Officer Menu*\n\n1️⃣ Enrollments (Global & Branch)\n2️⃣ Fee Payments (Daily Cash)\n3️⃣ Budget & Finance\n4️⃣ Branch Rankings"
                                : "🏢 *Menu Direction Générale*\n\n1️⃣ Effectifs (Global & Par Ecole)\n2️⃣ Paiement Frais (Caisses du jour)\n3️⃣ Budget & Finance\n4️⃣ Classements (Ecoles)";
             }
-            elseif ($role === 'school_admin') {
+            elseif ($menuProfile === ChatbotMenuProfile::SCHOOL_ADMIN->value) {
                 $menu .= $isEn ? "🏫 *Director Menu*\n\n1️⃣ Total Enrollment & Classes\n2️⃣ Daily Cash & Forecast\n3️⃣ Debtors List\n4️⃣ Today's Attendance"
                                : "🏫 *Menu Directeur*\n\n1️⃣ Effectif Global & Par Classe\n2️⃣ Etat Caisse & Prévision\n3️⃣ Elèves Débiteurs\n4️⃣ Présences du Jour";
-            } 
-            elseif ($role === 'teacher') {
+            }
+            elseif ($menuProfile === ChatbotMenuProfile::FINANCE->value) {
+                $options = [];
+                if ($user->can('payment.view')) {
+                    $options[] = $isEn ? "1️⃣ Daily Cash Collection" : "1️⃣ Recettes du jour";
+                }
+                if ($user->can('invoice.view')) {
+                    $options[] = $isEn ? "2️⃣ Debtors List" : "2️⃣ Elèves débiteurs";
+                }
+                if ($user->can('payment.view')) {
+                    $options[] = $isEn ? "3️⃣ Recent Payments (7 days)" : "3️⃣ Paiements récents (7 jours)";
+                }
+                $body = $options !== [] ? implode("\n", $options) : ($isEn ? "No finance actions available for your role." : "Aucune action finance disponible pour votre rôle.");
+                $menu .= $isEn ? "💰 *Finance Menu*\n\n{$body}" : "💰 *Menu Finance*\n\n{$body}";
+            }
+            elseif ($menuProfile === ChatbotMenuProfile::TEACHER->value) {
                 $menu .= $isEn ? "📚 *Teacher & Staff Menu*\n\n1️⃣ Mark Attendance (OTP)\n2️⃣ My Timetable\n3️⃣ My Exams\n4️⃣ My Leave Requests\n5️⃣ Request Salary Advance"
                                : "📚 *Menu Enseignant / Agent*\n\n1️⃣ Pointer présence (OTP)\n2️⃣ Mes Horaires\n3️⃣ Mes Epreuves\n4️⃣ Mes Requêtes (Congé/Maladie)\n5️⃣ Avance sur Salaire";
             }
@@ -1002,13 +933,13 @@ class ChatbotLogicService
 
     protected function processStaffMenu($session, $cmd)
     {
-        $role = $session->user_type;
+        $menuProfile = $this->getSessionMenuProfile($session);
         $user = User::find($session->user_id);
         if (!$user) return $this->reply($session->phone_number, "Error: Profile missing.", $session->institution_id);
         
         $isEn = $session->locale === 'en';
 
-        if ($role === 'super_admin') {
+        if ($menuProfile === ChatbotMenuProfile::SUPER_ADMIN->value) {
             switch($cmd) {
                 case '1': 
                     $invoiced = Subscription::sum('price_paid');
@@ -1034,7 +965,7 @@ class ChatbotLogicService
             }
         }
 
-        elseif ($role === 'head_officer') {
+        elseif ($menuProfile === ChatbotMenuProfile::HEAD_OFFICER->value) {
             switch($cmd) {
                 case '1': 
                     $session->update(['status' => 'HEADOFF_EFFECTIF_SELECT']);
@@ -1058,7 +989,7 @@ class ChatbotLogicService
             }
         }
         
-        elseif ($role === 'school_admin') {
+        elseif ($menuProfile === ChatbotMenuProfile::SCHOOL_ADMIN->value) {
             switch($cmd) {
                 case '1': 
                     $students = Student::where('institution_id', $session->institution_id)->count();
@@ -1082,7 +1013,38 @@ class ChatbotLogicService
             }
         }
         
-        elseif ($role === 'teacher') {
+        elseif ($menuProfile === ChatbotMenuProfile::FINANCE->value) {
+            switch ($cmd) {
+                case '1':
+                    if ($user->can('payment.view')) {
+                        $todayCash = Payment::where('institution_id', $session->institution_id)->whereDate('payment_date', today())->sum('amount');
+                        $msg = $isEn ? "💵 *Daily Cash*\nToday's Collection: " : "💵 *Caisse du Jour*\nRecettes du jour: ";
+                        return $this->reply($session->phone_number, $msg . number_format($todayCash, 2) . " " . $this->currencySymbol($session->institution_id) . $this->getReturnPrompt($session), $session->institution_id);
+                    }
+                    break;
+                case '2':
+                    if ($user->can('invoice.view')) {
+                        $debtors = Invoice::where('institution_id', $session->institution_id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->distinct('student_id')->count('student_id');
+                        $msg = $isEn ? "🚨 *Debtors List*\nStudents with unpaid invoices: $debtors" : "🚨 *Elèves Débiteurs*\nÉlèves avec factures impayées: $debtors";
+                        return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+                    }
+                    break;
+                case '3':
+                    if ($user->can('payment.view')) {
+                        $weekTotal = Payment::where('institution_id', $session->institution_id)->where('payment_date', '>=', now()->subDays(7))->sum('amount');
+                        $count = Payment::where('institution_id', $session->institution_id)->where('payment_date', '>=', now()->subDays(7))->count();
+                        $msg = $isEn
+                            ? "📊 *Recent Payments (7 days)*\nTotal: " . number_format($weekTotal, 2) . " | Count: $count"
+                            : "📊 *Paiements récents (7 jours)*\nTotal: " . number_format($weekTotal, 2) . " | Nombre: $count";
+                        return $this->reply($session->phone_number, $msg . " " . $this->currencySymbol($session->institution_id) . $this->getReturnPrompt($session), $session->institution_id);
+                    }
+                    break;
+            }
+
+            return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        elseif ($menuProfile === ChatbotMenuProfile::TEACHER->value) {
             $staffId = optional($user->staff)->id;
             if (!$staffId) {
                 return $this->reply($session->phone_number, "❌ Erreur: Profil Staff introuvable.", $session->institution_id);

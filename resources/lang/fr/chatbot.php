@@ -29,8 +29,11 @@ return [
     'response_message' => 'Message de Réponse',
     'response_placeholder' => 'Entrez la réponse automatisée ici...',
     'keyword_help' => 'Le mot qui démarre la conversation (ex. "Bonjour", "Menu", "Solde").',
-    'portal_role' => 'Portail / Rôle utilisateur',
-    'portal_role_help' => 'Seuls les identifiants correspondant à ce rôle seront acceptés après l\'envoi du mot-clé.',
+    'menu_profile' => 'Profil menu',
+    'menu_profile_help' => 'Définit le menu du chatbot affiché après l\'authentification.',
+    'allowed_roles' => 'Rôles autorisés',
+    'allowed_roles_help' => 'Laissez vide pour utiliser les rôles système par défaut. Sélectionnez les rôles de l\'école (ex. Comptable, Account) pour un accès personnalisé.',
+    'default_roles' => 'Par défaut (rôles système)',
     'actions' => 'Actions',
     'no_keywords' => 'Aucun mot-clé défini pour le moment.',
     

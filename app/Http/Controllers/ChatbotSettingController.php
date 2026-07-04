@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\InstitutionSetting;
 use App\Models\ChatbotKeyword;
-use App\Enums\ChatbotPortalRole;
+use App\Enums\ChatbotMenuProfile;
+use App\Enums\RoleEnum;
 use App\Models\ChatSession;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 use Yajra\DataTables\Facades\DataTables;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Carbon\Carbon;
@@ -31,7 +34,8 @@ class ChatbotSettingController extends BaseController
         $institutionId = $this->getInstitutionId();
         
         // 1. Get Keywords
-        $keywords = ChatbotKeyword::where('institution_id', $institutionId)
+        $keywords = ChatbotKeyword::with('allowedRoles')
+            ->where('institution_id', $institutionId)
             ->latest()
             ->get();
 
@@ -65,9 +69,10 @@ class ChatbotSettingController extends BaseController
             'legacy' => $baseUrl . '/api/v1/chatbot/webhook' . $secretQuery,
         ];
 
-        $portalRoles = ChatbotPortalRole::options();
+        $menuProfiles = ChatbotMenuProfile::options();
+        $assignableRoles = $this->getAssignableRoles($institutionId);
 
-        return view('chatbot.settings', compact('keywords', 'config', 'webhookUrls', 'portalRoles'));
+        return view('chatbot.settings', compact('keywords', 'config', 'webhookUrls', 'menuProfiles', 'assignableRoles'));
     }
 
     public function storeConfig(Request $request)
@@ -280,6 +285,27 @@ class ChatbotSettingController extends BaseController
         return response()->json(['error' => __('chatbot.something_went_wrong') ?? 'Something went wrong!']);
     }
 
+    protected function getAssignableRoles(?int $institutionId)
+    {
+        $query = Role::query()->orderBy('name');
+
+        if ($institutionId) {
+            $query->where(function ($q) use ($institutionId) {
+                $q->where('institution_id', $institutionId)
+                    ->orWhereNull('institution_id');
+            })->where('name', '!=', RoleEnum::SUPER_ADMIN->value);
+        }
+
+        return $query->get();
+    }
+
+    protected function validateAllowedRoleIds(array $roleIds, ?int $institutionId): array
+    {
+        $allowedIds = $this->getAssignableRoles($institutionId)->pluck('id')->all();
+
+        return array_values(array_intersect($roleIds, $allowedIds));
+    }
+
     // --- Keyword Methods ---
     public function storeKeyword(Request $request)
     {
@@ -293,17 +319,26 @@ class ChatbotSettingController extends BaseController
                 })
             ],
             'language' => 'required|in:en,fr',
-            'portal_role' => ['required', Rule::in(array_column(ChatbotPortalRole::cases(), 'value'))],
+            'menu_profile' => ['required', Rule::in(ChatbotMenuProfile::values())],
+            'allowed_role_ids' => 'nullable|array',
+            'allowed_role_ids.*' => 'integer|exists:roles,id',
             'welcome_message' => 'required|string|max:1000',
         ]);
 
-        ChatbotKeyword::create([
-            'institution_id' => $institutionId,
-            'keyword' => strtolower(trim($request->keyword)),
-            'language' => $request->language,
-            'portal_role' => $request->portal_role,
-            'welcome_message' => $request->welcome_message
-        ]);
+        DB::transaction(function () use ($request, $institutionId) {
+            $keyword = ChatbotKeyword::create([
+                'institution_id' => $institutionId,
+                'keyword' => strtolower(trim($request->keyword)),
+                'language' => $request->language,
+                'menu_profile' => $request->menu_profile,
+                'welcome_message' => $request->welcome_message,
+            ]);
+
+            $roleIds = $this->validateAllowedRoleIds($request->input('allowed_role_ids', []), $institutionId);
+            if ($roleIds !== []) {
+                $keyword->allowedRoles()->sync($roleIds);
+            }
+        });
 
         return back()->with('success', __('chatbot.keyword_created'));
     }
@@ -321,16 +356,23 @@ class ChatbotSettingController extends BaseController
                 })->ignore($id)
             ],
             'language' => 'required|in:en,fr',
-            'portal_role' => ['required', Rule::in(array_column(ChatbotPortalRole::cases(), 'value'))],
+            'menu_profile' => ['required', Rule::in(ChatbotMenuProfile::values())],
+            'allowed_role_ids' => 'nullable|array',
+            'allowed_role_ids.*' => 'integer|exists:roles,id',
             'welcome_message' => 'required|string|max:1000',
         ]);
 
-        $keyword->update([
-            'keyword' => strtolower(trim($request->keyword)),
-            'language' => $request->language,
-            'portal_role' => $request->portal_role,
-            'welcome_message' => $request->welcome_message
-        ]);
+        DB::transaction(function () use ($request, $keyword, $institutionId) {
+            $keyword->update([
+                'keyword' => strtolower(trim($request->keyword)),
+                'language' => $request->language,
+                'menu_profile' => $request->menu_profile,
+                'welcome_message' => $request->welcome_message,
+            ]);
+
+            $roleIds = $this->validateAllowedRoleIds($request->input('allowed_role_ids', []), $institutionId);
+            $keyword->allowedRoles()->sync($roleIds);
+        });
 
         return back()->with('success', __('chatbot.keyword_updated'));
     }
