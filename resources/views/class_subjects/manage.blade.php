@@ -40,7 +40,7 @@
                 <h4 class="card-title">{{ __('class_subject.header_title', ['class' => $selectedClass->name]) }}</h4>
             </div>
             <div class="card-body">
-                <form action="{{ route('class-subjects.store') }}" method="POST">
+                <form action="{{ route('class-subjects.store') }}" method="POST" id="classSubjectForm">
                     @csrf
                     <input type="hidden" name="class_section_id" value="{{ $selectedClass->id }}">
 
@@ -122,6 +122,24 @@
         if (typeof window.digitexReinitSelectPickers === 'function') {
             window.digitexReinitSelectPickers();
         }
+
+        var form = document.getElementById('classSubjectForm');
+        if (!form) {
+            return;
+        }
+
+        form.addEventListener('submit', function () {
+            if (typeof jQuery === 'undefined' || typeof jQuery.fn.selectpicker === 'undefined') {
+                return;
+            }
+
+            jQuery(form).find('.default-select').each(function () {
+                var $el = jQuery(this);
+                if ($el.data('selectpicker')) {
+                    $el.selectpicker('destroy');
+                }
+            });
+        });
     });
 </script>
 @endsection

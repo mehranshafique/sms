@@ -39,9 +39,32 @@ class StudentController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
 
+        $currentSessionId = $institutionId
+            ? AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->value('id')
+            : null;
+
         if ($request->ajax()) {
-            // FIX: Using the correct table name 'parents' instead of 'student_parents'
-            $query = Student::with(['classSection.gradeLevel', 'parent', 'user'])
+            $query = Student::with([
+                'classSection.gradeLevel',
+                'gradeLevel',
+                'parent',
+                'user',
+                'enrollments' => function ($enrollmentQuery) use ($currentSessionId) {
+                    $enrollmentQuery->where('status', 'active')
+                        ->with(['classSection.gradeLevel', 'gradeLevel']);
+
+                    if ($currentSessionId) {
+                        $enrollmentQuery->orderByRaw(
+                            'CASE WHEN academic_session_id = ? THEN 0 ELSE 1 END',
+                            [$currentSessionId]
+                        );
+                    }
+
+                    $enrollmentQuery->latest('id');
+                },
+                'enrollments.classSection.gradeLevel',
+                'enrollments.gradeLevel',
+            ])
                 ->leftJoin('parents', 'students.parent_id', '=', 'parents.id')
                 ->select('students.*');
 
@@ -88,10 +111,26 @@ class StudentController extends BaseController
                                 <div><i class="fa fa-phone text-muted me-1"></i> '.$pPhone.'</div>
                             </div>';
                 })
-                ->addColumn('class', function($row) {
-                    $grade = $row->classSection->gradeLevel->name ?? '';
-                    $section = $row->classSection->name ?? '';
-                    return trim($grade . ' ' . $section) ?: '-';
+                ->addColumn('class', function ($row) {
+                    $enrollment = $row->enrollments->first();
+
+                    if ($enrollment?->classSection) {
+                        return class_section_label($enrollment->classSection, 'grade_dash_section');
+                    }
+
+                    if ($enrollment?->gradeLevel) {
+                        return $enrollment->gradeLevel->name;
+                    }
+
+                    if ($row->classSection) {
+                        return class_section_label($row->classSection, 'grade_dash_section');
+                    }
+
+                    if ($row->gradeLevel) {
+                        return $row->gradeLevel->name;
+                    }
+
+                    return '-';
                 })
                 ->addColumn('status', function($row) {
                     $status = $row->status ?? 'active';
@@ -117,7 +156,32 @@ class StudentController extends BaseController
                         <button class="btn btn-danger shadow btn-xs sharp delete-btn" data-url="'.$delete.'" title="Delete"><i class="fa fa-trash"></i></button>
                     </div>';
                 })
-                ->filter(function ($query) use ($request) {
+                ->filter(function ($query) use ($request, $currentSessionId) {
+                    if ($request->filled('class_section_id')) {
+                        $query->where(function ($studentQuery) use ($request, $currentSessionId) {
+                            $studentQuery->whereHas('enrollments', function ($enrollmentQuery) use ($request, $currentSessionId) {
+                                $enrollmentQuery->where('status', 'active')
+                                    ->where('class_section_id', $request->class_section_id);
+                                if ($currentSessionId) {
+                                    $enrollmentQuery->where('academic_session_id', $currentSessionId);
+                                }
+                            })->orWhere('students.class_section_id', $request->class_section_id);
+                        });
+                    } elseif ($request->filled('grade_level_id')) {
+                        $query->where(function ($studentQuery) use ($request, $currentSessionId) {
+                            $studentQuery->whereHas('enrollments', function ($enrollmentQuery) use ($request, $currentSessionId) {
+                                $enrollmentQuery->where('status', 'active')
+                                    ->where('grade_level_id', $request->grade_level_id);
+                                if ($currentSessionId) {
+                                    $enrollmentQuery->where('academic_session_id', $currentSessionId);
+                                }
+                            })->orWhere('students.grade_level_id', $request->grade_level_id)
+                                ->orWhereHas('classSection', function ($classQuery) use ($request) {
+                                    $classQuery->where('grade_level_id', $request->grade_level_id);
+                                });
+                        });
+                    }
+
                     if ($request->has('search') && !empty($request->search['value'])) {
                         $keyword = strtolower($request->search['value']);
                         $query->where(function($q) use ($keyword) {
@@ -137,6 +201,22 @@ class StudentController extends BaseController
                                      ->orWhere('mother_phone', 'LIKE', "%{$keyword}%")
                                      ->orWhere('guardian_phone', 'LIKE', "%{$keyword}%");
                               })
+                              ->orWhereHas('enrollments', function ($enrollmentQuery) use ($keyword, $currentSessionId) {
+                                  if ($currentSessionId) {
+                                      $enrollmentQuery->where('academic_session_id', $currentSessionId);
+                                  }
+                                  $enrollmentQuery->where('status', 'active')
+                                      ->where(function ($eq) use ($keyword) {
+                                          $eq->whereHas('classSection', function ($classQuery) use ($keyword) {
+                                              $classQuery->where('name', 'LIKE', "%{$keyword}%")
+                                                  ->orWhereHas('gradeLevel', function ($gradeQuery) use ($keyword) {
+                                                      $gradeQuery->where('name', 'LIKE', "%{$keyword}%");
+                                                  });
+                                          })->orWhereHas('gradeLevel', function ($gradeQuery) use ($keyword) {
+                                              $gradeQuery->where('name', 'LIKE', "%{$keyword}%");
+                                          });
+                                      });
+                              })
                               ->orWhereHas('classSection', function($cq) use ($keyword) {
                                   $cq->where('name', 'LIKE', "%{$keyword}%")
                                      ->orWhereHas('gradeLevel', function($gq) use ($keyword) {
@@ -150,7 +230,11 @@ class StudentController extends BaseController
                 ->make(true);
         }
 
-        return view('students.index');
+        $gradeLevels = $institutionId
+            ? GradeLevel::where('institution_id', $institutionId)->orderBy('order_index')->pluck('name', 'id')
+            : collect();
+
+        return view('students.index', compact('gradeLevels'));
     }
 
     public function create()

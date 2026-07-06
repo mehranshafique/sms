@@ -1,8 +1,7 @@
-"use strict"
+"use strict";
 var dlabSettingsOptions = {};
 
-function getUrlParams(dParam) 
-{
+function getUrlParams(dParam) {
 	var dPageURL = window.location.search.substring(1),
 		dURLVariables = dPageURL.split('&'),
 		dParameterName,
@@ -16,17 +15,48 @@ function getUrlParams(dParam)
 		}
 	}
 }
-	
+
+function getNavLayoutPreference() {
+	var pref = getCookie('nav_layout');
+	return pref === 'horizontal' ? 'horizontal' : 'vertical';
+}
+
+function effectiveNavLayout() {
+	var pref = getNavLayoutPreference();
+	return (pref === 'horizontal' && window.innerWidth >= 1200) ? 'horizontal' : 'vertical';
+}
+
+function applyNavLayoutSettings() {
+	var pref = getNavLayoutPreference();
+	dlabSettingsOptions.layout = effectiveNavLayout();
+
+	if (typeof jQuery !== 'undefined') {
+		jQuery('body').attr('data-user-nav-layout', pref);
+	}
+
+	if (typeof dlabSettings === 'function') {
+		new dlabSettings(dlabSettingsOptions);
+	}
+
+	if (typeof window.updateNavLayoutToggleUI === 'function') {
+		window.updateNavLayoutToggleUI(pref);
+	}
+
+	if (typeof window.syncHorizontalNav === 'function') {
+		window.syncHorizontalNav();
+	}
+}
+
 (function($) {
 
-	var direction =  getUrlParams('dir');
-	
+	var direction = getUrlParams('dir');
+
 	var version = getCookie('version') || "light";
 
 	dlabSettingsOptions = {
 		typography: "poppins",
-		version: version,  // Use the value from the cookie
-		layout: "vertical",
+		version: version,
+		layout: effectiveNavLayout(),
 		primary: "color_1",
 		headerBg: "color_1",
 		navheaderBg: "color_3",
@@ -37,27 +67,22 @@ function getUrlParams(dParam)
 		containerLayout: "full",
 		direction: 'ltr',
 	};
-	
-	console.log(dlabSettingsOptions);
-	
-	new dlabSettings(dlabSettingsOptions); 
 
-	jQuery(window).on('resize',function(){
-        /*Check container layout on resize */
-        dlabSettingsOptions.containerLayout = $('#container_layout').val();
-        /*Check container layout on resize END */
-		new dlabSettings(dlabSettingsOptions); 
+	applyNavLayoutSettings();
+
+	jQuery(window).on('resize', function () {
+		dlabSettingsOptions.containerLayout = $('#container_layout').val();
+		applyNavLayoutSettings();
 	});
-	
-	if(direction == 'rtl' || body.attr('direction') == 'rtl'){
-        direction = 'rtl';
-		jQuery('.main-css').attr('href','css/style-rtl.css');
-    }else{
-        direction = 'ltr';
-		jQuery('.main-css').attr('href','css/style.css');
+
+	if (direction == 'rtl' || body.attr('direction') == 'rtl') {
+		direction = 'rtl';
+		jQuery('.main-css').attr('href', 'css/style-rtl.css');
+	} else {
+		direction = 'ltr';
+		jQuery('.main-css').attr('href', 'css/style.css');
 	}
-	
-	// Theme Mode Toggle Functionality
+
 	if (jQuery(".dlab-theme-mode").length > 0) {
 		jQuery('.dlab-theme-mode').on('click', function () {
 			jQuery(this).toggleClass('active');
@@ -74,7 +99,6 @@ function getUrlParams(dParam)
 			$('.default-select').selectpicker('refresh');
 		});
 
-		// Apply saved version from cookie
 		jQuery('body').attr('data-theme-version', version);
 		jQuery('.dlab-theme-mode').removeClass('active');
 
@@ -84,51 +108,47 @@ function getUrlParams(dParam)
 			}
 		}, 1500);
 	}
-	
+
 })(jQuery);
 
-/* Cookies Function */
-function setCookie(cname, cvalue, exhours) 
-	{
-		var d = new Date();
-		d.setTime(d.getTime() + (30*60*1000)); /* 30 Minutes */
-		var expires = "expires="+ d.toString();
-		document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
-	}
+function setCookie(cname, cvalue, exhours) {
+	var d = new Date();
+	d.setTime(d.getTime() + (30 * 60 * 1000));
+	var expires = "expires=" + d.toString();
+	document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
 
-function getCookie(cname) 
-	{
-		var name = cname + "=";
-		var decodedCookie = decodeURIComponent(document.cookie);
-		var ca = decodedCookie.split(';');
-		for(var i = 0; i <ca.length; i++) {
-			var c = ca[i];
-			while (c.charAt(0) == ' ') {
-				c = c.substring(1);
-			}
-			if (c.indexOf(name) == 0) {
-				return c.substring(name.length, c.length);
-			}
+function setNavLayoutCookie(cvalue) {
+	var d = new Date();
+	d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
+	document.cookie = 'nav_layout=' + cvalue + ';expires=' + d.toUTCString() + ';path=/';
+}
+
+function getCookie(cname) {
+	var name = cname + "=";
+	var decodedCookie = decodeURIComponent(document.cookie);
+	var ca = decodedCookie.split(';');
+	for (var i = 0; i < ca.length; i++) {
+		var c = ca[i];
+		while (c.charAt(0) == ' ') {
+			c = c.substring(1);
 		}
-		return "";
+		if (c.indexOf(name) == 0) {
+			return c.substring(name.length, c.length);
+		}
 	}
+	return "";
+}
 
-function deleteCookie(cname) 
-	{
-		var d = new Date();
-		d.setTime(d.getTime() + (1)); // 1/1000 second
-		var expires = "expires="+ d.toString();
-		//document.cookie = cname + "=1;" + expires + ";path=/";
-		document.cookie = cname + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT"+";path=/";
-	}
+function deleteCookie(cname) {
+	document.cookie = cname + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT" + ";path=/";
+}
 
-function deleteAllCookie(reload = true)
-	{
-	jQuery.each(themeOptionArr, function(optionKey, optionValue) {
-			deleteCookie(optionKey);
+function deleteAllCookie(reload = true) {
+	jQuery.each(themeOptionArr, function (optionKey, optionValue) {
+		deleteCookie(optionKey);
 	});
-	if(reload){
+	if (reload) {
 		location.reload();
 	}
-} 	
-/* Cookies Function END */
+}

@@ -24,6 +24,8 @@
 
 	<script src="{{ asset('js/custom.min.js') }}"></script>
     <script src="{{ asset('js/dlabnav-init.js') }}"></script>
+    <script src="{{ asset('js/nav-layout-toggle.js') }}"></script>
+    <script src="{{ asset('js/horizontal-nav.js') }}"></script>
 
     <!-- Date & Time Pickers JS -->
     <script src="{{asset('vendor/moment/moment.min.js')}}"></script>

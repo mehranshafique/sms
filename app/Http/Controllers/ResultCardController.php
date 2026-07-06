@@ -174,18 +174,47 @@ class ResultCardController extends BaseController
 
     public function getClasses(Request $request)
     {
-        if (!$request->exam_id) return response()->json([]);
+        if (!$request->exam_id) {
+            return response()->json([]);
+        }
 
         $exam = Exam::find($request->exam_id);
-        if (!$exam) return response()->json([]);
+        if (!$exam) {
+            return response()->json([]);
+        }
 
-        // FIX: Removed academic_session_id filter since your table structure (reused classes)
-        // does not contain this column on class_sections or grade_levels.
-        $classes = ClassSection::with('gradeLevel')
-            ->get()
-            ->mapWithKeys(function($item) {
-                return [$item->id => $item->gradeLevel->name . ' - ' . $item->name];
-            });
+        $user = Auth::user();
+        $activeInstId = session('active_institution_id') ?? $user->institute_id;
+        $isGlobalSuperAdmin = $user->hasRole('Super Admin')
+            && ($activeInstId === 'global' || !$activeInstId);
+
+        if (!$isGlobalSuperAdmin && $exam->institution_id != $activeInstId && !$user->hasRole('Super Admin')) {
+            return response()->json([]);
+        }
+
+        $baseQuery = ClassSection::with('gradeLevel')
+            ->where('institution_id', $exam->institution_id)
+            ->where('is_active', true);
+
+        $classes = (clone $baseQuery)
+            ->where(function ($query) use ($exam) {
+                $query->whereHas('enrollments', function ($enrollment) use ($exam) {
+                    $enrollment->where('academic_session_id', $exam->academic_session_id);
+                })->orWhereIn('id', ExamRecord::where('exam_id', $exam->id)
+                    ->distinct()
+                    ->pluck('class_section_id'));
+            })
+            ->get();
+
+        if ($classes->isEmpty()) {
+            $classes = $baseQuery->get();
+        }
+
+        $classes = $classes
+            ->sortBy(fn ($item) => [$item->gradeLevel->order_index ?? 999, $item->name])
+            ->mapWithKeys(fn ($item) => [
+                $item->id => class_section_label($item, 'grade_dash_section'),
+            ]);
 
         return response()->json($classes);
     }

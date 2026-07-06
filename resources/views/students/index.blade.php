@@ -23,6 +23,24 @@
             </div>
         </div>
 
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label" for="filter_grade">{{ __('grade_level.grade_name') }}</label>
+                <select id="filter_grade" class="form-control default-select">
+                    <option value="">{{ __('timetable.all_grades') }}</option>
+                    @foreach($gradeLevels as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="filter_section">{{ __('student.select_section') }}</label>
+                <select id="filter_section" class="form-control default-select">
+                    <option value="">{{ __('finance.all_sections') }}</option>
+                </select>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-12">
                 <div class="card">
@@ -37,6 +55,7 @@
                                         <th>{{ __('student.table_no') }}</th>
                                         <th>{{ __('student.details') }}</th>
                                         <th>{{ __('student.parent_info') }}</th>
+                                        <th>{{ __('student.class_grade') }}</th>
                                         <th>{{ __('student.status') }}</th>
                                         <th class="text-end">{{ __('student.action') }}</th>
                                     </tr>
@@ -65,16 +84,71 @@
         var table = $('#studentTable').DataTable({
             processing: true,
             serverSide: true,
-            ajax: "{{ route('students.index') }}",
+            ajax: {
+                url: "{{ route('students.index') }}",
+                data: function (d) {
+                    d.grade_level_id = $('#filter_grade').val();
+                    d.class_section_id = $('#filter_section').val();
+                }
+            },
+            language: {
+                search: "{{ __('pagination.search') }}",
+                lengthMenu: "{{ __('pagination.show') }} _MENU_ {{ __('pagination.entries') }}",
+                info: "{{ __('pagination.info') }}",
+                infoEmpty: "{{ __('pagination.info_empty') }}",
+                infoFiltered: "{{ __('pagination.info_filtered') }}",
+                zeroRecords: "{{ __('pagination.zero_records') }}",
+                emptyTable: "{{ __('pagination.empty_table') }}",
+                processing: "{{ __('pagination.processing') }}",
+            },
             columns: [
                 { data: 'DT_RowIndex', name: 'students.id' },
-                // Name matches Controller select fields for correct searching
-                { data: 'details', name: 'students.first_name' }, 
-                // Updated to search by parent name fields
-                { data: 'parent_info', name: 'parents.father_name' }, 
+                { data: 'details', name: 'students.first_name' },
+                { data: 'parent_info', name: 'parents.father_name' },
+                { data: 'class', name: 'classSection.name', orderable: false },
                 { data: 'status', name: 'students.status' },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
             ]
+        });
+
+        $('#filter_grade').on('change', function () {
+            var gradeId = $(this).val();
+            var $section = $('#filter_section');
+
+            $section.html('<option value="">{{ __('student.loading') }}</option>');
+
+            if (!gradeId) {
+                $section.html('<option value="">{{ __('finance.all_sections') }}</option>');
+                if ($section.data('selectpicker')) {
+                    $section.selectpicker('refresh');
+                }
+                table.draw();
+                return;
+            }
+
+            fetch("{{ route('students.get_sections') }}?grade_id=" + encodeURIComponent(gradeId))
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    var html = '<option value="">{{ __('finance.all_sections') }}</option>';
+                    Object.keys(data).forEach(function (id) {
+                        html += '<option value="' + id + '">' + data[id] + '</option>';
+                    });
+                    $section.html(html);
+                    if ($section.data('selectpicker')) {
+                        $section.selectpicker('destroy');
+                    }
+                    if (typeof window.digitexReinitSelectPickers === 'function') {
+                        window.digitexReinitSelectPickers();
+                    }
+                    table.draw();
+                })
+                .catch(function () {
+                    $section.html('<option value="">{{ __('student.error_loading') }}</option>');
+                });
+        });
+
+        $('#filter_section').on('change', function () {
+            table.draw();
         });
 
         // 2. Delete Button Logic

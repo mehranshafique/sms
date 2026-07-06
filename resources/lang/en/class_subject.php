@@ -18,6 +18,8 @@ return [
     // Empty States
     'no_subjects_defined' => 'No subjects defined for this Grade Level. Go to Academics > Subjects to add them.',
     'no_active_session' => 'No active academic session found.',
+    'invalid_class' => 'The selected class does not belong to your school.',
+    'save_failed' => 'Could not save course allocations. Please try again.',
     
     // Buttons
     'save_configuration' => 'Save Configuration',

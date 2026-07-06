@@ -7,6 +7,9 @@ return [
     'global_view' => 'Global View',
     'global_dashboard' => 'Global Dashboard',
     'mobile_menu' => 'Menu',
+    'nav_layout_sidebar' => 'Sidebar menu',
+    'nav_layout_horizontal' => 'Top menu',
+    'nav_layout_toggle' => 'Change navigation layout',
     
     // Search
     'search_school' => 'Search school...',

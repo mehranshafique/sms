@@ -14,6 +14,8 @@ return [
     'select_teacher' => '-- Sélectionner un enseignant --',
     'no_subjects_defined' => 'Aucune matière définie pour ce niveau. Allez dans Académique > Matières pour les ajouter.',
     'no_active_session' => 'Aucune session académique active trouvée.',
+    'invalid_class' => 'La classe sélectionnée n\'appartient pas à votre établissement.',
+    'save_failed' => 'Impossible d\'enregistrer les allocations. Veuillez réessayer.',
     'save_configuration' => 'Enregistrer la configuration',
     'success_update' => 'Allocations de cours mises à jour avec succès.',
     'validation_error' => 'Veuillez vérifier les données saisies.',

@@ -104,8 +104,8 @@
             {{-- ============================================================= --}}
             {{-- PART 1: SUPER ADMIN GLOBAL SECTION --}}
             {{-- ============================================================= --}}
-            {{-- Visible ONLY to Super Admins (Always visible) --}}
-            @if($isSuperAdmin)
+            {{-- Visible ONLY to Super Admins in global mode (avoids duplicate menus in institution context) --}}
+            @if($isSuperAdmin && $isGlobalMode)
                 <li class="nav-label first">{{ __('sidebar.main_admin') }}</li>
                 
                 {{-- Global Dashboard Link --}}
@@ -139,7 +139,7 @@
                 </li>
 
                 <li class="nav-label">{{ __('sidebar.management') }}</li>
-                <li class="{{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show', 'campuses.*', 'header-officers.index', 'header-officers.edit', 'packages.*', 'subscriptions.*') ? 'mm-active' : '' }}">
+                <li class="mega-menu-md {{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show', 'campuses.*', 'header-officers.index', 'header-officers.edit', 'packages.*', 'subscriptions.*') ? 'mm-active' : '' }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-university"></i><span class="nav-text">{{ __('sidebar.institution_mgmt') }}</span></a>
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('institutes.index', 'institutes.edit', 'institutes.show') ? 'mm-active' : '' }}" href="{{ route('institutes.index') }}">{{ __('sidebar.all_institutions') }}</a></li>
@@ -161,7 +161,7 @@
                 </li>
 
                 <li class="nav-label">{{ __('sidebar.configuration') }}</li>
-                <li class="{{ request()->routeIs('configuration.index', 'sms_templates.*', 'email_templates.*', 'platform.queue-monitor.*', 'currency.*') ? 'mm-active' : '' }}">
+                <li class="mega-menu-md {{ request()->routeIs('configuration.index', 'sms_templates.*', 'email_templates.*', 'platform.queue-monitor.*', 'currency.*') ? 'mm-active' : '' }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.system_config') }}</span></a>
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('configuration.index') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
@@ -268,7 +268,7 @@
                 )
                     <li class="nav-label">{{ __('sidebar.people') }}</li>
                     
-                    <li class="{{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*', 'discipline.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*', 'discipline.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'students'])</a>
                         <ul aria-expanded="false">
                             @if($hasModule('students') && $user->can('student.view'))
@@ -356,7 +356,7 @@
                     
                     {{-- Fees & Collection --}}
                     @if($hasModule('invoices') && $user->can('invoice.view'))
-                    <li class="{{ request()->routeIs('fee-types.*', 'fees.*', 'invoices.*', 'payment-proofs.*', 'finance.balances.*', 'finance.reports.*', 'payment-methods.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('fee-types.*', 'fees.*', 'invoices.*', 'payment-proofs.*', 'finance.balances.*', 'finance.reports.*', 'payment-methods.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-money"></i><span class="nav-text">{{ __('sidebar.fees_collection') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'fees_collection'])</a>
                         <ul aria-expanded="false">
                             @if($hasModule('fee_types') && $user->can('fee_type.view'))
@@ -409,7 +409,7 @@
                 {{-- EXAMINATIONS --}}
                 @if($hasModule('exams') && $user->can('exam.view'))
                     <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                    <li class="{{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'examinations'])</a>
                         <ul aria-expanded="false">
                             <li><a class="{{ request()->routeIs('exams.*') ? 'mm-active' : '' }}" href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}@include('layout.partials.sidebar-badge', ['key' => 'exams'])</a></li>
@@ -471,7 +471,7 @@
                 {{-- CONFIGURATION --}}
                 @if($user->can('setting.manage') || $user->can('setting.view') || $user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
-                    <li class="{{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'email_templates.*', 'currency.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'email_templates.*', 'currency.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
                         <ul aria-expanded="false">
                             @if($user->can('setting.manage') || $user->can('setting.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))

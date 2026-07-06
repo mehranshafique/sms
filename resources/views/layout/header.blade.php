@@ -56,15 +56,19 @@
             margin-left: 0 !important;
             width: 100% !important;
             min-height: auto !important;
+            padding-top: 0 !important;
             padding-bottom: 0;
         }
         .setup-alerts-inner .container-fluid {
-            padding-top: 0.75rem;
+            padding-top: 0.35rem;
             padding-bottom: 0;
         }
         .setup-alerts-inner + .content-body > .container-fluid,
         .setup-alerts-inner + .content-body > .container {
-            padding-top: 0.5rem;
+            padding-top: 0.35rem;
+        }
+        .setup-alerts-inner .alert {
+            margin-bottom: 0.5rem;
         }
         .dlabnav .nav-text {
             white-space: normal;
@@ -479,6 +483,7 @@
         }
     </style>
     @include('layout.partials.theme-dark')
+    @include('layout.partials.nav-layout-styles')
 </head>
 <body>
 
@@ -761,6 +766,20 @@
                                 </div>
 							</li>
                             
+                            {{-- Navigation layout toggle (desktop only) --}}
+                            <li class="nav-item header-item-desktop-only header-item-nav-layout">
+                                <a class="nav-link dlab-nav-layout-toggle p-0"
+                                   href="javascript:void(0);"
+                                   title="{{ __('header.nav_layout_toggle') }}"
+                                   aria-label="{{ __('header.nav_layout_toggle') }}"
+                                   aria-pressed="false"
+                                   data-label-sidebar="{{ __('header.nav_layout_sidebar') }}"
+                                   data-label-horizontal="{{ __('header.nav_layout_horizontal') }}">
+                                    <i class="fas fa-bars nav-layout-icon-sidebar" aria-hidden="true"></i>
+                                    <i class="fas fa-grip-lines nav-layout-icon-top" aria-hidden="true"></i>
+                                </a>
+                            </li>
+
                             {{-- Theme Toggle --}}
                             <li class="nav-item dropdown notification_dropdown header-item-desktop-only">
                                <a class="nav-link bell dlab-theme-mode p-0" href="javascript:void(0);">

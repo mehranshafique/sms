@@ -71,9 +71,14 @@
             ],
             language: {
                 paginate: { next: '<i class="fa fa-angle-right"></i>', previous: '<i class="fa fa-angle-left"></i>' },
-                search: "{{ __('pagination.search') ?? 'Search' }}",
-                lengthMenu: "{{ __('pagination.show') ?? 'Show' }} _MENU_ {{ __('pagination.entries') ?? 'entries' }}",
-                info: "Showing _START_ to _END_ of _TOTAL_ entries" // Add specific keys if needed
+                search: "{{ __('pagination.search') }}",
+                lengthMenu: "{{ __('pagination.show') }} _MENU_ {{ __('pagination.entries') }}",
+                info: "{{ __('pagination.info') }}",
+                infoEmpty: "{{ __('pagination.info_empty') }}",
+                infoFiltered: "{{ __('pagination.info_filtered') }}",
+                zeroRecords: "{{ __('pagination.zero_records') }}",
+                emptyTable: "{{ __('pagination.empty_table') }}",
+                processing: "{{ __('pagination.processing') }}",
             },
             // ADDED: Footer Callback to calculate totals
             footerCallback: function (row, data, start, end, display) {
