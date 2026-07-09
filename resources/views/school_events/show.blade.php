@@ -90,7 +90,7 @@
                             <tr>
                                 <th>{{ __('school_event.recipient') }}</th>
                                 <th>{{ __('school_event.phone') }}</th>
-                                <th>Telegram</th>
+                                <th>{{ __('school_event.telegram') }}</th>
                                 <th>{{ __('school_event.field_status') }}</th>
                             </tr>
                         </thead>
@@ -101,9 +101,17 @@
                                 <td>{{ $inv->recipient_phone ?: '—' }}</td>
                                 <td>{{ $inv->recipient_telegram_chat_id ?: '—' }}</td>
                                 <td>
-                                    <span class="badge badge-{{ $inv->delivery_status === 'sent' ? 'success' : 'secondary' }} light">
-                                        {{ ucfirst($inv->delivery_status) }}
-                                    </span>
+                                    @php
+                                        $deliveryKey = 'school_event.delivery_' . $inv->delivery_status;
+                                        $deliveryLabel = __($deliveryKey);
+                                        if ($deliveryLabel === $deliveryKey) {
+                                            $deliveryLabel = ucfirst($inv->delivery_status);
+                                        }
+                                        $deliveryBadge = $inv->delivery_status === 'sent'
+                                            ? 'success'
+                                            : ($inv->delivery_status === 'failed' ? 'danger' : 'secondary');
+                                    @endphp
+                                    <span class="badge badge-{{ $deliveryBadge }} light">{{ $deliveryLabel }}</span>
                                 </td>
                             </tr>
                         @empty
@@ -128,7 +136,7 @@ $('#previewBtn').on('click', function(){
         $('#previewBox').removeClass('d-none');
         $('#previewText').text(res.preview || '');
     }).fail(function(xhr){
-        Swal.fire({ icon: 'warning', title: @json(__('school_event.preview')), text: xhr.responseJSON?.message || 'Error' });
+        Swal.fire({ icon: 'warning', title: @json(__('school_event.preview')), text: xhr.responseJSON?.message || @json(__('school_event.error_generic')) });
     });
 });
 </script>

@@ -230,9 +230,7 @@ class ReminderController extends BaseController
 
         // 3. Query the schedules
         $schedulesQuery = ExamSchedule::with(['subject', 'classSection', 'exam'])
-            ->where(function($q) use ($tomorrow) {
-                $q->whereDate('exam_date', $tomorrow)->orWhereDate('date', $tomorrow);
-            })
+            ->whereDate('exam_date', $tomorrow)
             ->whereHas('exam', function($q) use ($institutionId) {
                 $q->where('institution_id', $institutionId);
             });

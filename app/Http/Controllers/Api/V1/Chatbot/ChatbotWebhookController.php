@@ -21,6 +21,17 @@ class ChatbotWebhookController extends Controller
     public function handle(Request $request, $provider)
     {
         try {
+            // Provider subscription handshakes (GET). Meta/WhatsApp Cloud API and some
+            // providers verify the callback URL with a GET containing a challenge that
+            // must be echoed back. This MUST run before signature verification, because
+            // handshake requests do not carry the message-signing headers.
+            if ($request->isMethod('get')) {
+                $challenge = $this->handleVerificationHandshake($request, (string) $provider);
+                if ($challenge !== null) {
+                    return $challenge;
+                }
+            }
+
             if (!$this->webhookVerifier->verify($request, (string) $provider)) {
                 Log::warning("Chatbot webhook rejected [$provider]: signature verification failed");
 
@@ -65,6 +76,43 @@ class ChatbotWebhookController extends Controller
             Log::error("Chatbot Webhook Error ($provider): " . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Handle provider webhook subscription handshakes (GET verification).
+     *
+     * Meta/WhatsApp Cloud API sends: ?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...
+     * We must echo back hub.challenge (as plain text) for the subscription to activate.
+     * Without this, Meta never keeps the webhook subscribed and inbound messages are
+     * not delivered until other activity re-triggers the subscription.
+     *
+     * @return \Illuminate\Http\Response|null  Response to return, or null to continue normal flow.
+     */
+    private function handleVerificationHandshake(Request $request, string $provider)
+    {
+        $mode = $request->query('hub_mode', $request->query('hub.mode'));
+        $challenge = $request->query('hub_challenge', $request->query('hub.challenge'));
+        $verifyToken = $request->query('hub_verify_token', $request->query('hub.verify_token'));
+
+        // Not a Meta-style subscription handshake.
+        if ($mode === null && $challenge === null && $verifyToken === null) {
+            return null;
+        }
+
+        $expectedToken = config('services.chatbot.meta_verify_token')
+            ?: config('services.chatbot.webhook_secret');
+
+        if ($mode === 'subscribe' && $expectedToken && hash_equals((string) $expectedToken, (string) $verifyToken)) {
+            Log::info("Chatbot webhook handshake verified [$provider].");
+
+            // Meta expects the raw challenge value echoed back with 200.
+            return response((string) $challenge, 200)
+                ->header('Content-Type', 'text/plain');
+        }
+
+        Log::warning("Chatbot webhook handshake rejected [$provider]: verify token mismatch or missing CHATBOT_META_VERIFY_TOKEN.");
+
+        return response('Forbidden', 403);
     }
 
     /**

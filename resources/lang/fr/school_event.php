@@ -50,4 +50,9 @@ return [
     'audience_class' => 'Classes spécifiques',
     'status_draft' => 'Brouillon',
     'status_sent' => 'Envoyé',
+    'telegram' => 'Telegram',
+    'delivery_pending' => 'En attente',
+    'delivery_sent' => 'Envoyé',
+    'delivery_failed' => 'Échec',
+    'error_generic' => 'Une erreur est survenue. Veuillez réessayer.',
 ];

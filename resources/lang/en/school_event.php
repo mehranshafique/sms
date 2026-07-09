@@ -50,4 +50,9 @@ return [
     'audience_class' => 'Specific Classes',
     'status_draft' => 'Draft',
     'status_sent' => 'Sent',
+    'telegram' => 'Telegram',
+    'delivery_pending' => 'Pending',
+    'delivery_sent' => 'Sent',
+    'delivery_failed' => 'Failed',
+    'error_generic' => 'Something went wrong. Please try again.',
 ];
