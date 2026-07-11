@@ -21,7 +21,8 @@ class InstitutionCreditService
             $before = (int) $institution->{$column};
             $after = $before + $amount;
 
-            $institution->update([$column => $after]);
+            $institution->{$column} = $after;
+            $institution->save();
 
             return InstitutionCreditTransaction::create([
                 'institution_id' => $institutionId,
@@ -56,7 +57,8 @@ class InstitutionCreditService
             $before = (int) $institution->{$column};
             $after = max(0, $before - (int) $transaction->amount);
 
-            $institution->update([$column => $after]);
+            $institution->{$column} = $after;
+            $institution->save();
 
             $transaction->update([
                 'status' => 'reversed',
@@ -121,5 +123,37 @@ class InstitutionCreditService
         if ($amount < 1) {
             throw ValidationException::withMessages(['amount' => __('configuration.enter_amount')]);
         }
+    }
+
+    /**
+     * Align institution balances with the latest ledger entry per channel.
+     * Fixes rows created before whatsapp_credits was mass-assignable.
+     */
+    public function syncBalancesFromLedger(int $institutionId): void
+    {
+        $institution = Institution::find($institutionId);
+        if (! $institution) {
+            return;
+        }
+
+        foreach (['sms', 'whatsapp'] as $type) {
+            $column = $this->creditColumn($type);
+            $latest = InstitutionCreditTransaction::query()
+                ->where('institution_id', $institutionId)
+                ->where('type', $type)
+                ->latest('id')
+                ->first();
+
+            if (! $latest) {
+                continue;
+            }
+
+            $ledgerBalance = (int) $latest->balance_after;
+            if ((int) $institution->{$column} !== $ledgerBalance) {
+                $institution->{$column} = $ledgerBalance;
+            }
+        }
+
+        $institution->save();
     }
 }

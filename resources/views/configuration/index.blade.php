@@ -263,7 +263,7 @@
                                                 <label class="form-label">{{ __('configuration.phone_number') }}</label>
                                                 <input type="text" name="phone" class="form-control" placeholder="{{ __('configuration.phone_placeholder') }}" required>
                                             </div>
-                                            <p class="text-muted small">{{ __('configuration.current_provider') }}: <strong>{{ ucfirst($sms['provider']) }}</strong></p>
+                                            <p class="text-muted small">{{ __('configuration.current_provider') }}: <strong>{{ $sms['provider'] }}</strong></p>
                                             <button type="submit" class="btn btn-outline-primary btn-sm test-btn"><i class="fa fa-paper-plane me-1"></i> {{ __('configuration.send_test_sms') }}</button>
                                         </form>
                                     </div>
@@ -276,7 +276,7 @@
                                                 <label class="form-label">{{ __('configuration.phone_number') }}</label>
                                                 <input type="text" name="phone" class="form-control" placeholder="{{ __('configuration.phone_placeholder') }}" required>
                                             </div>
-                                            <p class="text-muted small">{{ __('configuration.whatsapp_provider') }}</p>
+                                            <p class="text-muted small">{{ __('configuration.current_provider') }}: <strong>{{ $whatsapp['provider'] ?? __('configuration.whatsapp_provider') }}</strong></p>
                                             <button type="submit" class="btn btn-outline-success btn-sm test-btn"><i class="fa fa-paper-plane me-1"></i> {{ __('configuration.send_test_whatsapp') }}</button>
                                         </form>
                                     </div>

@@ -12,7 +12,7 @@ class GatewayFactory
      * @param string $provider
      * @param int|null $institutionId Context for loading credentials.
      */
-    public static function create(string $provider, int $institutionId = null): SmsGatewayInterface
+    public static function create(string $provider, ?int $institutionId = null, ?int $fallbackInstitutionId = null): SmsGatewayInterface
     {
         switch (strtolower($provider)) {
             case 'infobip':
@@ -22,7 +22,7 @@ class GatewayFactory
             case 'meta':
                 // Ensure class exists before instantiating to avoid crash if file not created yet
                 if (class_exists(\App\Services\Sms\MetaWhatsAppService::class)) {
-                    return new \App\Services\Sms\MetaWhatsAppService($institutionId);
+                    return new \App\Services\Sms\MetaWhatsAppService($institutionId, $fallbackInstitutionId);
                 }
                 break;
             case 'twilio':

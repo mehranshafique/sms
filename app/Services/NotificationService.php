@@ -523,26 +523,11 @@ class NotificationService
 
     public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms')
     {
-        $institution = Institution::find($institutionId);
-
-        $providerKey = ($channel === 'whatsapp') ? 'whatsapp_provider' : 'sms_provider';
-        $selectedProvider = InstitutionSetting::where('institution_id', $institutionId)
-            ->where('key', $providerKey)
-            ->value('value') ?? 'system';
-
-        $finalProviderName = $selectedProvider;
-        $credentialsContextId = $institutionId; 
-        $shouldDeductCredits = false;
-        
-        if ($selectedProvider === 'system') {
-            $finalProviderName = InstitutionSetting::resolveSystemProvider($channel);
-            $credentialsContextId = null; 
-            $shouldDeductCredits = true;
-        } else {
-            $finalProviderName = $selectedProvider;
-            $credentialsContextId = $institutionId;
-            $shouldDeductCredits = false;
-        }
+        $institution = $institutionId ? Institution::find($institutionId) : null;
+        $context = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
+        $finalProviderName = $context['resolved'];
+        $credentialsContextId = $context['credentials_institution_id'];
+        $shouldDeductCredits = $context['deduct_credits'];
 
         $creditCol = ($channel === 'whatsapp') ? 'whatsapp_credits' : 'sms_credits';
         
@@ -553,7 +538,8 @@ class NotificationService
         }
 
         try {
-            $gateway = GatewayFactory::create($finalProviderName, $credentialsContextId);
+            $credentialFallbackId = ($credentialsContextId === null && $institutionId) ? $institutionId : null;
+            $gateway = GatewayFactory::create($finalProviderName, $credentialsContextId, $credentialFallbackId);
 
             if ($channel === 'whatsapp') {
                 $result = $gateway->sendWhatsApp($to, $message);

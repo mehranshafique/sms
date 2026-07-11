@@ -28,6 +28,7 @@ class Institution extends Model
         'exchange_rate',
         'logo', 
         'sms_credits',
+        'whatsapp_credits',
         'is_active',
     ];
 

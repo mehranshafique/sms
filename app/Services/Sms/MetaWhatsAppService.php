@@ -14,7 +14,20 @@ class MetaWhatsAppService implements SmsGatewayInterface
     protected $phoneNumberId;
     protected $version = 'v18.0';
 
-    public function __construct($institutionId = null)
+    public function __construct($institutionId = null, $fallbackInstitutionId = null)
+    {
+        $this->loadCredentials($institutionId);
+
+        if ((!$this->accessToken || !$this->phoneNumberId) && !is_null($fallbackInstitutionId) && $fallbackInstitutionId !== $institutionId) {
+            $this->loadCredentials($fallbackInstitutionId);
+        }
+
+        if ((!$this->accessToken || !$this->phoneNumberId) && !is_null($institutionId)) {
+            $this->loadCredentials(null);
+        }
+    }
+
+    protected function loadCredentials($institutionId): void
     {
         $query = InstitutionSetting::query();
         if (is_null($institutionId)) {
@@ -25,11 +38,15 @@ class MetaWhatsAppService implements SmsGatewayInterface
 
         $settings = $query->whereIn('key', ['meta_access_token', 'meta_phone_number_id'])->pluck('value', 'key');
 
-        if (isset($settings['meta_access_token'])) {
-            try {
-                $this->accessToken = Crypt::decryptString($settings['meta_access_token']);
-                $this->phoneNumberId = $settings['meta_phone_number_id'];
-            } catch (\Exception $e) {}
+        if (empty($settings['meta_access_token']) || empty($settings['meta_phone_number_id'])) {
+            return;
+        }
+
+        try {
+            $this->accessToken = Crypt::decryptString($settings['meta_access_token']);
+            $this->phoneNumberId = $settings['meta_phone_number_id'];
+        } catch (\Exception $e) {
+            Log::error('Meta WhatsApp credential decryption failed: ' . $e->getMessage());
         }
     }
 
@@ -60,11 +77,14 @@ class MetaWhatsAppService implements SmsGatewayInterface
                 'text' => ['preview_url' => false, 'body' => $message]
             ]);
 
-            if ($response->successful()) {
+            $payload = $response->json();
+
+            if ($response->successful() && !empty($payload['messages'][0]['id'])) {
                 return ['success' => true, 'message' => __('configuration.whatsapp_sent_success')];
             }
-            
-            $err = $response->json()['error']['message'] ?? 'Meta API Error';
+
+            $err = $payload['error']['message'] ?? ($response->body() ?: 'Meta API Error');
+            Log::error('Meta WhatsApp send failed', ['response' => $payload]);
             return ['success' => false, 'message' => $err];
 
         } catch (\Exception $e) {

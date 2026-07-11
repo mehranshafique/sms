@@ -36,6 +36,35 @@ class InstitutionSetting extends Model
     }
 
     /**
+     * Resolve selected provider, gateway driver, and credential scope for SMS/WhatsApp.
+     *
+     * @return array{selected: string, resolved: string, credentials_institution_id: ?int, deduct_credits: bool}
+     */
+    public static function resolveMessagingContext(?int $institutionId, string $channel): array
+    {
+        $providerKey = $channel === 'whatsapp' ? 'whatsapp_provider' : 'sms_provider';
+        $selected = self::get($institutionId, $providerKey, 'system');
+        $useSystem = $selected === 'system';
+
+        return [
+            'selected' => $selected,
+            'resolved' => $useSystem ? self::resolveSystemProvider($channel) : $selected,
+            'credentials_institution_id' => $useSystem ? null : $institutionId,
+            'deduct_credits' => $useSystem,
+        ];
+    }
+
+    /**
+     * Human-readable provider label for configuration / test UI.
+     */
+    public static function displayProviderName(?int $institutionId, string $channel): string
+    {
+        $context = self::resolveMessagingContext($institutionId, $channel);
+
+        return ucfirst($context['resolved']);
+    }
+
+    /**
      * Helper to set a setting value.
      */
     public static function set($institutionId, $key, $value, $group = 'general')

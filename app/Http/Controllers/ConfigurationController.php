@@ -48,8 +48,12 @@ class ConfigurationController extends BaseController
         $allowedWa = json_decode($globalSettings['allowed_whatsapp_providers'] ?? $defaultWa, true);
 
         $sms = [
-            'provider' => $settings['sms_provider'] ?? 'system',
+            'provider' => InstitutionSetting::displayProviderName($institutionId, 'sms'),
             'sender_id' => $settings['sms_sender_id'] ?? '',
+        ];
+
+        $whatsapp = [
+            'provider' => InstitutionSetting::displayProviderName($institutionId, 'whatsapp'),
         ];
         
         $notificationPrefs = isset($settings['notification_preferences']) ? json_decode($settings['notification_preferences'], true) : [];
@@ -68,6 +72,10 @@ class ConfigurationController extends BaseController
         ];
 
         $institution = $institutionId ? Institution::find($institutionId) : null;
+        if ($institution) {
+            app(InstitutionCreditService::class)->syncBalancesFromLedger($institution->id);
+            $institution->refresh();
+        }
         $allModules = Module::all();
         $enabledModules = isset($settings['enabled_modules']) ? json_decode($settings['enabled_modules'], true) : [];
         $smtpInstitutionId = $platformScope ? null : $institutionId;
@@ -91,7 +99,7 @@ class ConfigurationController extends BaseController
         }
 
         return view('configuration.index', compact(
-            'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms',
+            'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 'whatsapp',
             'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
             'allowedSms', 'allowedWa', 'isSuperAdminUser', 'isGlobalContext', 'platformScope',
             'events', 'billingSettings', 'creditTransactions'
@@ -249,6 +257,12 @@ class ConfigurationController extends BaseController
     {
         $request->validate(['phone' => 'required', 'channel' => 'required|in:sms,whatsapp']);
         $institutionId = $this->getInstitutionId();
+
+        if (!$institutionId) {
+            return response()->json([
+                'message' => __('configuration.global_view_required_body'),
+            ], 422);
+        }
         
         // Resolve Notification Service
         try {
@@ -402,12 +416,14 @@ class ConfigurationController extends BaseController
             $request->note
         );
 
-        $institution = Institution::findOrFail($institutionId);
+        $institution = Institution::findOrFail($institutionId)->fresh();
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => __('configuration.recharge_success'),
                 'new_balance' => $request->type === 'sms' ? $institution->sms_credits : $institution->whatsapp_credits,
+                'sms_balance' => $institution->sms_credits,
+                'whatsapp_balance' => $institution->whatsapp_credits,
                 'transaction_id' => $transaction->id,
             ]);
         }

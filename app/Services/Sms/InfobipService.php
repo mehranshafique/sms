@@ -92,6 +92,7 @@ class InfobipService implements SmsGatewayInterface
     {
         try {
             $url = rtrim($this->baseUrl, '/') . '/whatsapp/1/message/text';
+            $recipient = preg_replace('/[^0-9]/', '', $to);
             
             $response = Http::withHeaders([
                 'Authorization' => "App {$this->apiKey}",
@@ -99,7 +100,7 @@ class InfobipService implements SmsGatewayInterface
                 'Accept' => 'application/json',
             ])->timeout(30)->post($url, [
                 'from' => $this->whatsappSender,
-                'to' => $to,
+                'to' => $recipient,
                 'content' => ['text' => $message]
             ]);
 

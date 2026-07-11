@@ -54,7 +54,35 @@
 		return "la la-layer-group";
 	}
 
+	function itemLabel($li) {
+		return $.trim($li.find("> a .nav-text").first().text());
+	}
+
 	function flushGroup($menu, label, items) {
+		if (!items.length) {
+			return;
+		}
+
+		var groupIcon = pickGroupIcon(items);
+		var groupActive = false;
+
+		// Section label + one parent with the same name (e.g. Examinations → Examinations).
+		// Hoist the parent's children so the dropdown is not duplicated.
+		if (items.length === 1 && items[0].find("> ul").length) {
+			var $wrapper = items[0];
+			if (itemLabel($wrapper).toLowerCase() === label.toLowerCase()) {
+				groupIcon =
+					$wrapper.find("> a > i").first().attr("class") || groupIcon;
+				groupActive =
+					$wrapper.hasClass("mm-active") ||
+					$wrapper.find("> ul > li.mm-active").length > 0;
+				items = [];
+				$wrapper.children("ul").children("li").each(function () {
+					items.push($(this).clone(true, true));
+				});
+			}
+		}
+
 		if (!items.length) {
 			return;
 		}
@@ -68,7 +96,7 @@
 		var $link = $(
 			'<a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"></a>'
 		);
-		$link.append($('<i></i>').attr("class", pickGroupIcon(items)));
+		$link.append($('<i></i>').attr("class", groupIcon));
 		$link.append($("<span></span>").addClass("nav-text").text(label));
 		var $sub = $("<ul></ul>");
 
@@ -76,7 +104,7 @@
 			$sub.append($item);
 		});
 
-		if ($sub.find(".mm-active").length) {
+		if (groupActive || $sub.find(".mm-active").length) {
 			$group.addClass("mm-active");
 		}
 
