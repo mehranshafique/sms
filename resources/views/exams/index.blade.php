@@ -25,6 +25,17 @@
             </div>
         </div>
 
+        @if(!empty($missingCategories))
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <strong>{{ __('exam.missing_categories_title') }}</strong>
+                    <p class="mb-0">{{ __('exam.missing_categories_body', ['list' => implode(', ', $missingCategories)]) }}</p>
+                </div>
+            </div>
+        </div>
+        @endif
+
         <div class="row">
             <div class="col-12">
                 <div class="card">

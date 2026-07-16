@@ -1500,6 +1500,42 @@ class ChatbotLogicService
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
             }
 
+            $cycleService = app(\App\Services\AcademicCycleService::class);
+            $cycle = $cycleService->resolveCycle($enrollment);
+
+            if ($cycleService->isUniversityCycle($cycle)) {
+                $msg = $isEn
+                    ? 'University students receive an academic transcript. Please contact the school office.'
+                    : 'Les étudiants universitaires reçoivent un relevé de notes. Veuillez contacter le secrétariat.';
+                return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
+            }
+
+            $activePeriods = json_decode(InstitutionSetting::get($institutionId, 'active_periods', '[]'), true) ?? [];
+            $reportParams = [
+                'student_id' => $student->id,
+                'type' => 'term',
+            ];
+
+            if ($cycleService->usesTrimesterModel($cycle)) {
+                $trimester = 1;
+                foreach ([3, 2, 1] as $t) {
+                    if (in_array('trimester_' . $t, $activePeriods, true) || in_array("trimester_exam_{$t}", $activePeriods, true)) {
+                        $trimester = $t;
+                        break;
+                    }
+                }
+                $reportParams['trimester'] = $trimester;
+            } else {
+                $semester = 1;
+                foreach ([2, 1] as $s) {
+                    if (in_array('semester_' . $s, $activePeriods, true) || in_array("semester_exam_{$s}", $activePeriods, true)) {
+                        $semester = $s;
+                        break;
+                    }
+                }
+                $reportParams['semester'] = $semester;
+            }
+
             $originalUser = Auth::user();
             $originalSession = session('active_institution_id');
             
@@ -1507,12 +1543,7 @@ class ChatbotLogicService
             if ($superAdmin) Auth::login($superAdmin);
             session(['active_institution_id' => $institutionId]);
 
-            $reportRequest = \Illuminate\Http\Request::create('/dummy', 'GET', [
-                'student_id' => $student->id,
-                'mode' => 'single',
-                'trimester' => 1,
-                'semester' => 1
-            ]);
+            $reportRequest = \Illuminate\Http\Request::create('/dummy', 'GET', $reportParams);
 
             $controller = app(\App\Http\Controllers\ReportController::class);
             $response = $controller->bulletin($reportRequest);
@@ -1554,7 +1585,7 @@ class ChatbotLogicService
 
             $pdf = Pdf::setOptions(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true])
                       ->loadHTML($html)
-                      ->setPaper('a4', 'portrait');
+                      ->setPaper('a4', 'landscape');
                       
             $pdfContent = $pdf->output();
 

@@ -14,10 +14,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use App\Services\AcademicCycleService;
 
 class ExamController extends BaseController
 {
-    public function __construct()
+    public function __construct(protected AcademicCycleService $cycleService)
     {
         $this->authorizeResource(Exam::class, 'exam');
         $this->setPageTitle(__('exam.page_title'));
@@ -124,7 +125,37 @@ class ExamController extends BaseController
                 ->make(true);
         }
 
-        return view('exams.index');
+        return view('exams.index', $this->examIndexContext($allowedInstitutionIds));
+    }
+
+    protected function examIndexContext(array $allowedInstitutionIds): array
+    {
+        $institutionId = session('active_institution_id') ?: Auth::user()->institute_id;
+        $missingCategories = [];
+        if ($institutionId && $institutionId !== 'global') {
+            $institution = Institution::find($institutionId);
+            $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+            if ($institution && $session) {
+                $missingCategories = $this->cycleService->missingExamCategoriesForSession(
+                    (int) $institutionId,
+                    $session->id,
+                    is_object($institution->type) ? $institution->type->value : $institution->type
+                );
+            }
+        }
+
+        return compact('missingCategories');
+    }
+
+    protected function allowedCategoriesForInstitution(?int $institutionId): array
+    {
+        if (!$institutionId) {
+            return $this->cycleService->examCategoriesForInstitutionType('mixed');
+        }
+        $institution = Institution::find($institutionId);
+        $type = $institution ? (is_object($institution->type) ? $institution->type->value : $institution->type) : 'mixed';
+
+        return $this->cycleService->examCategoriesForInstitutionType($type);
     }
 
     public function create()
@@ -154,8 +185,10 @@ class ExamController extends BaseController
             });
 
         $institutions = Institution::whereIn('id', $allowedInstitutionIds)->pluck('name', 'id');
+        $institutionId = Auth::user()->institute_id ?: ($allowedInstitutionIds[0] ?? null);
+        $allowedCategories = $this->allowedCategoriesForInstitution($institutionId);
 
-        return view('exams.create', compact('sessions', 'institutions'));
+        return view('exams.create', compact('sessions', 'institutions', 'allowedCategories'));
     }
 
     public function store(Request $request)
@@ -178,6 +211,8 @@ class ExamController extends BaseController
             }
         }
 
+        $allowedCategories = $this->allowedCategoriesForInstitution($session->institution_id);
+
         $request->validate([
             'academic_session_id' => 'required|exists:academic_sessions,id',
             'name' => [
@@ -187,7 +222,7 @@ class ExamController extends BaseController
                                  ->where('institution_id', $session->institution_id);
                 })
             ],
-            'category' => 'required|string|max:50', // NEW VALIDATION
+            'category' => ['required', 'string', 'max:50', Rule::in($allowedCategories)],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'status' => 'required|in:scheduled,ongoing,completed',
@@ -263,7 +298,9 @@ class ExamController extends BaseController
                 return [$item->id => $item->name . ' (' . $item->institution->name . ')'];
             });
 
-        return view('exams.edit', compact('exam', 'sessions'));
+        $allowedCategories = $this->allowedCategoriesForInstitution($exam->institution_id);
+
+        return view('exams.edit', compact('exam', 'sessions', 'allowedCategories'));
     }
 
     public function update(Request $request, Exam $exam)
@@ -290,6 +327,8 @@ class ExamController extends BaseController
             }
         }
 
+        $allowedCategories = $this->allowedCategoriesForInstitution($exam->institution_id);
+
         $request->validate([
             'academic_session_id' => 'required|exists:academic_sessions,id',
             'name' => [
@@ -299,7 +338,7 @@ class ExamController extends BaseController
                                  ->where('institution_id', $exam->institution_id);
                 })
             ],
-            'category' => 'required|string|max:50', // NEW VALIDATION
+            'category' => ['required', 'string', 'max:50', Rule::in($allowedCategories)],
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
             'status' => 'required|in:scheduled,ongoing,completed,published',

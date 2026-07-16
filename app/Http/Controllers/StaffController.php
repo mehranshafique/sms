@@ -224,6 +224,7 @@ class StaffController extends BaseController
                 'rfid_uid' => $request->rfid_uid,
             ]);
 
+            $user->refresh();
             $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
         });
 

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'page_title' => 'Result Card',
+    'page_title' => 'Single Exam Result Card',
     'student_result_card' => 'Student Result Card',
     'subtitle' => 'Generate and print student result cards',
     'find_result' => 'Find Student Result',

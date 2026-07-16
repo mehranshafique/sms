@@ -126,14 +126,16 @@
             max-height: min(70vh, 32rem);
             overflow-y: auto;
             border-radius: 0.5rem;
-            min-width: 14rem;
+            width: max-content;
+            max-width: min(24rem, calc(100vw - 2rem));
+            min-width: 11.5rem;
             z-index: 10050 !important;
         }
 
         [data-layout="horizontal"] .dlabnav .metismenu > li.nav-section-group > ul,
         [data-layout="horizontal"] .dlabnav .metismenu > li.mega-menu-md > ul,
         [data-layout="horizontal"] .dlabnav .metismenu > li.mega-menu-lg > ul {
-            min-width: 16rem;
+            min-width: 12.5rem;
         }
 
         [data-layout="horizontal"] .dlabnav .metismenu > li.nav-section-group > a {

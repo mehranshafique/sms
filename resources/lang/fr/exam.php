@@ -94,4 +94,7 @@ return [
     'error_occurred' => 'Une erreur est survenue',
     'something_went_wrong' => 'Quelque chose s\'est mal passé !',
     'validation_error' => 'Erreur de validation',
+    'category_help' => 'Utilisé pour l\'agrégation des bulletins (ex. P1 + P2 + Examen trimestre 1). Seules les catégories valides pour votre type d\'école sont affichées.',
+    'missing_categories_title' => 'Configuration d\'examens incomplète pour la session en cours',
+    'missing_categories_body' => 'Créez des examens pour les catégories suivantes afin d\'activer les bulletins complets : :list',
 ];

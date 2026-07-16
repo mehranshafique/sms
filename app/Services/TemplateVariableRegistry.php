@@ -18,12 +18,12 @@ class TemplateVariableRegistry
 
         self::$definitions = [
             'payment_received' => 'StudentName, ParentName, Amount, Balance, RemainingBalance, SchoolName, Date, TransactionID, Class, Grade, Section, Session, PaymentReason, InstallmentName, DueDate',
-            'student_welcome' => 'Name, SchoolName, Email, Url, Shortcode, Password',
-            'staff_welcome' => 'Name, SchoolName, Email, Password, Url',
-            'teacher_welcome' => 'Name, SchoolName, Email, Password',
-            'head_officer_welcome' => 'Name, SchoolName, Email, Password, Url',
-            'institution_created' => 'Name, SchoolName, Email, Password',
-            'user_welcome' => 'Name, SchoolName, Email, Password',
+            'student_welcome' => 'Name, SchoolName, Email, Url, Shortcode, LoginId, Username, Password',
+            'staff_welcome' => 'Name, SchoolName, LoginId, Username, Shortcode, Email, Password, Url',
+            'teacher_welcome' => 'Name, SchoolName, LoginId, Username, Shortcode, Email, Password',
+            'head_officer_welcome' => 'Name, SchoolName, LoginId, Username, Shortcode, Email, Password, Url',
+            'institution_created' => 'Name, SchoolName, LoginId, Username, Shortcode, Email, Password',
+            'user_welcome' => 'Name, SchoolName, LoginId, Username, Shortcode, Email, Password',
             'guardian_welcome' => 'SchoolName, Password, Url',
             'invoice_created' => 'StudentName, ParentName, Amount, AmountDue, OutstandingAmount, InvoiceNumber, DueDate, Class, Grade, Section, Session, InstallmentName, SchoolName',
             'low_balance' => 'SchoolName, Credits',

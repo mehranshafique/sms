@@ -32,39 +32,37 @@
                                 <input type="text" name="name" class="form-control" value="{{ old('name', $exam->name ?? '') }}" placeholder="{{ __('exam.enter_name') }}" required>
                             </div>
 
-                            {{-- Exam Category - Flattened List to avoid Select2 Optgroup issues --}}
+                            @php
+                                $allowedCategories = $allowedCategories ?? [];
+                                $categoryLabels = [
+                                    'p1' => __('exam.p1'), 'p2' => __('exam.p2'), 'p3' => __('exam.p3'),
+                                    'p4' => __('exam.p4'), 'p5' => __('exam.p5'), 'p6' => __('exam.p6'),
+                                    'trimester_exam_1' => __('exam.trimester_exam_1'),
+                                    'trimester_exam_2' => __('exam.trimester_exam_2'),
+                                    'trimester_exam_3' => __('exam.trimester_exam_3'),
+                                    'semester_exam_1' => __('exam.semester_exam_1'),
+                                    'semester_exam_2' => __('exam.semester_exam_2'),
+                                    'university_session_1' => __('exam.university_session_1'),
+                                    'university_session_2' => __('exam.university_session_2'),
+                                    'rattrapage_session_1' => __('exam.rattrapage_session_1'),
+                                    'rattrapage_session_2' => __('exam.rattrapage_session_2'),
+                                ];
+                                $currentCategory = old('category', $exam->category ?? '');
+                            @endphp
                             <div class="mb-3 col-md-6">
                                 <label class="form-label">{{ __('exam.category') }} <span class="text-danger">*</span></label>
                                 <select name="category" class="form-control default-select" required>
                                     <option value="">{{ __('exam.select_category') }}</option>
-                                    
-                                    {{-- Periods --}}
-                                    <option value="p1" {{ (old('category', $exam->category ?? '') == 'p1') ? 'selected' : '' }}>-- {{ __('exam.p1') }} --</option>
-                                    <option value="p2" {{ (old('category', $exam->category ?? '') == 'p2') ? 'selected' : '' }}>-- {{ __('exam.p2') }} --</option>
-                                    <option value="p3" {{ (old('category', $exam->category ?? '') == 'p3') ? 'selected' : '' }}>-- {{ __('exam.p3') }} --</option>
-                                    <option value="p4" {{ (old('category', $exam->category ?? '') == 'p4') ? 'selected' : '' }}>-- {{ __('exam.p4') }} --</option>
-                                    <option value="p5" {{ (old('category', $exam->category ?? '') == 'p5') ? 'selected' : '' }}>-- {{ __('exam.p5') }} --</option>
-                                    <option value="p6" {{ (old('category', $exam->category ?? '') == 'p6') ? 'selected' : '' }}>-- {{ __('exam.p6') }} --</option>
-                                    
-                                    {{-- Primary --}}
-                                    <option disabled>──────────</option>
-                                    <option value="trimester_exam_1" {{ (old('category', $exam->category ?? '') == 'trimester_exam_1') ? 'selected' : '' }}>{{ __('exam.trimester_exam_1') }}</option>
-                                    <option value="trimester_exam_2" {{ (old('category', $exam->category ?? '') == 'trimester_exam_2') ? 'selected' : '' }}>{{ __('exam.trimester_exam_2') }}</option>
-                                    <option value="trimester_exam_3" {{ (old('category', $exam->category ?? '') == 'trimester_exam_3') ? 'selected' : '' }}>{{ __('exam.trimester_exam_3') }}</option>
-                                    
-                                    {{-- Secondary --}}
-                                    <option disabled>──────────</option>
-                                    <option value="semester_exam_1" {{ (old('category', $exam->category ?? '') == 'semester_exam_1') ? 'selected' : '' }}>{{ __('exam.semester_exam_1') }}</option>
-                                    <option value="semester_exam_2" {{ (old('category', $exam->category ?? '') == 'semester_exam_2') ? 'selected' : '' }}>{{ __('exam.semester_exam_2') }}</option>
-                                    
-                                    {{-- University --}}
-                                    <option disabled>──────────</option>
-                                    <option value="university_session_1" {{ (old('category', $exam->category ?? '') == 'university_session_1') ? 'selected' : '' }}>{{ __('exam.university_session_1') }}</option>
-                                    <option value="university_session_2" {{ (old('category', $exam->category ?? '') == 'university_session_2') ? 'selected' : '' }}>{{ __('exam.university_session_2') }}</option>
-                                    <option value="rattrapage_session_1" {{ (old('category', $exam->category ?? '') == 'rattrapage_session_1') ? 'selected' : '' }}>{{ __('exam.rattrapage_session_1') }}</option>
-                                    <option value="rattrapage_session_2" {{ (old('category', $exam->category ?? '') == 'rattrapage_session_2') ? 'selected' : '' }}>{{ __('exam.rattrapage_session_2') }}</option>
+                                    @foreach($allowedCategories as $cat)
+                                        <option value="{{ $cat }}" {{ $currentCategory == $cat ? 'selected' : '' }}>
+                                            {{ $categoryLabels[$cat] ?? ucwords(str_replace('_', ' ', $cat)) }}
+                                        </option>
+                                    @endforeach
+                                    @if($currentCategory && !in_array($currentCategory, $allowedCategories))
+                                        <option value="{{ $currentCategory }}" selected>{{ $categoryLabels[$currentCategory] ?? $currentCategory }}</option>
+                                    @endif
                                 </select>
-                                <small class="text-muted">Used for report card aggregation (e.g. P1 + P2 + Trimester Exam 1).</small>
+                                <small class="text-muted">{{ __('exam.category_help') }}</small>
                             </div>
 
                             {{-- Status --}}

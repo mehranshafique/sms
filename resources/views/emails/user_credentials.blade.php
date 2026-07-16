@@ -74,13 +74,17 @@
             <div class="credentials-box">
                 <p style="margin-top: 0;"><strong>{{ __('emails.login_details') }}</strong></p>
                 <p style="margin-bottom: 0;">
-                    <strong>{{ __('emails.email') }}:</strong> {{ $data['email'] }}<br>
+                    <strong>{{ __('emails.login_id') }}:</strong> {{ $data['login_id'] ?? ($data['LoginId'] ?? ($data['username'] ?? 'N/A')) }}<br>
+                    <strong>{{ __('emails.email') }}:</strong> {{ $data['email'] ?? 'N/A' }}<br>
                     <strong>{{ __('emails.password') }}:</strong> {{ $data['password'] }}
+                </p>
+                <p style="margin-top: 12px; margin-bottom: 0; font-size: 13px; color: #555;">
+                    {{ __('emails.login_help') }}
                 </p>
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{{ $data['login_link'] }}" class="button">{{ __('emails.login_button') }}</a>
+                <a href="{{ $data['login_link'] ?? ($data['LoginLink'] ?? ($data['Url'] ?? '#')) }}" class="button">{{ __('emails.login_button') }}</a>
             </div>
             
             <p>

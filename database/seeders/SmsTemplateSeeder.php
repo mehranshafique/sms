@@ -28,8 +28,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'student_welcome',
                 'name' => 'Student Welcome',
-                'body' => 'Welcome $Name to $SchoolName! Your Admission No: $Shortcode. Login using this ID. Password: $Password. URL: $Url',
-                'available_tags' => '$Name, $SchoolName, $Email, $Url, $Shortcode, $Password',
+                'body' => 'Welcome $Name to $SchoolName! Your Admission No: $Shortcode. Login ID: $LoginId | Email: $Email | Password: $Password. URL: $Url',
+                'available_tags' => '$Name, $SchoolName, $LoginId, $Username, $Shortcode, $Email, $Url, $Password',
                 'is_active' => true,
             ],
             
@@ -37,15 +37,15 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'staff_welcome', // Used by NotificationService logic
                 'name' => 'Staff Welcome',
-                'body' => 'Hello $Name, welcome to the team at $SchoolName! Login ID: $Email | Pass: $Password | URL: $Url',
-                'available_tags' => '$Name, $SchoolName, $Email, $Password, $Url',
+                'body' => 'Hello $Name, welcome to the team at $SchoolName! Login ID: $LoginId | Email: $Email | Password: $Password | URL: $Url',
+                'available_tags' => '$Name, $SchoolName, $LoginId, $Username, $Shortcode, $Email, $Password, $Url',
                 'is_active' => true,
             ],
             [
                 'event_key' => 'teacher_welcome', // Specific for teachers if needed
                 'name' => 'Teacher Welcome',
-                'body' => 'Hello $Name, welcome to $SchoolName as a Teacher. Login: $Email | Pass: $Password',
-                'available_tags' => '$Name, $SchoolName, $Email, $Password',
+                'body' => 'Hello $Name, welcome to $SchoolName as a Teacher. Login ID: $LoginId | Email: $Email | Password: $Password',
+                'available_tags' => '$Name, $SchoolName, $LoginId, $Username, $Shortcode, $Email, $Password',
                 'is_active' => true,
             ],
 
@@ -53,8 +53,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'head_officer_welcome',
                 'name' => 'Head Officer Welcome',
-                'body' => 'Hello $Name, you are appointed as Head Officer at $SchoolName. Login: $Url | Pass: $Password',
-                'available_tags' => '$Name, $SchoolName, $Email, $Password, $Url',
+                'body' => 'Hello $Name, you are appointed as Head Officer at $SchoolName. Login ID: $LoginId | Email: $Email | Password: $Password | URL: $Url',
+                'available_tags' => '$Name, $SchoolName, $LoginId, $Username, $Shortcode, $Email, $Password, $Url',
                 'is_active' => true,
             ],
             
@@ -62,8 +62,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'institution_created',
                 'name' => 'Institution Created',
-                'body' => 'New Institute $SchoolName Registered. Admin: $Name. Creds sent via Email.',
-                'available_tags' => '$Name, $SchoolName, $Email, $Password',
+                'body' => 'New Institute $SchoolName Registered. Admin: $Name. Login ID: $LoginId | Email: $Email | Password: $Password',
+                'available_tags' => '$Name, $SchoolName, $LoginId, $Username, $Shortcode, $Email, $Password',
                 'is_active' => true,
             ],
 
@@ -71,8 +71,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'user_welcome',
                 'name' => 'General User Welcome',
-                'body' => 'Welcome to $SchoolName. Your login credentials are ID: $Email, Password: $Password.',
-                'available_tags' => '$Name, $SchoolName, $Email, $Password',
+                'body' => 'Welcome to $SchoolName. Login ID: $LoginId | Email: $Email | Password: $Password',
+                'available_tags' => '$Name, $SchoolName, $LoginId, $Username, $Shortcode, $Email, $Password',
                 'is_active' => true,
             ],
 

@@ -117,13 +117,14 @@ class ReminderController extends BaseController
         // Initialize Gateway (Only if not sending via Email)
         $gateway = null;
         if ($channel !== 'email') {
-            $providerName = InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
-            if ($providerName === 'system') {
-                $providerName = InstitutionSetting::get(null, $channel . '_provider', 'system');
-            }
+            $context = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
 
             try {
-                $gateway = GatewayFactory::create($providerName, $institutionId);
+                $gateway = GatewayFactory::create(
+                    $context['resolved'],
+                    $context['credentials_institution_id'],
+                    $institutionId
+                );
             } catch (\Exception $e) {
                 return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
             }
@@ -249,13 +250,14 @@ class ReminderController extends BaseController
         // Initialize Gateway (Only if not sending via Email)
         $gateway = null;
         if ($channel !== 'email') {
-            $providerName = InstitutionSetting::get($institutionId, $channel . '_provider', 'system');
-            if ($providerName === 'system') {
-                $providerName = InstitutionSetting::get(null, $channel . '_provider', 'system');
-            }
+            $context = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
 
             try {
-                $gateway = GatewayFactory::create($providerName, $institutionId);
+                $gateway = GatewayFactory::create(
+                    $context['resolved'],
+                    $context['credentials_institution_id'],
+                    $institutionId
+                );
             } catch (\Exception $e) {
                 return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
             }

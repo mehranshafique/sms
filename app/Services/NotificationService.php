@@ -317,22 +317,8 @@ class NotificationService
             $templateKey = 'guardian_welcome';
         }
 
-        $data = [
-            'Name' => $user->name,
-            'Email' => $user->email,
-            'Shortcode' => $user->shortcode ?? 'N/A',
-            'Username' => $user->username ?? $user->shortcode ?? 'N/A',
-            'Password' => $plainPassword ?? 'Unchanged',
-            'Role' => $roleLabel,
-            'SchoolName' => $schoolName,
-            'Url' => route('login'),
-            'LoginLink' => route('login'),
-            'name' => $user->name,
-            'email' => $user->email,
-            'password' => $plainPassword ?? 'Unchanged',
-            'role' => $roleLabel,
-            'school_name' => $schoolName,
-        ];
+        $user->refresh();
+        $data = $this->buildCredentialTemplateData($user, $plainPassword, $roleLabel, $schoolName);
 
         if ($this->isChannelEnabled($institutionId, $eventKey, 'system')) {
             try {
@@ -420,20 +406,13 @@ class NotificationService
     {
         $eventKey = 'institution_created';
         
-        $data = [
-            'Name' => $adminUser->name,
-            'Email' => $adminUser->email,
-            'Shortcode' => $adminUser->shortcode ?? 'N/A',
-            'Password' => $plainPassword,
-            'Role' => 'Head Officer', 
-            'SchoolName' => $institution->name,
-            'Url' => route('login'),
-            'LoginLink' => route('login'),
-            'name' => $adminUser->name,
-            'email' => $adminUser->email,
-            'password' => $plainPassword,
-            'school_name' => $institution->name
-        ];
+        $adminUser->refresh();
+        $data = $this->buildCredentialTemplateData(
+            $adminUser,
+            $plainPassword,
+            'Head Officer',
+            $institution->name
+        );
 
         if ($this->isChannelEnabled($institution->id, $eventKey, 'email') && $adminUser->email) {
             try {
@@ -455,6 +434,41 @@ class NotificationService
         }
     }
 
+    /**
+     * Credential placeholders for welcome SMS/WhatsApp/email.
+     * LoginId prefers username → shortcode → user id (email is separate; many users have no email).
+     */
+    protected function buildCredentialTemplateData(User $user, $plainPassword, string $roleLabel, string $schoolName): array
+    {
+        $loginId = $user->username
+            ?: ($user->shortcode ?: (string) $user->id);
+        $email = filled($user->email) ? $user->email : 'N/A';
+        $loginUrl = route('login');
+        $password = $plainPassword ?? 'Unchanged';
+
+        return [
+            'Name' => $user->name,
+            'Email' => $email,
+            'LoginId' => $loginId,
+            'Username' => $user->username ?: $loginId,
+            'Shortcode' => $user->shortcode ?: $loginId,
+            'UserId' => (string) $user->id,
+            'Password' => $password,
+            'Role' => $roleLabel,
+            'SchoolName' => $schoolName,
+            'Url' => $loginUrl,
+            'LoginLink' => $loginUrl,
+            'name' => $user->name,
+            'email' => $email,
+            'login_id' => $loginId,
+            'username' => $user->username ?: $loginId,
+            'password' => $password,
+            'role' => $roleLabel,
+            'school_name' => $schoolName,
+            'login_link' => $loginUrl,
+        ];
+    }
+
     public function sendNotificationEvent($eventKey, $to, $data = [], $institutionId = null, $channel = 'sms')
     {
         $template = null;
@@ -468,6 +482,7 @@ class NotificationService
 
         $message = $template->body;
         foreach ($data as $key => $value) {
+            $value = $value === null ? '' : (string) $value;
             $message = str_replace('$' . $key, $value, $message);
             $message = str_replace('{' . $key . '}', $value, $message);
         }

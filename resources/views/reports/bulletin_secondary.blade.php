@@ -20,15 +20,18 @@
     </div>
 
     <!-- Container wrapper centers the beautiful Single Card view on the screen natively -->
-    <div style="display: flex; justify-content: center; width: 100%; min-height: 100vh;">
+    <div class="single-card-page">
         <div class="student-column single-card-view">
 @else
-    <!-- Standard bulk mode column rendering -->
-    <div class="student-column" style="float: left; width: 33.33%; height: 210mm;">
+    <div class="student-column">
 @endif
 
+    <div class="card-inner">
     @php
-        $principalName = __('reports.direction') ?? 'DIRECTION';
+        $labels = $column_labels ?? [];
+        $subjectCount = collect($data)->where('has_marks', true)->count();
+        $densityClass = $subjectCount > 16 ? 'density-high' : ($subjectCount > 12 ? 'density-medium' : 'density-low');
+        $principalName = __('reports.direction');
         if (isset($student->institution_id)) {
             $adminUser = \App\Models\User::where('institute_id', $student->institution_id)
                             ->where(function($q) {
@@ -42,8 +45,8 @@
             }
         }
 
-        $p1_label = ($semester == 1) ? "P1" : "P3";
-        $p2_label = ($semester == 1) ? "P2" : "P4";
+        $p1_label = $labels['p1'] ?? (($semester == 1) ? 'P1' : 'P3');
+        $p2_label = $labels['p2'] ?? (($semester == 1) ? 'P2' : 'P4');
     @endphp
 
         <div class="header-content">
@@ -60,27 +63,28 @@
             <div class="student-name">{{ strtoupper($student->first_name . ' ' . $student->last_name) }}</div>
             <div class="class-name">{{ $enrollment->classSection->gradeLevel->name ?? '' }} - {{ $enrollment->classSection->name ?? '' }}</div>
             <div class="barcode"></div>
-            <div class="term-title">{{ __('reports.bulletin_title') }} {{ $semester }}{{ $semester == 1 ? 'e' : 'e' }} {{ __('reports.semester') }}</div>
+            <div class="term-title-bar">{{ $term_title ?? (__('reports.bulletin_title') . ' ' . ($semester ?? 1) . ' ' . __('reports.semester')) }}</div>
         </div>
-        
+
         <div class="divider-thick"></div>
         <div class="divider-thin"></div>
 
+        <div class="subjects-table-wrap {{ $densityClass }}">
         <table>
             <thead>
                 <tr>
-                    <th class="left-align" style="width: 30%;">{{ __('reports.subject') ?? 'Branches' }}</th>
-                    <th style="width: 8%;">{{ $p1_label }}</th>
-                    <th style="width: 8%;">{{ $p2_label }}</th>
-                    <th style="width: 10%;">{{ __('reports.max_marks') ?? 'MAX' }}</th>
-                    <th style="width: 10%;">{{ __('reports.exam') ?? 'EXAM' }}</th>
-                    <th style="width: 10%;">{{ __('reports.max_marks') ?? 'MAX' }}</th>
-                    <th style="width: 12%;">{{ __('reports.total') ?? 'TOTAL' }}</th>
-                    <th style="width: 12%;">{{ __('reports.t_max') ?? 'T. MAX' }}</th>
+                    <th class="left-align">{{ $labels['subject'] ?? __('reports.subject') }}</th>
+                    <th>{{ $p1_label }}</th>
+                    <th>{{ $p2_label }}</th>
+                    <th>{{ $labels['p_max'] ?? __('reports.max_marks') }}</th>
+                    <th>{{ $labels['exam'] ?? __('reports.exam') }}</th>
+                    <th>{{ $labels['exam_max'] ?? __('reports.max_marks') }}</th>
+                    <th>{{ $labels['total'] ?? __('reports.total') }}</th>
+                    <th>{{ $labels['total_max'] ?? __('reports.t_max') }}</th>
                 </tr>
             </thead>
         </table>
-        
+
         <div class="divider-bottom"></div>
 
         <table>
@@ -111,37 +115,38 @@
                             
                             $p1_max = $row['p1_max'] ?? 0;
                             $p2_max = $row['p2_max'] ?? 0;
-                            $p_max_display = max($p1_max, $p2_max); 
+                            $p_max_display = ($p1_max > 0 && $p2_max > 0 && $p1_max != $p2_max)
+                                ? ($p1_max + $p2_max)
+                                : max($p1_max, $p2_max);
                             $ex_max = $row['exam_max'] ?? 0;
-                            
-                            // T.MAX is strictly P1+P2+Exam maximums from database
                             $tot_max = $row['total_max'] ?? 0;
-                            
+
                             $sum_p_obt += ($p1_val + $p2_val);
                             $sum_tot_obt += $tot;
-                            
                             $sum_p_max_actual += ($p1_max + $p2_max);
                             $sum_tot_max += $tot_max;
-                            
-                            $isP1Fail = (is_numeric($p1) && $p1_max > 0 && $p1 < ($p1_max / 2));
-                            $isP2Fail = (is_numeric($p2) && $p2_max > 0 && $p2 < ($p2_max / 2));
-                            $isExFail = (is_numeric($ex) && $ex_max > 0 && $ex < ($ex_max / 2));
-                            $isTotFail = (is_numeric($tot) && $tot_max > 0 && $tot < ($tot_max / 2));
+
+                            $failThreshold = fn($score, $max) => is_numeric($score) && $max > 0 && ($score < ($max / 2) || ($max == 20 && $score < 10));
+                            $isP1Fail = $failThreshold($p1, $p1_max);
+                            $isP2Fail = $failThreshold($p2, $p2_max);
+                            $isExFail = $failThreshold($ex, $ex_max);
+                            $isTotFail = $failThreshold($tot, $tot_max);
                         @endphp
                         <tr>
-                            <td class="left-align" style="width: 30%;">{{ $row['subject']->name }}</td>
-                            <td class="{{ $isP1Fail ? 'fail-grade' : '' }}" style="width: 8%;">{{ $p1 }}</td>
-                            <td class="{{ $isP2Fail ? 'fail-grade' : '' }}" style="width: 8%;">{{ $p2 }}</td>
-                            <td style="width: 10%;">{{ $p_max_display > 0 ? $p_max_display : '-' }}</td>
-                            <td class="{{ $isExFail ? 'fail-grade' : '' }}" style="width: 10%;">{{ $ex }}</td>
-                            <td style="width: 10%;">{{ $ex_max > 0 ? $ex_max : '-' }}</td>
-                            <td class="{{ $isTotFail ? 'fail-grade' : '' }}" style="width: 12%;">{{ $tot }}</td>
-                            <td style="width: 12%;">{{ $tot_max > 0 ? $tot_max : '-' }}</td>
+                            <td class="left-align subject-name">{{ $row['subject']->name }}</td>
+                            <td class="{{ $isP1Fail ? 'fail-grade' : '' }}">{{ $p1 }}</td>
+                            <td class="{{ $isP2Fail ? 'fail-grade' : '' }}">{{ $p2 }}</td>
+                            <td>{{ $p_max_display > 0 ? $p_max_display : '-' }}</td>
+                            <td class="{{ $isExFail ? 'fail-grade' : '' }}">{{ $ex }}</td>
+                            <td>{{ $ex_max > 0 ? $ex_max : '-' }}</td>
+                            <td class="{{ $isTotFail ? 'fail-grade' : '' }}">{{ $tot }}</td>
+                            <td>{{ $tot_max > 0 ? $tot_max : '-' }}</td>
                         </tr>
                     @endif
                 @endforeach
             </tbody>
         </table>
+        </div>
 
         @php
             $percentagePeriod = $sum_p_max_actual > 0 ? ($sum_p_obt / $sum_p_max_actual) * 100 : 0;
@@ -198,11 +203,11 @@
             </div>
         </div>
 
-        <div class="footer-wrapper" style="position: relative; height: 70px; margin-top: 15px; clear: both; width: 100%;">
+        <div class="footer-wrapper">
             @php $qrData = urlencode("{$student->first_name} {$student->last_name} | ID: {$student->admission_number}"); @endphp
-            <div class="qr-code" style="position: absolute; left: 0; bottom: 0; width: 32px; height: 32px; background-color: white; padding: 2px; box-sizing: border-box; background-image: url('https://api.qrserver.com/v1/create-qr-code/?size=64x64&data={{ $qrData }}'); background-size: cover;"></div>
+            <div class="qr-code" style="background-image: url('https://api.qrserver.com/v1/create-qr-code/?size=64x64&data={{ $qrData }}');"></div>
 
-            <div class="stamp-overlay" style="position: absolute; left: 45%; margin-left: -40px; bottom: 0; width: 65px; height: 65px; opacity: 0.95; z-index: 5; pointer-events: none;">
+            <div class="stamp-overlay">
                 @php $svgId = isset($loop_index) ? $loop_index . '-' . $student->id : $student->id; @endphp
                 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="50" cy="50" r="48" fill="none" stroke="var(--stamp-blue)" stroke-width="2"/>
@@ -234,13 +239,14 @@
                 </svg>
             </div>
 
-            <div class="signature-block" style="position: absolute; right: 0; bottom: 0; text-align: center; font-size: 8px; font-weight: bold; line-height: 1.5; color: #000;">
+            <div class="signature-block">
                 <div>{{ __('reports.made_in') }} {{ $student->institution->city ?? 'Kinshasa' }}, {{ __('reports.on_date') }} {{ date('d/m/Y') }}</div>
-                <div style="margin: 3px 0;">{{ __('reports.principal') }}</div>
+                <div style="margin: 2px 0;">{{ __('reports.principal') }}</div>
                 <div>{{ strtoupper($principalName) }}</div>
             </div>
         </div>
-    </div> 
+    </div>
+    </div>
 
 @if(!isset($is_bulk) || !$is_bulk)
     </div>

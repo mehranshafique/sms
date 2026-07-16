@@ -19,15 +19,18 @@
     </div>
 
     <!-- Container wrapper centers the beautiful Single Card view on the screen natively -->
-    <div style="display: flex; justify-content: center; width: 100%; min-height: 100vh;">
-        <div class="student-column single-card-view single-card-view-period">
+    <div class="single-card-page">
+        <div class="student-column single-card-view">
 @else
-    <!-- Standard bulk mode column rendering -->
-    <div class="student-column" style="float: left; width: 25%; height: 210mm;">
+    <div class="student-column">
 @endif
 
+    <div class="card-inner">
     @php
-        $principalName = __('reports.direction') ?? 'DIRECTION';
+        $labels = $column_labels ?? [];
+        $subjectCount = collect($data)->where('has_marks', true)->count();
+        $densityClass = $subjectCount > 16 ? 'density-high' : ($subjectCount > 12 ? 'density-medium' : 'density-low');
+        $principalName = __('reports.direction');
         if (isset($student->institution_id)) {
             $adminUser = \App\Models\User::where('institute_id', $student->institution_id)
                             ->where(function($q) {
@@ -43,6 +46,7 @@
     @endphp
 
         <div class="header-content">
+            @include('reports.partials.epst_header', ['student' => $student])
             <div class="logo-box">
                 @if(isset($student->institution->logo) && $student->institution->logo)
                     <img src="{{ asset('storage/' . $student->institution->logo) }}" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
@@ -55,22 +59,23 @@
             <div class="student-name">{{ strtoupper($student->first_name . ' ' . $student->last_name) }}</div>
             <div class="class-name">{{ $enrollment->classSection->gradeLevel->name ?? '' }} - {{ $enrollment->classSection->name ?? '' }}</div>
             <div class="barcode"></div>
-            <div class="term-title">{{ __('reports.bulletin_title') ?? 'BULLETIN' }} {{ strtoupper($period) }}</div>
+            <div class="term-title-bar">{{ $term_title ?? (__('reports.bulletin_period_title', ['period' => strtoupper($period ?? '')])) }}</div>
         </div>
-        
+
         <div class="divider-thick"></div>
         <div class="divider-thin"></div>
 
+        <div class="subjects-table-wrap {{ $densityClass }}">
         <table>
             <thead>
                 <tr>
-                    <th class="left-align">{{ __('reports.subject') ?? 'Branches' }}</th>
-                    <th>{{ __('reports.cotes') ?? 'Cotes' }}</th>
-                    <th>{{ __('reports.max_marks') ?? 'MAX' }}</th>
+                    <th class="left-align">{{ $labels['subject'] ?? __('reports.subject') }}</th>
+                    <th>{{ $labels['score'] ?? __('reports.cotes') }}</th>
+                    <th>{{ $labels['max'] ?? __('reports.max_marks') }}</th>
                 </tr>
             </thead>
         </table>
-        
+
         <div class="divider-bottom"></div>
 
         <table>
@@ -89,17 +94,18 @@
                             $val_calc = is_numeric($val) ? $val : 0;
                             $totalObtained += $val_calc;
                             $totalMax += $max;
-                            $isFail = ($max > 0 && $val_calc < ($max / 2));
+                            $isFail = ($max > 0 && ($val_calc < ($max / 2) || ($max == 20 && $val_calc < 10)));
                         @endphp
                         <tr>
-                            <td class="left-align" style="width: 60%;">{{ $row['subject']->name }}</td>
-                            <td class="{{ $isFail ? 'fail-grade' : '' }}" style="width: 20%;">{{ $val }}</td>
-                            <td style="width: 20%;">{{ $max > 0 ? $max : '-' }}</td>
+                            <td class="left-align subject-name">{{ $row['subject']->name }}</td>
+                            <td class="{{ $isFail ? 'fail-grade' : '' }}">{{ $val }}</td>
+                            <td>{{ $max > 0 ? $max : '-' }}</td>
                         </tr>
                     @endif
                 @endforeach
             </tbody>
         </table>
+        </div>
 
         @php
             $percentage = $totalMax > 0 ? ($totalObtained / $totalMax) * 100 : 0;
@@ -186,7 +192,8 @@
                 <div>{{ strtoupper($principalName) }}</div>
             </div>
         </div>
-    </div> 
+    </div>
+    </div>
 
 @if(!isset($is_bulk) || !$is_bulk)
     </div>

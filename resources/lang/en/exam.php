@@ -119,4 +119,7 @@ return [
     'error_occurred' => 'Error Occurred',
     'something_went_wrong' => 'Something went wrong!',
     'validation_error' => 'Validation Error',
+    'category_help' => 'Used for bulletin aggregation (e.g. P1 + P2 + Trimester Exam 1). Only categories valid for your school type are shown.',
+    'missing_categories_title' => 'Incomplete exam setup for current session',
+    'missing_categories_body' => 'Create exams for the following categories to enable full bulletin reports: :list',
 ];

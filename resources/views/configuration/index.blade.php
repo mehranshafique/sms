@@ -24,6 +24,13 @@
     .modal-dialog { max-width: 90%; margin: 1.75rem auto; }
     @media (min-width: 576px) { .modal-dialog { max-width: 600px; margin: 1.75rem auto; } }
     @media (min-width: 992px) { .modal-dialog.modal-lg { max-width: 800px; } }
+    #recharge .widget-stat[class*="bg-"] .media > span {
+        background: rgba(255, 255, 255, 0.25) !important;
+        border-color: rgba(255, 255, 255, 0.35) !important;
+        color: #fff !important;
+    }
+    #recharge .widget-stat .card-body { min-height: 88px; }
+    #recharge .widget-stat .media-body h3 { color: #fff !important; margin-bottom: 0; }
 </style>
 @endsection
 
@@ -372,8 +379,32 @@
                                 </div>
                                 @else
                                 <div class="row mb-4">
-                                    <div class="col-md-6"><div class="widget-stat card bg-primary text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-envelope"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.sms_purchased') }}</p><h3 class="text-white" id="smsBalance">{{ number_format($institution->sms_credits ?? 0) }}</h3></div></div></div></div></div>
-                                    <div class="col-md-6"><div class="widget-stat card bg-success text-white mb-0"><div class="card-body p-3"><div class="media"><span class="me-3"><i class="fa fa-whatsapp"></i></span><div class="media-body text-white"><p class="mb-1">{{ __('configuration.whatsapp_purchased') }}</p><h3 class="text-white" id="waBalance">{{ number_format($institution->whatsapp_credits ?? 0) }}</h3></div></div></div></div></div>
+                                    <div class="col-md-6">
+                                        <div class="widget-stat card bg-primary border-0 shadow-sm mb-0">
+                                            <div class="card-body p-4">
+                                                <div class="media ai-icon align-items-center">
+                                                    <span class="me-3"><i class="fa fa-envelope"></i></span>
+                                                    <div class="media-body text-white">
+                                                        <p class="mb-1">{{ __('configuration.sms_purchased') }}</p>
+                                                        <h3 class="text-white" id="smsBalance">{{ number_format($institution->sms_credits ?? 0) }}</h3>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="widget-stat card bg-success border-0 shadow-sm mb-0">
+                                            <div class="card-body p-4">
+                                                <div class="media ai-icon align-items-center">
+                                                    <span class="me-3"><i class="fab fa-whatsapp"></i></span>
+                                                    <div class="media-body text-white">
+                                                        <p class="mb-1">{{ __('configuration.whatsapp_purchased') }}</p>
+                                                        <h3 class="text-white" id="waBalance">{{ number_format($institution->whatsapp_credits ?? 0) }}</h3>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <h4 class="mb-3">{{ __('configuration.add_credits') }}</h4>
                                 <form action="{{ route('configuration.recharge') }}" method="POST" id="rechargeForm">

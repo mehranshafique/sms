@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'page_title' => 'Carte de résultats',
+    'page_title' => 'Carte de résultat (examen unique)',
     'student_result_card' => 'Carte de résultats de l\'élève',
     'subtitle' => 'Générer et imprimer les cartes de résultats',
     'find_result' => 'Trouver le résultat',

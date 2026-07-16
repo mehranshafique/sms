@@ -473,6 +473,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Academic Reports (Bulletins, Transcripts)
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/scope-options', [ReportController::class, 'scopeOptions'])->name('scope_options');
         Route::get('/bulletin', [ReportController::class, 'bulletin'])->name('bulletin');
         Route::get('/transcript', [ReportController::class, 'transcript'])->name('transcript');
     });

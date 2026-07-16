@@ -20,23 +20,26 @@ use Illuminate\Support\Facades\Auth;
 use Barryvdh\DomPDF\Facade\Pdf; 
 use App\Services\LmdCalculationService; 
 use App\Services\GradeMentionService;
+use App\Services\AcademicCycleService;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends BaseController
 {
     protected $lmdService;
+    protected AcademicCycleService $cycleService;
     
-    public function __construct(LmdCalculationService $lmdService)
+    public function __construct(LmdCalculationService $lmdService, AcademicCycleService $cycleService)
     {
         $this->middleware('auth')->except(['bulletinSigned']);
         $this->middleware(function ($request, $next) {
             $this->denyStudentLikeRoles();
             $this->authorizeAdminOrPermission('academic_report.view');
             return $next($request);
-        })->only(['index', 'bulletin', 'transcript']);
+        })->only(['index', 'bulletin', 'transcript', 'scopeOptions']);
         $this->setPageTitle(__('reports.page_title'));
         $this->lmdService = $lmdService;
+        $this->cycleService = $cycleService;
     }
 
     public function bulletinSigned(Request $request)
@@ -52,6 +55,18 @@ class ReportController extends BaseController
         $student = Student::findOrFail($request->student_id);
 
         return $this->renderBulletin($request, (int) $student->institution_id, skipRoleChecks: true);
+    }
+
+    /**
+     * Soft empty-result response for AJAX pre-checks (info dialog, not danger).
+     */
+    protected function emptyReportJson(string $message, array $extra = [])
+    {
+        return response()->json(array_merge([
+            'status' => 'error',
+            'feedback' => 'info',
+            'message' => $message,
+        ], $extra));
     }
 
     public function checkFinancialClearance($studentId, $institutionId, $abort = true)
@@ -87,9 +102,18 @@ class ReportController extends BaseController
 
         $students = Student::where('institution_id', $institutionId)
             ->where('status', 'active')
+            ->with(['enrollments' => fn ($q) => $q->where('status', 'active')->latest(), 'enrollments.classSection.gradeLevel'])
             ->select('id', 'first_name', 'last_name', 'admission_number')
             ->orderBy('first_name')
-            ->get();
+            ->get()
+            ->map(function ($student) {
+                $enrollment = $student->enrollments->first();
+                $student->education_cycle = $enrollment
+                    ? $this->cycleService->resolveCycle($enrollment)
+                    : AcademicType::PRIMARY->value;
+
+                return $student;
+            });
 
         $classes = ClassSection::with('gradeLevel')
             ->where('institution_id', $institutionId)
@@ -97,6 +121,33 @@ class ReportController extends BaseController
             ->get();
 
         return view('reports.index', compact('exams', 'students', 'classes', 'institutionType'));
+    }
+
+    public function scopeOptions(Request $request)
+    {
+        $institutionId = $this->getInstitutionId();
+        $cycle = AcademicType::PRIMARY->value;
+
+        if ($request->filled('student_id')) {
+            $student = Student::with(['enrollments.classSection.gradeLevel'])
+                ->where('institution_id', $institutionId)
+                ->findOrFail($request->student_id);
+            $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+            if (!$enrollment) {
+                return $this->emptyReportJson(__('reports.no_enrollment'));
+            }
+            $cycle = $this->cycleService->resolveCycle($enrollment);
+        } elseif ($request->filled('class_section_id')) {
+            $classSection = ClassSection::with('gradeLevel')
+                ->where('institution_id', $institutionId)
+                ->findOrFail($request->class_section_id);
+            $cycle = $this->cycleService->resolveCycle($classSection);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $this->cycleService->scopeOptionsPayload($cycle),
+        ]);
     }
 
     public function bulletin(Request $request)
@@ -146,13 +197,15 @@ class ReportController extends BaseController
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
             if (!$enrollment) {
                 $msg = __('reports.no_enrollment');
-                if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+                if ($request->ajax() || $request->check_only) {
+                    return $this->emptyReportJson($msg);
+                }
                 return back()->with('error', $msg);
             }
 
             $classSection = $enrollment->classSection;
             $targetStudents = collect([$enrollment]);
-        } elseif ($request->class_section_id) {
+        } elseif ($request->filled('class_section_id')) {
             $classSection = ClassSection::with('gradeLevel')->find($request->class_section_id);
             if ($classSection->institution_id != $institutionId) abort(403);
 
@@ -163,15 +216,45 @@ class ReportController extends BaseController
             
             if ($enrollments->isEmpty()) {
                 $msg = __('reports.no_students_in_class');
-                if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+                if ($request->ajax() || $request->check_only) {
+                    return $this->emptyReportJson($msg);
+                }
                 return back()->with('error', $msg);
             }
             
             $targetStudents = $enrollments;
         } else {
             $msg = __('reports.select_student');
-            if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
+            if ($request->ajax() || $request->check_only) {
+                return $this->emptyReportJson($msg);
+            }
             return back()->with('error', $msg);
+        }
+
+        $referenceEnrollment = $targetStudents->first();
+        $cycleValue = $this->cycleService->resolveCycle($referenceEnrollment);
+
+        if ($this->cycleService->isUniversityCycle($cycleValue)) {
+            $msg = __('reports.error_university_use_transcript');
+            if ($request->ajax() || $request->check_only) {
+                return $this->emptyReportJson($msg, ['redirect_transcript' => true]);
+            }
+            return back()->with('error', $msg);
+        }
+
+        $validationError = $this->cycleService->validateReportRequest(
+            $cycleValue,
+            $request->type,
+            $request->period,
+            $request->trimester ? (int) $request->trimester : null,
+            $request->semester ? (int) $request->semester : null
+        );
+
+        if ($validationError) {
+            if ($request->ajax() || $request->check_only) {
+                return response()->json(['status' => 'error', 'message' => $validationError]);
+            }
+            return back()->with('error', $validationError);
         }
 
         $bulkData = [];
@@ -184,36 +267,48 @@ class ReportController extends BaseController
 
         foreach ($targetStudents as $enrollment) {
             $student = $enrollment->student;
-            $cycle = $enrollment->classSection->gradeLevel->education_cycle ?? AcademicType::PRIMARY; 
-            $cycleValue = ($cycle instanceof AcademicType) ? $cycle->value : $cycle;
+            $studentCycle = $this->cycleService->resolveCycle($enrollment);
+
+            if ($this->cycleService->isUniversityCycle($studentCycle)) {
+                continue;
+            }
 
             $reportData = null;
             $viewName = '';
+            $termNumber = (int) ($request->trimester ?: $request->semester ?: 1);
 
-            if ($cycleValue === 'university' || $cycleValue === 'lmd') {
-                continue; 
-            } 
-            elseif ($cycleValue === 'secondary') {
+            if ($this->cycleService->usesSemesterModel($studentCycle)) {
                 $viewName = 'reports.bulletin_secondary';
                 if ($request->type === 'period') {
                     $viewName = 'reports.bulletin_period';
                     $reportData = $this->getPeriodData($student, $enrollment, $request->period);
                 } else {
                     $reportData = $this->getSecondaryData($student, $enrollment, $request->semester);
+                    $termNumber = (int) ($request->semester ?: 1);
                 }
-            } 
-            else {
+            } else {
                 $viewName = 'reports.bulletin_primary';
                 if ($request->type === 'period') {
                     $viewName = 'reports.bulletin_period';
                     $reportData = $this->getPeriodData($student, $enrollment, $request->period);
                 } else {
                     $reportData = $this->getPrimaryData($student, $enrollment, $request->trimester);
+                    $termNumber = (int) ($request->trimester ?: 1);
                 }
             }
 
             if ($reportData && $this->hasMarks($reportData)) {
                 $studentRank = $rankings[$student->id] ?? null;
+                $mode = $request->type === 'period' ? 'period' : 'term';
+                $reportData['column_labels'] = $this->cycleService->columnLabels(
+                    $studentCycle,
+                    $request->type === 'period' ? 1 : $termNumber,
+                    $mode
+                );
+                $reportData['term_title'] = $request->type === 'period'
+                    ? __('reports.bulletin_period_title', ['period' => strtoupper($request->period ?? '')])
+                    : $this->cycleService->termTitle($studentCycle, $termNumber);
+                $reportData['education_cycle'] = $studentCycle;
                 $reportData['ranks'] = [
                     'section_rank' => $studentRank['section_rank'] ?? '-',
                     'section_total' => $studentRank['section_total'] ?? '-',
@@ -233,7 +328,7 @@ class ReportController extends BaseController
 
         if ($request->check_only) {
             if (empty($bulkData)) {
-                return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+                return $this->emptyReportJson(__('reports.no_records_found'));
             }
             return response()->json(['status' => 'success']);
         }
@@ -288,7 +383,9 @@ class ReportController extends BaseController
             }
 
             if ($request->check_only) {
-                if (empty($history)) return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+                if (empty($history)) {
+                    return $this->emptyReportJson(__('reports.no_records_found'));
+                }
                 return response()->json(['status' => 'success']);
             }
 
@@ -301,7 +398,9 @@ class ReportController extends BaseController
                 ->get();
 
             if ($records->isEmpty()) {
-                if ($request->check_only) return response()->json(['status' => 'error', 'message' => __('reports.no_records_found')]);
+                if ($request->check_only) {
+                    return $this->emptyReportJson(__('reports.no_records_found'));
+                }
                 return back()->with('error', __('reports.no_records_found'));
             }
 
@@ -390,16 +489,17 @@ class ReportController extends BaseController
 
     private function calculateRankings($classSection, Request $request, $institutionId)
     {
-        $categories = [];
-        if ($request->type === 'period') {
-            $categories = [$request->period];
-        } elseif ($request->trimester) {
-            $tri = $request->trimester;
-            $categories = ["p" . (($tri * 2) - 1), "p" . ($tri * 2), "trimester_exam_$tri"];
-        } elseif ($request->semester) {
-            $sem = $request->semester;
-            $startPeriod = ($sem * 2) - 1;
-            $categories = ["p" . $startPeriod, "p" . ($startPeriod + 1), "semester_exam_$sem"];
+        $cycle = $this->cycleService->resolveCycle($classSection);
+        $categories = $this->cycleService->categoriesForRequest(
+            $cycle,
+            $request->type,
+            $request->period,
+            $request->trimester ? (int) $request->trimester : null,
+            $request->semester ? (int) $request->semester : null
+        );
+
+        if (empty($categories)) {
+            return [];
         }
 
         $gradeEnrollments = StudentEnrollment::where('grade_level_id', $classSection->grade_level_id)
@@ -543,9 +643,10 @@ class ReportController extends BaseController
     private function getPrimaryData($student, $enrollment, $trimester)
     {
         $trimester = $trimester ?? 1;
-        $pA = "p" . (($trimester * 2) - 1); 
-        $pB = "p" . ($trimester * 2);       
-        $examCat = "trimester_exam_$trimester";
+        $keys = $this->cycleService->periodKeysForTerm(AcademicType::PRIMARY->value, (int) $trimester);
+        $pA = $keys['pA'];
+        $pB = $keys['pB'];
+        $examCat = $keys['examCat'];
 
         $subjects = $this->getSubjectsForSection($enrollment->classSection);
 
@@ -614,10 +715,10 @@ class ReportController extends BaseController
     private function getSecondaryData($student, $enrollment, $semester)
     {
         $semester = $semester ?? 1;
-        $startPeriod = ($semester * 2) - 1; 
-        $pA = "p" . $startPeriod;       
-        $pB = "p" . ($startPeriod + 1); 
-        $examCat = "semester_exam_$semester";
+        $keys = $this->cycleService->periodKeysForTerm(AcademicType::SECONDARY->value, (int) $semester);
+        $pA = $keys['pA'];
+        $pB = $keys['pB'];
+        $examCat = $keys['examCat'];
 
         $subjects = $this->getSubjectsForSection($enrollment->classSection);
 
