@@ -43,6 +43,7 @@ return [
     'settings_saved' => 'Paramètres enregistrés avec succès.',
     'sms_sent_success' => 'SMS envoyé avec succès.',
     'whatsapp_sent_success' => 'Message WhatsApp envoyé avec succès.',
+    'whatsapp_template_required' => 'Le texte libre WhatsApp a été refusé. Le destinataire doit vous écrire d\'abord (fenêtre 24h), ou utilisez un modèle Meta approuvé pour les invitations en masse.',
     'gateway_connection_error' => 'Impossible de se connecter à la passerelle.',
     'gateway_response_error' => 'La passerelle a renvoyé une erreur.',
     'credentials_missing' => 'Identifiants API manquants pour le fournisseur sélectionné.',

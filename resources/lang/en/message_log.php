@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'page_title' => 'Message Logs',
+    'subtitle' => 'Track SMS & WhatsApp delivery status (compact storage)',
+    'institution' => 'Institution',
+    'all_institutions' => 'All institutions',
+    'channel' => 'Channel',
+    'all_channels' => 'All channels',
+    'status' => 'Status',
+    'all_statuses' => 'All statuses',
+    'status_sent' => 'Sent',
+    'status_failed' => 'Failed',
+    'status_skipped' => 'Skipped',
+    'event' => 'Event',
+    'all_events' => 'All events',
+    'date' => 'Date',
+    'date_from' => 'From',
+    'recipient' => 'Recipient',
+    'provider' => 'Provider',
+    'credited' => 'Credit',
+    'error' => 'Error',
+    'filter' => 'Filter',
+    'stat_sent_7d' => 'Sent (7 days)',
+    'stat_failed_7d' => 'Failed (7 days)',
+    'storage_note' => 'Logs store masked phone, status, and short errors only — message body is not saved to keep the database small.',
+];

@@ -54,5 +54,8 @@ return [
     'delivery_pending' => 'Pending',
     'delivery_sent' => 'Sent',
     'delivery_failed' => 'Failed',
+    'delivery_partial' => 'Partial',
+    'sent_summary' => 'Invitations processed: :sent sent, :partial partial, :failed failed.',
+    'channels' => 'Channels',
     'error_generic' => 'Something went wrong. Please try again.',
 ];

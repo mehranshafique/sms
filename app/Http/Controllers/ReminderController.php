@@ -116,14 +116,16 @@ class ReminderController extends BaseController
 
         // Initialize Gateway (Only if not sending via Email)
         $gateway = null;
+        $messagingContext = null;
         if ($channel !== 'email') {
-            $context = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
+            $messagingContext = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
 
             try {
                 $gateway = GatewayFactory::create(
-                    $context['resolved'],
-                    $context['credentials_institution_id'],
-                    $institutionId
+                    $messagingContext['resolved'],
+                    $messagingContext['credentials_institution_id'],
+                    $institutionId,
+                    $channel
                 );
             } catch (\Exception $e) {
                 return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
@@ -182,6 +184,17 @@ class ReminderController extends BaseController
                     $response = ($channel === 'whatsapp') 
                         ? $gateway->sendWhatsApp($contactInfo, $message) 
                         : $gateway->sendSms($contactInfo, $message);
+
+                    app(\App\Services\MessageLogService::class)->log([
+                        'institution_id' => $institutionId,
+                        'channel' => $channel,
+                        'event_key' => 'fee_reminder',
+                        'to' => $contactInfo,
+                        'status' => !empty($response['success']) ? 'sent' : 'failed',
+                        'provider' => $messagingContext['resolved'] ?? null,
+                        'provider_msg_id' => $response['provider_message_id'] ?? null,
+                        'error' => empty($response['success']) ? ($response['message'] ?? 'failed') : null,
+                    ]);
 
                     if ($response['success']) {
                         $sentCount++;
@@ -249,14 +262,16 @@ class ReminderController extends BaseController
 
         // Initialize Gateway (Only if not sending via Email)
         $gateway = null;
+        $messagingContext = null;
         if ($channel !== 'email') {
-            $context = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
+            $messagingContext = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
 
             try {
                 $gateway = GatewayFactory::create(
-                    $context['resolved'],
-                    $context['credentials_institution_id'],
-                    $institutionId
+                    $messagingContext['resolved'],
+                    $messagingContext['credentials_institution_id'],
+                    $institutionId,
+                    $channel
                 );
             } catch (\Exception $e) {
                 return response()->json(['message' => __('reminders.messages.gateway_config_error', ['error' => $e->getMessage()])], 500);
@@ -323,6 +338,17 @@ class ReminderController extends BaseController
                         $response = ($channel === 'whatsapp') 
                             ? $gateway->sendWhatsApp($contactInfo, $message) 
                             : $gateway->sendSms($contactInfo, $message);
+
+                        app(\App\Services\MessageLogService::class)->log([
+                            'institution_id' => $institutionId,
+                            'channel' => $channel,
+                            'event_key' => 'exam_reminder',
+                            'to' => $contactInfo,
+                            'status' => !empty($response['success']) ? 'sent' : 'failed',
+                            'provider' => $messagingContext['resolved'] ?? null,
+                            'provider_msg_id' => $response['provider_message_id'] ?? null,
+                            'error' => empty($response['success']) ? ($response['message'] ?? 'failed') : null,
+                        ]);
 
                         if ($response['success']) {
                             $sentCount++;

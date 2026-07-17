@@ -4,6 +4,8 @@ namespace App\Services\Sms;
 
 use App\Interfaces\SmsGatewayInterface;
 use App\Models\InstitutionSetting;
+use App\Services\MessageLogService;
+use App\Services\PaymentGateways\PaymentPhoneHelper;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Crypt;
@@ -67,25 +69,43 @@ class MetaWhatsAppService implements SmsGatewayInterface
         }
 
         try {
+            $msisdn = PaymentPhoneHelper::toMsisdn($to, config('sms.default_country_code', '243'));
             $url = "https://graph.facebook.com/{$this->version}/{$this->phoneNumberId}/messages";
-            
+
             $response = Http::withToken($this->accessToken)->post($url, [
                 'messaging_product' => 'whatsapp',
                 'recipient_type' => 'individual',
-                'to' => preg_replace('/[^0-9]/', '', $to),
+                'to' => $msisdn,
                 'type' => 'text',
-                'text' => ['preview_url' => false, 'body' => $message]
+                'text' => ['preview_url' => false, 'body' => $message],
             ]);
 
             $payload = $response->json();
 
             if ($response->successful() && !empty($payload['messages'][0]['id'])) {
-                return ['success' => true, 'message' => __('configuration.whatsapp_sent_success')];
+                return [
+                    'success' => true,
+                    'message' => __('configuration.whatsapp_sent_success'),
+                    'provider_message_id' => $payload['messages'][0]['id'],
+                ];
             }
 
             $err = $payload['error']['message'] ?? ($response->body() ?: 'Meta API Error');
-            Log::error('Meta WhatsApp send failed', ['response' => $payload]);
-            return ['success' => false, 'message' => $err];
+            $code = $payload['error']['code'] ?? null;
+
+            // Meta rejects free-form text outside the 24h customer-care window.
+            if (in_array((int) $code, [131047, 131026, 131051], true)
+                || stripos($err, '24 hour') !== false
+                || stripos($err, 'template') !== false) {
+                $err = __('configuration.whatsapp_template_required');
+            }
+
+            Log::error('Meta WhatsApp send failed', [
+                'response' => $payload,
+                'to' => MessageLogService::maskPhone($msisdn),
+            ]);
+
+            return ['success' => false, 'message' => $err, 'error_code' => $code];
 
         } catch (\Exception $e) {
             return ['success' => false, 'message' => __('configuration.gateway_connection_error')];

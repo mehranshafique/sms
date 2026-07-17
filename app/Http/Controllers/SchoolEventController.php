@@ -151,34 +151,118 @@ class SchoolEventController extends BaseController
 
         $schoolEvent->load(['invitations.student.enrollments.classSection.gradeLevel', 'institution']);
 
+        $stats = ['sent' => 0, 'partial' => 0, 'failed' => 0, 'skipped' => 0];
+
         foreach ($schoolEvent->invitations as $invitation) {
             $payload = $this->invitationPayload($schoolEvent, $invitation);
+            $meta = [];
+            $attempted = 0;
+            $succeeded = 0;
+            $related = [
+                'related_type' => SchoolEventInvitation::class,
+                'related_id' => $invitation->id,
+            ];
 
             if ($invitation->recipient_phone) {
                 if ($notifications->channelEnabled($schoolEvent->institution_id, 'event_invitation', 'sms')) {
-                    $notifications->sendNotificationEvent('event_invitation', $invitation->recipient_phone, $payload, $schoolEvent->institution_id, 'sms');
+                    $attempted++;
+                    $sms = $notifications->sendNotificationEvent(
+                        'event_invitation',
+                        $invitation->recipient_phone,
+                        $payload,
+                        $schoolEvent->institution_id,
+                        'sms',
+                        $related
+                    );
+                    $meta['sms'] = !empty($sms['success']) ? 'sent' : 'failed';
+                    if (!empty($sms['success'])) {
+                        $succeeded++;
+                    } else {
+                        $meta['sms_error'] = mb_substr((string) ($sms['message'] ?? 'failed'), 0, 120);
+                    }
                 }
+
                 if ($notifications->channelEnabled($schoolEvent->institution_id, 'event_invitation', 'whatsapp')) {
-                    $notifications->sendNotificationEvent('event_invitation', $invitation->recipient_phone, $payload, $schoolEvent->institution_id, 'whatsapp');
+                    $attempted++;
+                    $wa = $notifications->sendNotificationEvent(
+                        'event_invitation',
+                        $invitation->recipient_phone,
+                        $payload,
+                        $schoolEvent->institution_id,
+                        'whatsapp',
+                        $related
+                    );
+                    $meta['whatsapp'] = !empty($wa['success']) ? 'sent' : 'failed';
+                    if (!empty($wa['success'])) {
+                        $succeeded++;
+                    } else {
+                        $meta['whatsapp_error'] = mb_substr((string) ($wa['message'] ?? 'failed'), 0, 120);
+                    }
                 }
             }
 
             if ($invitation->recipient_email && $notifications->channelEnabled($schoolEvent->institution_id, 'event_invitation', 'email')) {
-                $notifications->sendEmailTemplate('event_invitation', $invitation->recipient_email, $payload, $schoolEvent->institution_id);
+                $attempted++;
+                $email = $notifications->sendEmailTemplate(
+                    'event_invitation',
+                    $invitation->recipient_email,
+                    $payload,
+                    $schoolEvent->institution_id
+                );
+                $meta['email'] = !empty($email['success']) ? 'sent' : 'failed';
+                if (!empty($email['success'])) {
+                    $succeeded++;
+                } else {
+                    $meta['email_error'] = mb_substr((string) ($email['message'] ?? 'failed'), 0, 120);
+                }
             }
 
             if ($invitation->recipient_telegram_chat_id) {
+                $attempted++;
                 $template = \App\Models\SmsTemplate::forEvent('event_invitation', $schoolEvent->institution_id)->first();
                 $text = $template ? apply_sms_template_tags($template->body, $payload) : ($payload['EventName'] ?? $schoolEvent->name);
-                $notifications->sendTelegramMessage($invitation->recipient_telegram_chat_id, $text);
+                $tg = $notifications->sendTelegramMessage($invitation->recipient_telegram_chat_id, $text);
+                $meta['telegram'] = !empty($tg['success']) ? 'sent' : 'failed';
+                if (!empty($tg['success'])) {
+                    $succeeded++;
+                } else {
+                    $meta['telegram_error'] = mb_substr((string) ($tg['message'] ?? 'failed'), 0, 120);
+                }
             }
 
-            $invitation->update(['delivery_status' => 'sent', 'sent_at' => now()]);
+            if ($attempted === 0) {
+                $status = 'failed';
+                $meta['note'] = 'no_channel';
+                $stats['skipped']++;
+            } elseif ($succeeded === $attempted) {
+                $status = 'sent';
+                $stats['sent']++;
+            } elseif ($succeeded > 0) {
+                $status = 'partial';
+                $stats['partial']++;
+            } else {
+                $status = 'failed';
+                $stats['failed']++;
+            }
+
+            $invitation->update([
+                'delivery_status' => $status,
+                'delivery_meta' => $meta,
+                'sent_at' => $succeeded > 0 ? now() : $invitation->sent_at,
+            ]);
         }
 
         $schoolEvent->update(['status' => 'sent']);
 
-        return back()->with('success', __('school_event.sent'));
+        $summary = __('school_event.sent_summary', [
+            'sent' => $stats['sent'],
+            'partial' => $stats['partial'],
+            'failed' => $stats['failed'],
+        ]);
+
+        $flashKey = ($stats['failed'] > 0 || $stats['partial'] > 0) ? 'warning' : 'success';
+
+        return back()->with($flashKey, $summary);
     }
 
     private function invitationPayload(SchoolEvent $schoolEvent, SchoolEventInvitation $invitation): array

@@ -30,6 +30,11 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         @endif
+        @if(session('warning'))
+            <div class="alert alert-warning alert-dismissible fade show">{{ session('warning') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
 
         <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -92,6 +97,7 @@
                                 <th>{{ __('school_event.phone') }}</th>
                                 <th>{{ __('school_event.telegram') }}</th>
                                 <th>{{ __('school_event.field_status') }}</th>
+                                <th>{{ __('school_event.channels') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -107,16 +113,37 @@
                                         if ($deliveryLabel === $deliveryKey) {
                                             $deliveryLabel = ucfirst($inv->delivery_status);
                                         }
-                                        $deliveryBadge = $inv->delivery_status === 'sent'
-                                            ? 'success'
-                                            : ($inv->delivery_status === 'failed' ? 'danger' : 'secondary');
+                                        $deliveryBadge = match ($inv->delivery_status) {
+                                            'sent' => 'success',
+                                            'partial' => 'warning',
+                                            'failed' => 'danger',
+                                            default => 'secondary',
+                                        };
                                     @endphp
                                     <span class="badge badge-{{ $deliveryBadge }} light">{{ $deliveryLabel }}</span>
+                                </td>
+                                <td class="small">
+                                    @php $meta = $inv->delivery_meta ?? []; @endphp
+                                    @if(empty($meta))
+                                        —
+                                    @else
+                                        @foreach(['sms','whatsapp','email','telegram'] as $ch)
+                                            @if(isset($meta[$ch]))
+                                                <div>
+                                                    <strong>{{ strtoupper($ch) }}:</strong>
+                                                    <span class="text-{{ $meta[$ch] === 'sent' ? 'success' : 'danger' }}">{{ $meta[$ch] }}</span>
+                                                    @if(!empty($meta[$ch . '_error']))
+                                                        <span class="text-muted">({{ $meta[$ch . '_error'] }})</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-4">{{ __('school_event.no_recipients') }}</td>
+                                <td colspan="5" class="text-center text-muted py-4">{{ __('school_event.no_recipients') }}</td>
                             </tr>
                         @endforelse
                         </tbody>

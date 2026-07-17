@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'page_title' => 'Journaux de messages',
+    'subtitle' => 'Suivi du statut SMS & WhatsApp (stockage compact)',
+    'institution' => 'Établissement',
+    'all_institutions' => 'Tous les établissements',
+    'channel' => 'Canal',
+    'all_channels' => 'Tous les canaux',
+    'status' => 'Statut',
+    'all_statuses' => 'Tous les statuts',
+    'status_sent' => 'Envoyé',
+    'status_failed' => 'Échoué',
+    'status_skipped' => 'Ignoré',
+    'event' => 'Événement',
+    'all_events' => 'Tous les événements',
+    'date' => 'Date',
+    'date_from' => 'Du',
+    'recipient' => 'Destinataire',
+    'provider' => 'Fournisseur',
+    'credited' => 'Crédit',
+    'error' => 'Erreur',
+    'filter' => 'Filtrer',
+    'stat_sent_7d' => 'Envoyés (7 jours)',
+    'stat_failed_7d' => 'Échoués (7 jours)',
+    'storage_note' => 'Les journaux stockent uniquement le téléphone masqué, le statut et une courte erreur — le corps du message n\'est pas enregistré pour limiter la taille de la base.',
+];

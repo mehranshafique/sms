@@ -25,6 +25,7 @@ use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\AgentPaymentController;
 use App\Http\Controllers\SchoolEventController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\MessageLogController;
 use App\Http\Controllers\PlatformUserController;
 use App\Http\Controllers\PickupWebController;
 use App\Http\Controllers\GlobalSearchController;
@@ -758,6 +759,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     // Audit Logs (Super Admin)
     Route::resource('audit-logs', AuditLogController::class)->only(['index'])->middleware([RoleMiddleware::class . ':Super Admin']);
+
+    // SMS / WhatsApp delivery logs (Super Admin + School Admin)
+    Route::get('message-logs', [MessageLogController::class, 'index'])->name('message-logs.index');
 
     // Platform user directory (Super Admin)
     Route::middleware([RoleMiddleware::class . ':Super Admin'])->prefix('platform/users')->name('platform.users.')->group(function () {

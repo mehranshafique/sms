@@ -27,6 +27,7 @@ return [
     'currency' => 'Devise',
     'tracking' => 'Suivi',
     'audit_log' => 'Journal d\'audit',
+    'message_logs' => 'Journaux SMS/WhatsApp',
     'finance' => 'Finance',
     'fees_collection' => 'Frais & Recouvrement',
     'budget_payroll' => 'Budget & Paie',

@@ -32,6 +32,7 @@ return [
     
     'tracking' => 'Tracking',
     'audit_log' => 'Audit Log',
+    'message_logs' => 'Message Logs',
     
     'finance' => 'Finance',
     'fees_collection' => 'Fees & Collection',

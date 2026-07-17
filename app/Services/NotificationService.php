@@ -17,6 +17,7 @@ use App\Mail\UserCredentialsMail;
 use App\Services\Sms\GatewayFactory;
 use App\Services\Sms\InfobipService; 
 use App\Services\MailSettingsService;
+use App\Services\MessageLogService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
@@ -199,24 +200,9 @@ class NotificationService
 
     private function dispatchMessage($phone, $message, $institutionId, $channel)
     {
-        $providerKey = $channel . '_provider';
-        $providerName = InstitutionSetting::get($institutionId, $providerKey, 'system');
-
-        if ($providerName === 'system') {
-            $providerName = InstitutionSetting::resolveSystemProvider($channel);
-            $institutionId = null;
-        }
-
-        try {
-            $gateway = \App\Services\Sms\GatewayFactory::create($providerName, $institutionId);
-            if ($channel === 'whatsapp') {
-                $gateway->sendWhatsApp($phone, $message);
-            } else {
-                $gateway->sendSms($phone, $message);
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error(strtoupper($channel) . " Notification Error: " . $e->getMessage());
-        }
+        return $this->performSend($phone, $message, $institutionId, false, $channel, [
+            'event_key' => 'legacy_dispatch',
+        ]);
     }
 
     public function sendRequestUpdatedNotification(\App\Models\StudentRequest $request)
@@ -469,7 +455,7 @@ class NotificationService
         ];
     }
 
-    public function sendNotificationEvent($eventKey, $to, $data = [], $institutionId = null, $channel = 'sms')
+    public function sendNotificationEvent($eventKey, $to, $data = [], $institutionId = null, $channel = 'sms', array $context = [])
     {
         $template = null;
         if (class_exists(\App\Models\SmsTemplate::class)) {
@@ -477,7 +463,18 @@ class NotificationService
         }
 
         if (!$template || !$template->is_active) {
-            return ['success' => false, 'message' => "Template '$eventKey' missing or inactive."];
+            $result = ['success' => false, 'message' => "Template '$eventKey' missing or inactive."];
+            app(MessageLogService::class)->log([
+                'institution_id' => $institutionId,
+                'channel' => $channel,
+                'event_key' => $eventKey,
+                'to' => $to,
+                'status' => 'failed',
+                'error' => $result['message'],
+                'related_type' => $context['related_type'] ?? null,
+                'related_id' => $context['related_id'] ?? null,
+            ]);
+            return $result;
         }
 
         $message = $template->body;
@@ -489,7 +486,9 @@ class NotificationService
         
         $isUnlimited = $this->preferences->isCreditExemptEvent($eventKey);
 
-        return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel);
+        return $this->performSend($to, $message, $institutionId, $isUnlimited, $channel, array_merge($context, [
+            'event_key' => $eventKey,
+        ]));
     }
 
     public function sendEmailTemplate(string $eventKey, string $to, array $data = [], ?int $institutionId = null): array
@@ -536,25 +535,41 @@ class NotificationService
         }
     }
 
-    public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms')
+    public function performSend($to, $message, $institutionId, $isUnlimited = false, $channel = 'sms', array $context = [])
     {
         $institution = $institutionId ? Institution::find($institutionId) : null;
-        $context = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
-        $finalProviderName = $context['resolved'];
-        $credentialsContextId = $context['credentials_institution_id'];
-        $shouldDeductCredits = $context['deduct_credits'];
+        $messagingContext = InstitutionSetting::resolveMessagingContext($institutionId, $channel);
+        $finalProviderName = $messagingContext['resolved'];
+        $credentialsContextId = $messagingContext['credentials_institution_id'];
+        $shouldDeductCredits = $messagingContext['deduct_credits'];
 
         $creditCol = ($channel === 'whatsapp') ? 'whatsapp_credits' : 'sms_credits';
+        $eventKey = $context['event_key'] ?? null;
+        $logBase = [
+            'institution_id' => $institutionId,
+            'channel' => $channel,
+            'event_key' => $eventKey,
+            'to' => $to,
+            'provider' => $finalProviderName,
+            'related_type' => $context['related_type'] ?? null,
+            'related_id' => $context['related_id'] ?? null,
+        ];
         
         if ($shouldDeductCredits && !$isUnlimited && $institution) {
             if ($institution->$creditCol <= 0) {
-                return ['success' => false, 'message' => __('configuration.insufficient_credits')];
+                $result = ['success' => false, 'message' => __('configuration.insufficient_credits')];
+                app(MessageLogService::class)->log(array_merge($logBase, [
+                    'status' => 'failed',
+                    'error' => $result['message'],
+                    'credited' => false,
+                ]));
+                return $result;
             }
         }
 
         try {
             $credentialFallbackId = ($credentialsContextId === null && $institutionId) ? $institutionId : null;
-            $gateway = GatewayFactory::create($finalProviderName, $credentialsContextId, $credentialFallbackId);
+            $gateway = GatewayFactory::create($finalProviderName, $credentialsContextId, $credentialFallbackId, $channel);
 
             if ($channel === 'whatsapp') {
                 $result = $gateway->sendWhatsApp($to, $message);
@@ -562,17 +577,32 @@ class NotificationService
                 $result = $gateway->sendSms($to, $message);
             }
 
-            if ($result['success'] && $shouldDeductCredits && !$isUnlimited && $institution) {
-                if($institution->$creditCol > 0) {
+            $credited = false;
+            if (!empty($result['success']) && $shouldDeductCredits && !$isUnlimited && $institution) {
+                if ($institution->$creditCol > 0) {
                     $institution->decrement($creditCol);
+                    $credited = true;
                 }
             }
+
+            app(MessageLogService::class)->log(array_merge($logBase, [
+                'status' => !empty($result['success']) ? 'sent' : 'failed',
+                'provider_msg_id' => $result['provider_message_id'] ?? ($result['message_id'] ?? null),
+                'error' => empty($result['success']) ? ($result['message'] ?? 'Send failed') : null,
+                'credited' => $credited,
+            ]));
 
             return $result;
 
         } catch (\Exception $e) {
             Log::error("Notification Error: " . $e->getMessage());
-            return ['success' => false, 'message' => __('configuration.gateway_connection_error')];
+            $result = ['success' => false, 'message' => __('configuration.gateway_connection_error')];
+            app(MessageLogService::class)->log(array_merge($logBase, [
+                'status' => 'failed',
+                'error' => $result['message'],
+                'credited' => false,
+            ]));
+            return $result;
         }
     }
     

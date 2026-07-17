@@ -14,11 +14,13 @@ class SchoolEventInvitation extends Model
         'recipient_email',
         'recipient_telegram_chat_id',
         'delivery_status',
+        'delivery_meta',
         'sent_at',
     ];
 
     protected $casts = [
         'sent_at' => 'datetime',
+        'delivery_meta' => 'array',
     ];
 
     public function event()

@@ -54,5 +54,8 @@ return [
     'delivery_pending' => 'En attente',
     'delivery_sent' => 'Envoyé',
     'delivery_failed' => 'Échec',
+    'delivery_partial' => 'Partiel',
+    'sent_summary' => 'Invitations traitées : :sent envoyées, :partial partielles, :failed échouées.',
+    'channels' => 'Canaux',
     'error_generic' => 'Une erreur est survenue. Veuillez réessayer.',
 ];

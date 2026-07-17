@@ -161,12 +161,13 @@
                 </li>
 
                 <li class="nav-label">{{ __('sidebar.configuration') }}</li>
-                <li class="mega-menu-md {{ request()->routeIs('configuration.index', 'sms_templates.*', 'email_templates.*', 'platform.queue-monitor.*', 'currency.*') ? 'mm-active' : '' }}">
+                <li class="mega-menu-md {{ request()->routeIs('configuration.index', 'sms_templates.*', 'email_templates.*', 'message-logs.*', 'platform.queue-monitor.*', 'currency.*') ? 'mm-active' : '' }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.system_config') }}</span></a>
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('configuration.index') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
                         <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') }}</a></li>
                         <li><a class="{{ request()->routeIs('email_templates.*') ? 'mm-active' : '' }}" href="{{ route('email_templates.index') }}">{{ __('email_template.page_title') }}</a></li>
+                        <li><a class="{{ request()->routeIs('message-logs.*') ? 'mm-active' : '' }}" href="{{ route('message-logs.index') }}">{{ __('sidebar.message_logs') }}</a></li>
                         <li><a class="{{ request()->routeIs('platform.queue-monitor.*') ? 'mm-active' : '' }}" href="{{ route('platform.queue-monitor.index') }}">{{ __('sidebar.queue_monitor') }}</a></li>
                         @if($isGlobalMode && ($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])))
                             <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}"><i class="fa fa-coins me-1"></i> {{ __('sidebar.currency') }}</a></li>
@@ -471,7 +472,7 @@
                 {{-- CONFIGURATION --}}
                 @if($user->can('setting.manage') || $user->can('setting.view') || $user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
-                    <li class="mega-menu-md {{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'email_templates.*', 'currency.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'email_templates.*', 'message-logs.*', 'currency.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
                         <ul aria-expanded="false">
                             @if($user->can('setting.manage') || $user->can('setting.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
@@ -487,6 +488,9 @@
                             <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') ?? 'SMS Templates' }}</a></li>
                             <li><a class="{{ request()->routeIs('email_templates.*') ? 'mm-active' : '' }}" href="{{ route('email_templates.index') }}">{{ __('email_template.page_title') }}</a></li>
                             @endcan
+                            @if($user->hasRole(['Super Admin', 'School Admin']))
+                            <li><a class="{{ request()->routeIs('message-logs.*') ? 'mm-active' : '' }}" href="{{ route('message-logs.index') }}">{{ __('sidebar.message_logs') }}</a></li>
+                            @endif
                             @can('role.viewAny')
                             <li><a class="{{ request()->routeIs('roles.*') ? 'mm-active' : '' }}" href="{{ route('roles.index') }}">{{ __('sidebar.permissions.roles') }}</a></li>
                             @endcan
