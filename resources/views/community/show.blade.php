@@ -48,7 +48,7 @@
         @if (!$thread->is_locked)
             <div class="help-card mt-4">
                 <h6 class="mb-3">{{ __('community.post_reply') }}</h6>
-                <form method="POST" action="{{ route('community.reply', $thread) }}">
+                <form method="POST" action="{{ route('community.reply', $thread) }}" class="ajax-form">
                     @csrf
                     <div class="mb-3">
                         <textarea name="body" class="form-control @error('body') is-invalid @enderror" rows="4"

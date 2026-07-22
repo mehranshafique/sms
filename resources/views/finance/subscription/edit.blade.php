@@ -20,7 +20,7 @@
 
         <div class="card">
             <div class="card-body">
-                <form action="{{ route('subscriptions.update', $subscription->id) }}" method="POST">
+                <form action="{{ route('subscriptions.update', $subscription->id) }}" method="POST" class="ajax-form">
                     @csrf
                     @method('PUT')
                     

@@ -7,7 +7,7 @@ use App\Models\CommunityThread;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class CommunityForumController extends Controller
+class CommunityForumController extends BaseController
 {
     public function categories(): array
     {
@@ -72,13 +72,13 @@ class CommunityForumController extends Controller
             'body' => $request->body,
         ]);
 
-        return redirect()->route('community.show', $thread)->with('success', __('community.thread_created'));
+        return $this->successResponse(__('community.thread_created'), route('community.show', $thread));
     }
 
     public function reply(Request $request, CommunityThread $thread)
     {
         if ($thread->is_locked) {
-            return back()->with('error', __('community.thread_locked'));
+            return $this->errorResponse(__('community.thread_locked'), 422);
         }
 
         $request->validate([
@@ -93,6 +93,6 @@ class CommunityForumController extends Controller
 
         $thread->touch();
 
-        return back()->with('success', __('community.reply_posted'));
+        return $this->successResponse(__('community.reply_posted'), route('community.show', $thread));
     }
 }

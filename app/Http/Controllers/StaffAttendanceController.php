@@ -139,6 +139,6 @@ class StaffAttendanceController extends BaseController
             }
         });
 
-        return redirect()->route('staff-attendance.index')->with('success', __('attendance.messages.success_marked'));
+        return $this->successResponse(__('attendance.messages.success_marked'), route('staff-attendance.index'));
     }
 }

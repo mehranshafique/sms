@@ -1,4 +1,4 @@
-<form action="{{ isset($parent) ? route('parents.update', $parent->id) : route('parents.store') }}" method="POST">
+<form action="{{ isset($parent) ? route('parents.update', $parent->id) : route('parents.store') }}" method="POST" class="ajax-form">
     @csrf
     @if(isset($parent))
         @method('PUT')

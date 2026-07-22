@@ -148,6 +148,6 @@ class SalaryStructureController extends BaseController
             ]
         );
 
-        return redirect()->route('salary-structures.index')->with('success', __('payroll.success_updated'));
+        return $this->successResponse(__('payroll.success_updated'), route('salary-structures.index'));
     }
 }

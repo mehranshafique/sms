@@ -71,6 +71,7 @@
                             <th>{{ __('requests.request_type') }}</th>
                             <th>{{ __('requests.status') }}</th>
                             <th>{{ __('requests.date_submitted') }}</th>
+                            <th>{{ __('requests.deadline') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -80,6 +81,7 @@
                                 <td>{{ $prev['type'] }}</td>
                                 <td>{{ $prev['status'] }}</td>
                                 <td>{{ $prev['date'] }}</td>
+                                <td>{{ $prev['deadline'] ?? '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

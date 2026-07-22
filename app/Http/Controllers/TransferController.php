@@ -72,7 +72,10 @@ class TransferController extends BaseController
             }
         });
 
-        return redirect()->route('students.show', $student->id)->with('success', 'Student marked as ' . $request->status);
+        return $this->successResponse(
+            'Student marked as ' . $request->status,
+            route('students.show', $student->id)
+        );
     }
 
     public function printCertificate(Student $student)

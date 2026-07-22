@@ -137,7 +137,7 @@ class StaffLeaveController extends BaseController
             app(\App\Services\InAppNotificationService::class)->notifyStaffLeaveSubmitted($leave);
         }
 
-        return redirect()->route('staff-leaves.index')->with('success', __('staff_leave.success_create'));
+        return $this->successResponse(__('staff_leave.success_create'), route('staff-leaves.index'));
     }
 
     public function show($id)

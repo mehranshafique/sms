@@ -1,4 +1,4 @@
-<form action="{{ route('school-events.store') }}" method="POST" id="schoolEventForm">
+<form action="{{ route('school-events.store') }}" method="POST" id="schoolEventForm" class="ajax-form">
     @csrf
     <div class="row justify-content-center">
         <div class="col-xl-10 col-lg-11">

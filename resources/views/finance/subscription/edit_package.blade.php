@@ -19,7 +19,7 @@
 
         <div class="card">
             <div class="card-body">
-                <form action="{{ route('packages.update', $package->id) }}" method="POST">
+                <form action="{{ route('packages.update', $package->id) }}" method="POST" class="ajax-form">
                     @csrf
                     @method('PUT')
                     

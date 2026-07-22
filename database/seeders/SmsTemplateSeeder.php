@@ -176,8 +176,8 @@ class SmsTemplateSeeder extends Seeder
             [
                 'event_key' => 'request_submitted',
                 'name' => 'New Student Request Submitted',
-                'body' => 'New request from $StudentName. Type: $RequestType. Ticket: $TicketNumber. Please review in the admin panel.',
-                'available_tags' => '$StudentName, $RequestType, $TicketNumber, $SchoolName',
+                'body' => 'New request from $StudentName ($Class, $SchoolYear). Type: $RequestType. Ticket: $TicketNumber. Please review in the admin panel.',
+                'available_tags' => '$StudentName, $RequestType, $TicketNumber, $SchoolName, $SchoolYear, $Class',
                 'is_active' => true,
             ],
             [
@@ -241,15 +241,15 @@ Thank you, $SchoolName.',
             [
                 'event_key' => 'fund_request_submitted',
                 'name' => 'Fund Request Submitted',
-                'body' => '$Requester submitted a fund request: $Title. Amount: $Amount.',
-                'available_tags' => '$Requester, $Title, $Amount, $SchoolName',
+                'body' => 'Hi $Requester, fund request $TicketNumber ($Amount) submitted. Pending approval. — $SchoolName',
+                'available_tags' => '$Requester, $Title, $Amount, $TicketNumber, $SchoolName',
                 'is_active' => true,
             ],
             [
                 'event_key' => 'fund_request_processed',
                 'name' => 'Fund Request Processed',
-                'body' => 'Your fund request "$Title" was $Status.',
-                'available_tags' => '$Title, $Status, $SchoolName',
+                'body' => 'Hi $Requester, fund request $TicketNumber ($Amount) is $Status. — $SchoolName',
+                'available_tags' => '$Requester, $Title, $Status, $Amount, $Remaining, $TicketNumber, $Reason, $SchoolName',
                 'is_active' => true,
             ],
             [

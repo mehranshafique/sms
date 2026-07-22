@@ -19,7 +19,7 @@
                         <h4 class="card-title">{{ __('transfer.issue_certificate') }}</h4>
                     </div>
                     <div class="card-body">
-                        <form action="{{ route('transfers.store', $student->id) }}" method="POST">
+                        <form action="{{ route('transfers.store', $student->id) }}" method="POST" class="ajax-form">
                             @csrf
                             
                             <div class="alert alert-warning">

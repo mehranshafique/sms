@@ -91,7 +91,7 @@
                 {{-- Actions --}}
                 <div class="sp-panel p-3">
                     <h6 class="fw-bold mb-3">{{ __('support.manage') }}</h6>
-                    <form action="{{ route('support.status', $ticket->id) }}" method="POST">
+                    <form action="{{ route('support.status', $ticket->id) }}" method="POST" class="ajax-form" data-ajax-reload="1">
                         @csrf
                         @if($isSupport)
                             <label class="form-label small fw-bold mb-1">{{ __('support.field_status') }}</label>

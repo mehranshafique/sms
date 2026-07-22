@@ -32,7 +32,7 @@
                             </div>
                         </form>
 
-                        <form action="{{ route('staff-attendance.store') }}" method="POST">
+                        <form action="{{ route('staff-attendance.store') }}" method="POST" class="ajax-form">
                             @csrf
                             <input type="hidden" name="date" value="{{ $date }}">
                             

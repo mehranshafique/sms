@@ -147,11 +147,7 @@ class DisciplineController extends BaseController
             Log::error('Discipline notification error: ' . $e->getMessage());
         }
 
-        if ($request->ajax() || $request->wantsJson()) {
-            return response()->json(['message' => __('discipline.success_created')]);
-        }
-
-        return redirect()->route('discipline.index')->with('success', __('discipline.success_created'));
+        return $this->successResponse(__('discipline.success_created'), route('discipline.index'));
     }
 
     public function show(DisciplinaryRecord $discipline)

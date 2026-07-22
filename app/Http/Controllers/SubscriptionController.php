@@ -58,7 +58,7 @@ class SubscriptionController extends BaseController
         ]);
 
         AuditLogger::log('Create', 'Package', 'Created package: ' . $request->name);
-        return back()->with('success', __('subscription.success_create'));
+        return $this->successResponse(__('subscription.success_create'), route('packages.index'));
     }
 
     public function editPackage(Package $package)
@@ -100,7 +100,7 @@ class SubscriptionController extends BaseController
         $this->syncPackageAiToInstitutions($package);
 
         AuditLogger::log('Update', 'Package', 'Updated package: ' . $package->name);
-        return redirect()->route('packages.index')->with('success', __('subscription.success_update'));
+        return $this->successResponse(__('subscription.success_update'), route('packages.index'));
     }
 
     /**
@@ -245,7 +245,7 @@ class SubscriptionController extends BaseController
             );
         });
 
-        return redirect()->route('subscriptions.index')->with('success', __('subscription.subscription_assigned'));
+        return $this->successResponse(__('subscription.subscription_assigned'), route('subscriptions.index'));
     }
 
     public function edit(Subscription $subscription)
@@ -280,7 +280,7 @@ class SubscriptionController extends BaseController
         });
 
         AuditLogger::log('Update', 'Subscription', 'Updated subscription #' . $subscription->id);
-        return redirect()->route('subscriptions.index')->with('success', __('subscription.subscription_updated'));
+        return $this->successResponse(__('subscription.subscription_updated'), route('subscriptions.index'));
     }
 
     public function destroy(Subscription $subscription)

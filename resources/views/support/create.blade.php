@@ -24,7 +24,7 @@
         <div class="row justify-content-center">
             <div class="col-xl-8 col-lg-10">
                 <div class="sp-panel p-4">
-                    <form action="{{ route('support.store') }}" method="POST" enctype="multipart/form-data">
+                    <form action="{{ route('support.store') }}" method="POST" enctype="multipart/form-data" class="ajax-form">
                         @csrf
 
                         <div class="mb-3">

@@ -175,36 +175,6 @@
     }
 
     $(document).ready(function(){
-        // Generic Ajax Form Handler
-        $('.ajax-form').submit(function(e){
-            e.preventDefault();
-            var $form = $(this);
-            var $modal = $form.closest('.modal');
-            
-            $.ajax({
-                url: $form.attr('action'),
-                type: "POST",
-                data: $form.serialize(),
-                success: function(response){
-                    if($modal.length) {
-                        bootstrap.Modal.getInstance($modal[0]).hide();
-                    }
-                    Swal.fire({
-                        icon: 'success',
-                        title: '{{ __("voting.success") }}',
-                        text: response.message
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                },
-                error: function(xhr){
-                    let msg = '{{ __("voting.system_error") }}';
-                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                    Swal.fire({ icon: 'error', title: '{{ __("voting.validation_error") }}', html: msg });
-                }
-            });
-        });
-
         // Delete Candidate Logic
         $(document).on('click', '.delete-candidate-btn', function() {
             let id = $(this).data('id');

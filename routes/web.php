@@ -633,6 +633,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('school-events/{schoolEvent}/build-invitations', [SchoolEventController::class, 'buildInvitations'])->name('school-events.build-invitations');
         Route::get('school-events/{schoolEvent}/preview', [SchoolEventController::class, 'preview'])->name('school-events.preview');
         Route::post('school-events/{schoolEvent}/send', [SchoolEventController::class, 'send'])->name('school-events.send');
+        Route::get('school-events/{schoolEvent}/send-status', [SchoolEventController::class, 'sendStatus'])->name('school-events.send-status');
         // Student View
         Route::get('my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
         Route::get('my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');

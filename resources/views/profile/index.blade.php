@@ -326,7 +326,7 @@
                                     <!-- TAB 2: EDIT PROFILE -->
                                     <div id="about-me" class="tab-pane fade">
                                         <div class="pt-3">
-                                            <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
+                                            <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data" class="ajax-form">
                                                 @csrf
                                                 @method('PUT')
                                                 
@@ -403,7 +403,7 @@
                                         <div class="pt-3">
                                             <div class="settings-form">
                                                 <h5 class="text-primary mb-4">{{ __('profile.change_password') }}</h5>
-                                                <form action="{{ route('profile.password') }}" method="POST">
+                                                <form action="{{ route('profile.password') }}" method="POST" class="ajax-form">
                                                     @csrf
                                                     @method('PUT')
                                                     

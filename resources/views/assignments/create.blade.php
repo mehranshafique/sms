@@ -15,7 +15,7 @@
             <div class="col-xl-12">
                 <div class="card">
                     <div class="card-body">
-                        <form action="{{ route('assignments.store') }}" method="POST" enctype="multipart/form-data">
+                        <form action="{{ route('assignments.store') }}" method="POST" enctype="multipart/form-data" class="ajax-form">
                             @csrf
                             <div class="row">
                                 {{-- Class Section --}}

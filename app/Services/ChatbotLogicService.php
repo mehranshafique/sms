@@ -85,12 +85,18 @@ class ChatbotLogicService
 
             $session = ChatSession::where('phone_number', $phone)->first();
 
-            if ($session && now()->gt($session->expires_at)) {
+            // Expired session: drop it and process the inbound keyword (do not consume Bonjour).
+            if ($session && $session->expires_at && now()->gt($session->expires_at)) {
                 Log::info("Chatbot Lifecycle: Session Expired", ['phone' => $phone, 'expired_at' => $session->expires_at]);
                 $session->delete();
                 $session = null;
-                $msg = ($session && $session->locale === 'en') ? "Session expired. Send 'Menu' to start again." : "Session expirée. Veuillez envoyer 'Menu' pour recommencer.";
-                return $this->reply($phone, $msg, null);
+            }
+
+            // Valid restart keyword always starts a fresh flow, even if a stale session exists.
+            if ($session && $this->isRestartKeyword($text)) {
+                Log::info("Chatbot Lifecycle: Restart keyword on existing session", ['phone' => $phone, 'text' => $text]);
+                $session->delete();
+                $session = null;
             }
 
             if (!$session) {
@@ -239,6 +245,21 @@ class ChatbotLogicService
         Log::warning("Chatbot Flow: Keyword totally unrecognized", ['text' => $textLower]);
         $fallbackMsg = "👋 Mot clé introuvable. Envoyez le mot-clé de votre école pour commencer.\n\nKeyword not found. Send your school's keyword to begin.";
         return $this->reply($phone, $fallbackMsg, null);
+    }
+
+    /** True when inbound text should start/restart a chatbot session. */
+    protected function isRestartKeyword(string $text): bool
+    {
+        $textLower = strtolower(trim($text));
+        if ($textLower === '') {
+            return false;
+        }
+
+        if (ChatbotKeyword::whereRaw('LOWER(keyword) = ?', [$textLower])->exists()) {
+            return true;
+        }
+
+        return (bool) $this->chatbotAccess->resolveBuiltinMenuProfile($textLower);
     }
 
     protected function startKeywordSession(
@@ -1706,6 +1727,7 @@ class ChatbotLogicService
                 'reason' => __('requests.reason_chatbot_fee_extension', ['days' => $days], $s->locale ?? 'fr'),
                 'start_date' => now(),
                 'end_date' => now()->addDays($days),
+                'payment_deadline' => now()->addDays($days),
                 'status' => 'submitted',
                 'ticket_number' => $ticket,
                 'created_by' => $s->user_id 

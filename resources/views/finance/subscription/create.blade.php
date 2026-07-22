@@ -14,7 +14,7 @@
 
         <div class="card">
             <div class="card-body">
-                <form action="{{ route('subscriptions.store') }}" method="POST">
+                <form action="{{ route('subscriptions.store') }}" method="POST" class="ajax-form">
                     @csrf
                     <div class="row">
                         <div class="col-md-6 mb-3">

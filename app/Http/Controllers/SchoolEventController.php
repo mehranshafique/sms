@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendSchoolEventInvitationsJob;
 use App\Models\ChatSession;
 use App\Models\ClassSection;
 use App\Models\SchoolEvent;
 use App\Models\SchoolEventInvitation;
-use App\Models\Student;
 use App\Models\StudentEnrollment;
 use App\Services\NotificationService;
-use App\Services\TemplateVariableRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -71,7 +70,7 @@ class SchoolEventController extends BaseController
             'created_by' => Auth::id(),
         ]);
 
-        return redirect()->route('school-events.show', $event)->with('success', __('school_event.created'));
+        return $this->successResponse(__('school_event.created'), route('school-events.show', $event));
     }
 
     public function show(SchoolEvent $schoolEvent)
@@ -123,6 +122,72 @@ class SchoolEventController extends BaseController
         return back()->with('success', __('school_event.invitations_built', ['count' => $count]));
     }
 
+    public function send(SchoolEvent $schoolEvent)
+    {
+        if ($schoolEvent->institution_id != $this->getInstitutionId()) {
+            abort(403);
+        }
+
+        if ($schoolEvent->invitations()->count() === 0) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => __('school_event.no_invitations'),
+                ], 422);
+            }
+
+            return back()->with('error', __('school_event.no_invitations'));
+        }
+
+        if ($schoolEvent->status === 'sending') {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'status' => 'info',
+                    'message' => __('school_event.already_sending'),
+                ]);
+            }
+
+            return back()->with('info', __('school_event.already_sending'));
+        }
+
+        $schoolEvent->update(['status' => 'sending']);
+
+        SendSchoolEventInvitationsJob::dispatchAfterResponse(
+            $schoolEvent->id,
+            (int) Auth::id()
+        );
+
+        $message = __('school_event.job_queued');
+
+        if (request()->expectsJson() || request()->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $message,
+                'event_status' => 'sending',
+            ]);
+        }
+
+        return back()->with('success', $message);
+    }
+
+    public function sendStatus(SchoolEvent $schoolEvent)
+    {
+        if ($schoolEvent->institution_id != $this->getInstitutionId()) {
+            abort(403);
+        }
+
+        return response()->json([
+            'status' => $schoolEvent->status,
+            'invitation_stats' => [
+                'total' => $schoolEvent->invitations()->count(),
+                'sent' => $schoolEvent->invitations()->where('delivery_status', 'sent')->count(),
+                'partial' => $schoolEvent->invitations()->where('delivery_status', 'partial')->count(),
+                'failed' => $schoolEvent->invitations()->where('delivery_status', 'failed')->count(),
+                'pending' => $schoolEvent->invitations()->where('delivery_status', 'pending')->count(),
+            ],
+        ]);
+    }
+
     public function preview(SchoolEvent $schoolEvent, NotificationService $notifications)
     {
         if ($schoolEvent->institution_id != $this->getInstitutionId()) {
@@ -141,128 +206,6 @@ class SchoolEventController extends BaseController
             : json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         return response()->json(['preview' => $preview]);
-    }
-
-    public function send(SchoolEvent $schoolEvent, NotificationService $notifications)
-    {
-        if ($schoolEvent->institution_id != $this->getInstitutionId()) {
-            abort(403);
-        }
-
-        $schoolEvent->load(['invitations.student.enrollments.classSection.gradeLevel', 'institution']);
-
-        $stats = ['sent' => 0, 'partial' => 0, 'failed' => 0, 'skipped' => 0];
-
-        foreach ($schoolEvent->invitations as $invitation) {
-            $payload = $this->invitationPayload($schoolEvent, $invitation);
-            $meta = [];
-            $attempted = 0;
-            $succeeded = 0;
-            $related = [
-                'related_type' => SchoolEventInvitation::class,
-                'related_id' => $invitation->id,
-            ];
-
-            if ($invitation->recipient_phone) {
-                if ($notifications->channelEnabled($schoolEvent->institution_id, 'event_invitation', 'sms')) {
-                    $attempted++;
-                    $sms = $notifications->sendNotificationEvent(
-                        'event_invitation',
-                        $invitation->recipient_phone,
-                        $payload,
-                        $schoolEvent->institution_id,
-                        'sms',
-                        $related
-                    );
-                    $meta['sms'] = !empty($sms['success']) ? 'sent' : 'failed';
-                    if (!empty($sms['success'])) {
-                        $succeeded++;
-                    } else {
-                        $meta['sms_error'] = mb_substr((string) ($sms['message'] ?? 'failed'), 0, 120);
-                    }
-                }
-
-                if ($notifications->channelEnabled($schoolEvent->institution_id, 'event_invitation', 'whatsapp')) {
-                    $attempted++;
-                    $wa = $notifications->sendNotificationEvent(
-                        'event_invitation',
-                        $invitation->recipient_phone,
-                        $payload,
-                        $schoolEvent->institution_id,
-                        'whatsapp',
-                        $related
-                    );
-                    $meta['whatsapp'] = !empty($wa['success']) ? 'sent' : 'failed';
-                    if (!empty($wa['success'])) {
-                        $succeeded++;
-                    } else {
-                        $meta['whatsapp_error'] = mb_substr((string) ($wa['message'] ?? 'failed'), 0, 120);
-                    }
-                }
-            }
-
-            if ($invitation->recipient_email && $notifications->channelEnabled($schoolEvent->institution_id, 'event_invitation', 'email')) {
-                $attempted++;
-                $email = $notifications->sendEmailTemplate(
-                    'event_invitation',
-                    $invitation->recipient_email,
-                    $payload,
-                    $schoolEvent->institution_id
-                );
-                $meta['email'] = !empty($email['success']) ? 'sent' : 'failed';
-                if (!empty($email['success'])) {
-                    $succeeded++;
-                } else {
-                    $meta['email_error'] = mb_substr((string) ($email['message'] ?? 'failed'), 0, 120);
-                }
-            }
-
-            if ($invitation->recipient_telegram_chat_id) {
-                $attempted++;
-                $template = \App\Models\SmsTemplate::forEvent('event_invitation', $schoolEvent->institution_id)->first();
-                $text = $template ? apply_sms_template_tags($template->body, $payload) : ($payload['EventName'] ?? $schoolEvent->name);
-                $tg = $notifications->sendTelegramMessage($invitation->recipient_telegram_chat_id, $text);
-                $meta['telegram'] = !empty($tg['success']) ? 'sent' : 'failed';
-                if (!empty($tg['success'])) {
-                    $succeeded++;
-                } else {
-                    $meta['telegram_error'] = mb_substr((string) ($tg['message'] ?? 'failed'), 0, 120);
-                }
-            }
-
-            if ($attempted === 0) {
-                $status = 'failed';
-                $meta['note'] = 'no_channel';
-                $stats['skipped']++;
-            } elseif ($succeeded === $attempted) {
-                $status = 'sent';
-                $stats['sent']++;
-            } elseif ($succeeded > 0) {
-                $status = 'partial';
-                $stats['partial']++;
-            } else {
-                $status = 'failed';
-                $stats['failed']++;
-            }
-
-            $invitation->update([
-                'delivery_status' => $status,
-                'delivery_meta' => $meta,
-                'sent_at' => $succeeded > 0 ? now() : $invitation->sent_at,
-            ]);
-        }
-
-        $schoolEvent->update(['status' => 'sent']);
-
-        $summary = __('school_event.sent_summary', [
-            'sent' => $stats['sent'],
-            'partial' => $stats['partial'],
-            'failed' => $stats['failed'],
-        ]);
-
-        $flashKey = ($stats['failed'] > 0 || $stats['partial'] > 0) ? 'warning' : 'success';
-
-        return back()->with($flashKey, $summary);
     }
 
     private function invitationPayload(SchoolEvent $schoolEvent, SchoolEventInvitation $invitation): array

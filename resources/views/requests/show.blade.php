@@ -60,6 +60,17 @@
                         <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.date_submitted') }}</label>
                         <span class="fs-16 text-dark">{{ localized_date($request->created_at, 'd M Y H:i') }}</span>
                     </div>
+
+                    <div class="col-md-6 mb-4">
+                        <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.start_date') }}</label>
+                        <span class="fs-16 text-dark">{{ $request->start_date ? localized_date($request->start_date, 'd M Y') : '—' }}</span>
+                    </div>
+
+                    <div class="col-md-6 mb-4">
+                        <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.deadline') }}</label>
+                        @php $deadline = $request->payment_deadline ?? $request->end_date; @endphp
+                        <span class="fs-16 text-dark">{{ $deadline ? localized_date($deadline, 'd M Y') : '—' }}</span>
+                    </div>
                     
                     <div class="col-12 mb-4">
                         <label class="fw-bold d-block text-uppercase small text-muted">{{ __('requests.reason') }}</label>
@@ -73,8 +84,8 @@
                             {{ $request->admin_note }}
                         </p>
                         <small class="text-muted">
-                            <i class="fa fa-user-check me-1"></i> {{ __('requests.processed_by') ?? 'Processed by:' }} <strong>{{ $request->approver->name ?? __('requests.admin') ?? 'Admin' }}</strong> 
-                            {{ __('reports.on_date') ?? 'on' }} {{ $request->approved_at ? localized_date($request->approved_at, 'd M Y H:i') : '' }}
+                            <i class="fa fa-user-check me-1"></i> {{ __('requests.processed_by') }} <strong>{{ $request->approver->name ?? __('requests.admin') }}</strong> 
+                            {{ __('reports.on_date') }} {{ $request->approved_at ? localized_date($request->approved_at, 'd M Y H:i') : '' }}
                         </small>
                     </div>
                     @endif

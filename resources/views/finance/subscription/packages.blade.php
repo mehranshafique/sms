@@ -30,7 +30,7 @@
                         <h6 class="mb-0 fw-bold"><i class="la la-plus-circle text-primary"></i> {{ __('subscription.create_package') }}</h6>
                     </div>
                     <div class="p-3">
-                        <form action="{{ route('packages.store') }}" method="POST">
+                        <form action="{{ route('packages.store') }}" method="POST" class="ajax-form">
                             @csrf
                             <div class="mb-3">
                                 <label class="form-label">{{ __('subscription.package_name') }} <span class="text-danger">*</span></label>

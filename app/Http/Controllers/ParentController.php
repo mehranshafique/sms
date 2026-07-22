@@ -132,7 +132,7 @@ class ParentController extends BaseController
             $success .= ' ' . $credentialsMessage;
         }
 
-        return redirect()->route('parents.index')->with('success', $success);
+        return $this->successResponse($success, route('parents.index'));
     }
 
     public function show(StudentParent $parent)
@@ -185,7 +185,7 @@ class ParentController extends BaseController
             ]));
         });
 
-        return redirect()->route('parents.index')->with('success', __('parent.success_update'));
+        return $this->successResponse(__('parent.success_update'), route('parents.index'));
     }
 
     public function destroy(StudentParent $parent)

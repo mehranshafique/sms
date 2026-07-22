@@ -245,4 +245,51 @@ class BaseController extends LaravelController
             abort(403);
         }
     }
+
+    protected function wantsAjaxResponse(?\Illuminate\Http\Request $request = null): bool
+    {
+        $request = $request ?? request();
+
+        return $request->ajax() || $request->wantsJson() || $request->expectsJson();
+    }
+
+    /**
+     * JSON for AJAX forms (loader/toastr); flash redirect for classic posts.
+     */
+    protected function successResponse(string $message, ?string $redirect = null, array $extra = [])
+    {
+        if ($this->wantsAjaxResponse()) {
+            return response()->json(array_merge([
+                'success' => true,
+                'message' => $message,
+                'redirect' => $redirect,
+            ], $extra));
+        }
+
+        $response = $redirect ? redirect()->to($redirect) : back();
+
+        return $response->with('success', $message);
+    }
+
+    protected function errorResponse(string $message, int $status = 422, array $errors = [])
+    {
+        if ($this->wantsAjaxResponse()) {
+            $payload = [
+                'success' => false,
+                'message' => $message,
+            ];
+            if ($errors !== []) {
+                $payload['errors'] = $errors;
+            }
+
+            return response()->json($payload, $status);
+        }
+
+        $response = back()->withInput()->with('error', $message);
+        if ($errors !== []) {
+            $response = $response->withErrors($errors);
+        }
+
+        return $response;
+    }
 }

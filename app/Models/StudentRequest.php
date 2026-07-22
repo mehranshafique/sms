@@ -98,6 +98,11 @@ class StudentRequest extends Model
     {
         return $this->belongsTo(Student::class);
     }
+
+    public function academicSession()
+    {
+        return $this->belongsTo(AcademicSession::class);
+    }
     
     public function institution()
     {

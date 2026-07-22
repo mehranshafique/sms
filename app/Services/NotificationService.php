@@ -668,80 +668,94 @@ class NotificationService
 
     public function sendFundRequestConfirmation($fundRequest, $phone, $name, $institutionId)
     {
-        $providerName = InstitutionSetting::get($institutionId, 'sms_provider', 'system');
-        if ($providerName === 'system') {
-            $providerName = InstitutionSetting::resolveSystemProvider('sms');
-            $institutionId = null;
+        if (empty($phone)) {
+            return;
         }
 
-        try {
-            $gateway = GatewayFactory::create($providerName, $institutionId);
-            $currency = \App\Enums\CurrencySymbol::default();
-            $amount = $currency . ' ' . number_format($fundRequest->amount, 2);
-            
-            $message = "Hello {$name}, your fund request (Ticket: {$fundRequest->ticket_number}) for {$amount} has been successfully submitted and is pending approval.";
-            
-            $gateway->sendSms($phone, $message);
-        } catch (\Exception $e) {
-            Log::error("Fund Request Notification Error: " . $e->getMessage());
+        $currency = \App\Enums\CurrencySymbol::default();
+        $amount = $currency . ' ' . number_format((float) $fundRequest->amount, 2);
+        $shortName = $this->shortFirstName($name);
+        $data = [
+            'Requester' => $shortName,
+            'Title' => $fundRequest->title ?? '',
+            'Amount' => $amount,
+            'TicketNumber' => $fundRequest->ticket_number ?? '',
+            'SchoolName' => $fundRequest->institution?->name ?? config('app.name'),
+        ];
+
+        $eventKey = 'fund_request_submitted';
+        // Transactional confirmation: always attempt SMS when a phone is provided.
+        $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
+        if ($this->isChannelEnabled($institutionId, $eventKey, 'whatsapp')) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
         }
     }
 
-    // --- NEW: EVENT LISTENER METHOD (APPROVED / REJECTED) ---
     public function sendFundRequestProcessedNotification($fundRequest, $institutionId)
     {
-        // Must load relationships to access data
-        $fundRequest->loadMissing(['requester', 'budget.category']);
+        $fundRequest->loadMissing(['requester', 'budget.category', 'institution']);
         $requester = $fundRequest->requester;
         $budget = $fundRequest->budget;
 
-        if (!$requester || !$budget) return;
+        if (!$requester || !$budget) {
+            return;
+        }
+
+        if (!in_array($fundRequest->status, ['approved', 'rejected'], true)) {
+            return;
+        }
 
         $phone = $requester->staff->phone ?? $requester->phone ?? null;
         $email = $requester->email ?? null;
-
         $currency = \App\Enums\CurrencySymbol::default();
-        $amount = $currency . ' ' . number_format($fundRequest->amount, 2);
-        
-        // Calculate remaining balance
+        $amount = $currency . ' ' . number_format((float) $fundRequest->amount, 2);
         $remaining = $currency . ' ' . number_format(max(0, $budget->allocated_amount - $budget->spent_amount), 2);
-        $categoryName = $budget->category->name ?? 'General';
+        $shortName = $this->shortFirstName($requester->name ?? '');
 
-        if ($fundRequest->status === 'approved') {
-            $message = "Hello {$requester->name}, your fund request ({$fundRequest->ticket_number}) for {$amount} from the '{$categoryName}' budget has been APPROVED and deducted. Remaining budget balance is now {$remaining}.";
-        } elseif ($fundRequest->status === 'rejected') {
-            $message = "Hello {$requester->name}, your fund request ({$fundRequest->ticket_number}) for {$amount} was REJECTED. Reason: {$fundRequest->rejection_reason}";
-        } else {
-            return; // Ignore pending
-        }
+        $data = [
+            'Requester' => $shortName,
+            'Title' => $fundRequest->title ?? '',
+            'Amount' => $amount,
+            'Status' => strtoupper($fundRequest->status),
+            'Remaining' => $remaining,
+            'TicketNumber' => $fundRequest->ticket_number ?? '',
+            'Reason' => $fundRequest->rejection_reason ?? '',
+            'SchoolName' => $fundRequest->institution?->name ?? config('app.name'),
+        ];
 
-        // 1. Dispatch via SMS
-        $providerName = InstitutionSetting::get($institutionId, 'sms_provider', 'system');
-        if ($providerName === 'system') {
-            $providerName = InstitutionSetting::get(null, 'sms_provider', 'system');
-        }
-
-        try {
-            $gateway = GatewayFactory::create($providerName, $institutionId);
-            if ($phone) {
-                $gateway->sendSms($phone, $message);
+        $eventKey = 'fund_request_processed';
+        if ($phone) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
+            if ($this->isChannelEnabled($institutionId, $eventKey, 'whatsapp')) {
+                $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
             }
-        } catch (\Exception $e) {
-            Log::error("Fund Request Processed SMS Error: " . $e->getMessage());
         }
 
-        // 2. Dispatch via Email (Raw Mail Dispatch)
-        // If email notifications are enabled globally or locally for 'system_alert'
-        if ($email && $this->isChannelEnabled($institutionId, 'system_alert', 'email')) {
-             try {
-                 Mail::raw($message, function($msg) use ($email, $fundRequest) {
-                     $msg->to($email)
-                         ->subject("Budget Update: Fund Request {$fundRequest->ticket_number}");
-                 });
-             } catch (\Exception $e) {
-                 Log::error("Fund Request Processed Email Error: " . $e->getMessage());
-             }
+        if ($email && $this->isChannelEnabled($institutionId, $eventKey, 'email')) {
+            try {
+                $template = \App\Models\SmsTemplate::forEvent($eventKey, $institutionId)->first();
+                $message = $template
+                    ? apply_sms_template_tags($template->body, $data)
+                    : "{$shortName}, fund request {$fundRequest->ticket_number}: {$fundRequest->status}.";
+                Mail::raw($message, function ($msg) use ($email, $fundRequest) {
+                    $msg->to($email)->subject("Budget Update: Fund Request {$fundRequest->ticket_number}");
+                });
+            } catch (\Exception $e) {
+                Log::error("Fund Request Processed Email Error: " . $e->getMessage());
+            }
         }
+    }
+
+    /** First token only — shorter SMS / lower segment cost. */
+    private function shortFirstName(?string $fullName): string
+    {
+        $fullName = trim((string) $fullName);
+        if ($fullName === '') {
+            return '';
+        }
+        $parts = preg_split('/\s+/', $fullName) ?: [];
+
+        return $parts[0] ?? $fullName;
     }
 
     /**

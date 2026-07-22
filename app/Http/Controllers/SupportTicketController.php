@@ -129,8 +129,10 @@ class SupportTicketController extends BaseController
 
         $this->notifyNewTicket($ticket);
 
-        return redirect()->route('support.show', $ticket->id)
-            ->with('success', __('support.created_success', ['ticket' => $ticket->ticket_number]));
+        return $this->successResponse(
+            __('support.created_success', ['ticket' => $ticket->ticket_number]),
+            route('support.show', $ticket->id)
+        );
     }
 
     public function show(SupportTicket $ticket)
@@ -279,8 +281,7 @@ class SupportTicketController extends BaseController
             $this->notifyReply($ticket, null, true);
         }
 
-        return redirect()->route('support.show', $ticket->id)
-            ->with('success', __('support.updated_success'));
+        return $this->successResponse(__('support.updated_success'), route('support.show', $ticket->id));
     }
 
     // ---- helpers ----

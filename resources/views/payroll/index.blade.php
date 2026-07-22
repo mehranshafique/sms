@@ -23,7 +23,7 @@
                         <div class="alert alert-info solid fade show">
                             <i class="fa fa-info-circle me-1"></i> <strong>{{ __('payroll.note_title') }}</strong> {!! __('payroll.generate_note') !!}
                         </div>
-                        <form action="{{ route('payroll.generate') }}" method="POST" class="row align-items-end">
+                        <form action="{{ route('payroll.generate') }}" method="POST" class="ajax-form row align-items-end">
                             @csrf
                             <div class="col-md-4">
                                 <label class="form-label font-w600">{{ __('payroll.select_month') }}</label>

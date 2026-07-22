@@ -10,7 +10,13 @@
                     <p class="mb-0">{{ __('requests.subtitle') }}</p>
                 </div>
             </div>
-            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
+            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2 flex-wrap">
+                <select id="classFilter" class="form-control default-select bg-white shadow-sm w-auto">
+                    <option value="">{{ __('requests.all_classes') }}</option>
+                    @foreach($classes ?? [] as $cls)
+                        <option value="{{ $cls->id }}">{{ class_section_label($cls) }}</option>
+                    @endforeach
+                </select>
                 <select id="statusFilter" class="form-control default-select bg-white shadow-sm w-auto">
                     {{-- FIXED: "All Tickets" is now explicitly the selected default --}}
                     <option value="all" selected>{{ __('requests.status_all') }}</option>
@@ -40,6 +46,7 @@
                                         <th>{{ __('requests.applicant') }}</th>
                                         <th>{{ __('requests.request_type') }}</th>
                                         <th>{{ __('requests.classe') }}</th>
+                                        <th>{{ __('requests.deadline') }}</th>
                                         <th>{{ __('requests.date_submitted') }}</th>
                                         <th>{{ __('requests.status') }}</th>
                                         <th class="text-end">{{ __('requests.action') }}</th>
@@ -144,6 +151,7 @@
                 url: "{{ route('requests.index') }}",
                 data: function (d) {
                     d.status = $('#statusFilter').val();
+                    d.class_section_id = $('#classFilter').val();
                 }
             },
             columns: [
@@ -152,14 +160,15 @@
                 { data: 'applicant', name: 'student.first_name' },
                 { data: 'type', name: 'type' },
                 { data: 'classe', orderable: false, searchable: false },
+                { data: 'deadline', orderable: false, searchable: false },
                 { data: 'created_at', name: 'created_at' },
                 { data: 'status', name: 'status' },
                 { data: 'action', orderable: false, searchable: false, className: 'text-end' }
             ],
-            order: [[4, 'desc']]
+            order: [[6, 'desc']]
         });
 
-        $('#statusFilter').change(function() {
+        $('#statusFilter, #classFilter').change(function() {
             table.draw();
         });
 
@@ -230,6 +239,16 @@
                 });
             } else {
                 $('#paymentDeadlineDiv').slideUp();
+            }
+        });
+
+        // Auto-calc payment deadline = today + approved_days
+        $(document).on('input change', 'input[name="approved_days"]', function () {
+            const days = parseInt($(this).val(), 10);
+            if (!days || days < 1) return;
+            const deadline = moment().add(days, 'days').format('YYYY-MM-DD');
+            if ($('#paymentDeadlineDiv').is(':visible')) {
+                $('#payment_deadline_input').val(deadline);
             }
         });
 

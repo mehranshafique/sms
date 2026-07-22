@@ -82,7 +82,7 @@ class UserProfileController extends BaseController
 
         $user->save();
 
-        return redirect()->route('profile.index')->with('success', __('profile.update_success'));
+        return $this->successResponse(__('profile.update_success'), route('profile.index'));
     }
 
     /**
@@ -99,6 +99,6 @@ class UserProfileController extends BaseController
         $user->password = Hash::make($request->password);
         $user->save();
 
-        return redirect()->route('profile.index')->with('success', __('profile.password_update_success'));
+        return $this->successResponse(__('profile.password_update_success'), route('profile.index'));
     }
 }

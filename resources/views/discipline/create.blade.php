@@ -18,7 +18,7 @@
             <div class="col-xl-9">
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
-                        <form action="{{ route('discipline.store') }}" method="POST">
+                        <form action="{{ route('discipline.store') }}" method="POST" class="ajax-form">
                             @csrf
                             <div class="row">
                                 <div class="col-md-6 mb-3">

@@ -57,6 +57,9 @@ class StudentRequestContextService
                 'type' => $r->typeLabel(),
                 'status' => __('requests.status_' . $r->status),
                 'date' => localized_date($r->created_at, 'd M Y'),
+                'deadline' => ($r->payment_deadline ?? $r->end_date)
+                    ? localized_date($r->payment_deadline ?? $r->end_date, 'd M Y')
+                    : '—',
             ]);
 
         $parent = $student->parent;

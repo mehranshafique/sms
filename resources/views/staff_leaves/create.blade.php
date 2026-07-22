@@ -25,7 +25,7 @@
             <div class="col-xl-8">
                 <div class="card">
                     <div class="card-body">
-                        <form action="{{ route('staff-leaves.store') }}" method="POST" enctype="multipart/form-data">
+                        <form action="{{ route('staff-leaves.store') }}" method="POST" enctype="multipart/form-data" class="ajax-form">
                             @csrf
                             
                             {{-- Admin Selection --}}

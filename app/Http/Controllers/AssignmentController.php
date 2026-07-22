@@ -193,7 +193,7 @@ class AssignmentController extends BaseController
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
 
         if (!$session) {
-            return back()->with('error', __('assignment.no_active_session'));
+            return $this->errorResponse(__('assignment.no_active_session'));
         }
 
         $filePath = null;
@@ -213,7 +213,7 @@ class AssignmentController extends BaseController
             'file_path' => $filePath,
         ]);
 
-        return redirect()->route('assignments.index')->with('success', __('assignment.success_create'));
+        return $this->successResponse(__('assignment.success_create'), route('assignments.index'));
     }
     
     public function destroy(Assignment $assignment)

@@ -13,7 +13,7 @@
             </div>
             <div class="help-card">
                 <h1 class="h4 mb-4">{{ __('community.new_thread') }}</h1>
-                <form method="POST" action="{{ route('community.store') }}">
+                <form method="POST" action="{{ route('community.store') }}" class="ajax-form">
                     @csrf
                     <div class="mb-3">
                         <label class="form-label">{{ __('community.category') }}</label>

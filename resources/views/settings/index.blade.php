@@ -1,4 +1,4 @@
-@extends('layout.layout')
+﻿@extends('layout.layout')
 
 @section('content')
 <div class="content-body">
@@ -69,59 +69,4 @@
 @section('js')
 {{-- FIXED: Add SweetAlert2 Library --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script>
-    $(document).ready(function() {
-        // Handling AJAX form submissions for settings partials
-        // Using document delegation to ensure it works for all forms loaded or present
-        $(document).on('submit', '.ajax-form', function(e) {
-            e.preventDefault();
-            const form = $(this);
-            const url = form.attr('action');
-            const data = form.serialize();
-
-            // Disable button
-            const btn = form.find('button[type="submit"]');
-            btn.prop('disabled', true).addClass('btn-disabled');
-
-            $.ajax({
-                url: url,
-                type: 'POST',
-                data: data,
-                success: function(response) {
-                    if (typeof Swal !== 'undefined') {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success',
-                            text: response.message || 'Settings updated successfully',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                    } else {
-                        alert(response.message || 'Settings updated successfully');
-                    }
-                },
-                error: function(xhr) {
-                    let errorMsg = 'Something went wrong';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        errorMsg = xhr.responseJSON.message;
-                    }
-                    
-                    if (typeof Swal !== 'undefined') {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: errorMsg
-                        });
-                    } else {
-                        alert(errorMsg);
-                    }
-                },
-                complete: function() {
-                    btn.prop('disabled', false).removeClass('btn-disabled');
-                }
-            });
-        });
-    });
-</script>
 @endsection

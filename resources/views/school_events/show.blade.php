@@ -41,7 +41,7 @@
                 <div class="se-stat">
                     <div class="text-muted small">{{ __('school_event.field_status') }}</div>
                     <h5 class="fw-bold mb-0">
-                        <span class="badge badge-{{ $schoolEvent->status === 'sent' ? 'success' : 'warning' }} light">
+                        <span id="eventStatusBadge" class="badge badge-{{ $schoolEvent->status === 'sent' ? 'success' : ($schoolEvent->status === 'sending' ? 'info' : 'warning') }} light">
                             {{ __('school_event.status_' . $schoolEvent->status) }}
                         </span>
                     </h5>
@@ -73,9 +73,21 @@
                     <button type="button" class="btn btn-outline-primary shadow-sm" id="previewBtn">
                         <i class="la la-eye me-1"></i> {{ __('school_event.preview') }}
                     </button>
-                    <form method="POST" action="{{ route('school-events.send', $schoolEvent) }}" onsubmit="return confirm(@json(__('school_event.confirm_send')));">@csrf
-                        <button class="btn btn-primary shadow-sm"><i class="la la-paper-plane me-1"></i> {{ __('school_event.send_invitations') }}</button>
-                    </form>
+                    <button type="button" class="btn btn-primary shadow-sm" id="sendInvitationsBtn"
+                        data-empty="{{ $schoolEvent->invitations->isEmpty() ? '1' : '0' }}"
+                        {{ $schoolEvent->status === 'sending' || $schoolEvent->invitations->isEmpty() ? 'disabled' : '' }}>
+                        <i class="la la-paper-plane me-1"></i>
+                        <span id="sendInvitationsBtnLabel">{{ __('school_event.send_invitations') }}</span>
+                    </button>
+                </div>
+                <div id="sendProgressAlert" class="alert alert-info border mt-3 mb-0 {{ $schoolEvent->status === 'sending' ? '' : 'd-none' }}">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+                        <div>
+                            <strong>{{ __('school_event.job_running_title') }}</strong>
+                            <div class="small mb-0">{{ __('school_event.job_queued') }}</div>
+                        </div>
+                    </div>
                 </div>
                 <div id="previewBox" class="alert alert-light border mt-3 d-none mb-0">
                     <div class="small text-muted mb-1">{{ __('school_event.preview') }}</div>
@@ -158,13 +170,163 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-$('#previewBtn').on('click', function(){
-    $.get('{{ route('school-events.preview', $schoolEvent) }}', function(res){
-        $('#previewBox').removeClass('d-none');
-        $('#previewText').text(res.preview || '');
-    }).fail(function(xhr){
-        Swal.fire({ icon: 'warning', title: @json(__('school_event.preview')), text: xhr.responseJSON?.message || @json(__('school_event.error_generic')) });
+(function () {
+    const sendUrl = @json(route('school-events.send', $schoolEvent));
+    const statusUrl = @json(route('school-events.send-status', $schoolEvent));
+    const csrf = @json(csrf_token());
+    const statusLabels = {
+        draft: @json(__('school_event.status_draft')),
+        sending: @json(__('school_event.status_sending')),
+        sent: @json(__('school_event.status_sent')),
+    };
+
+    let pollTimer = null;
+    let pollCount = 0;
+
+    function setSendingUi(isSending) {
+        const btn = document.getElementById('sendInvitationsBtn');
+        const label = document.getElementById('sendInvitationsBtnLabel');
+        const alertBox = document.getElementById('sendProgressAlert');
+        const badge = document.getElementById('eventStatusBadge');
+
+        if (btn) {
+            btn.disabled = isSending || btn.dataset.empty === '1';
+        }
+        if (label) {
+            label.textContent = isSending
+                ? @json(__('school_event.sending_btn'))
+                : @json(__('school_event.send_invitations'));
+        }
+        if (alertBox) {
+            alertBox.classList.toggle('d-none', !isSending);
+        }
+        if (badge) {
+            badge.className = 'badge light badge-' + (isSending ? 'info' : (badge.dataset.after || 'warning'));
+            badge.textContent = isSending ? statusLabels.sending : (badge.dataset.afterLabel || statusLabels.draft);
+        }
+    }
+
+    function stopPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+        pollCount = 0;
+    }
+
+    function startPolling() {
+        stopPolling();
+        pollTimer = setInterval(async function () {
+            pollCount++;
+            if (window.DigitexNotifications && typeof window.DigitexNotifications.sync === 'function') {
+                window.DigitexNotifications.sync({ force: true });
+            }
+            try {
+                const res = await fetch(statusUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+                if (data.status && data.status !== 'sending') {
+                    stopPolling();
+                    setSendingUi(false);
+                    const badge = document.getElementById('eventStatusBadge');
+                    if (badge) {
+                        badge.className = 'badge light badge-' + (data.status === 'sent' ? 'success' : 'warning');
+                        badge.textContent = statusLabels[data.status] || data.status;
+                    }
+                    Swal.fire({
+                        icon: data.status === 'sent' ? 'success' : 'info',
+                        title: @json(__('school_event.job_done_title')),
+                        text: @json(__('school_event.job_done_reload')),
+                        confirmButtonText: @json(__('school_event.reload_page')),
+                    }).then(function () {
+                        window.location.reload();
+                    });
+                }
+            } catch (e) {}
+            if (pollCount >= 120) {
+                stopPolling();
+            }
+        }, 4000);
+    }
+
+    $('#previewBtn').on('click', function () {
+        $.get('{{ route('school-events.preview', $schoolEvent) }}', function (res) {
+            $('#previewBox').removeClass('d-none');
+            $('#previewText').text(res.preview || '');
+        }).fail(function (xhr) {
+            Swal.fire({
+                icon: 'warning',
+                title: @json(__('school_event.preview')),
+                text: xhr.responseJSON?.message || @json(__('school_event.error_generic'))
+            });
+        });
     });
-});
+
+    $('#sendInvitationsBtn').on('click', function () {
+        Swal.fire({
+            title: @json(__('school_event.confirm_send')),
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: @json(__('school_event.send_invitations')),
+            cancelButtonText: @json(__('school_event.back')),
+        }).then(function (result) {
+            if (!result.isConfirmed) return;
+
+            Swal.fire({
+                title: @json(__('school_event.job_running_title')),
+                html: @json(__('school_event.job_starting')),
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: function () {
+                    Swal.showLoading();
+                },
+            });
+
+            fetch(sendUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({}),
+            })
+            .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+            .then(function (result) {
+                if (!result.ok || result.data.status === 'error') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: @json(__('school_event.error_generic')),
+                        text: result.data.message || @json(__('school_event.error_generic')),
+                    });
+                    return;
+                }
+
+                setSendingUi(true);
+                Swal.fire({
+                    icon: 'info',
+                    title: @json(__('school_event.job_queued_title')),
+                    text: result.data.message || @json(__('school_event.job_queued')),
+                    confirmButtonText: 'OK',
+                });
+                startPolling();
+            })
+            .catch(function () {
+                Swal.fire({
+                    icon: 'error',
+                    title: @json(__('school_event.error_generic')),
+                    text: @json(__('school_event.error_generic')),
+                });
+            });
+        });
+    });
+
+    @if($schoolEvent->status === 'sending')
+    setSendingUi(true);
+    startPolling();
+    @endif
+})();
 </script>
 @endsection

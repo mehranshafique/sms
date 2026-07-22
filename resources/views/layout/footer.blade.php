@@ -151,11 +151,107 @@
 
             window.digitexNotifyError = function(message, title) {
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire({ icon: 'error', title: title || @json(__('attendance.error_occurred')), text: message });
+                    Swal.fire({
+                        icon: 'error',
+                        title: title || @json(__('attendance.error_occurred')),
+                        html: String(message).replace(/\n/g, '<br>')
+                    });
+                } else if (typeof window.toastr !== 'undefined') {
+                    window.toastr.error(String(message).replace(/<br\s*\/?>/gi, ' '));
                 } else {
-                    alert(message);
+                    alert(String(message).replace(/<br\s*\/?>/gi, '\n'));
                 }
             };
+
+            // Global AJAX forms: add class "ajax-form" (loader via ajaxSend + toastr/Swal)
+            $(document).on('submit', 'form.ajax-form', function(e) {
+                e.preventDefault();
+                var $form = $(this);
+
+                if ($form.data('submitting')) {
+                    return;
+                }
+                $form.data('submitting', true);
+
+                if (typeof jQuery.fn.selectpicker !== 'undefined') {
+                    $form.find('select.default-select, select.multi-select').each(function() {
+                        var $el = jQuery(this);
+                        if ($el.data('selectpicker')) {
+                            $el.val($el.selectpicker('val'));
+                        }
+                    });
+                }
+
+                $form.find('.is-invalid').removeClass('is-invalid');
+                $form.find('.invalid-feedback.digitex-ajax-error').remove();
+
+                var formEl = this;
+                var formData = new FormData(formEl);
+
+                $.ajax({
+                    url: $form.attr('action'),
+                    method: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    success: function(response) {
+                        $form.data('submitting', false);
+                        var msg = (response && response.message) ? response.message : @json(__('attendance.success'));
+
+                        if (typeof window.digitexNotifySuccess === 'function') {
+                            window.digitexNotifySuccess(msg);
+                        }
+
+                        var $modal = $form.closest('.modal');
+                        if ($modal.length && typeof bootstrap !== 'undefined') {
+                            var modalInstance = bootstrap.Modal.getInstance($modal[0]);
+                            if (modalInstance) {
+                                modalInstance.hide();
+                            }
+                        }
+
+                        var redirectUrl = response && response.redirect ? response.redirect : null;
+                        var shouldReload = $form.attr('data-ajax-reload') === '1' || $form.data('ajax-reload') === 1;
+
+                        if (redirectUrl) {
+                            setTimeout(function() { window.location.href = redirectUrl; }, 500);
+                        } else if (shouldReload) {
+                            setTimeout(function() { window.location.reload(); }, 500);
+                        }
+                    },
+                    error: function(xhr) {
+                        $form.data('submitting', false);
+                        var msg = @json(__('attendance.error_occurred'));
+                        var json = xhr.responseJSON || {};
+
+                        if (xhr.status === 422 && json.errors) {
+                            var list = [];
+                            $.each(json.errors, function(field, messages) {
+                                var text = Array.isArray(messages) ? messages[0] : messages;
+                                list.push(text);
+                                var $input = $form.find('[name="' + field + '"]');
+                                if ($input.length) {
+                                    $input.addClass('is-invalid');
+                                    if ($input.next('.invalid-feedback').length === 0) {
+                                        $input.after('<div class="invalid-feedback digitex-ajax-error d-block">' + text + '</div>');
+                                    }
+                                }
+                            });
+                            msg = list.join(' ') || json.message || msg;
+                        } else if (json.message) {
+                            msg = json.message;
+                        }
+
+                        if (typeof window.digitexNotifyError === 'function') {
+                            window.digitexNotifyError(msg, @json(__('requests.validation_error')));
+                        }
+                    }
+                });
+            });
 
             // 4. Global Button Loading State
             var $lastClickedBtn = null;

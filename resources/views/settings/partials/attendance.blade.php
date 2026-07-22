@@ -1,4 +1,4 @@
-<form action="{{ route('settings.update') }}" method="POST">
+<form action="{{ route('settings.update') }}" method="POST" class="ajax-form">
     @csrf
     
     <div class="row">

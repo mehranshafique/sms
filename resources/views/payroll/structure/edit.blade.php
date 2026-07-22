@@ -18,7 +18,7 @@
             </div>
         </div>
 
-        <form action="{{ route('salary-structures.update', $staff->id) }}" method="POST">
+        <form action="{{ route('salary-structures.update', $staff->id) }}" method="POST" class="ajax-form">
             @csrf
             @method('PUT')
             

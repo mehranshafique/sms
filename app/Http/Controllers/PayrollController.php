@@ -130,8 +130,10 @@ class PayrollController extends BaseController
             $generatedCount++;
         }
 
-        return redirect()->route('payroll.index')
-            ->with('success', __('payroll.success_generated', ['count' => $generatedCount]));
+        return $this->successResponse(
+            __('payroll.success_generated', ['count' => $generatedCount]),
+            route('payroll.index')
+        );
     }
 
     public function payslip(Request $request, Payroll $payroll)
