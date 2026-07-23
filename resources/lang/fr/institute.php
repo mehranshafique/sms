@@ -14,6 +14,7 @@ return [
     'total_institutes' => 'Total des instituts',
     'active_institutes' => 'Instituts actifs',
     'inactive' => 'Inactif',
+    'institution' => 'Établissement',
     'new_this_month' => 'Nouveaux ce mois-ci',
     'recent_analytics' => 'Analyses récentes',
     'institute_details' => 'Détails de l\'institut',

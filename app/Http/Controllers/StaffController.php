@@ -6,8 +6,9 @@ use App\Models\Staff;
 use App\Models\User;
 use App\Models\Institution;
 use App\Models\Campus;
+use App\Models\Role;
 use App\Services\NotificationService;
-use Spatie\Permission\Models\Role;
+use App\Services\RoleAssignmentService;
 use App\Enums\RoleEnum;
 use App\Enums\UserType;
 use Illuminate\Http\Request;
@@ -21,12 +22,14 @@ use Illuminate\Validation\Rule;
 class StaffController extends BaseController
 {
     protected $notificationService;
+    protected RoleAssignmentService $roleAssignment;
 
-    public function __construct(NotificationService $notificationService)
+    public function __construct(NotificationService $notificationService, RoleAssignmentService $roleAssignment)
     {
         $this->authorizeResource(Staff::class, 'staff');
         $this->setPageTitle(__('staff.page_title'));
         $this->notificationService = $notificationService;
+        $this->roleAssignment = $roleAssignment;
     }
 
     public function index(Request $request)
@@ -158,16 +161,16 @@ class StaffController extends BaseController
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
-            'role' => [
+            'role_id' => [
                 'required',
-                Rule::exists('roles', 'name')->where(function ($query) use ($institutionId) {
+                'integer',
+                Rule::exists('roles', 'id')->where(function ($query) use ($institutionId) {
                     $query->where('name', '!=', RoleEnum::SUPER_ADMIN->value)
-                          ->whereNotNull('institution_id'); 
+                          ->whereNotNull('institution_id');
 
                     if ($institutionId) {
                         $query->where('institution_id', $institutionId);
                     }
-                    return $query;
                 }),
             ],
             'phone' => 'nullable|string',
@@ -200,7 +203,7 @@ class StaffController extends BaseController
                 'is_active' => true,
             ])->save();
             
-            $user->assignRole($request->role);
+            $assignedRole = $this->roleAssignment->assign($user, (int) $request->role_id, (int) $institutionId);
 
             $empId = $request->employee_id ?? 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT);
             
@@ -225,7 +228,7 @@ class StaffController extends BaseController
             ]);
 
             $user->refresh();
-            $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
+            $this->notificationService->sendUserCredentials($user, $request->password, $assignedRole->name);
         });
 
         return response()->json(['redirect' => route('staff.index'), 'message' => __('staff.messages.success_create')]);
@@ -274,16 +277,16 @@ class StaffController extends BaseController
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,'.$user->id,
-            'role' => [
+            'role_id' => [
                 'required',
-                Rule::exists('roles', 'name')->where(function ($query) use ($targetInstitutionId) {
+                'integer',
+                Rule::exists('roles', 'id')->where(function ($query) use ($targetInstitutionId) {
                     $query->where('name', '!=', RoleEnum::SUPER_ADMIN->value)
-                          ->whereNotNull('institution_id'); 
+                          ->whereNotNull('institution_id');
 
                     if ($targetInstitutionId) {
                         $query->where('institution_id', $targetInstitutionId);
                     }
-                    return $query;
                 }),
             ],
             'profile_picture' => 'nullable|image|max:2048',
@@ -292,7 +295,7 @@ class StaffController extends BaseController
             'rfid_uid' => 'nullable|string|max:100',
         ]);
 
-        DB::transaction(function () use ($request, $staff, $user, $institutionId) {
+        DB::transaction(function () use ($request, $staff, $user, $institutionId, $targetInstitutionId) {
             $userData = [
                 'name' => $request->name,
                 'email' => $request->email,
@@ -317,7 +320,24 @@ class StaffController extends BaseController
             }
 
             $user->update($userData);
-            $user->syncRoles([$request->role]);
+
+            // School Admin may assign/change any institution role for school staff.
+            // Prevent an admin from demoting themselves away from School Admin.
+            $pendingRole = $this->roleAssignment->resolve((int) $request->role_id, (int) $targetInstitutionId);
+            if (
+                (int) $user->id === (int) Auth::id()
+                && Auth::user()->hasRole(RoleEnum::SCHOOL_ADMIN->value)
+                && $pendingRole->name !== RoleEnum::SCHOOL_ADMIN->value
+            ) {
+                abort(422, __('roles.cannot_demote_self'));
+            }
+
+            $assignedRoles = $this->roleAssignment->sync(
+                $user,
+                [(int) $request->role_id],
+                (int) $targetInstitutionId
+            );
+            $assignedRoleName = $assignedRoles->first()?->name;
 
             $staff->update([
                 'institution_id' => $institutionId ?? $request->institution_id,
@@ -334,7 +354,7 @@ class StaffController extends BaseController
             ]);
 
             if($request->password) {
-                $this->notificationService->sendUserCredentials($user, $request->password, $request->role);
+                $this->notificationService->sendUserCredentials($user, $request->password, $assignedRoleName);
             }
         });
 

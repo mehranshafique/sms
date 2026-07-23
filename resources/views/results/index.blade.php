@@ -267,17 +267,20 @@
                         submitBtn.innerHTML = originalHtml;
                     }
 
-                    if (data.status === 'error') {
-                        Swal.fire({
-                            icon: 'error',
-                            title: @json(__('results.no_results_title')),
-                            text: data.message || @json(__('results.no_marks_found_error')),
-                            confirmButtonColor: '#d33'
-                        });
-                    } else {
+                    if (data.status === 'success') {
                         resultReady = true;
                         HTMLFormElement.prototype.submit.call(resultForm);
                         resultReady = false;
+                    } else {
+                        const isInfo = data.status === 'info' || data.feedback === 'info';
+                        Swal.fire({
+                            icon: isInfo ? 'info' : 'error',
+                            title: isInfo
+                                ? @json(__('results.no_results_title'))
+                                : @json(__('results.error_occurred')),
+                            text: data.message || @json(__('results.no_marks_found_error')),
+                            confirmButtonColor: isInfo ? '#3085d6' : '#d33'
+                        });
                     }
                 })
                 .catch(function() {

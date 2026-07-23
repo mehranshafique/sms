@@ -8,6 +8,7 @@ use App\Models\Institution;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
 use App\Services\IdGeneratorService;
+use App\Services\RoleAssignmentService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,9 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class ParentController extends BaseController
 {
-    public function __construct()
+    protected RoleAssignmentService $roleAssignment;
+
+    public function __construct(RoleAssignmentService $roleAssignment)
     {
         $this->middleware('auth');
         $this->middleware(PermissionMiddleware::class . ':student_parent.view')->only(['index', 'show']);
@@ -25,6 +28,7 @@ class ParentController extends BaseController
         $this->middleware(PermissionMiddleware::class . ':student_parent.update')->only(['edit', 'update']);
         $this->middleware(PermissionMiddleware::class . ':student_parent.delete')->only(['destroy', 'bulkDelete']);
         $this->setPageTitle(__('parent.page_title'));
+        $this->roleAssignment = $roleAssignment;
     }
 
     public function index(Request $request)
@@ -291,7 +295,7 @@ class ParentController extends BaseController
             'username' => $username,
         ]);
 
-        $user->assignRole(RoleEnum::GUARDIAN->value);
+        $this->roleAssignment->assign($user, RoleEnum::GUARDIAN->value, (int) $institutionId);
 
         if ($parent) {
             $parent->update(['user_id' => $user->id]);

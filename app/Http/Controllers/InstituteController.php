@@ -10,7 +10,7 @@ use App\Services\InstitutionSubscriptionService;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
 use App\Enums\InstitutionType; // Import Enum
-use Spatie\Permission\Models\Role;
+use App\Services\RoleAssignmentService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Validation\Rule;
@@ -24,14 +24,17 @@ class InstituteController extends BaseController
 {
     protected $notificationService;
     protected $institutionSubscription;
+    protected RoleAssignmentService $roleAssignment;
 
     public function __construct(
         NotificationService $notificationService,
-        InstitutionSubscriptionService $institutionSubscription
+        InstitutionSubscriptionService $institutionSubscription,
+        RoleAssignmentService $roleAssignment
     ) {
         $this->authorizeResource(Institution::class, 'institute');
         $this->notificationService = $notificationService;
         $this->institutionSubscription = $institutionSubscription;
+        $this->roleAssignment = $roleAssignment;
     }
 
     public function index(Request $request)
@@ -220,13 +223,7 @@ class InstituteController extends BaseController
                     'is_active'     => true,
                 ])->save();
 
-                $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
-                            ->where('institution_id', $institute->id)
-                            ->first();
-
-                if ($role) {
-                    $adminUser->assignRole($role);
-                }
+                $this->roleAssignment->assign($adminUser, RoleEnum::SCHOOL_ADMIN->value, (int) $institute->id);
 
                 $this->notificationService->sendInstitutionCreation($institute, $adminUser, $request->password);
             }
@@ -332,12 +329,8 @@ class InstituteController extends BaseController
 
                     $adminUser->update($updateData);
 
-                    $role = Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
-                        ->where('institution_id', $institute->id)
-                        ->first();
-                        
-                    if($role && !$adminUser->hasRole($role)) {
-                        $adminUser->assignRole($role);
+                    if (!$adminUser->hasRole(RoleEnum::SCHOOL_ADMIN->value)) {
+                        $this->roleAssignment->assign($adminUser, RoleEnum::SCHOOL_ADMIN->value, (int) $institute->id);
                     }
 
                     if ($request->filled('password')) {
@@ -421,20 +414,6 @@ class InstituteController extends BaseController
 
     private function createInstituteRoles($institute)
     {
-        $roles = [
-            RoleEnum::SCHOOL_ADMIN->value, 
-            RoleEnum::HEAD_OFFICER->value, 
-            RoleEnum::TEACHER->value, 
-            RoleEnum::STUDENT->value,
-            RoleEnum::GUARDIAN->value
-        ];
-        
-        foreach ($roles as $roleName) {
-            Role::firstOrCreate([
-                'name' => $roleName,
-                'guard_name' => 'web',
-                'institution_id' => $institute->id
-            ]);
-        }
+        $this->roleAssignment->ensureInstitutionRoles((int) $institute->id);
     }
 }

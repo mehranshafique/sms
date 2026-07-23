@@ -362,7 +362,11 @@
                 if (typeof toastr !== 'undefined') { toastr.warning(@json(session('warning'))); }
             @endif
             @if(session('info'))
-                if (typeof toastr !== 'undefined') { toastr.info(@json(session('info'))); }
+                Swal.fire({
+                    icon: 'info',
+                    text: @json(session('info')),
+                    confirmButtonColor: '#3085d6'
+                });
             @endif
         });
     </script>

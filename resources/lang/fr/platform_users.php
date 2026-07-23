@@ -24,6 +24,7 @@ return [
     'status_updated' => 'Statut utilisateur mis à jour.',
     'cannot_remove_own_super_admin' => 'Vous ne pouvez pas retirer votre propre rôle Super Admin.',
     'cannot_deactivate_self' => 'Vous ne pouvez pas désactiver votre propre compte.',
+    'institution_required_for_role' => 'L\'utilisateur doit appartenir à une institution avant d\'assigner des rôles scolaires.',
     'select_at_least_one_role' => 'Sélectionnez au moins un rôle.',
     'success' => 'Succès',
     'error' => 'Erreur',

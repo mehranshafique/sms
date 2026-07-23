@@ -141,10 +141,14 @@ class ResultCardController extends BaseController
             $message = __('results.no_marks_found_error');
 
             if ($request->ajax() || $request->boolean('check_only')) {
-                return response()->json(['status' => 'error', 'message' => $message]);
+                return response()->json([
+                    'status' => 'info',
+                    'feedback' => 'info',
+                    'message' => $message,
+                ]);
             }
 
-            return redirect()->route('results.index')->with('error', $message);
+            return redirect()->route('results.index')->with('info', $message);
         }
 
         $enrollment = StudentEnrollment::with(['classSection.gradeLevel', 'student'])

@@ -21,8 +21,8 @@
                 </div>
             </div>
             <div class="col-sm-4 p-0 text-end mt-sm-0 mt-3">
-                <a href="{{ route('roles.index') }}" class="btn btn-outline-dark btn-sm"><i class="fa fa-arrow-left me-2"></i> Back to Roles</a>
-                <a href="{{ route('roles.edit', $role->id) }}" class="btn btn-primary btn-sm ms-2"><i class="fa fa-pencil me-2"></i> Edit Permissions</a>
+                <a href="{{ route('roles.index') }}" class="btn btn-outline-dark btn-sm"><i class="fa fa-arrow-left me-2"></i> {{ __('roles.back_to_roles') }}</a>
+                <a href="{{ route('roles.edit', $role->id) }}" class="btn btn-primary btn-sm ms-2"><i class="fa fa-pencil me-2"></i> {{ __('roles.edit_permissions') }}</a>
             </div>
         </div>
 

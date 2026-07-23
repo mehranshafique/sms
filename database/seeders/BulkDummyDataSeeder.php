@@ -48,7 +48,7 @@ use App\Models\Program;
 use App\Models\AcademicUnit;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 use Carbon\Carbon;
 use App\Services\IdGeneratorService;
 
@@ -232,9 +232,15 @@ class BulkDummyDataSeeder extends Seeder
             ['value' => json_encode(['p1', 'p2', 'trimester_1'])]
         );
         
-        // 3. Roles
-        $roles = [RoleEnum::HEAD_OFFICER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::TEACHER->value, RoleEnum::STUDENT->value, RoleEnum::GUARDIAN->value, 'Accountant', 'Librarian'];
-        foreach ($roles as $r) Role::firstOrCreate(['name' => $r, 'institution_id' => $institution->id, 'guard_name' => 'web']);
+        // 3. Roles (institution-scoped + permissions from templates)
+        app(\App\Services\RoleAssignmentService::class)->ensureInstitutionRoles((int) $institution->id);
+        foreach (['Accountant', 'Librarian'] as $customRole) {
+            \App\Models\Role::firstOrCreate([
+                'name' => $customRole,
+                'institution_id' => $institution->id,
+                'guard_name' => 'web',
+            ]);
+        }
 
         // 4. Admin User
         $adminUsername = 'admin_' . strtolower($data['acronym']);
@@ -250,7 +256,7 @@ class BulkDummyDataSeeder extends Seeder
             'institute_id' => $institution->id,
             'is_active' => true,
         ])->save();
-        $adminUser->assignRole(RoleEnum::SCHOOL_ADMIN->value);
+        app(\App\Services\RoleAssignmentService::class)->assign($adminUser, RoleEnum::SCHOOL_ADMIN->value, (int) $institution->id);
 
         // 5. Campus & Session
         $campus = Campus::create([
@@ -284,8 +290,8 @@ class BulkDummyDataSeeder extends Seeder
                 'institute_id' => $institution->id,
                 'is_active' => true,
             ])->save();
-            $tUser->assignRole(RoleEnum::TEACHER->value);
-            
+            app(\App\Services\RoleAssignmentService::class)->assign($tUser, RoleEnum::TEACHER->value, (int) $institution->id);
+
             $staff = Staff::create([
                 'user_id' => $tUser->id,
                 'institution_id' => $institution->id,
@@ -471,7 +477,9 @@ class BulkDummyDataSeeder extends Seeder
                 'institute_id' => $institution->id,
                 'is_active' => true,
             ])->save();
-            if($studentRole) $sUser->assignRole($studentRole);
+            if ($studentRole) {
+                app(\App\Services\RoleAssignmentService::class)->assign($sUser, $studentRole->id, (int) $institution->id);
+            }
 
             $guardianUsername = 'guardian_' . $s . '_' . strtolower($data['acronym']);
             $parent = StudentParent::firstOrCreate(

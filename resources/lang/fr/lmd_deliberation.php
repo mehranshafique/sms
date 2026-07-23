@@ -14,4 +14,12 @@ return [
     'decision_admitted' => 'Admis',
     'decision_adjourned' => 'Ajourné',
     'decision_rattrapage' => 'Session de rattrapage',
+    'actions' => 'Actions',
+    'no_records_found' => 'Aucun dossier académique trouvé pour ces critères.',
+    'datatable_search' => 'Rechercher :',
+    'datatable_length' => 'Afficher _MENU_ entrées',
+    'datatable_info' => 'Affichage de _START_ à _END_ sur _TOTAL_ entrées',
+    'datatable_info_empty' => 'Affichage de 0 à 0 sur 0 entrée',
+    'datatable_first' => 'Premier',
+    'datatable_last' => 'Dernier',
 ];

@@ -162,7 +162,7 @@ class BaseController extends LaravelController
     /**
      * Ensure a Spatie role belongs to the current institution context (or is global for Super Admin).
      */
-    protected function checkInstitution(\Spatie\Permission\Models\Role $role): void
+    protected function checkInstitution(\Spatie\Permission\Models\Role|\App\Models\Role $role): void
     {
         $user = Auth::user();
         if ($user->hasRole('Super Admin')) {

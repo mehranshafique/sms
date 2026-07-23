@@ -9,7 +9,8 @@ use App\Services\NotificationService;
 use App\Enums\RoleEnum;
 use App\Enums\UserType;
 use Spatie\Permission\Middleware\RoleMiddleware;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
+use App\Services\RoleAssignmentService;
 use Illuminate\Support\Facades\Hash;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Storage;
@@ -17,12 +18,14 @@ use Illuminate\Support\Facades\Storage;
 class HeadOfficersController extends BaseController
 {
     protected $notificationService;
+    protected RoleAssignmentService $roleAssignment;
 
-    public function __construct(NotificationService $notificationService)
+    public function __construct(NotificationService $notificationService, RoleAssignmentService $roleAssignment)
     {
         $this->middleware('auth');
         $this->middleware(RoleMiddleware::class . ':Super Admin');
         $this->notificationService = $notificationService;
+        $this->roleAssignment = $roleAssignment;
     }
 
     public function index(Request $request)
@@ -123,11 +126,12 @@ class HeadOfficersController extends BaseController
         
         $user->institutes()->sync($assignedInstitutes);
 
-        $rolesToAssign = Role::whereIn('institution_id', $assignedInstitutes)
-                             ->where('name', RoleEnum::HEAD_OFFICER->value)
-                             ->get();
-        
-        $user->syncRoles($rolesToAssign);
+        $rolesToAssign = collect($assignedInstitutes)->map(function ($instituteId) {
+            $this->roleAssignment->ensureInstitutionRoles((int) $instituteId);
+            return $this->roleAssignment->resolveForInstitution(RoleEnum::HEAD_OFFICER->value, (int) $instituteId);
+        });
+
+        $user->syncRoles($rolesToAssign->all());
 
         $this->notificationService->sendHeadOfficerCredentials($user, $request->password, $assignedInstitutes);
 
@@ -184,11 +188,12 @@ class HeadOfficersController extends BaseController
         
         $user->institutes()->sync($assignedInstitutes);
 
-        $rolesToAssign = Role::whereIn('institution_id', $assignedInstitutes)
-                             ->where('name', RoleEnum::HEAD_OFFICER->value)
-                             ->get();
+        $rolesToAssign = collect($assignedInstitutes)->map(function ($instituteId) {
+            $this->roleAssignment->ensureInstitutionRoles((int) $instituteId);
+            return $this->roleAssignment->resolveForInstitution(RoleEnum::HEAD_OFFICER->value, (int) $instituteId);
+        });
 
-        $user->syncRoles($rolesToAssign);
+        $user->syncRoles($rolesToAssign->all());
 
         if($request->filled('password')){
             $this->notificationService->sendHeadOfficerCredentials($user, $request->password, $assignedInstitutes);

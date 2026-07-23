@@ -7,13 +7,38 @@ return [
     'delete' => 'Delete Role',
     'role_name' => 'Role Name',
     'permissions' => 'Permissions',
-    'users_count' => 'Users',
+    'users_count' => 'Users Assigned',
     'actions' => 'Actions',
     'save' => 'Save Role',
     'update' => 'Update Role',
     'cancel' => 'Cancel',
     'select_all' => 'Select All',
-    
+
+    'protected' => 'Protected',
+    'system_global' => 'System Template',
+    'institution' => 'Institution',
+    'test_role' => 'Test Role',
+    'view' => 'View',
+    'cannot_update_own_role' => 'You cannot modify your own role.',
+    'cannot_delete_own_role' => 'You cannot delete your own role.',
+    'cannot_demote_self' => 'You cannot remove your own School Admin role.',
+    'role_permissions_page_title' => 'Role Permissions',
+    'read_only_mode' => 'Read Only Mode',
+    'cannot_edit_own_role_permissions' => 'This is your active role. You cannot edit permissions assigned to yourself.',
+    'module_inactive' => 'Inactive',
+    'back_to_roles' => 'Back to Roles',
+    'edit_permissions' => 'Edit Permissions',
+    'perm_view' => 'View',
+    'perm_view_any' => 'View list',
+    'perm_create' => 'Create',
+    'perm_update' => 'Update',
+    'perm_delete' => 'Delete',
+    'perm_delete_any' => 'Bulk delete',
+    'perm_manage' => 'Manage',
+    'perm_approve_funds' => 'Approve funds',
+    'perm_download_admit_card' => 'Download admit card',
+    'perm_print' => 'Print',
+
     'messages' => [
         'success_create' => 'Role created successfully.',
         'success_update' => 'Role updated successfully.',
@@ -24,28 +49,29 @@ return [
         'cannot_delete_system' => 'System roles cannot be deleted.',
         'role_has_users' => 'Cannot delete role because it is assigned to users.',
         'unauthorized_access' => 'You do not have access to this role.',
+        'unauthorized_assignment' => 'Unauthorized permission assignment: :perm',
+        'permission_assigned_successfully' => 'Permissions assigned successfully.',
+        'select_institution' => 'Select an institution before creating a role.',
+        'role_not_found_for_institution' => 'Role ":role" was not found for this institution.',
+        'cannot_assign_global_role' => 'Global template roles cannot be assigned to school users.',
+        'cross_institution_role' => 'Cannot assign a role from another institution.',
     ],
+
     'role_management' => 'Role Management',
     'manage_list_subtitle' => 'Manage system roles and permissions',
-    'create_new' => 'Create New Role',
     'role_list' => 'Role List',
     'total_roles' => 'Total Roles',
     'roles_with_users' => 'Roles with Users',
-    
-    // Table
+
     'table_no' => '#',
     'name' => 'Role Name',
-    'users_count' => 'Users Assigned',
     'action' => 'Action',
     'no_records_found' => 'No roles found',
     'search_placeholder' => 'Search Roles...',
 
-    // Forms
     'role_details' => 'Role Details',
-    'role_name' => 'Role Name',
     'enter_role_name' => 'Enter role name (e.g. Manager)',
     'assign_permissions' => 'Assign Permissions',
-    'select_all' => 'Select All',
     'create_new_role' => 'Create New Role',
     'create_role_subtitle' => 'Define a new role and its permissions',
     'edit_role' => 'Edit Role',
@@ -54,14 +80,9 @@ return [
     'update_role' => 'Update Role',
     'no_permissions_available' => 'No permissions available to assign.',
 
-    // Buttons
     'export' => 'Export',
-    'edit' => 'Edit',
-    'delete' => 'Delete',
-    'cancel' => 'Cancel',
     'yes_delete' => 'Yes, delete it!',
 
-    // Alerts
     'success' => 'Success!',
     'error_occurred' => 'Error Occurred',
     'validation_error' => 'Validation Error',
@@ -72,10 +93,8 @@ return [
     'cannot_edit_super_admin_name' => 'The Super Admin role name cannot be changed.',
     'cannot_delete_system_role' => 'System roles cannot be deleted.',
 
-    // emais template roles
     'head_officer' => 'Head Officer',
     'student' => 'Student',
     'teacher' => 'Teacher',
     'parent' => 'Parent',
-    
 ];

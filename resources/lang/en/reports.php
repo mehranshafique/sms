@@ -30,6 +30,7 @@ return [
     
     // Errors & Messages
     'no_records_found' => 'No academic records found for the selected criteria.',
+    'no_results_title' => 'No results found',
     'unauthorized' => 'Unauthorized access.',
     'no_enrollment' => 'Student is not enrolled in any class.',
     'error_period_inactive' => 'The selected period (:period) is not currently active. Reports cannot be generated.',

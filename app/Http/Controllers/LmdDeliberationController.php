@@ -31,7 +31,7 @@ class LmdDeliberationController extends BaseController
             ->when($session, fn ($q) => $q->where('academic_session_id', $session->id))
             ->where('semester', $semester)
             ->latest()
-            ->paginate(20);
+            ->get();
 
         return view('lmd.deliberations.index', compact('deliberations', 'session', 'semester'));
     }
@@ -77,7 +77,15 @@ class LmdDeliberationController extends BaseController
             $count++;
         }
 
-        return back()->with('success', __('lmd_deliberation.generated', ['count' => $count]));
+        if ($count === 0) {
+            return redirect()
+                ->route('lmd-deliberations.index', ['semester' => $data['semester']])
+                ->with('info', __('lmd_deliberation.no_records_found'));
+        }
+
+        return redirect()
+            ->route('lmd-deliberations.index', ['semester' => $data['semester']])
+            ->with('success', __('lmd_deliberation.generated', ['count' => $count]));
     }
 
     public function validateDeliberation(LmdDeliberation $deliberation)

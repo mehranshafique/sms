@@ -14,4 +14,12 @@ return [
     'decision_admitted' => 'Admitted',
     'decision_adjourned' => 'Adjourned',
     'decision_rattrapage' => 'Resit session',
+    'actions' => 'Actions',
+    'no_records_found' => 'No academic records found for the selected criteria.',
+    'datatable_search' => 'Search:',
+    'datatable_length' => 'Show _MENU_ entries',
+    'datatable_info' => 'Showing _START_ to _END_ of _TOTAL_ entries',
+    'datatable_info_empty' => 'Showing 0 to 0 of 0 entries',
+    'datatable_first' => 'First',
+    'datatable_last' => 'Last',
 ];

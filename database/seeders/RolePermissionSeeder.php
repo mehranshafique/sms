@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 use App\Models\Permission; 
 use App\Models\Module;
 use App\Enums\RoleEnum;

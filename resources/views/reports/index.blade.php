@@ -223,16 +223,19 @@
                 return;
             }
             const $el = $(selectEl);
-            selectEl.disabled = false;
+            // Destroy + re-init: refresh on disabled/hidden pickers leaves an empty UI
+            // while <option> nodes remain in the DOM.
             try {
                 if ($el.data('selectpicker')) {
-                    $el.selectpicker('refresh');
-                } else {
-                    $el.selectpicker();
+                    $el.selectpicker('destroy');
                 }
-            } catch (e) {
-                try { $el.selectpicker(); } catch (e2) {}
+            } catch (e) {}
+            if (selectEl.disabled) {
+                return;
             }
+            try {
+                $el.selectpicker();
+            } catch (e2) {}
         }
 
         function setPickerVal(selectEl, value) {
@@ -248,16 +251,23 @@
             }
         }
 
+        var suppressEntityChange = false;
+
         function deactivateSelect(selectEl) {
             if (!selectEl) {
                 return;
             }
-            setPickerVal(selectEl, '');
-            selectEl.removeAttribute('name');
-            selectEl.required = false;
-            selectEl.disabled = true;
-            if (hasSelectpicker() && $(selectEl).data('selectpicker')) {
-                try { $(selectEl).selectpicker('refresh'); } catch (e) {}
+            suppressEntityChange = true;
+            try {
+                if (hasSelectpicker() && $(selectEl).data('selectpicker')) {
+                    try { $(selectEl).selectpicker('destroy'); } catch (e) {}
+                }
+                selectEl.value = '';
+                selectEl.removeAttribute('name');
+                selectEl.required = false;
+                selectEl.disabled = true;
+            } finally {
+                suppressEntityChange = false;
             }
         }
 
@@ -382,13 +392,19 @@
             if (bulk) {
                 classGroup.classList.remove('d-none');
                 studentGroup.classList.add('d-none');
-                refreshPicker(classSelect);
+                if (classSelect && !classSelect.disabled) {
+                    refreshPicker(classSelect);
+                }
             } else {
                 studentGroup.classList.remove('d-none');
                 classGroup.classList.add('d-none');
-                refreshPicker(studentSelect);
+                if (studentSelect && !studentSelect.disabled) {
+                    refreshPicker(studentSelect);
+                }
             }
-            refreshPicker(reportScope);
+            if (reportScope && !reportScope.disabled) {
+                refreshPicker(reportScope);
+            }
             if (!document.getElementById('periodGroup').classList.contains('d-none')) {
                 refreshPicker(periodSelect);
             }
@@ -458,6 +474,9 @@
         }
 
         function onEntityPicked() {
+            if (suppressEntityChange) {
+                return;
+            }
             refreshCycleScopes();
         }
 
@@ -505,14 +524,14 @@
             if (!data) {
                 return false;
             }
-            if (data.feedback === 'info') {
+            if (data.status === 'info' || data.feedback === 'info') {
                 return true;
             }
-            const message = data.message || '';
+            const message = (data.message || '').toString();
             if (infoMessages.indexOf(message) !== -1) {
                 return true;
             }
-            return /no academic records|aucun dossier académique|no active students|aucun élève actif|not enrolled|n'est inscrit/i.test(message);
+            return /no academic records|aucun dossier académique|no active students|aucun élève actif|not enrolled|n'est inscrit|no records found|aucun enregistrement/i.test(message);
         }
 
         function showReportFeedback(data) {
@@ -542,7 +561,8 @@
             if (isInfoFeedback(data)) {
                 Swal.fire({
                     icon: 'info',
-                    title: message,
+                    title: @json(__('reports.no_results_title')),
+                    text: message,
                     confirmButtonColor: '#3085d6'
                 }).then(afterClose);
                 return;
@@ -619,12 +639,13 @@
                     btnBulletin.innerHTML = originalText;
                     repairVisiblePickers();
 
-                    if (data.status === 'error') {
-                        showReportFeedback(data);
-                    } else {
+                    if (data.status === 'success') {
                         bulletinReady = true;
                         HTMLFormElement.prototype.submit.call(bulletinForm);
                         bulletinReady = false;
+                    } else {
+                        // info (no records) or real errors — never treat empty results as danger
+                        showReportFeedback(data);
                     }
                 })
                 .catch(function () {
@@ -675,12 +696,12 @@
                     btnTranscript.disabled = false;
                     btnTranscript.innerHTML = originalText;
 
-                    if (data.status === 'error') {
-                        showReportFeedback(data);
-                    } else {
+                    if (data.status === 'success') {
                         transcriptReady = true;
                         HTMLFormElement.prototype.submit.call(transcriptForm);
                         transcriptReady = false;
+                    } else {
+                        showReportFeedback(data);
                     }
                 })
                 .catch(function () {

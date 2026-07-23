@@ -15,7 +15,7 @@ use App\Services\IdGeneratorService;
 use App\Services\NotificationService;
 use App\Enums\UserType;
 use App\Enums\RoleEnum; 
-use Spatie\Permission\Models\Role; 
+use App\Services\RoleAssignmentService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\DB;
@@ -28,11 +28,13 @@ use Illuminate\Support\Str;
 class StudentController extends BaseController
 {
     protected $notificationService;
+    protected RoleAssignmentService $roleAssignment;
 
-    public function __construct(NotificationService $notificationService)
+    public function __construct(NotificationService $notificationService, RoleAssignmentService $roleAssignment)
     {
         $this->authorizeResource(Student::class, 'student');
         $this->notificationService = $notificationService;
+        $this->roleAssignment = $roleAssignment;
     }
 
     public function index(Request $request)
@@ -401,8 +403,8 @@ class StudentController extends BaseController
                     if ($existingUser) {
                         $parentUserId = $existingUser->id;
                         $parentUserObj = $existingUser;
-                        if(!$existingUser->hasRole('Guardian')) {
-                            $existingUser->assignRole('Guardian');
+                        if(!$existingUser->hasRole(RoleEnum::GUARDIAN->value)) {
+                            $this->roleAssignment->assign($existingUser, RoleEnum::GUARDIAN->value, (int) $institutionId);
                         }
                         
                         $primaryPhone = $request->guardian_phone ?? $request->father_phone ?? $request->mother_phone;
@@ -433,7 +435,7 @@ class StudentController extends BaseController
                             'institute_id' => $institutionId,
                             'is_active' => true,
                         ])->save();
-                        $newUser->assignRole('Guardian'); 
+                        $this->roleAssignment->assign($newUser, RoleEnum::GUARDIAN->value, (int) $institutionId); 
                         $parentUserId = $newUser->id;
                         $parentUserObj = $newUser;
                     }
@@ -501,12 +503,7 @@ class StudentController extends BaseController
                     'is_active' => ($request->status === 'active'),
                 ])->save();
 
-                $studentRole = Role::where('name', RoleEnum::STUDENT->value)
-                                   ->where('institution_id', $institutionId)
-                                   ->first();
-                if ($studentRole) {
-                    $studentUser->assignRole($studentRole);
-                }
+                $this->roleAssignment->assign($studentUser, RoleEnum::STUDENT->value, (int) $institutionId);
 
                 $data['user_id'] = $studentUser->id;
                 
@@ -687,7 +684,7 @@ class StudentController extends BaseController
                                 'institute_id' => $student->institution_id,
                                 'is_active' => true,
                             ])->save();
-                            $newUser->assignRole('Guardian');
+                            $this->roleAssignment->assign($newUser, RoleEnum::GUARDIAN->value, (int) $student->institution_id);
                             $student->parent->update(['user_id' => $newUser->id]);
                             $parentUser = $newUser;
                         }

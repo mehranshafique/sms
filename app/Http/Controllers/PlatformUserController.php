@@ -5,17 +5,20 @@ namespace App\Http\Controllers;
 use App\Enums\RoleEnum;
 use App\Enums\UserType;
 use App\Models\Institution;
+use App\Models\Role;
 use App\Models\User;
+use App\Services\AuditLogger;
+use App\Services\RoleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Middleware\RoleMiddleware;
-use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Yajra\DataTables\Facades\DataTables;
 
 class PlatformUserController extends BaseController
 {
-    public function __construct()
+    public function __construct(private RoleAssignmentService $roleAssignment)
     {
         $this->middleware('auth');
         $this->middleware(RoleMiddleware::class . ':Super Admin');
@@ -105,8 +108,21 @@ class PlatformUserController extends BaseController
             return response()->json(['message' => __('platform_users.cannot_remove_own_super_admin')], 422);
         }
 
-        $user->syncRoles($request->roles);
+        $before = $user->roles->pluck('id')->sort()->values()->all();
+        $resolved = $this->resolvePlatformRoles($user, $request->roles);
+
+        $user->syncRoles($resolved);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->syncUserTypeFromRoles($user);
+
+        $user->unsetRelation('roles');
+        AuditLogger::log(
+            'Sync Roles',
+            'Roles',
+            "Platform synced roles for user #{$user->id}",
+            ['role_ids' => $before],
+            ['role_ids' => $user->roles->pluck('id')->sort()->values()->all()]
+        );
 
         return response()->json(['message' => __('platform_users.roles_updated')]);
     }
@@ -123,6 +139,39 @@ class PlatformUserController extends BaseController
             'message' => __('platform_users.status_updated'),
             'is_active' => $user->is_active,
         ]);
+    }
+
+    /**
+     * Map role names to concrete Role models: Super Admin = global template;
+     * all other roles = institution-scoped for the user's institute_id.
+     *
+     * @param  list<string>  $roleNames
+     * @return list<Role>
+     */
+    private function resolvePlatformRoles(User $user, array $roleNames): array
+    {
+        $resolved = [];
+
+        foreach ($roleNames as $name) {
+            if ($name === RoleEnum::SUPER_ADMIN->value) {
+                $role = Role::query()
+                    ->templates()
+                    ->where('name', RoleEnum::SUPER_ADMIN->value)
+                    ->firstOrFail();
+                $resolved[] = $role;
+                continue;
+            }
+
+            $institutionId = (int) ($user->institute_id ?? 0);
+            if (!$institutionId) {
+                abort(422, __('platform_users.institution_required_for_role'));
+            }
+
+            $this->roleAssignment->ensureInstitutionRoles($institutionId);
+            $resolved[] = $this->roleAssignment->resolveForInstitution($name, $institutionId);
+        }
+
+        return $resolved;
     }
 
     private function syncUserTypeFromRoles(User $user): void

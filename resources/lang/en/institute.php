@@ -16,6 +16,7 @@ return [
     'total_institutes' => 'Total Institutes',
     'active_institutes' => 'Active Institutes',
     'inactive' => 'Inactive',
+    'institution' => 'Institution',
     'new_this_month' => 'New This Month',
     'recent_analytics' => 'Recent analytics',
     'institute_details' => 'Institute Details',

@@ -37,6 +37,9 @@
                                     <tr>
                                         <th>{{ __('roles.table_no') }}</th>
                                         <th>{{ __('roles.role_name') }}</th>
+                                        @if(!empty($isGlobalMode) || (!empty($isSuperAdmin) && empty($isGlobalMode)))
+                                        <th>{{ __('roles.institution') }}</th>
+                                        @endif
                                         <th>{{ __('roles.users_count') }}</th>
                                         <th class="text-end">{{ __('roles.actions') }}</th>
                                     </tr>
@@ -60,17 +63,29 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const showInstitution = @json(!empty($isGlobalMode) || (!empty($isSuperAdmin) && empty($isGlobalMode)));
+        const columns = [
+            { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
+            { data: 'name', name: 'name' },
+        ];
+        if (showInstitution) {
+            columns.push({ data: 'institution', name: 'institution_name', orderable: false, searchable: true });
+        }
+        columns.push(
+            { data: 'users_count', name: 'users_count', searchable: false },
+            { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
+        );
+
         const table = $('#roleTable').DataTable({
             processing: true,
             serverSide: true,
             ajax: "{{ route('roles.index') }}",
-            columns: [
-                { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
-                { data: 'name', name: 'name' },
-                { data: 'users_count', name: 'users_count', searchable: false },
-                { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
-            ],
-            order: [[0, 'desc']] // Rule 3: Latest First (assuming ID correlates to time)
+            columns: columns,
+            language: {
+                emptyTable: "{{ __('roles.no_records_found') }}",
+                zeroRecords: "{{ __('roles.no_records_found') }}"
+            },
+            order: [[0, 'desc']]
         });
 
         $('#roleTable tbody').on('click', '.delete-btn', function() {

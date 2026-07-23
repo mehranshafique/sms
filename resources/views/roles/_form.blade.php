@@ -54,7 +54,7 @@
                             @php
                                 $isDisabled = !$module->is_subscribed || (isset($isReadOnly) && $isReadOnly);
                                 $opacity = $isDisabled ? '0.6' : '1';
-                                $badge = !$module->is_subscribed ? '<span class="badge badge-xs badge-danger ms-2">Inactive</span>' : '';
+                                $badge = !$module->is_subscribed ? '<span class="badge badge-xs badge-danger ms-2">'.e(__('roles.module_inactive')).'</span>' : '';
                             @endphp
                             <div class="col-md-6 col-lg-4 mb-4">
                                 <div class="border rounded h-100 shadow-sm" style="opacity: {{ $opacity }};">
@@ -88,7 +88,23 @@
                                                        {{ (isset($rolePermissions) && in_array($permission->name, $rolePermissions)) ? 'checked' : '' }}
                                                        {{ $isDisabled ? 'disabled' : '' }}>
                                                 <label class="form-check-label" for="perm_{{ $permission->id }}">
-                                                    {{ ucfirst(last(explode('.', $permission->name))) }}
+                                                    @php
+                                                        $action = last(explode('.', $permission->name));
+                                                        $actionLabel = match ($action) {
+                                                            'view' => __('roles.perm_view'),
+                                                            'viewAny' => __('roles.perm_view_any'),
+                                                            'create' => __('roles.perm_create'),
+                                                            'update' => __('roles.perm_update'),
+                                                            'delete' => __('roles.perm_delete'),
+                                                            'deleteAny' => __('roles.perm_delete_any'),
+                                                            'manage' => __('roles.perm_manage'),
+                                                            'approve_funds' => __('roles.perm_approve_funds'),
+                                                            'download_admit_card' => __('roles.perm_download_admit_card'),
+                                                            'print' => __('roles.perm_print'),
+                                                            default => ucfirst(str_replace('_', ' ', $action)),
+                                                        };
+                                                    @endphp
+                                                    {{ $actionLabel }}
                                                 </label>
                                             </div>
                                         @endforeach

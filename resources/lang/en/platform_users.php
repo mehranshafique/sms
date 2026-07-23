@@ -24,6 +24,7 @@ return [
     'status_updated' => 'User status updated.',
     'cannot_remove_own_super_admin' => 'You cannot remove your own Super Admin role.',
     'cannot_deactivate_self' => 'You cannot deactivate your own account.',
+    'institution_required_for_role' => 'User must belong to an institution before assigning school roles.',
     'select_at_least_one_role' => 'Select at least one role.',
     'success' => 'Success',
     'error' => 'Error',

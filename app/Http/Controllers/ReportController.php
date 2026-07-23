@@ -63,7 +63,7 @@ class ReportController extends BaseController
     protected function emptyReportJson(string $message, array $extra = [])
     {
         return response()->json(array_merge([
-            'status' => 'error',
+            'status' => 'info',
             'feedback' => 'info',
             'message' => $message,
         ], $extra));
@@ -207,7 +207,7 @@ class ReportController extends BaseController
                 if ($request->ajax() || $request->check_only) {
                     return $this->emptyReportJson($msg);
                 }
-                return back()->with('error', $msg);
+                return back()->with('info', $msg);
             }
 
             $classSection = $enrollment->classSection;
@@ -226,7 +226,7 @@ class ReportController extends BaseController
                 if ($request->ajax() || $request->check_only) {
                     return $this->emptyReportJson($msg);
                 }
-                return back()->with('error', $msg);
+                return back()->with('info', $msg);
             }
             
             $targetStudents = $enrollments;
@@ -235,7 +235,7 @@ class ReportController extends BaseController
             if ($request->ajax() || $request->check_only) {
                 return $this->emptyReportJson($msg);
             }
-            return back()->with('error', $msg);
+            return back()->with('info', $msg);
         }
 
         $referenceEnrollment = $targetStudents->first();
@@ -246,7 +246,7 @@ class ReportController extends BaseController
             if ($request->ajax() || $request->check_only) {
                 return $this->emptyReportJson($msg, ['redirect_transcript' => true]);
             }
-            return back()->with('error', $msg);
+            return back()->with('info', $msg);
         }
 
         $validationError = $this->cycleService->validateReportRequest(
@@ -341,7 +341,7 @@ class ReportController extends BaseController
         }
 
         if (empty($bulkData)) {
-            return back()->with('error', __('reports.no_records_found'));
+            return back()->with('info', __('reports.no_records_found'));
         }
 
         if (count($bulkData) === 1) {
@@ -408,7 +408,7 @@ class ReportController extends BaseController
                 if ($request->check_only) {
                     return $this->emptyReportJson(__('reports.no_records_found'));
                 }
-                return back()->with('error', __('reports.no_records_found'));
+                return back()->with('info', __('reports.no_records_found'));
             }
 
             $schedules = ExamSchedule::whereIn('exam_id', $records->pluck('exam_id'))

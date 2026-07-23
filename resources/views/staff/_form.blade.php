@@ -72,29 +72,31 @@
                             <input type="password" name="password" class="form-control" placeholder="{{ isset($staff) ? __('staff.leave_blank_password') : '' }}" {{ isset($staff) ? '' : 'required' }}>
                         </div>
                         
-                        {{-- Role Selection (Filtered) --}}
+                        {{-- Role Selection — School Admin may assign any school role (except Super Admin / Head Officer) --}}
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('staff.select_role') }} <span class="text-danger">*</span></label>
-                            <select name="role" class="form-control default-select" required>
+                            <select name="role_id" class="form-control default-select" required>
                                 <option value="">{{ __('staff.select_role') }}</option>
                                 @foreach($roles as $role)
                                     @php
-                                        $user = auth()->user();
+                                        $authUser = auth()->user();
                                         
-                                        // 1. Hide Super Admin if current user is not Super Admin
-                                        if ($role->name === 'Super Admin' && !$user->hasRole('Super Admin')) continue;
+                                        if ($role->name === 'Super Admin') continue;
+                                        if (is_null($role->institution_id)) continue;
+                                        if (in_array($role->name, ['Student', 'Parent', 'Guardian'], true)) continue;
 
-                                        // 2. Hide Head Officer if current user is not Head Officer or Super Admin
-                                        if ($role->name === 'Head Officer' && !$user->hasRole(['Super Admin', 'Head Officer'])) continue;
-                                        
-                                        // 3. Hide Roles with NULL institution_id (Platform Global Roles) unless user is Super Admin
-                                        // Assumption: 'institution_id' exists on Role model. If not, rely on name check above.
-                                        if (isset($role->institution_id) && is_null($role->institution_id) && !$user->hasRole('Super Admin') && $role->name !== 'Head Officer') continue;
+                                        // Head Officer is platform-managed
+                                        if ($role->name === 'Head Officer' && !$authUser->hasRole(['Super Admin', 'Head Officer'])) continue;
 
-                                        // 4. Hide Roles not relevant to Staff context (e.g. Student, Parent)
-                                        if (in_array($role->name, ['Student', 'Parent'])) continue;
+                                        $isSelected = false;
+                                        if (old('role_id')) {
+                                            $isSelected = (int) old('role_id') === (int) $role->id;
+                                        } elseif (isset($staff) && $staff->user) {
+                                            $isSelected = $staff->user->roles->contains('id', $role->id)
+                                                || $staff->user->hasRole($role->name);
+                                        }
                                     @endphp
-                                    <option value="{{ $role->name }}" {{ (isset($staff) && $staff->user->hasRole($role->name)) ? 'selected' : '' }}>{{ $role->name }}</option>
+                                    <option value="{{ $role->id }}" {{ $isSelected ? 'selected' : '' }}>{{ $role->name }}</option>
                                 @endforeach
                             </select>
                         </div>

@@ -24,6 +24,7 @@ return [
     'generate_bulletin' => 'Générer le bulletin',
     'generate_transcript' => 'Générer le relevé',
     'no_records_found' => 'Aucun dossier académique trouvé pour ces critères.',
+    'no_results_title' => 'Aucun résultat trouvé',
     'unauthorized' => 'Accès non autorisé.',
     'no_enrollment' => 'L\'élève n\'est inscrit dans aucune classe.',
     'error_period_inactive' => 'La période sélectionnée (:period) n\'est pas active.',
