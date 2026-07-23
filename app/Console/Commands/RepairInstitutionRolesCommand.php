@@ -15,7 +15,9 @@ class RepairInstitutionRolesCommand extends Command
 {
     protected $signature = 'roles:repair-institutions
                             {--dry-run : Show what would change without writing}
-                            {--force-sync-perms : Overwrite institution role permissions from global templates}';
+                            {--force-sync-perms : Overwrite institution role permissions from global templates}
+                            {--institution= : Repair only this institution id}
+                            {--code= : Repair only the institution with this school code (e.g. 01180005)}';
 
     protected $description = 'Ensure one system role per school, reattach users from global templates, and sync permissions';
 
@@ -23,6 +25,22 @@ class RepairInstitutionRolesCommand extends Command
     {
         $dryRun = (bool) $this->option('dry-run');
         $forceSync = (bool) $this->option('force-sync-perms');
+
+        $query = Institution::query()->orderBy('id');
+
+        if ($institutionId = $this->option('institution')) {
+            $query->where('id', (int) $institutionId);
+        }
+
+        if ($code = $this->option('code')) {
+            $query->where('code', (string) $code);
+        }
+
+        if (($this->option('institution') || $this->option('code')) && !$query->clone()->exists()) {
+            $this->error('No institution matched the given --institution / --code filter.');
+
+            return self::FAILURE;
+        }
 
         $this->info($dryRun ? 'Dry run — no changes will be saved.' : 'Repairing institution roles…');
 
@@ -34,10 +52,11 @@ class RepairInstitutionRolesCommand extends Command
             'perms_synced' => 0,
         ];
 
-        Institution::query()->orderBy('id')->chunkById(50, function ($institutions) use ($roleAssignment, $dryRun, $forceSync, &$stats) {
+        $query->chunkById(50, function ($institutions) use ($roleAssignment, $dryRun, $forceSync, &$stats) {
             foreach ($institutions as $institution) {
                 $stats['institutions']++;
                 $institutionId = (int) $institution->id;
+                $this->line("Institution {$institution->code} (#{$institutionId})");
 
                 if (!$dryRun) {
                     $beforeCount = Role::forInstitution($institutionId)->count();

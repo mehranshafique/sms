@@ -415,7 +415,9 @@
                 @php
                     $canViewExams = $hasModule('exams') && ($isAdminRole || $user->can('exam.view'));
                     $canViewResultCards = $hasModule('exams') && ($isAdminRole || $user->can('result_card.view'));
-                    $canViewAcademicReports = $isAdminRole || $user->can('academic_report.view');
+                    // School Admin / Head Officer / Super Admin always see reports; custom roles need module + permission
+                    $canViewAcademicReports = $isAdminRole
+                        || ($hasModule('academic_reports') && $user->can('academic_report.view'));
                     $canViewExamSchedules = $hasModule('exam_schedules') && $canViewExams;
                     $canEnterMarks = $hasModule('exam_marks') && ($isAdminRole || $user->can('exam_mark.create'));
                     $showExaminationsNav = $canViewExams

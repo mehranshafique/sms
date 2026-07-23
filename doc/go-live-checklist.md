@@ -26,6 +26,15 @@ Use this checklist before opening a school or university on production.
 - [ ] School Admin can log in and see personalized dashboard welcome
 - [ ] Teachers, accountants, students, guardians assigned correct roles
 - [ ] Guardian accounts linked to children (parent phone/email match)
+- [ ] After role/permission changes, clear Spatie cache: `php artisan permission:cache-reset`
+- [ ] If a school admin cannot see **Examinations → Reports (PDF) / e-Bulletin** despite subscription + module + role UI looking correct, repair institution-scoped roles (example Complexe Scolaire Integrale `01180005`):
+
+```bash
+php artisan roles:repair-institutions --code=01180005 --force-sync-perms
+php artisan permission:cache-reset
+```
+
+  Then have the school admin **log out and back in**, and confirm they are attached to the institution `School Admin` role (not the global template).
 
 ## Academics
 

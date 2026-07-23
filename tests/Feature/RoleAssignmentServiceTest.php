@@ -111,3 +111,87 @@ it('repairs users stuck on the global School Admin template', function () {
         ->and($user->roles->pluck('id')->all())->not->toContain($global->id)
         ->and($scoped->fresh()->users()->count())->toBe(1);
 });
+
+it('treats institution-scoped School Admin as hasRole School Admin', function () {
+    $institution = makeInstitution('01180008');
+    ['global' => $global, 'scoped' => $scoped] = makeGlobalAndInstitutionRoles($institution);
+
+    $user = User::factory()->create(['institute_id' => $institution->id]);
+    $user->assignRole($scoped);
+    $user->unsetRelation('roles');
+
+    expect($user->fresh()->hasRole(RoleEnum::SCHOOL_ADMIN->value))->toBeTrue()
+        ->and($user->fresh()->hasRole(['Teacher', RoleEnum::SCHOOL_ADMIN->value]))->toBeTrue()
+        ->and($user->fresh()->hasRole($global))->toBeTrue() // same name as assigned institution role
+        ->and($user->fresh()->roles->pluck('id')->all())->toContain($scoped->id)
+        ->and($user->fresh()->roles->pluck('id')->all())->not->toContain($global->id);
+});
+
+it('lets institution School Admin open reports without academic_report.view on the role', function () {
+    $institution = makeInstitution('01180009');
+    ['scoped' => $scoped] = makeGlobalAndInstitutionRoles($institution);
+
+    \App\Models\Subscription::create([
+        'institution_id' => $institution->id,
+        'start_date' => now()->subDay(),
+        'end_date' => now()->addYear(),
+        'status' => 'active',
+        'price_paid' => 0,
+    ]);
+
+    // Intentionally do NOT attach academic_report.view — admin bypass must still work.
+    $user = User::factory()->create(['institute_id' => $institution->id]);
+    $user->assignRole($scoped);
+
+    $this->actingAs($user)
+        ->withSession(['active_institution_id' => $institution->id])
+        ->get(route('reports.index'))
+        ->assertOk();
+});
+
+it('forbids custom roles without academic_report.view from reports', function () {
+    $institution = makeInstitution('01180010');
+    makeGlobalAndInstitutionRoles($institution);
+
+    \App\Models\Subscription::create([
+        'institution_id' => $institution->id,
+        'start_date' => now()->subDay(),
+        'end_date' => now()->addYear(),
+        'status' => 'active',
+        'price_paid' => 0,
+    ]);
+
+    $custom = Role::firstOrCreate([
+        'name' => 'Clerk',
+        'guard_name' => 'web',
+        'institution_id' => $institution->id,
+    ]);
+
+    $user = User::factory()->create(['institute_id' => $institution->id]);
+    $user->assignRole($custom);
+
+    $this->actingAs($user)
+        ->withSession(['active_institution_id' => $institution->id])
+        ->get(route('reports.index'))
+        ->assertForbidden();
+});
+
+it('repairs a single institution by code', function () {
+    $target = makeInstitution('01180005');
+    $other = makeInstitution('01189999');
+    makeGlobalAndInstitutionRoles($target);
+    makeGlobalAndInstitutionRoles($other);
+
+    $user = User::factory()->create(['institute_id' => $target->id]);
+    $global = Role::templates()->where('name', RoleEnum::SCHOOL_ADMIN->value)->firstOrFail();
+    $user->roles()->attach($global->id);
+
+    $this->artisan('roles:repair-institutions', ['--code' => '01180005'])->assertSuccessful();
+
+    $scoped = Role::forInstitution((int) $target->id)
+        ->where('name', RoleEnum::SCHOOL_ADMIN->value)
+        ->firstOrFail();
+
+    expect($user->fresh()->roles->pluck('id')->all())->toContain($scoped->id)
+        ->and($user->fresh()->roles->pluck('id')->all())->not->toContain($global->id);
+});
