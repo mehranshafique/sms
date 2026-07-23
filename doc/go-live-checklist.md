@@ -34,7 +34,7 @@ php artisan roles:repair-institutions --code=01180005 --force-sync-perms
 php artisan permission:cache-reset
 ```
 
-  Then have the school admin **log out and back in**, and confirm they are attached to the institution `School Admin` role (not the global template).
+  Then have the school admin **log out and back in**, confirm they are attached to the institution `School Admin` role (not the global template), and if they also have **Guardian**, use **Switch Role → School Admin** (sidebar should show the **school name**, not “Guardian”).
 
 ## Academics
 

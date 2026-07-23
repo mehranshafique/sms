@@ -813,13 +813,13 @@
                                     <i class="la la-user-tag"></i>
                                     <span class="d-none d-xl-inline fs-12">{{ $activeSessionRole }}</span>
                                 </a>
-                                <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:220px;">
+                                <div class="dropdown-menu dropdown-menu-end p-2 role-switch-menu" style="min-width:220px;">
                                     <h6 class="dropdown-header px-2">{{ __('role.switch_role') }}</h6>
                                     @foreach($switchableRoles as $roleName)
                                         <form method="POST" action="{{ route('role.switch') }}" class="mb-1">
                                             @csrf
                                             <input type="hidden" name="role" value="{{ $roleName }}">
-                                            <button type="submit" class="dropdown-item rounded {{ $roleName === $activeSessionRole ? 'active bg-primary text-white' : '' }}">
+                                            <button type="submit" class="dropdown-item rounded role-switch-item {{ $roleName === $activeSessionRole ? 'is-active' : '' }}">
                                                 {{ $roleName }}
                                                 @if($roleName === $activeSessionRole)
                                                     <i class="fa fa-check float-end mt-1"></i>
@@ -829,6 +829,19 @@
                                     @endforeach
                                 </div>
                             </li>
+                            <style>
+                                /* Theme sets .dropdown-item.active { color: var(--primary) !important } which hides text on primary bg */
+                                .role-switch-menu .role-switch-item.is-active,
+                                .role-switch-menu .role-switch-item.is-active:hover,
+                                .role-switch-menu .role-switch-item.is-active:focus,
+                                .role-switch-menu .role-switch-item.is-active:active {
+                                    background-color: var(--primary, #6366f1) !important;
+                                    color: #fff !important;
+                                }
+                                .role-switch-menu .role-switch-item.is-active i {
+                                    color: #fff !important;
+                                }
+                            </style>
                             @endif
 
                             {{-- User Profile --}}

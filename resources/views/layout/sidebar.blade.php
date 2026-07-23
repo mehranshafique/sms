@@ -25,8 +25,9 @@
                 $linkedAsParent = \App\Models\StudentParent::where('user_id', $user->id)->exists();
                 $hasGuardianRole = $user->hasRole(RoleEnum::GUARDIAN->value);
                 $isAdminRole = $isSuperAdmin || $isHeadOfficer || $isSchoolAdmin;
-                // Parent profile must not override admin/teacher/student navigation.
-                $isGuardian = ($hasGuardianRole || $linkedAsParent) && !$isAdminRole && !$isTeacher && !$isStudent;
+                // Use active role for Guardian so dual School Admin+Guardian users do not mix nav contexts.
+                $isGuardian = $roleIs(RoleEnum::GUARDIAN->value)
+                    || (($hasGuardianRole || $linkedAsParent) && !$isAdminRole && !$isTeacher && !$isStudent);
                 
                 // CRITICAL FIX: Group Custom Roles (Finance, Sales, etc.) with Management
                 $isManagement = !$isTeacher && !$isStudent && !$isGuardian;
@@ -184,14 +185,17 @@
             {{-- FIXED: Uses $isManagement logic instead of strictly checking $isSchoolAdmin --}}
             @if($showManagementNav)
                 
-                {{-- SEPARATOR / HEADER WITH SCHOOL ID --}}
+                {{-- SEPARATOR / HEADER WITH SCHOOL CONTEXT (active role, not first attached role) --}}
                 <li class="nav-label first" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-                    {{-- Displays the custom role's actual name rather than hardcoding "School Admin" --}}
-                    {{ $user->roles->pluck('name')->first() ?? 'Management' }} <br>
                     @if($activeInstitution)
+                        {{ $activeInstitution->name }}
+                        <br>
                         <span style="font-size: 11px; opacity: 0.7; font-weight: normal; letter-spacing: 1px;">
-                            ({{ $activeInstitution->code ?? $activeInstitution->id }})
+                            {{ $activeRole ?? __('sidebar.management') }}
+                            · ({{ $activeInstitution->code ?? $activeInstitution->id }})
                         </span>
+                    @else
+                        {{ $activeRole ?? __('sidebar.management') }}
                     @endif
                 </li>
 

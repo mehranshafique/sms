@@ -15,10 +15,23 @@ class ActiveRoleService
 
     public function availableRoles(User $user): Collection
     {
+        $priority = [
+            RoleEnum::SCHOOL_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::TEACHER->value,
+            RoleEnum::STUDENT->value,
+            RoleEnum::GUARDIAN->value,
+        ];
+
         return $user->roles
             ->pluck('name')
             ->unique()
             ->filter(fn (string $role) => !in_array($role, self::HIDDEN_SWITCH_ROLES, true))
+            ->sortBy(function (string $role) use ($priority) {
+                $index = array_search($role, $priority, true);
+
+                return $index === false ? 100 + ord($role[0] ?? 'Z') : $index;
+            })
             ->values();
     }
 
