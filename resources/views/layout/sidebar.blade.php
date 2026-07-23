@@ -198,11 +198,15 @@
                 <li><a class="ai-icon {{ request()->routeIs('dashboard') && !$isGlobalMode ? 'mm-active' : '' }}" href="{{ route('dashboard') }}"><i class="la la-home"></i><span class="nav-text">{{ __('sidebar.dashboard.title') }}</span></a></li>
 
                 {{-- ACADEMICS --}}
+                @php
+                    $canViewPrograms = $showLmdFeatures && ($isAdminRole || $user->can('department.view'));
+                @endphp
                 @if(
                     ($hasModule('academic_sessions') && $user->can('academic_session.view')) ||
                     ($hasModule('grade_levels') && $user->can('grade_level.view')) ||
                     ($hasModule('class_sections') && $user->can('class_section.view')) ||
-                    ($hasModule('departments') && $user->can('department.view')) ||
+                    ($hasModule('departments') && ($isAdminRole || $user->can('department.view'))) ||
+                    $canViewPrograms ||
                     ($hasModule('subjects') && $user->can('subject.view')) ||
                     ($hasModule('timetables') && $user->can('timetable.view')) ||
                     ($hasModule('assignments') && $user->can('assignment.view'))
@@ -213,12 +217,12 @@
                         <li><a class="ai-icon {{ request()->routeIs('academic-sessions.*') ? 'mm-active' : '' }}" href="{{ route('academic-sessions.index') }}"><i class="la la-calendar-check-o"></i><span class="nav-text">{{ __('sidebar.sessions.title') }}</span></a></li>
                     @endif
 
-                    @if($hasModule('departments') && $user->can('department.view') && $showLmdFeatures)
+                    @if($hasModule('departments') && ($isAdminRole || $user->can('department.view')) && $showLmdFeatures)
                         <li><a class="ai-icon {{ request()->routeIs('departments.*') ? 'mm-active' : '' }}" href="{{ route('departments.index') }}"><i class="la la-building"></i><span class="nav-text">{{ __('sidebar.departments.title') }}</span></a></li>
                     @endif
 
-                    {{-- PROGRAMS (University / Vocational) --}}
-                    @if($showLmdFeatures && $user->can('department.view'))
+                    {{-- PROGRAMS (University / Vocational) — department.view or school admin --}}
+                    @if($canViewPrograms)
                         <li>
                             <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false">
                                 <i class="la la-graduation-cap"></i><span class="nav-text">{{ __('sidebar.programs.title') }}</span>
@@ -407,32 +411,47 @@
                     @endcan
                 @endif
 
-                {{-- EXAMINATIONS --}}
-                @if($hasModule('exams') && $user->can('exam.view'))
+                {{-- EXAMINATIONS — open section if any exams child permission is granted --}}
+                @php
+                    $canViewExams = $hasModule('exams') && ($isAdminRole || $user->can('exam.view'));
+                    $canViewResultCards = $hasModule('exams') && ($isAdminRole || $user->can('result_card.view'));
+                    $canViewAcademicReports = $isAdminRole || $user->can('academic_report.view');
+                    $canViewExamSchedules = $hasModule('exam_schedules') && $canViewExams;
+                    $canEnterMarks = $hasModule('exam_marks') && ($isAdminRole || $user->can('exam_mark.create'));
+                    $showExaminationsNav = $canViewExams
+                        || $canViewResultCards
+                        || $canViewAcademicReports
+                        || $canEnterMarks
+                        || ($showStateExams && $isAdminRole)
+                        || ($showLmdFeatures && $isAdminRole);
+                @endphp
+                @if($showExaminationsNav)
                     <li class="nav-label">{{ __('sidebar.examinations') }}</li>
                     <li class="mega-menu-md {{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'examinations'])</a>
                         <ul aria-expanded="false">
+                            @if($canViewExams)
                             <li><a class="{{ request()->routeIs('exams.*') ? 'mm-active' : '' }}" href="{{ route('exams.index') }}">{{ __('sidebar.exams.title') }}@include('layout.partials.sidebar-badge', ['key' => 'exams'])</a></li>
+                            @endif
                             
-                            @if($hasModule('exam_schedules'))
+                            @if($canViewExamSchedules)
                                 <li><a class="{{ request()->routeIs('exam-schedules.*') ? 'mm-active' : '' }}" href="{{ route('exam-schedules.manage') }}">{{ __('sidebar.exam_schedules.manage') }}</a></li>
                             @endif
                             
-                            @if($hasModule('exam_marks') && $user->can('exam_mark.create'))
+                            @if($canEnterMarks)
                                 <li><a class="{{ request()->routeIs('marks.create', 'marks.index') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}">{{ __('sidebar.marks.enter_marks') }}</a></li>
                             @endif
                             
-                            @if($user->can('result_card.view'))
+                            @if($canViewResultCards)
                             <li><a class="{{ request()->routeIs('results.*') ? 'mm-active' : '' }}" href="{{ route('results.index') }}">{{ __('sidebar.results') }}</a></li>
                             @endif
-                            @if($user->can('academic_report.view'))
+                            @if($canViewAcademicReports)
                             <li><a class="{{ request()->routeIs('reports.*') ? 'mm-active' : '' }}" href="{{ route('reports.index') }}">{{ __('sidebar.academic_reports') }}</a></li>
                             @endif
-                            @if($showStateExams)
+                            @if($showStateExams && $isAdminRole)
                             <li><a class="{{ request()->routeIs('state-exams.*') ? 'mm-active' : '' }}" href="{{ route('state-exams.index') }}">{{ __('sidebar.state_exams') }}</a></li>
                             @endif
-                            @if($showLmdFeatures)
+                            @if($showLmdFeatures && $isAdminRole)
                             <li><a class="{{ request()->routeIs('lmd-deliberations.*') ? 'mm-active' : '' }}" href="{{ route('lmd-deliberations.index') }}">{{ __('sidebar.lmd_deliberations') }}</a></li>
                             @endif
                         </ul>

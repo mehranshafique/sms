@@ -278,7 +278,17 @@ class ConfigurationController extends BaseController
             if($result['success']) {
                 return response()->json(['message' => $result['message']]);
             }
-            return response()->json(['message' => $result['message']], 422);
+
+            $message = $result['message'] ?? __('configuration.gateway_connection_error');
+            if (!empty($result['msisdn']) && ($request->channel === 'whatsapp')) {
+                $message .= ' (MSISDN: ' . $result['msisdn'] . ')';
+            }
+
+            return response()->json([
+                'message' => $message,
+                'error_code' => $result['error_code'] ?? null,
+                'msisdn' => $result['msisdn'] ?? null,
+            ], 422);
 
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 500);

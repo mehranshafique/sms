@@ -44,6 +44,7 @@ return [
     'sms_sent_success' => 'SMS sent successfully.',
     'whatsapp_sent_success' => 'WhatsApp message sent successfully.',
     'whatsapp_template_required' => 'WhatsApp free-form text was rejected. Recipients must message you first (24h window), or use an approved Meta template for bulk invitations.',
+    'whatsapp_invalid_number' => 'Invalid WhatsApp number. Use full international format (e.g. +243899763122).',
     'gateway_connection_error' => 'Could not connect to the gateway provider.',
     'gateway_response_error' => 'Gateway returned an error.',
     'credentials_missing' => 'API Credentials are missing for the selected provider.',

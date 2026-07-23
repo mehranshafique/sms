@@ -473,10 +473,12 @@
             } else if (scope === 'trimester') {
                 document.getElementById('trimesterGroup').classList.remove('d-none');
                 trimesterSelect.required = true;
+                document.getElementById('typeInput').value = 'term';
                 refreshPicker(trimesterSelect);
             } else if (scope === 'semester') {
                 document.getElementById('semesterGroup').classList.remove('d-none');
                 semesterSelect.required = true;
+                document.getElementById('typeInput').value = 'term';
                 refreshPicker(semesterSelect);
             } else if (scope === 'session' && scopeCycleHint) {
                 scopeCycleHint.textContent = @json(__('reports.error_university_use_transcript'));

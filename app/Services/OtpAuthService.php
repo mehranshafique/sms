@@ -92,8 +92,14 @@ class OtpAuthService
 
         if (!$user) {
             $staff = Staff::where('employee_id', $credential)->first();
+            // staff has no phone column — look up via related users.phone
             if (!$staff && strlen($normalizedPhone) >= 8) {
-                $staff = Staff::whereRaw("REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') LIKE ?", ['%' . substr($normalizedPhone, -9)])->first();
+                $staff = Staff::whereHas('user', function ($q) use ($normalizedPhone) {
+                    $q->whereRaw(
+                        "REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') LIKE ?",
+                        ['%' . substr($normalizedPhone, -9)]
+                    );
+                })->first();
             }
             $user = $staff?->user;
         }
@@ -110,11 +116,7 @@ class OtpAuthService
 
     private function resolvePhone(User $user): ?string
     {
-        if ($user->phone) {
-            return $user->phone;
-        }
-
-        return $user->staff?->phone;
+        return $user->phone ?: null;
     }
 
     private function cacheKey(int $userId): string

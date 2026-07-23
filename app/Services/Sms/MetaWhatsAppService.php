@@ -68,8 +68,16 @@ class MetaWhatsAppService implements SmsGatewayInterface
             return ['success' => false, 'message' => __('configuration.meta_credentials_missing')];
         }
 
+        $msisdn = PaymentPhoneHelper::toMsisdn($to, config('sms.default_country_code', '243'));
+        if ($msisdn === '' || strlen($msisdn) < 10) {
+            return [
+                'success' => false,
+                'message' => __('configuration.whatsapp_invalid_number'),
+                'msisdn' => $msisdn,
+            ];
+        }
+
         try {
-            $msisdn = PaymentPhoneHelper::toMsisdn($to, config('sms.default_country_code', '243'));
             $url = "https://graph.facebook.com/{$this->version}/{$this->phoneNumberId}/messages";
 
             $response = Http::withToken($this->accessToken)->post($url, [
@@ -87,28 +95,48 @@ class MetaWhatsAppService implements SmsGatewayInterface
                     'success' => true,
                     'message' => __('configuration.whatsapp_sent_success'),
                     'provider_message_id' => $payload['messages'][0]['id'],
+                    'msisdn' => $msisdn,
                 ];
             }
 
             $err = $payload['error']['message'] ?? ($response->body() ?: 'Meta API Error');
             $code = $payload['error']['code'] ?? null;
+            $errorDetails = $payload['error']['error_data']['details'] ?? null;
 
             // Meta rejects free-form text outside the 24h customer-care window.
-            if (in_array((int) $code, [131047, 131026, 131051], true)
+            $isTemplateWindow = in_array((int) $code, [131047, 131026, 131051], true)
                 || stripos($err, '24 hour') !== false
-                || stripos($err, 'template') !== false) {
+                || stripos($err, 'template') !== false;
+
+            if ($isTemplateWindow) {
                 $err = __('configuration.whatsapp_template_required');
             }
 
             Log::error('Meta WhatsApp send failed', [
                 'response' => $payload,
                 'to' => MessageLogService::maskPhone($msisdn),
+                'error_code' => $code,
+                'error_details' => $errorDetails,
             ]);
 
-            return ['success' => false, 'message' => $err, 'error_code' => $code];
+            return [
+                'success' => false,
+                'message' => $err,
+                'error_code' => $code,
+                'msisdn' => $msisdn,
+                'error_details' => $errorDetails,
+            ];
 
         } catch (\Exception $e) {
-            return ['success' => false, 'message' => __('configuration.gateway_connection_error')];
+            Log::error('Meta WhatsApp connection error: ' . $e->getMessage(), [
+                'to' => MessageLogService::maskPhone($msisdn),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => __('configuration.gateway_connection_error'),
+                'msisdn' => $msisdn,
+            ];
         }
     }
 }

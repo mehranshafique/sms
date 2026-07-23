@@ -168,6 +168,13 @@ class ReportController extends BaseController
             'type' => 'nullable|in:period,term', 
         ]);
 
+        // Authoritative mode: period key alone → period bulletin; term keys → examination bulletin
+        if ($request->filled('period') && !$request->filled('trimester') && !$request->filled('semester')) {
+            $request->merge(['type' => 'period']);
+        } else {
+            $request->merge(['type' => 'term']);
+        }
+
         if (!$skipRoleChecks && Auth::check() && !Auth::user()->hasRole('Super Admin')) {
             $activePeriodsJson = InstitutionSetting::get($institutionId, 'active_periods', '[]');
             $activePeriods = json_decode($activePeriodsJson, true) ?? [];

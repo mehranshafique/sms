@@ -6,16 +6,24 @@ use App\Models\Program;
 use App\Models\Department;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
-use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class ProgramController extends BaseController
 {
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware(PermissionMiddleware::class . ':department.view')->only(['index']);
-        $this->middleware(PermissionMiddleware::class . ':department.create')->only(['store']);
-        $this->middleware(PermissionMiddleware::class . ':department.delete')->only(['destroy']);
+        $this->middleware(function ($request, $next) {
+            $this->authorizeAdminOrPermission('department.view');
+            return $next($request);
+        })->only(['index']);
+        $this->middleware(function ($request, $next) {
+            $this->authorizeAdminOrPermission('department.create');
+            return $next($request);
+        })->only(['store']);
+        $this->middleware(function ($request, $next) {
+            $this->authorizeAdminOrPermission('department.delete');
+            return $next($request);
+        })->only(['destroy']);
         $this->setPageTitle(__('lmd.programs_page_title'));
     }
 

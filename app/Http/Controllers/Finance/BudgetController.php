@@ -342,7 +342,7 @@ class BudgetController extends BaseController
 
         // Send Initial Notification to the Requester
         $user = Auth::user();
-        $phone = $user->staff->phone ?? $user->phone ?? null; 
+        $phone = $user->phone ?? null; 
         if ($phone) {
             $this->notificationService->sendFundRequestConfirmation($fundRequest, $phone, $user->name, $institutionId);
         }

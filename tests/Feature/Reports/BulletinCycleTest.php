@@ -71,3 +71,20 @@ it('builds dynamic column labels for trimester bulletin', function () {
 
     expect($labels)->toHaveKeys(['p1', 'p2', 'exam', 'total', 'total_max']);
 });
+
+it('builds period bulletin labels with only score and max', function () {
+    $service = app(AcademicCycleService::class);
+    $labels = $service->columnLabels(AcademicType::PRIMARY->value, 1, 'period');
+
+    expect($labels)->toHaveKeys(['subject', 'score', 'max'])
+        ->and($labels)->not->toHaveKey('exam')
+        ->and($labels)->not->toHaveKey('total');
+});
+
+it('builds period bulletin labels for secondary without exam columns', function () {
+    $service = app(AcademicCycleService::class);
+    $labels = $service->columnLabels(AcademicType::SECONDARY->value, 1, 'period');
+
+    expect($labels)->toHaveKeys(['subject', 'score', 'max'])
+        ->and($labels)->not->toHaveKeys(['p1', 'p2', 'exam', 'total']);
+});

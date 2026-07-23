@@ -170,6 +170,13 @@ class RolePermissionSeeder extends Seeder
         });
         $schoolAdminRole->syncPermissions($schoolAdminPermissions);
 
+        // Keep every institution-scoped "School Admin" role aligned with the template
+        Role::where('name', RoleEnum::SCHOOL_ADMIN->value)
+            ->whereNotNull('institution_id')
+            ->each(function (Role $role) use ($schoolAdminPermissions) {
+                $role->syncPermissions($schoolAdminPermissions);
+            });
+
         $teacherPermissions = array_values(array_filter($allPermissions, function ($perm) {
             return \Illuminate\Support\Str::startsWith($perm, [
                 'discipline.view',

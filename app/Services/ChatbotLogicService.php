@@ -485,7 +485,7 @@ class ChatbotLogicService
         } elseif ($type === ChatbotParticipantType::PARENT->value || $type === 'parent') {
             $phone = $model->father_phone ?? $model->mother_phone ?? $model->guardian_phone;
         } else {
-            $phone = $model->phone ?? optional($model->staff)->phone;
+            $phone = $model->phone ?? null;
         }
 
         if (!$phone) {
@@ -1532,29 +1532,70 @@ class ChatbotLogicService
             }
 
             $activePeriods = json_decode(InstitutionSetting::get($institutionId, 'active_periods', '[]'), true) ?? [];
-            $reportParams = [
-                'student_id' => $student->id,
-                'type' => 'term',
-            ];
+            $allowedPeriodKeys = $cycleService->allowedPeriodKeys($cycle);
+            $reportParams = ['student_id' => $student->id];
 
+            // Latest active period key (p6→p1) among allowed cycle periods
+            $chosenPeriod = null;
+            foreach (['p6', 'p5', 'p4', 'p3', 'p2', 'p1'] as $pk) {
+                if (!in_array($pk, $allowedPeriodKeys, true)) {
+                    continue;
+                }
+                if (empty($activePeriods) && $pk === 'p1') {
+                    $chosenPeriod = 'p1';
+                    break;
+                }
+                if (!empty($activePeriods) && in_array($pk, $activePeriods, true)) {
+                    $chosenPeriod = $pk;
+                    break;
+                }
+            }
+
+            $hasActiveTermExam = false;
             if ($cycleService->usesTrimesterModel($cycle)) {
-                $trimester = 1;
                 foreach ([3, 2, 1] as $t) {
                     if (in_array('trimester_' . $t, $activePeriods, true) || in_array("trimester_exam_{$t}", $activePeriods, true)) {
-                        $trimester = $t;
+                        $hasActiveTermExam = true;
                         break;
                     }
                 }
-                $reportParams['trimester'] = $trimester;
             } else {
-                $semester = 1;
                 foreach ([2, 1] as $s) {
                     if (in_array('semester_' . $s, $activePeriods, true) || in_array("semester_exam_{$s}", $activePeriods, true)) {
-                        $semester = $s;
+                        $hasActiveTermExam = true;
                         break;
                     }
                 }
-                $reportParams['semester'] = $semester;
+            }
+
+            // Prefer period bulletin (score + max). Term/exam format only when no period is active.
+            if ($chosenPeriod) {
+                $reportParams['type'] = 'period';
+                $reportParams['period'] = $chosenPeriod;
+            } elseif ($hasActiveTermExam) {
+                $reportParams['type'] = 'term';
+                if ($cycleService->usesTrimesterModel($cycle)) {
+                    $trimester = 1;
+                    foreach ([3, 2, 1] as $t) {
+                        if (in_array('trimester_' . $t, $activePeriods, true) || in_array("trimester_exam_{$t}", $activePeriods, true)) {
+                            $trimester = $t;
+                            break;
+                        }
+                    }
+                    $reportParams['trimester'] = $trimester;
+                } else {
+                    $semester = 1;
+                    foreach ([2, 1] as $s) {
+                        if (in_array('semester_' . $s, $activePeriods, true) || in_array("semester_exam_{$s}", $activePeriods, true)) {
+                            $semester = $s;
+                            break;
+                        }
+                    }
+                    $reportParams['semester'] = $semester;
+                }
+            } else {
+                $reportParams['type'] = 'period';
+                $reportParams['period'] = $allowedPeriodKeys[0] ?? 'p1';
             }
 
             $originalUser = Auth::user();

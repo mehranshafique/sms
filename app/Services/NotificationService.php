@@ -705,7 +705,7 @@ class NotificationService
             return;
         }
 
-        $phone = $requester->staff->phone ?? $requester->phone ?? null;
+        $phone = $requester->phone ?? null;
         $email = $requester->email ?? null;
         $currency = \App\Enums\CurrencySymbol::default();
         $amount = $currency . ' ' . number_format((float) $fundRequest->amount, 2);
@@ -793,7 +793,7 @@ class NotificationService
         $recipients = $this->budgetConsumptionRecipients($institutionId, $budget);
 
         foreach ($recipients as $user) {
-            $phone = $user->staff->phone ?? $user->phone ?? null;
+            $phone = $user->phone ?? null;
             if ($phone && $this->isChannelEnabled($institutionId, $eventKey, 'sms')) {
                 $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
             }
