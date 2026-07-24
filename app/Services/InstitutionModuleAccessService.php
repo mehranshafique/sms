@@ -78,11 +78,15 @@ class InstitutionModuleAccessService
 
     public function userHasModulePermission(User $user, string $moduleSlug): bool
     {
-        if ($user->hasRole([
-            RoleEnum::SUPER_ADMIN->value,
-            RoleEnum::SCHOOL_ADMIN->value,
-            RoleEnum::HEAD_OFFICER->value,
-        ])) {
+        $activeRoles = app(ActiveRoleService::class);
+
+        // Dual-role School Admin + Guardian: while acting as Guardian/Student,
+        // do not inherit staff module access from assigned admin roles/permissions.
+        if ($activeRoles->isPortalPersona($user)) {
+            return false;
+        }
+
+        if ($activeRoles->isAdminPersona($user)) {
             return true;
         }
 
@@ -108,7 +112,7 @@ class InstitutionModuleAccessService
 
     public function canAccessModule(User $user, int $institutionId, string $moduleSlug): bool
     {
-        if ($user->hasRole(RoleEnum::SUPER_ADMIN->value)) {
+        if ($user->hasRole(RoleEnum::SUPER_ADMIN->value) && ! app(ActiveRoleService::class)->isPortalPersona($user)) {
             return true;
         }
 

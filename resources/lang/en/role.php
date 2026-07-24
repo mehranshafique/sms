@@ -35,4 +35,5 @@ return [
     'switch_role' => 'Switch Role',
     'switched_to' => 'Active role switched to :role.',
     'invalid_role_switch' => 'You cannot switch to that role.',
+    'active_role_required' => 'You do not have access with your current role. Switch role from the header to continue.',
 ];

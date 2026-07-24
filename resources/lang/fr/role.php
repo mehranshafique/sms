@@ -28,4 +28,5 @@ return [
     'switch_role' => 'Changer de rôle',
     'switched_to' => 'Rôle actif changé pour :role.',
     'invalid_role_switch' => 'Vous ne pouvez pas passer à ce rôle.',
+    'active_role_required' => 'Vous n\'avez pas accès avec votre rôle actuel. Changez de rôle depuis l\'en-tête pour continuer.',
 ];

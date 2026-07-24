@@ -47,7 +47,7 @@ class AttendanceReportController extends BaseController
         $classSection = ClassSection::find($classId);
         if (!$classSection) return [];
 
-        $isAdmin = $user->hasRole(['Super Admin', 'Head Officer', 'School Admin']);
+        $isAdmin = $this->userIsSchoolAdmin($user);
         $subjectIds = [];
 
         if ($isAdmin || ($user->staff && $classSection->staff_id == $user->staff->id)) {
@@ -83,13 +83,22 @@ class AttendanceReportController extends BaseController
     public function index(Request $request)
     {
         $user = Auth::user();
+        $activeRoles = $this->activeRoles();
 
-        if ($user->hasRole('Student')) {
+        if ($activeRoles->userActsAs($user, 'Student')) {
             return redirect()->route('attendance.analytics.show');
         }
 
-        if (!$user->hasRole('Guardian') && !$user->can('student_attendance.view')) {
-            abort(403, 'Unauthorized access.');
+        $isGuardian = $activeRoles->userActsAs($user, 'Guardian');
+
+        if (!$isGuardian && !$this->userIsSchoolAdmin($user)) {
+            try {
+                if (!$user->can('student_attendance.view')) {
+                    abort(403, __('role.active_role_required'));
+                }
+            } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+                abort(403, __('role.active_role_required'));
+            }
         }
 
         if ($request->ajax()) {
@@ -98,7 +107,7 @@ class AttendanceReportController extends BaseController
                 $q->where('status', 'active')->latest();
             }, 'enrollments.classSection'])->select('students.*');
 
-            if ($user->hasRole('Guardian')) {
+            if ($isGuardian) {
                 $parent = StudentParent::where('user_id', $user->id)->first();
                 $query->where('students.parent_id', $parent ? $parent->id : 0);
             } else {
@@ -147,16 +156,25 @@ class AttendanceReportController extends BaseController
     public function studentReport(Request $request, $id = null)
     {
         $user = Auth::user();
+        $activeRoles = $this->activeRoles();
         
-        if ($user->hasRole('Student')) {
+        if ($activeRoles->userActsAs($user, 'Student')) {
             $studentId = $user->student->id ?? abort(404, 'Student profile not found.');
-        } elseif ($user->hasRole('Guardian')) {
+        } elseif ($activeRoles->userActsAs($user, 'Guardian')) {
             $studentId = $id;
             $parent = StudentParent::where('user_id', $user->id)->first();
             $ownsChild = Student::where('id', $studentId)->where('parent_id', $parent->id ?? 0)->exists();
             if (!$ownsChild) abort(403, 'Unauthorized access to student record.');
         } else {
-            if (!$user->can('student_attendance.view')) abort(403);
+            if (!$this->userIsSchoolAdmin($user)) {
+                try {
+                    if (!$user->can('student_attendance.view')) {
+                        abort(403);
+                    }
+                } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+                    abort(403);
+                }
+            }
             $studentId = $id;
         }
 

@@ -13,15 +13,22 @@ class ActiveRoleService
         RoleEnum::SUPER_ADMIN->value,
     ];
 
+    /** Parent/student portal personas — must not exercise staff/admin capabilities. */
+    public const PORTAL_ROLES = [
+        RoleEnum::STUDENT->value,
+        RoleEnum::GUARDIAN->value,
+    ];
+
+    /** Institution / platform management personas. */
+    public const ADMIN_ROLES = [
+        RoleEnum::SUPER_ADMIN->value,
+        RoleEnum::SCHOOL_ADMIN->value,
+        RoleEnum::HEAD_OFFICER->value,
+    ];
+
     public function availableRoles(User $user): Collection
     {
-        $priority = [
-            RoleEnum::SCHOOL_ADMIN->value,
-            RoleEnum::HEAD_OFFICER->value,
-            RoleEnum::TEACHER->value,
-            RoleEnum::STUDENT->value,
-            RoleEnum::GUARDIAN->value,
-        ];
+        $priority = $this->rolePriority();
 
         return $user->roles
             ->pluck('name')
@@ -71,22 +78,60 @@ class ActiveRoleService
         return $user->hasRole($roles);
     }
 
-    private function defaultRole(User $user): ?string
+    public function isPortalPersona(User $user): bool
     {
-        $priority = [
+        return $this->userActsAs($user, self::PORTAL_ROLES);
+    }
+
+    public function isAdminPersona(User $user): bool
+    {
+        if ($this->isPortalPersona($user)) {
+            return false;
+        }
+
+        // Super Admin is hidden from the switcher; treat as admin unless in a portal persona.
+        if ($user->hasRole(RoleEnum::SUPER_ADMIN->value)) {
+            return true;
+        }
+
+        return $this->userActsAs($user, [
             RoleEnum::SCHOOL_ADMIN->value,
             RoleEnum::HEAD_OFFICER->value,
-            RoleEnum::TEACHER->value,
-            RoleEnum::STUDENT->value,
-            RoleEnum::GUARDIAN->value,
-        ];
+        ]);
+    }
 
-        foreach ($priority as $role) {
+    /**
+     * Staff/module permissions may be assigned via Spatie on dual-role accounts.
+     * Portal personas must not inherit those while acting as Student/Guardian.
+     */
+    public function canUseStaffCapabilities(User $user): bool
+    {
+        return ! $this->isPortalPersona($user);
+    }
+
+    private function defaultRole(User $user): ?string
+    {
+        foreach ($this->rolePriority() as $role) {
             if ($user->hasRole($role)) {
                 return $role;
             }
         }
 
         return $user->roles->first()?->name;
+    }
+
+    /** @return list<string> */
+    private function rolePriority(): array
+    {
+        return [
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::TEACHER->value,
+            RoleEnum::STAFF->value,
+            RoleEnum::GATE_ATTENDANT->value,
+            RoleEnum::STUDENT->value,
+            RoleEnum::GUARDIAN->value,
+        ];
     }
 }

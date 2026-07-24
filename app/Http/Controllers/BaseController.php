@@ -183,14 +183,23 @@ class BaseController extends LaravelController
     /** @return list<string> */
     protected function adminRoleNames(): array
     {
-        return ['Super Admin', 'School Admin', 'Head Officer'];
+        return \App\Services\ActiveRoleService::ADMIN_ROLES;
     }
 
+    protected function activeRoles(): \App\Services\ActiveRoleService
+    {
+        return app(\App\Services\ActiveRoleService::class);
+    }
+
+    /**
+     * True when the user is currently acting as a management persona
+     * (not merely assigned School Admin while switched to Guardian/Student).
+     */
     protected function userIsSchoolAdmin(?\App\Models\User $user = null): bool
     {
         $user = $user ?? Auth::user();
 
-        return $user && $user->hasRole($this->adminRoleNames());
+        return (bool) ($user && $this->activeRoles()->isAdminPersona($user));
     }
 
     protected function authorizeAdminOrPermission(string $permission, int $status = 403): void
@@ -199,25 +208,12 @@ class BaseController extends LaravelController
         if (!$user) {
             abort(401);
         }
-        // #region agent log
-        $isAdmin = $this->userIsSchoolAdmin($user);
-        $canPerm = false;
-        $permMissing = false;
-        try {
-            $canPerm = $user->can($permission);
-        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
-            $permMissing = true;
+
+        if ($this->activeRoles()->isPortalPersona($user)) {
+            abort($status, __('role.active_role_required'));
         }
-        $this->agentDebugLog('B', 'BaseController.php:authorizeAdminOrPermission', 'authorizeAdminOrPermission check', [
-            'userId' => $user->id,
-            'permission' => $permission,
-            'isAdminBypass' => $isAdmin,
-            'canPermission' => $canPerm,
-            'permissionMissing' => $permMissing,
-            'roleNames' => $user->getRoleNames()->values()->all(),
-        ]);
-        // #endregion
-        if ($isAdmin) {
+
+        if ($this->userIsSchoolAdmin($user)) {
             return;
         }
 
@@ -226,22 +222,10 @@ class BaseController extends LaravelController
                 return;
             }
         } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
-            // #region agent log
-            $this->agentDebugLog('C', 'BaseController.php:authorizeAdminOrPermission', 'abort: permission does not exist', [
-                'userId' => $user->id,
-                'permission' => $permission,
-            ]);
-            // #endregion
-            abort($status);
+            abort($status, __('role.active_role_required'));
         }
 
-        // #region agent log
-        $this->agentDebugLog('B', 'BaseController.php:authorizeAdminOrPermission', 'abort: no admin bypass and cannot permission', [
-            'userId' => $user->id,
-            'permission' => $permission,
-        ]);
-        // #endregion
-        abort($status);
+        abort($status, __('role.active_role_required'));
     }
 
     /** @param list<string> $permissions */
@@ -251,6 +235,11 @@ class BaseController extends LaravelController
         if (!$user) {
             abort(401);
         }
+
+        if ($this->activeRoles()->isPortalPersona($user)) {
+            abort($status, __('role.active_role_required'));
+        }
+
         if ($this->userIsSchoolAdmin($user)) {
             return;
         }
@@ -265,7 +254,7 @@ class BaseController extends LaravelController
             }
         }
 
-        abort($status);
+        abort($status, __('role.active_role_required'));
     }
 
     protected function denyStudentLikeRoles(): void
@@ -275,54 +264,8 @@ class BaseController extends LaravelController
             return;
         }
 
-        $activeRoles = app(\App\Services\ActiveRoleService::class);
-        $effectiveRole = $activeRoles->getActiveRole($user);
-        $actsAsStudentLike = $activeRoles->userActsAs($user, ['Student', 'Guardian']);
-
-        // #region agent log
-        $this->agentDebugLog('A', 'BaseController.php:denyStudentLikeRoles', 'denyStudentLikeRoles check', [
-            'userId' => $user->id,
-            'hasStudent' => $user->hasRole('Student'),
-            'hasGuardian' => $user->hasRole('Guardian'),
-            'actsAsStudentLike' => $actsAsStudentLike,
-            'willAbort' => $actsAsStudentLike,
-            'roleNames' => $user->getRoleNames()->values()->all(),
-            'sessionActiveRole' => session('active_role'),
-            'effectiveActiveRole' => $effectiveRole,
-        ]);
-        // #endregion
-
-        // Block only when the user is currently acting as Student/Guardian
-        // (dual-role School Admin + Guardian must still access admin modules).
-        if ($actsAsStudentLike) {
-            // #region agent log
-            $this->agentDebugLog('A', 'BaseController.php:denyStudentLikeRoles', 'abort: student-like role blocked', [
-                'userId' => $user->id,
-                'effectiveActiveRole' => $effectiveRole,
-            ]);
-            // #endregion
-            abort(403);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    protected function agentDebugLog(string $hypothesisId, string $location, string $message, array $data = []): void
-    {
-        try {
-            $payload = [
-                'sessionId' => '958aa2',
-                'runId' => 'post-fix',
-                'hypothesisId' => $hypothesisId,
-                'location' => $location,
-                'message' => $message,
-                'data' => $data,
-                'timestamp' => (int) round(microtime(true) * 1000),
-            ];
-            file_put_contents(base_path('debug-958aa2.log'), json_encode($payload) . "\n", FILE_APPEND | LOCK_EX);
-        } catch (\Throwable) {
-            // ignore debug logging failures
+        if ($this->activeRoles()->isPortalPersona($user)) {
+            abort(403, __('role.active_role_required'));
         }
     }
 

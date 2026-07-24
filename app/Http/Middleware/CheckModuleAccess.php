@@ -22,7 +22,7 @@ class CheckModuleAccess
             return $next($request);
         }
 
-        if ($user->hasRole(RoleEnum::SUPER_ADMIN->value)) {
+        if ($user->hasRole(RoleEnum::SUPER_ADMIN->value) && ! app(\App\Services\ActiveRoleService::class)->isPortalPersona($user)) {
             return $next($request);
         }
 

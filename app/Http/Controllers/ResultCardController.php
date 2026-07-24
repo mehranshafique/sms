@@ -31,7 +31,7 @@ class ResultCardController extends BaseController
     {
         $user = Auth::user();
         
-        if ($user->hasRole('Student')) {
+        if ($this->activeRoles()->userActsAs($user, 'Student')) {
             $studentId = $user->student->id ?? null;
             $institutionId = session('active_institution_id') ?? $user->institute_id;
             
@@ -43,7 +43,7 @@ class ResultCardController extends BaseController
 
         // School Admin / Head Officer bypass via authorizeAdminOrPermission;
         // custom roles need result_card.view; teachers keep role access for class results.
-        if (!$user->hasRole('Teacher')) {
+        if (!$this->activeRoles()->userActsAs($user, 'Teacher')) {
             $this->authorizeAdminOrPermission('result_card.view');
         }
 
@@ -121,10 +121,10 @@ class ResultCardController extends BaseController
             abort(403, __('results.unauthorized_institution_context'));
         }
 
-        if ($user->hasRole('Student')) {
+        if ($this->activeRoles()->userActsAs($user, 'Student')) {
             if ($user->student->id != $request->student_id) abort(403);
             if ($exam->status != 'published') abort(403, __('results.result_not_published'));
-        } elseif ($user->hasRole('Teacher')) {
+        } elseif ($this->activeRoles()->userActsAs($user, 'Teacher')) {
             $isAuthorized = $this->checkTeacherAccess($user, $request->student_id, $exam->id);
             if (!$isAuthorized) abort(403, __('results.teacher_unauthorized_view'));
         } else {

@@ -99,7 +99,7 @@ use App\Http\Controllers\CommunityForumController;
 use App\Http\Controllers\ManualController;
 
 // --- Middleware ---
-use Spatie\Permission\Middleware\RoleMiddleware;
+use App\Http\Middleware\EnsureActiveRole as RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use App\Http\Middleware\CheckModuleAccess; 
 
