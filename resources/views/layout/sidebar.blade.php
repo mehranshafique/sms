@@ -495,9 +495,9 @@
                 @endif
 
                 {{-- CONFIGURATION --}}
-                @if($user->can('setting.manage') || $user->can('setting.view') || $user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                @if($user->can('setting.manage') || $user->can('setting.view') || $user->can('currency.view') || $user->can('school_backup.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                     <li class="nav-label">{{ __('sidebar.settings') }}</li>
-                    <li class="mega-menu-md {{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'email_templates.*', 'message-logs.*', 'currency.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('configuration.*', 'settings.*', 'roles.*', 'sms_templates.*', 'email_templates.*', 'message-logs.*', 'currency.*', 'school-backups.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.settings') }}</span></a>
                         <ul aria-expanded="false">
                             @if($user->can('setting.manage') || $user->can('setting.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
@@ -508,6 +508,9 @@
                             @endif
                             @if($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                                 <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}">{{ __('sidebar.currency') }}</a></li>
+                            @endif
+                            @if($hasModule('school_backups') && ($isAdminRole || $user->can('school_backup.view')))
+                                <li><a class="{{ request()->routeIs('school-backups.*') ? 'mm-active' : '' }}" href="{{ route('school-backups.index') }}">{{ __('sidebar.school_backups') }}</a></li>
                             @endif
                             @can('sms_template.view')
                             <li><a class="{{ request()->routeIs('sms_templates.*') ? 'mm-active' : '' }}" href="{{ route('sms_templates.index') }}">{{ __('sidebar.sms_templates') ?? 'SMS Templates' }}</a></li>

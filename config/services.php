@@ -55,4 +55,10 @@ return [
         'webhook_secret' => env('CHATBOT_WEBHOOK_SECRET'),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_DRIVE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_DRIVE_REDIRECT_URI', env('APP_URL') . '/school-backups/drive/callback'),
+    ],
+
 ];

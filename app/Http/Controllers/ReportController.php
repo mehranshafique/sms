@@ -33,8 +33,25 @@ class ReportController extends BaseController
     {
         $this->middleware('auth')->except(['bulletinSigned']);
         $this->middleware(function ($request, $next) {
+            // #region agent log
+            $u = \Illuminate\Support\Facades\Auth::user();
+            $this->agentDebugLog('D', 'ReportController.php:middleware', 'reports middleware entered', [
+                'path' => $request->path(),
+                'userId' => $u?->id,
+                'instituteId' => $u?->institute_id,
+                'activeInstitutionId' => session('active_institution_id'),
+                'activeRole' => session('active_role'),
+                'roleNames' => $u ? $u->getRoleNames()->values()->all() : [],
+            ]);
+            // #endregion
             $this->denyStudentLikeRoles();
             $this->authorizeAdminOrPermission('academic_report.view');
+            // #region agent log
+            $this->agentDebugLog('E', 'ReportController.php:middleware', 'reports middleware authorized OK', [
+                'userId' => $u?->id,
+                'path' => $request->path(),
+            ]);
+            // #endregion
             return $next($request);
         })->only(['index', 'bulletin', 'transcript', 'scopeOptions']);
         $this->setPageTitle(__('reports.page_title'));

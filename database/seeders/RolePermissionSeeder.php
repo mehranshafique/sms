@@ -82,6 +82,7 @@ class RolePermissionSeeder extends Seeder
             'Packages' => ['view', 'create', 'update', 'delete'],
             'Sms Templates' => ['view', 'update'],
             'Currency' => ['view', 'update'],
+            'School Backups' => ['view', 'create', 'manage'],
             
             // Communication & Voting
             'Communication' => ['view', 'create', 'update', 'delete'],
@@ -114,6 +115,7 @@ class RolePermissionSeeder extends Seeder
                 if ($slug === 'audit_logs') $singularKey = 'audit_log';
                 if ($slug === 'sms_templates') $singularKey = 'sms_template';
                 if ($slug === 'currency') $singularKey = 'currency';
+                if ($slug === 'school_backups') $singularKey = 'school_backup';
                 
                 // Manual fix for 'Staff Leaves' and 'Student Requests' to ensure clean permission names
                 if ($slug === 'staff_leaves') $singularKey = 'staff_leave';

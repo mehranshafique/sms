@@ -17,6 +17,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\SchoolBackupController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
@@ -757,6 +758,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Currency (per institution)
     Route::get('/currency', [CurrencyController::class, 'index'])->name('currency.index');
     Route::post('/currency', [CurrencyController::class, 'update'])->name('currency.update');
+
+    // School Backups (export / import / Google Drive)
+    Route::middleware([CheckModuleAccess::class . ':school_backups'])->prefix('school-backups')->name('school-backups.')->group(function () {
+        Route::get('/', [SchoolBackupController::class, 'index'])->name('index');
+        Route::post('/export', [SchoolBackupController::class, 'export'])->name('export');
+        Route::get('/{schoolBackup}/download', [SchoolBackupController::class, 'download'])->name('download');
+        Route::delete('/{schoolBackup}', [SchoolBackupController::class, 'destroy'])->name('destroy');
+        Route::post('/import/preview', [SchoolBackupController::class, 'previewImport'])->name('import.preview');
+        Route::post('/import/confirm', [SchoolBackupController::class, 'confirmImport'])->name('import.confirm');
+        Route::post('/settings', [SchoolBackupController::class, 'updateSettings'])->name('settings');
+        Route::post('/platform-oauth', [SchoolBackupController::class, 'updatePlatformOauth'])->name('platform-oauth');
+        Route::get('/drive/redirect', [SchoolBackupController::class, 'driveRedirect'])->name('drive.redirect');
+        Route::get('/drive/callback', [SchoolBackupController::class, 'driveCallback'])->name('drive.callback');
+        Route::post('/drive/disconnect', [SchoolBackupController::class, 'driveDisconnect'])->name('drive.disconnect');
+        Route::post('/{schoolBackup}/drive-upload', [SchoolBackupController::class, 'uploadToDrive'])->name('drive.upload');
+    });
     
     // Audit Logs (Super Admin)
     Route::resource('audit-logs', AuditLogController::class)->only(['index'])->middleware([RoleMiddleware::class . ':Super Admin']);

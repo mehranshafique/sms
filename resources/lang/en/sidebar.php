@@ -29,6 +29,7 @@ return [
     'recharging' => 'Recharging',
     'sms_templates' => 'SMS Templates', 
     'currency' => 'Currency',
+    'school_backups' => 'School Backups',
     
     'tracking' => 'Tracking',
     'audit_log' => 'Audit Log',

@@ -50,6 +50,14 @@ php artisan permission:cache-reset
 - [ ] Mobile Money payments recorded with reference (Orange, Airtel, M-Pesa, Vodacom)
 - [ ] Financial clearance blocks reports when configured
 
+## School Backups
+
+- [ ] Enable **School Backups** module in Configuration / subscription packages
+- [ ] Run migration: `php artisan migrate --force`
+- [ ] **Platform (once):** Super Admin opens a school → Settings → School Backups → **Platform Google OAuth app**, and saves Client ID / Secret from Google Cloud Console (Drive API enabled; redirect URI `https://YOUR_DOMAIN/school-backups/drive/callback`). Optional `.env` fallback still works but is not required if saved in the UI.
+- [ ] **Each school:** School Admin clicks **Connect my Google account**, signs in with their own Google user, then sets Daily/Weekly schedule. Backups upload to **that school’s Drive**, not a shared platform account.
+- [ ] Ensure scheduler runs (`php artisan schedule:work` or cron) for automatic backups
+
 ## Mobile app
 
 - [ ] API base URL points to production `/api/v1`

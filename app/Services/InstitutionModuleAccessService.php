@@ -29,6 +29,9 @@ class InstitutionModuleAccessService
         'sms_templates' => 'sms_template',
         'audit_logs' => 'audit_log',
         'fund_requests' => 'fund_request',
+        'school_backups' => 'school_backup',
+        'academic_reports' => 'academic_report',
+        'result_cards' => 'result_card',
     ];
 
     public function hasActiveSubscription(int $institutionId): bool

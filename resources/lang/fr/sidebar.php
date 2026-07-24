@@ -25,6 +25,7 @@ return [
     'recharging' => 'Rechargement',
     'sms_templates' => 'Modèles SMS',
     'currency' => 'Devise',
+    'school_backups' => 'Sauvegardes scolaires',
     'tracking' => 'Suivi',
     'audit_log' => 'Journal d\'audit',
     'message_logs' => 'Journaux SMS/WhatsApp',
