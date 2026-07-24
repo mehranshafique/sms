@@ -89,6 +89,20 @@
                                             <a href="{{ route('school-events.show', $event) }}" class="btn btn-primary btn-xs shadow-sm">
                                                 <i class="fa fa-eye"></i> {{ __('school_event.view') }}
                                             </a>
+                                            @if($event->status === 'draft')
+                                                <a href="{{ route('school-events.edit', $event) }}" class="btn btn-warning btn-xs shadow-sm">
+                                                    <i class="fa fa-pencil"></i> {{ __('school_event.edit') }}
+                                                </a>
+                                            @endif
+                                            @if($event->status !== 'sending')
+                                                <form method="POST" action="{{ route('school-events.destroy', $event) }}" class="d-inline delete-event-form">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger btn-xs shadow-sm">
+                                                        <i class="fa fa-trash"></i> {{ __('school_event.delete') }}
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
@@ -111,4 +125,26 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('js')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$(function () {
+    $('.delete-event-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = this;
+        Swal.fire({
+            title: @json(__('school_event.confirm_delete')),
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: @json(__('school_event.delete')),
+            cancelButtonText: @json(__('school_event.cancel')),
+        }).then(function (result) {
+            if (result.isConfirmed) form.submit();
+        });
+    });
+});
+</script>
 @endsection

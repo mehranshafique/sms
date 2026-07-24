@@ -177,6 +177,16 @@
                                 <input type="text" name="infobip_whatsapp_from" class="form-control" value="{{ $settings['infobip_whatsapp_from'] ?? '' }}" placeholder="e.g. 243899xxxxxx">
                                 <small class="text-muted">Registered Infobip WhatsApp sender (digits only, with country code). Do not leave empty — empty falls back to a UK demo number.</small>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">WhatsApp Template Name <span class="text-muted fw-normal">(optional)</span></label>
+                                <input type="text" name="infobip_whatsapp_template_name" class="form-control" value="{{ $settings['infobip_whatsapp_template_name'] ?? '' }}" placeholder="e.g. school_notification">
+                                <small class="text-muted">Approved template with one placeholder <code>@{{1}}</code> in the body. Used automatically when the recipient is outside the 24h chat window (bulk invitations, notifications).</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Template Language</label>
+                                <input type="text" name="infobip_whatsapp_template_language" class="form-control" value="{{ $settings['infobip_whatsapp_template_language'] ?? 'en' }}" placeholder="en / fr">
+                                <small class="text-muted">Must match the language code used when the template was registered.</small>
+                            </div>
                         </div>
                     </div>
 

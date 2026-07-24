@@ -16,6 +16,8 @@ class InfobipService implements SmsGatewayInterface
     protected $apiKey;
     protected $whatsappSender;
     protected $senderId;
+    protected $whatsappTemplateName;
+    protected $whatsappTemplateLanguage = 'en';
 
     public function __construct($institutionId = null)
     {
@@ -33,8 +35,18 @@ class InfobipService implements SmsGatewayInterface
             $query->where('institution_id', $institutionId);
         }
 
-        $settings = $query->whereIn('key', ['infobip_api_key', 'infobip_subdomain', 'infobip_sender_id', 'infobip_whatsapp_from'])
-            ->pluck('value', 'key');
+        $settings = $query->whereIn('key', [
+            'infobip_api_key', 'infobip_subdomain', 'infobip_sender_id', 'infobip_whatsapp_from',
+            'infobip_whatsapp_template_name', 'infobip_whatsapp_template_language',
+        ])->pluck('value', 'key');
+
+        if (!empty($settings['infobip_whatsapp_template_name'])) {
+            $this->whatsappTemplateName = trim($settings['infobip_whatsapp_template_name']);
+        }
+
+        if (!empty($settings['infobip_whatsapp_template_language'])) {
+            $this->whatsappTemplateLanguage = trim($settings['infobip_whatsapp_template_language']);
+        }
 
         if (isset($settings['infobip_subdomain']) && $settings['infobip_subdomain'] !== '') {
             $this->baseUrl = 'https://' . $settings['infobip_subdomain'] . '.api.infobip.com';
@@ -155,16 +167,22 @@ class InfobipService implements SmsGatewayInterface
 
             $err = $apiError !== '' ? $apiError : ($statusDesc !== '' ? $statusDesc : ($response->body() ?: 'Failed to send WhatsApp'));
 
-            if ($this->isTemplateWindowError($err, $statusName, $statusDesc)) {
-                $err = __('configuration.whatsapp_template_required');
-            }
-
             Log::error('Infobip WhatsApp Error', [
                 'response' => $payload,
                 'http_status' => $response->status(),
                 'to' => MessageLogService::maskPhone($msisdn),
                 'from' => $from,
             ]);
+
+            if ($this->isTemplateWindowError($err, $statusName, $statusDesc)) {
+                // Outside the 24h customer-service window free-form text is rejected.
+                // Retry with the school's approved template when one is configured.
+                if ($this->whatsappTemplateName) {
+                    return $this->sendWhatsAppTemplate($msisdn, $from, $message);
+                }
+
+                $err = __('configuration.whatsapp_template_required');
+            }
 
             return [
                 'success' => false,
@@ -182,6 +200,76 @@ class InfobipService implements SmsGatewayInterface
                 'message' => $e->getMessage(),
                 'msisdn' => $msisdn,
             ];
+        }
+    }
+
+    /**
+     * Send an approved Infobip WhatsApp template (business-initiated messages,
+     * allowed outside the 24h window). The template must be registered with a
+     * single body placeholder {{1}} that receives the full message text.
+     */
+    protected function sendWhatsAppTemplate(string $msisdn, string $from, string $message): array
+    {
+        try {
+            $url = rtrim((string) $this->baseUrl, '/') . '/whatsapp/1/message/template';
+
+            $response = Http::withHeaders([
+                'Authorization' => "App {$this->apiKey}",
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ])->timeout(30)->post($url, [
+                'messages' => [[
+                    'from' => $from,
+                    'to' => $msisdn,
+                    'content' => [
+                        'templateName' => $this->whatsappTemplateName,
+                        'templateData' => [
+                            'body' => ['placeholders' => [$message]],
+                        ],
+                        'language' => $this->whatsappTemplateLanguage,
+                    ],
+                ]],
+            ]);
+
+            $payload = $response->json() ?? [];
+            $first = data_get($payload, 'messages.0', []);
+            $statusName = (string) (data_get($first, 'status.name') ?? '');
+            $groupName = (string) (data_get($first, 'status.groupName') ?? '');
+
+            $rejected = $response->failed()
+                || stripos($groupName, 'REJECTED') !== false
+                || stripos($statusName, 'REJECTED') !== false;
+
+            if ($response->successful() && ! $rejected) {
+                return [
+                    'success' => true,
+                    'message' => __('configuration.whatsapp_sent_success'),
+                    'provider_message_id' => data_get($first, 'messageId'),
+                    'msisdn' => $msisdn,
+                ];
+            }
+
+            $err = (string) (data_get($first, 'status.description')
+                ?? data_get($payload, 'requestError.serviceException.text')
+                ?? ($response->body() ?: 'Failed to send WhatsApp template'));
+
+            Log::error('Infobip WhatsApp Template Error', [
+                'response' => $payload,
+                'http_status' => $response->status(),
+                'template' => $this->whatsappTemplateName,
+                'to' => MessageLogService::maskPhone($msisdn),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $err,
+                'msisdn' => $msisdn,
+                'error_code' => $statusName !== '' ? $statusName : null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Infobip WhatsApp Template Exception: ' . $e->getMessage());
+
+            return ['success' => false, 'message' => $e->getMessage(), 'msisdn' => $msisdn];
         }
     }
 

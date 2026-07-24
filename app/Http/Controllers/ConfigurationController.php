@@ -211,6 +211,7 @@ class ConfigurationController extends BaseController
             'mobishastra_user', 'mobishastra_sender_id',
             // Infobip
             'infobip_subdomain', 'infobip_whatsapp_from', 'infobip_sender_id', // Subdomain stored raw
+            'infobip_whatsapp_template_name', 'infobip_whatsapp_template_language',
             // Meta
             'meta_phone_number_id', 'meta_business_account_id',
             // Twilio

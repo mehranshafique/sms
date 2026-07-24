@@ -7,6 +7,7 @@ use App\Models\ChatSession;
 use App\Models\ClassSection;
 use App\Models\SchoolEvent;
 use App\Models\SchoolEventInvitation;
+use App\Models\Staff;
 use App\Models\StudentEnrollment;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -84,10 +85,134 @@ class SchoolEventController extends BaseController
         return view('school_events.show', compact('schoolEvent'));
     }
 
+    public function edit(SchoolEvent $schoolEvent)
+    {
+        if ($schoolEvent->institution_id != $this->getInstitutionId()) {
+            abort(403);
+        }
+
+        if ($schoolEvent->status !== 'draft') {
+            return redirect()
+                ->route('school-events.show', $schoolEvent)
+                ->with('warning', __('school_event.only_draft_editable'));
+        }
+
+        $institutionId = $this->getInstitutionId();
+        $sections = ClassSection::where('institution_id', $institutionId)->with('gradeLevel')->get();
+
+        return view('school_events.edit', compact('schoolEvent', 'sections'));
+    }
+
+    public function update(Request $request, SchoolEvent $schoolEvent)
+    {
+        if ($schoolEvent->institution_id != $this->getInstitutionId()) {
+            abort(403);
+        }
+
+        if ($schoolEvent->status !== 'draft') {
+            return $this->errorResponse(__('school_event.only_draft_editable'), 422);
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:200',
+            'event_date' => 'required|date',
+            'event_time' => 'nullable',
+            'venue' => 'nullable|string|max:200',
+            'audience' => 'required|in:parents,students,staff,class',
+            'class_section_ids' => 'nullable|array',
+        ]);
+
+        $audienceChanged = $schoolEvent->audience !== $request->audience
+            || ($schoolEvent->class_section_ids ?? []) != ($request->class_section_ids ?? []);
+
+        $schoolEvent->update([
+            'name' => $request->name,
+            'description' => $request->description,
+            'event_date' => $request->event_date,
+            'event_time' => $request->event_time,
+            'venue' => $request->venue,
+            'contact' => $request->contact,
+            'audience' => $request->audience,
+            'class_section_ids' => $request->class_section_ids,
+        ]);
+
+        // Audience changed → old recipient list no longer matches; force a rebuild.
+        if ($audienceChanged) {
+            $schoolEvent->invitations()->delete();
+        }
+
+        return $this->successResponse(__('school_event.updated'), route('school-events.show', $schoolEvent));
+    }
+
+    public function destroy(SchoolEvent $schoolEvent)
+    {
+        if ($schoolEvent->institution_id != $this->getInstitutionId()) {
+            abort(403);
+        }
+
+        if ($schoolEvent->status === 'sending') {
+            return $this->errorResponse(__('school_event.cannot_delete_sending'), 422);
+        }
+
+        $schoolEvent->invitations()->delete();
+        $schoolEvent->delete();
+
+        return $this->successResponse(__('school_event.deleted'), route('school-events.index'));
+    }
+
     public function buildInvitations(SchoolEvent $schoolEvent)
     {
         if ($schoolEvent->institution_id != $this->getInstitutionId()) {
             abort(403);
+        }
+
+        if ($schoolEvent->status === 'sending') {
+            return back()->with('warning', __('school_event.already_sending'));
+        }
+
+        $recipients = $this->collectRecipients($schoolEvent);
+
+        // Rebuild = replace: clear previous list so repeated clicks or audience
+        // changes never append/duplicate rows. Sent history stays in delivery logs.
+        $schoolEvent->invitations()->delete();
+
+        foreach ($recipients as $recipient) {
+            SchoolEventInvitation::create(array_merge($recipient, [
+                'school_event_id' => $schoolEvent->id,
+                'delivery_status' => 'pending',
+            ]));
+        }
+
+        return back()->with('success', __('school_event.invitations_built', ['count' => count($recipients)]));
+    }
+
+    /**
+     * Build the recipient list according to the event audience.
+     *
+     * - parents / class : one invitation per parent (deduplicated by parent),
+     *   linked to one child for template variables (StudentName, ClassName).
+     * - students        : one invitation per student using the student's own contact.
+     * - staff           : one invitation per active staff member.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectRecipients(SchoolEvent $schoolEvent): array
+    {
+        if ($schoolEvent->audience === 'staff') {
+            return Staff::with('user')
+                ->where('institution_id', $schoolEvent->institution_id)
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', 'active'))
+                ->get()
+                ->filter(fn (Staff $staff) => $staff->user)
+                ->map(fn (Staff $staff) => [
+                    'student_id' => null,
+                    'recipient_name' => $staff->user->name,
+                    'recipient_phone' => $staff->user->phone,
+                    'recipient_email' => $staff->user->email,
+                    'recipient_telegram_chat_id' => $this->resolveTelegramChatId($staff->user_id),
+                ])
+                ->values()
+                ->all();
         }
 
         $query = StudentEnrollment::with(['student.parent', 'classSection.gradeLevel'])
@@ -98,28 +223,50 @@ class SchoolEventController extends BaseController
             $query->whereIn('class_section_id', $schoolEvent->class_section_ids);
         }
 
-        $count = 0;
-        foreach ($query->get() as $enrollment) {
+        $enrollments = $query->get();
+
+        if ($schoolEvent->audience === 'students') {
+            return $enrollments
+                ->pluck('student')
+                ->filter()
+                ->unique('id')
+                ->map(fn ($student) => [
+                    'student_id' => $student->id,
+                    'recipient_name' => $student->full_name,
+                    'recipient_phone' => $student->mobile_number,
+                    'recipient_email' => $student->email,
+                    'recipient_telegram_chat_id' => $this->resolveTelegramChatId($student->user_id ?? null),
+                ])
+                ->values()
+                ->all();
+        }
+
+        // parents / class → one invitation per family, not one per child.
+        $recipients = [];
+        foreach ($enrollments as $enrollment) {
             $student = $enrollment->student;
             $parent = $student?->parent;
             if (!$student) {
                 continue;
             }
 
-            SchoolEventInvitation::updateOrCreate(
-                ['school_event_id' => $schoolEvent->id, 'student_id' => $student->id],
-                [
-                    'recipient_name' => $parent?->full_name ?? $parent?->father_name ?? $student->full_name,
-                    'recipient_phone' => $parent?->father_phone ?? $parent?->mother_phone ?? $student->mobile_number,
-                    'recipient_email' => $parent?->email ?? $student->email,
-                    'recipient_telegram_chat_id' => $this->resolveTelegramChatId($parent?->user_id),
-                    'delivery_status' => 'pending',
-                ]
-            );
-            $count++;
+            $phone = $parent?->father_phone ?? $parent?->mother_phone ?? $student->mobile_number;
+            $dedupeKey = $parent?->id ? 'p' . $parent->id : 'phone' . preg_replace('/\D+/', '', (string) $phone) . '-s' . $student->id;
+
+            if (isset($recipients[$dedupeKey])) {
+                continue;
+            }
+
+            $recipients[$dedupeKey] = [
+                'student_id' => $student->id,
+                'recipient_name' => $parent?->full_name ?? $parent?->father_name ?? $student->full_name,
+                'recipient_phone' => $phone,
+                'recipient_email' => $parent?->email ?? $student->email,
+                'recipient_telegram_chat_id' => $this->resolveTelegramChatId($parent?->user_id),
+            ];
         }
 
-        return back()->with('success', __('school_event.invitations_built', ['count' => $count]));
+        return array_values($recipients);
     }
 
     public function send(SchoolEvent $schoolEvent)

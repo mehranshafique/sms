@@ -21,6 +21,20 @@
                 </div>
             </div>
             <div class="col-sm-5 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
+                @if($schoolEvent->status === 'draft')
+                    <a href="{{ route('school-events.edit', $schoolEvent) }}" class="btn btn-warning">
+                        <i class="fa fa-pencil me-1"></i>{{ __('school_event.edit') }}
+                    </a>
+                @endif
+                @if($schoolEvent->status !== 'sending')
+                    <form method="POST" action="{{ route('school-events.destroy', $schoolEvent) }}" id="deleteEventForm">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa fa-trash me-1"></i>{{ __('school_event.delete') }}
+                        </button>
+                    </form>
+                @endif
                 <a href="{{ route('school-events.index') }}" class="btn btn-light">{{ __('school_event.back') }}</a>
             </div>
         </div>
@@ -66,6 +80,16 @@
                 <h5 class="card-title fw-bold mb-0">{{ __('school_event.actions_title') }}</h5>
             </div>
             <div class="card-body px-4 pb-4">
+                <div class="alert alert-light border small mb-3">
+                    <strong><i class="fa fa-question-circle me-1"></i>{{ __('school_event.howto_title') }}</strong>
+                    <ol class="mb-1 mt-2 ps-3">
+                        <li>{{ __('school_event.howto_step1') }}</li>
+                        <li>{{ __('school_event.howto_step2') }}</li>
+                        <li>{{ __('school_event.howto_step3') }}</li>
+                        <li>{{ __('school_event.howto_step4') }}</li>
+                    </ol>
+                    <span class="text-muted">{{ __('school_event.howto_rebuild_note') }}</span>
+                </div>
                 <div class="d-flex flex-wrap gap-2">
                     <form method="POST" action="{{ route('school-events.build-invitations', $schoolEvent) }}">@csrf
                         <button class="btn btn-secondary shadow-sm"><i class="la la-users me-1"></i> {{ __('school_event.build_invitations') }}</button>
@@ -249,6 +273,21 @@
             }
         }, 4000);
     }
+
+    $('#deleteEventForm').on('submit', function (e) {
+        e.preventDefault();
+        const form = this;
+        Swal.fire({
+            title: @json(__('school_event.confirm_delete')),
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: @json(__('school_event.delete')),
+            cancelButtonText: @json(__('school_event.cancel')),
+        }).then(function (result) {
+            if (result.isConfirmed) form.submit();
+        });
+    });
 
     $('#previewBtn').on('click', function () {
         $.get('{{ route('school-events.preview', $schoolEvent) }}', function (res) {

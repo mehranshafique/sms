@@ -630,7 +630,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::middleware([CheckModuleAccess::class . ':notices'])->group(function () {
         Route::resource('notices', NoticeController::class);
-        Route::resource('school-events', SchoolEventController::class)->except(['edit', 'update', 'destroy']);
+        Route::resource('school-events', SchoolEventController::class);
         Route::post('school-events/{schoolEvent}/build-invitations', [SchoolEventController::class, 'buildInvitations'])->name('school-events.build-invitations');
         Route::get('school-events/{schoolEvent}/preview', [SchoolEventController::class, 'preview'])->name('school-events.preview');
         Route::post('school-events/{schoolEvent}/send', [SchoolEventController::class, 'send'])->name('school-events.send');
