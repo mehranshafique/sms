@@ -43,8 +43,9 @@ return [
     'settings_saved' => 'Settings saved successfully.',
     'sms_sent_success' => 'SMS sent successfully.',
     'whatsapp_sent_success' => 'WhatsApp message sent successfully.',
-    'whatsapp_template_required' => 'WhatsApp free-form text was rejected. Recipients must message you first (24h window), or use an approved Meta template for bulk invitations.',
+    'whatsapp_template_required' => 'WhatsApp free-form text was rejected. The recipient must message your WhatsApp Business number first (24h window), or send an approved template message instead.',
     'whatsapp_invalid_number' => 'Invalid WhatsApp number. Use full international format (e.g. +243899763122).',
+    'whatsapp_test_hint' => 'Test WhatsApp sends free-form text. Outside the 24h chat window WhatsApp requires an approved template. Ask the recipient to message your business number first, then retry.',
     'gateway_connection_error' => 'Could not connect to the gateway provider.',
     'gateway_response_error' => 'Gateway returned an error.',
     'credentials_missing' => 'API Credentials are missing for the selected provider.',
@@ -53,6 +54,8 @@ return [
     
     // Existing Keys
     'meta_credentials_missing' => 'Meta Cloud API credentials (Token/Phone ID) are missing.',
+    'infobip_credentials_missing' => 'Infobip API key is missing. Save your Infobip credentials in Configuration → SMS/WhatsApp settings.',
+    'infobip_whatsapp_from_missing' => 'Infobip WhatsApp From number is missing. Set the registered WhatsApp sender (digits only, e.g. 243xxxxxxxxx).',
     'twilio_credentials_missing' => 'Twilio SID or Token is missing.',
     'sw_credentials_missing' => 'SignalWire Project ID, Token or Space URL missing.',
 

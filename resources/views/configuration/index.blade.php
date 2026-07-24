@@ -284,6 +284,7 @@
                                                 <input type="text" name="phone" class="form-control" placeholder="{{ __('configuration.phone_placeholder') }}" required>
                                             </div>
                                             <p class="text-muted small">{{ __('configuration.current_provider') }}: <strong>{{ $whatsapp['provider'] ?? __('configuration.whatsapp_provider') }}</strong></p>
+                                            <p class="text-muted small mb-3"><i class="fa fa-info-circle me-1"></i>{{ __('configuration.whatsapp_test_hint') }}</p>
                                             <button type="submit" class="btn btn-outline-success btn-sm test-btn"><i class="fa fa-paper-plane me-1"></i> {{ __('configuration.send_test_whatsapp') }}</button>
                                         </form>
                                     </div>

@@ -174,7 +174,8 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">WhatsApp From Number</label>
-                                <input type="text" name="infobip_whatsapp_from" class="form-control" value="{{ $settings['infobip_whatsapp_from'] ?? '' }}" placeholder="e.g. 447860099299">
+                                <input type="text" name="infobip_whatsapp_from" class="form-control" value="{{ $settings['infobip_whatsapp_from'] ?? '' }}" placeholder="e.g. 243899xxxxxx">
+                                <small class="text-muted">Registered Infobip WhatsApp sender (digits only, with country code). Do not leave empty — empty falls back to a UK demo number.</small>
                             </div>
                         </div>
                     </div>

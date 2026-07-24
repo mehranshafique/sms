@@ -43,8 +43,9 @@ return [
     'settings_saved' => 'Paramètres enregistrés avec succès.',
     'sms_sent_success' => 'SMS envoyé avec succès.',
     'whatsapp_sent_success' => 'Message WhatsApp envoyé avec succès.',
-    'whatsapp_template_required' => 'Le texte libre WhatsApp a été refusé. Le destinataire doit vous écrire d\'abord (fenêtre 24h), ou utilisez un modèle Meta approuvé pour les invitations en masse.',
+    'whatsapp_template_required' => 'Le texte libre WhatsApp a été refusé. Le destinataire doit écrire à votre numéro WhatsApp Business d\'abord (fenêtre 24h), ou envoyez un modèle approuvé.',
     'whatsapp_invalid_number' => 'Numéro WhatsApp invalide. Utilisez le format international complet (ex. +243899763122).',
+    'whatsapp_test_hint' => 'Le test WhatsApp envoie du texte libre. Hors fenêtre 24h, WhatsApp exige un modèle approuvé. Demandez au destinataire d\'écrire d\'abord à votre numéro professionnel, puis réessayez.',
     'gateway_connection_error' => 'Impossible de se connecter à la passerelle.',
     'gateway_response_error' => 'La passerelle a renvoyé une erreur.',
     'credentials_missing' => 'Identifiants API manquants pour le fournisseur sélectionné.',
@@ -52,6 +53,8 @@ return [
     'insufficient_credits' => 'Crédits de message insuffisants.',
     
     'meta_credentials_missing' => 'Identifiants Meta Cloud API manquants.',
+    'infobip_credentials_missing' => 'Clé API Infobip manquante. Enregistrez vos identifiants Infobip dans Configuration → SMS/WhatsApp.',
+    'infobip_whatsapp_from_missing' => 'Numéro WhatsApp From Infobip manquant. Indiquez l\'expéditeur WhatsApp enregistré (chiffres uniquement, ex. 243xxxxxxxxx).',
     'twilio_credentials_missing' => 'SID ou Token Twilio manquant.',
     'sw_credentials_missing' => 'Identifiants SignalWire manquants.',
 
