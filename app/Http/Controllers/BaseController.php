@@ -271,24 +271,34 @@ class BaseController extends LaravelController
     protected function denyStudentLikeRoles(): void
     {
         $user = Auth::user();
+        if (!$user) {
+            return;
+        }
+
+        $activeRoles = app(\App\Services\ActiveRoleService::class);
+        $effectiveRole = $activeRoles->getActiveRole($user);
+        $actsAsStudentLike = $activeRoles->userActsAs($user, ['Student', 'Guardian']);
+
         // #region agent log
-        $hasStudent = $user ? $user->hasRole('Student') : false;
-        $hasGuardian = $user ? $user->hasRole('Guardian') : false;
         $this->agentDebugLog('A', 'BaseController.php:denyStudentLikeRoles', 'denyStudentLikeRoles check', [
-            'userId' => $user?->id,
-            'hasStudent' => $hasStudent,
-            'hasGuardian' => $hasGuardian,
-            'willAbort' => (bool) ($user && ($hasStudent || $hasGuardian)),
-            'roleNames' => $user ? $user->getRoleNames()->values()->all() : [],
-            'activeRole' => session('active_role'),
+            'userId' => $user->id,
+            'hasStudent' => $user->hasRole('Student'),
+            'hasGuardian' => $user->hasRole('Guardian'),
+            'actsAsStudentLike' => $actsAsStudentLike,
+            'willAbort' => $actsAsStudentLike,
+            'roleNames' => $user->getRoleNames()->values()->all(),
+            'sessionActiveRole' => session('active_role'),
+            'effectiveActiveRole' => $effectiveRole,
         ]);
         // #endregion
-        if ($user && $user->hasRole(['Student', 'Guardian'])) {
+
+        // Block only when the user is currently acting as Student/Guardian
+        // (dual-role School Admin + Guardian must still access admin modules).
+        if ($actsAsStudentLike) {
             // #region agent log
             $this->agentDebugLog('A', 'BaseController.php:denyStudentLikeRoles', 'abort: student-like role blocked', [
                 'userId' => $user->id,
-                'hasStudent' => $hasStudent,
-                'hasGuardian' => $hasGuardian,
+                'effectiveActiveRole' => $effectiveRole,
             ]);
             // #endregion
             abort(403);
@@ -303,7 +313,7 @@ class BaseController extends LaravelController
         try {
             $payload = [
                 'sessionId' => '958aa2',
-                'runId' => 'pre-fix',
+                'runId' => 'post-fix',
                 'hypothesisId' => $hypothesisId,
                 'location' => $location,
                 'message' => $message,
