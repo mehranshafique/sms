@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\NotifyAbsentParentsJob;
 use App\Models\AcademicSession;
 use App\Models\ClassSection;
 use App\Models\ClassSubject;
@@ -11,6 +12,7 @@ use App\Models\StudentAttendance;
 use App\Models\StudentEnrollment;
 use App\Models\Timetable;
 use App\Services\Mobile\MobileContextService;
+use App\Services\StudentAbsenceNotificationService;
 use App\Services\TeacherAttendanceAuthorization;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -278,6 +280,20 @@ class TeacherAttendanceApiController extends Controller
                 );
             }
         });
+
+        $absentIds = app(StudentAbsenceNotificationService::class)
+            ->absentStudentIdsFromMap($request->attendance)
+            ->filter(fn ($id) => in_array((string) $id, $enrolledStudentIds, true))
+            ->values()
+            ->all();
+
+        if ($absentIds !== []) {
+            NotifyAbsentParentsJob::dispatch(
+                (int) $targetInstituteId,
+                $absentIds,
+                (string) $request->attendance_date
+            );
+        }
 
         return response()->json([
             'success' => true,

@@ -3,12 +3,12 @@
 return [
     'country' => 'Country',
     'select_country' => 'Select Country',
-    'state' => 'State / Province',
-    'select_state' => 'Select State',
-    'city' => 'City/Commune',
-    'select_city' => 'Select City/Commune',
-    'commune' => 'Commune / Location',
-    'select_commune' => 'Select Commune',
+    'state' => 'City / Province',
+    'select_state' => 'Select city / province',
+    'city' => 'Commune',
+    'select_city' => 'Select commune',
+    'commune' => 'Commune',
+    'select_commune' => 'Select commune',
     'address' => 'Address',
     
     // Validation Messages

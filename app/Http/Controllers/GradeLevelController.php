@@ -45,6 +45,12 @@ class GradeLevelController extends BaseController
                 ->addColumn('institution_name', function($row){
                     return $row->institution->name ?? 'N/A';
                 })
+                ->editColumn('name', function($row){
+                    return dt_link(dt_route('grade-levels.edit', $row->id), $row->name);
+                })
+                ->editColumn('code', function($row){
+                    return dt_link(dt_route('grade-levels.edit', $row->id), $row->code);
+                })
                 ->editColumn('education_cycle', function($row){
                     $val = is_object($row->education_cycle) ? $row->education_cycle->value : $row->education_cycle;
                     return __('grade_level.cycle_' . $val);
@@ -60,7 +66,7 @@ class GradeLevelController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'action'])
+                ->rawColumns(['checkbox', 'name', 'code', 'action'])
                 ->make(true);
         }
 

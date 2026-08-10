@@ -47,7 +47,7 @@
     <div class="fix-wrapper">
         <div class="container">
             <div class="row justify-content-center">
-                <div class="col-lg-5 col-md-6">
+                <div class="@yield('column_class', 'col-lg-5 col-md-6')">
                     <div class="card mb-0 h-auto">
                         <div class="card-body">
                             <div class="text-center mb-2">

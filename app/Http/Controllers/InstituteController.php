@@ -63,6 +63,12 @@ class InstituteController extends BaseController
                     $url = $row->logo ? asset('storage/'.$row->logo) : asset('images/no-image.png');
                     return '<img src="'.$url.'" class="rounded-circle" width="35" alt="">';
                 })
+                ->editColumn('name', function ($row) {
+                    return dt_link(dt_route('institutes.show', $row->id, 'institutes.edit'), $row->name);
+                })
+                ->editColumn('code', function ($row) {
+                    return dt_link(dt_route('institutes.show', $row->id, 'institutes.edit'), $row->code);
+                })
                 ->addColumn('contact', function($row){
                     return '<div class="d-flex flex-column">
                                 <span class="fs-14 fw-bold">'.$row->acronym.'</span>
@@ -99,7 +105,7 @@ class InstituteController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'logo', 'contact', 'is_active', 'action'])
+                ->rawColumns(['checkbox', 'logo', 'name', 'code', 'contact', 'is_active', 'action'])
                 ->make(true);
         }
 

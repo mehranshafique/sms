@@ -78,6 +78,9 @@ class ExamController extends BaseController
                 ->addColumn('category', function($row){
                     return $row->category ? ucwords(str_replace('_', ' ', $row->category)) : '-';
                 })
+                ->editColumn('name', function($row){
+                    return dt_link(dt_route('exams.show', $row->id, 'exams.edit'), $row->name);
+                })
                 ->editColumn('start_date', function($row){
                     return $row->start_date->format('d M, Y');
                 })
@@ -121,7 +124,7 @@ class ExamController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'status', 'action'])
+                ->rawColumns(['checkbox', 'name', 'status', 'action'])
                 ->make(true);
         }
 
@@ -374,6 +377,10 @@ class ExamController extends BaseController
         $exam->update(['finalized_at' => now(), 'status' => 'published']);
 
         app(\App\Services\InAppNotificationService::class)->notifyExamPublished($exam);
+
+        if ($exam->category === 'semester_exam_2') {
+            \App\Jobs\NotifyResitParentsJob::dispatchAfterResponse($exam->id);
+        }
         
         return back()->with('success', __('exam.messages.finalized_success'));
     }

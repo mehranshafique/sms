@@ -54,6 +54,7 @@ return [
     'late' => 'En retard',
     'excused' => 'Excusé',
     'half_day' => 'Demi-journée',
+    'no_staff_found' => 'Aucun personnel actif trouvé.',
     'save_staff' => 'Enregistrer le personnel',
     'update_staff' => 'Mettre à jour le personnel',
     'view' => 'Voir le profil',

@@ -32,6 +32,9 @@ class NoticeController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
+                ->editColumn('title', function ($row) {
+                    return dt_link(dt_route('notices.edit', $row->id), $row->title);
+                })
                 ->editColumn('type', function($row){
                     $badges = [
                         'info' => 'badge-info', 
@@ -64,7 +67,7 @@ class NoticeController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['type', 'status', 'action'])
+                ->rawColumns(['title', 'type', 'status', 'action'])
                 ->make(true);
         }
 

@@ -277,52 +277,94 @@
                 )
                     <li class="nav-label">{{ __('sidebar.people') }}</li>
                     
-                    <li class="mega-menu-md {{ request()->routeIs('students.*', 'parents.*', 'enrollments.*', 'university.enrollments.*', 'promotions.*', 'attendance.*', 'pickups.*', 'transfers.*', 'requests.*', 'discipline.*') ? 'mm-active' : '' }}">
-                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'students'])</a>
-                        <ul aria-expanded="false">
-                            @if($hasModule('students') && $user->can('student.view'))
-                                <li><a class="{{ request()->routeIs('students.*') ? 'mm-active' : '' }}" href="{{ route('students.index') }}">{{ __('sidebar.students.title') }}</a></li>
+                    @php
+                        $canViewStudents = $hasModule('students') && $user->can('student.view');
+                        $canViewAttendance = $hasModule('student_attendance') && $user->can('student_attendance.view');
+                        $canViewKiosk = $hasModule('student_attendance') && $user->hasRole([\App\Enums\RoleEnum::GATE_ATTENDANT->value, \App\Enums\RoleEnum::SUPER_ADMIN->value, \App\Enums\RoleEnum::HEAD_OFFICER->value, \App\Enums\RoleEnum::SCHOOL_ADMIN->value, 'Guard']);
+                        $canViewStdEnrollments = $hasModule('student_enrollments') && in_array($activeInstType, [InstitutionType::PRIMARY->value, InstitutionType::SECONDARY->value, 'mixed', InstitutionType::VOCATIONAL->value]) && $user->can('student_enrollment.view');
+                        $canViewUniEnrollments = $hasModule('university_enrollments') && $showLmdFeatures && $user->can('university_enrollment.view');
+                        $canViewReenrollments = $hasModule('student_promotion') && ($user->can('student_reenrollment.view') || $user->can('student_promotion.view') || $user->can('student_promotion.create'));
+                        $canViewPromotions = $hasModule('student_promotion') && $user->can('student_promotion.create');
+                        $canViewStdRequests = $hasModule('student_requests') && $user->can('student_request.view');
+                        $canViewDiscipline = $hasModule('discipline') && $user->can('discipline.view');
+                        $canViewPickups = $user->can('student.view') || $user->hasRole(RoleEnum::TEACHER->value);
+
+                        $directoryOpen = request()->routeIs('students.*', 'pre-enrollments.*', 'parents.*');
+                        $attendanceOpen = request()->routeIs('attendance.*');
+                        $progressionOpen = request()->routeIs('enrollments.*', 'university.enrollments.*', 'reenrollments.*', 'promotions.*', 'transfers.*');
+                        $welfareOpen = request()->routeIs('requests.*', 'discipline.*', 'pickups.*');
+                    @endphp
+
+                    {{-- Directory: students, candidates, parents --}}
+                    @if($canViewStudents || $user->can('student_parent.view'))
+                    <li class="{{ $directoryOpen ? 'mm-active' : '' }}">
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="{{ $directoryOpen ? 'true' : 'false' }}"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.students.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'students'])</a>
+                        <ul aria-expanded="{{ $directoryOpen ? 'true' : 'false' }}">
+                            @if($canViewStudents)
+                                <li><a class="{{ request()->routeIs('students.*') ? 'mm-active' : '' }}" href="{{ route('students.index') }}">{{ __('sidebar.students.all') }}</a></li>
+                                <li><a class="{{ request()->routeIs('pre-enrollments.*') ? 'mm-active' : '' }}" href="{{ route('pre-enrollments.index') }}">{{ __('sidebar.pre_enrollments.title') }}</a></li>
                             @endif
-                            
                             @can('student_parent.view')
                                 <li><a class="{{ request()->routeIs('parents.*') ? 'mm-active' : '' }}" href="{{ route('parents.index') }}">{{ __('parent.page_title') ?? 'Parents' }}</a></li>
                             @endcan
+                        </ul>
+                    </li>
+                    @endif
 
-                            {{-- Standard Enrollment --}}
-                            @if($hasModule('student_enrollments') && in_array($activeInstType, [InstitutionType::PRIMARY->value, InstitutionType::SECONDARY->value, 'mixed', InstitutionType::VOCATIONAL->value]) && $user->can('student_enrollment.view'))
-                                <li><a class="{{ request()->routeIs('enrollments.*') ? 'mm-active' : '' }}" href="{{ route('enrollments.index') }}">{{ __('sidebar.enrollments.title') }}</a></li>
+                    {{-- Attendance --}}
+                    @if($canViewAttendance || $canViewKiosk)
+                    <li class="{{ $attendanceOpen ? 'mm-active' : '' }}">
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="{{ $attendanceOpen ? 'true' : 'false' }}"><i class="la la-check-square-o"></i><span class="nav-text">{{ __('sidebar.attendance.title') }}</span></a>
+                        <ul aria-expanded="{{ $attendanceOpen ? 'true' : 'false' }}">
+                            @if($canViewAttendance)
+                                <li><a class="{{ request()->routeIs('attendance.index', 'attendance.create', 'attendance.report', 'attendance.print_report') ? 'mm-active' : '' }}" href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.register') }}</a></li>
+                                <li><a class="{{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">{{ __('sidebar.attendance_analytics') ?? 'Analytics & Reports' }}</a></li>
                             @endif
-
-                            {{-- University Enrollment --}}
-                            @if($hasModule('university_enrollments') && $showLmdFeatures && $user->can('university_enrollment.view'))
-                                <li><a class="{{ request()->routeIs('university.enrollments.*') ? 'mm-active' : '' }}" href="{{ route('university.enrollments.index') }}">{{ __('sidebar.university_enrollments.title') }}</a></li>
-                            @endif
-
-                            @if($hasModule('student_attendance') && $user->can('student_attendance.view'))
-                                <li><a class="{{ request()->routeIs('attendance.*') ? 'mm-active' : '' }}" href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.title') }}</a></li>
-                            @endif
-
-                            @if($user->can('student_attendance.view'))
-                                <li><a class="ai-icon {{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">{{ __('sidebar.attendance_analytics') ?? 'Analytics & Reports' }}</a></li>
-                            @endif
-
-                            @if($hasModule('student_promotion') && $user->can('student_promotion.create'))
-                                <li><a class="{{ request()->routeIs('promotions.*') ? 'mm-active' : '' }}" href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
-                            @endif
-                            
-                            @if($hasModule('student_requests') && $user->can('student_request.view'))
-                            <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
-                            @endif
-
-                            @if($hasModule('discipline') && $user->can('discipline.view'))
-                            <li><a class="{{ request()->routeIs('discipline.*') ? 'mm-active' : '' }}" href="{{ route('discipline.index') }}">{{ __('sidebar.discipline') }}</a></li>
-                            @endif
-                            
-                            @if($user->can('student.view') || $user->hasRole(RoleEnum::TEACHER->value))
-                            <li><a class="{{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}@include('layout.partials.sidebar-badge', ['key' => 'pickups'])</a></li>
+                            @if($canViewKiosk)
+                                <li><a class="{{ request()->routeIs('attendance.kiosk') ? 'mm-active' : '' }}" href="{{ route('attendance.kiosk') }}" target="_blank">{{ __('sidebar.attendance_kiosk') }}</a></li>
                             @endif
                         </ul>
                     </li>
+                    @endif
+
+                    {{-- Enrollment & progression --}}
+                    @if($canViewStdEnrollments || $canViewUniEnrollments || $canViewReenrollments || $canViewPromotions)
+                    <li class="{{ $progressionOpen ? 'mm-active' : '' }}">
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="{{ $progressionOpen ? 'true' : 'false' }}"><i class="la la-level-up"></i><span class="nav-text">{{ __('sidebar.enrollment_progression') }}</span></a>
+                        <ul aria-expanded="{{ $progressionOpen ? 'true' : 'false' }}">
+                            @if($canViewStdEnrollments)
+                                <li><a class="{{ request()->routeIs('enrollments.*') ? 'mm-active' : '' }}" href="{{ route('enrollments.index') }}">{{ __('sidebar.enrollments.title') }}</a></li>
+                            @endif
+                            @if($canViewUniEnrollments)
+                                <li><a class="{{ request()->routeIs('university.enrollments.*') ? 'mm-active' : '' }}" href="{{ route('university.enrollments.index') }}">{{ __('sidebar.university_enrollments.title') }}</a></li>
+                            @endif
+                            @if($canViewReenrollments)
+                                <li><a class="{{ request()->routeIs('reenrollments.*') ? 'mm-active' : '' }}" href="{{ route('reenrollments.index') }}">{{ __('sidebar.reenrollments.title') }}</a></li>
+                            @endif
+                            @if($canViewPromotions)
+                                <li><a class="{{ request()->routeIs('promotions.*') ? 'mm-active' : '' }}" href="{{ route('promotions.index') }}">{{ __('sidebar.promotions.title') }}</a></li>
+                            @endif
+                        </ul>
+                    </li>
+                    @endif
+
+                    {{-- Requests, discipline, pickups --}}
+                    @if($canViewStdRequests || $canViewDiscipline || $canViewPickups)
+                    <li class="{{ $welfareOpen ? 'mm-active' : '' }}">
+                        <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="{{ $welfareOpen ? 'true' : 'false' }}"><i class="la la-clipboard-list"></i><span class="nav-text">{{ __('sidebar.student_welfare') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a>
+                        <ul aria-expanded="{{ $welfareOpen ? 'true' : 'false' }}">
+                            @if($canViewStdRequests)
+                                <li><a class="{{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}">{{ __('sidebar.requests') }}</a></li>
+                            @endif
+                            @if($canViewDiscipline)
+                                <li><a class="{{ request()->routeIs('discipline.*') ? 'mm-active' : '' }}" href="{{ route('discipline.index') }}">{{ __('sidebar.discipline') }}</a></li>
+                            @endif
+                            @if($canViewPickups)
+                                <li><a class="{{ request()->routeIs('pickups.teacher') ? 'mm-active' : '' }}" href="{{ route('pickups.teacher') }}">{{ __('pickup.manager_title') ?? 'Pickup Requests' }}@include('layout.partials.sidebar-badge', ['key' => 'pickups'])</a></li>
+                            @endif
+                        </ul>
+                    </li>
+                    @endif
 
                     @php
                         $hasStaffModule = $hasModule('staff') && $user->can('staff.view');
@@ -340,7 +382,8 @@
                                 <li><a class="{{ request()->routeIs('staff-leaves.*') ? 'mm-active' : '' }}" href="{{ route('staff-leaves.index') }}">{{ __('sidebar.staff_leaves') }}@include('layout.partials.sidebar-badge', ['key' => 'staff-leaves'])</a></li>
                                 @endif
                                 @if($hasStaffAttendanceModule)
-                                    <li><a class="{{ request()->routeIs('staff-attendance.*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
+                                    <li><a class="{{ request()->routeIs('staff-attendance.index', 'staff-attendance.create', 'staff-attendance.store') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.index') }}">{{ __('sidebar.staff_attendance') }}</a></li>
+                                    <li><a class="{{ request()->routeIs('staff-attendance.analytics*') ? 'mm-active' : '' }}" href="{{ route('staff-attendance.analytics') }}">{{ __('sidebar.staff_attendance_analytics') }}</a></li>
                                 @endif
                             </ul>
                         </li>
@@ -348,11 +391,16 @@
                 @endif
                 
                 {{-- SECURITY / GUARD LINK --}}
-                @if($user->hasRole('Guard'))
+                @if($user->hasRole('Guard') || $user->hasRole(\App\Enums\RoleEnum::GATE_ATTENDANT->value))
                     <li class="nav-label">{{ __('sidebar.security') }}</li>
                     <li>
                         <a class="ai-icon {{ request()->routeIs('pickups.scanner') ? 'mm-active' : '' }}" href="{{ route('pickups.scanner') }}"><i class="la la-qrcode"></i><span class="nav-text">{{ __('pickup.scanner_title') ?? 'QR Scanner' }}</span></a>
                     </li>
+                    @if($hasModule('student_attendance'))
+                    <li>
+                        <a class="ai-icon {{ request()->routeIs('attendance.kiosk') ? 'mm-active' : '' }}" href="{{ route('attendance.kiosk') }}" target="_blank"><i class="la la-desktop"></i><span class="nav-text">{{ __('sidebar.attendance_kiosk') }}</span></a>
+                    </li>
+                    @endif
                 @endif
 
                 {{-- FINANCE --}}
@@ -424,16 +472,20 @@
                         || ($hasModule('academic_reports') && $user->can('academic_report.view'));
                     $canViewExamSchedules = $hasModule('exam_schedules') && $canViewExams;
                     $canEnterMarks = $hasModule('exam_marks') && ($isAdminRole || $user->can('exam_mark.create'));
+                    $canManageConduct = $isAdminRole
+                        || $canEnterMarks
+                        || ($hasModule('discipline') && ($user->can('discipline.view') || $user->can('discipline.create') || $user->can('discipline.update')));
                     $showExaminationsNav = $canViewExams
                         || $canViewResultCards
                         || $canViewAcademicReports
                         || $canEnterMarks
+                        || $canManageConduct
                         || ($showStateExams && $isAdminRole)
                         || ($showLmdFeatures && $isAdminRole);
                 @endphp
                 @if($showExaminationsNav)
                     <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                    <li class="mega-menu-md {{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*', 'conduct.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'examinations'])</a>
                         <ul aria-expanded="false">
                             @if($canViewExams)
@@ -446,6 +498,9 @@
                             
                             @if($canEnterMarks)
                                 <li><a class="{{ request()->routeIs('marks.create', 'marks.index') ? 'mm-active' : '' }}" href="{{ route('marks.create') }}">{{ __('sidebar.marks.enter_marks') }}</a></li>
+                            @endif
+                            @if($canManageConduct)
+                                <li><a class="{{ request()->routeIs('conduct.*') ? 'mm-active' : '' }}" href="{{ route('conduct.index') }}">{{ __('sidebar.conduct') }}</a></li>
                             @endif
                             
                             @if($canViewResultCards)

@@ -51,7 +51,13 @@ class HeadOfficersController extends BaseController
                         ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" alt="">'
                         : '<div class="head-officer-icon bgl-primary text-primary position-relative me-3" style="width:50px; height:50px; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">'.$initial.'</div>';
 
-                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0"><a href="'.route('header-officers.show', $row->id).'" class="text-black">'.$row->name.'</a></h6><span class="fs-13 text-muted">'.$row->email.'</span></div></div>';
+                    $nameLink = dt_link(
+                        dt_route('header-officers.show', $row->id, 'header-officers.edit'),
+                        $row->name,
+                        'text-black'
+                    );
+
+                    return '<div class="d-flex align-items-center">'.$avatarHtml.'<div><h6 class="fs-16 font-w600 mb-0">'.$nameLink.'</h6><span class="fs-13 text-muted">'.$row->email.'</span></div></div>';
                 })
                 ->addColumn('contact', function($row){
                     return '<div>'.$row->phone.'</div>';

@@ -69,10 +69,16 @@ class StudentEnrollmentController extends BaseController
                     return '';
                 })
                 ->addColumn('student_name', function($row){
-                    return $row->student->full_name ?? 'N/A';
+                    return dt_link(
+                        $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                        $row->student->full_name ?? 'N/A'
+                    );
                 })
                 ->addColumn('student_code', function($row){
-                    return $row->student->admission_number ?? '-';
+                    return dt_link(
+                        $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                        $row->student->admission_number ?? null
+                    );
                 })
                 ->addColumn('class', function($row){
                     $grade = $row->classSection->gradeLevel->name ?? '';
@@ -99,7 +105,7 @@ class StudentEnrollmentController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'status', 'action'])
+                ->rawColumns(['checkbox', 'student_name', 'student_code', 'status', 'action'])
                 ->make(true);
         }
 

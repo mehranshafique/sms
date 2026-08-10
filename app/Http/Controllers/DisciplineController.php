@@ -63,8 +63,11 @@ class DisciplineController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
-                ->addColumn('reference', fn ($row) => '<span class="fw-bold text-primary">' . e($row->reference_no) . '</span>')
-                ->addColumn('student_name', fn ($row) => e($row->student->full_name ?? 'N/A'))
+                ->addColumn('reference', fn ($row) => dt_link(dt_route('discipline.show', $row->id), $row->reference_no))
+                ->addColumn('student_name', fn ($row) => dt_link(
+                    $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                    $row->student->full_name ?? 'N/A'
+                ))
                 ->addColumn('incident_type_label', fn ($row) => e($row->typeLabel()))
                 ->editColumn('incident_date', fn ($row) => $row->incident_date->format('d M, Y'))
                 ->editColumn('severity', fn ($row) => '<span class="badge badge-' . ($row->severity === 'major' ? 'danger' : ($row->severity === 'moderate' ? 'warning' : 'info')) . '">' . e($row->severityLabel()) . '</span>')
@@ -81,7 +84,7 @@ class DisciplineController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['reference', 'severity', 'status', 'action'])
+                ->rawColumns(['reference', 'student_name', 'severity', 'status', 'action'])
                 ->make(true);
         }
 

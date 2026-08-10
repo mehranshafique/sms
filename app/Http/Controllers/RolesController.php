@@ -386,7 +386,7 @@ class RolesController extends BaseController
     private function getParentGroup($slug)
     {
         $groups = [
-            'academics' => ['academic_sessions', 'grade_levels', 'class_sections', 'subjects', 'timetables', 'enrollments', 'student_promotion', 'students', 'student_attendance'],
+            'academics' => ['academic_sessions', 'grade_levels', 'class_sections', 'subjects', 'timetables', 'enrollments', 'student_promotion', 'student_reenrollments', 'students', 'student_attendance'],
             'hr' => ['staff'],
             'examinations' => ['exams', 'exam_marks'],
             'finance' => ['fee_structures', 'fee_types', 'invoices', 'payments'],

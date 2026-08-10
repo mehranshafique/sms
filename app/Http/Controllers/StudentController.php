@@ -89,12 +89,13 @@ class StudentController extends BaseController
                     $fName = mb_convert_encoding($row->first_name, 'UTF-8', 'UTF-8');
                     $lName = mb_convert_encoding($row->last_name, 'UTF-8', 'UTF-8');
                     $fullName = $fName . ' ' . $lName;
+                    $url = dt_route('students.show', $row->id, 'students.edit');
                     
                     return '<div class="d-flex align-items-center">
                                 '.$avatarHtml.'
                                 <div>
-                                    <h6 class="mb-0 fw-bold"><a href="'.route('students.show', $row->id).'" class="text-black">'.$fullName.'</a></h6>
-                                    <small class="text-muted">'.__('student.admission_no'). ': ' . ($row->admission_number ?? '-').'</small>
+                                    <h6 class="mb-0 fw-bold">'.dt_link($url, $fullName, 'text-black').'</h6>
+                                    <small class="text-muted">'.__('student.admission_no'). ': ' . dt_link($url, $row->admission_number).'</small>
                                 </div>
                             </div>';
                 })

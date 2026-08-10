@@ -25,6 +25,16 @@
                 <small class="text-muted d-block mt-1">{{ __('settings.grace_help') }}</small>
             </div>
 
+            {{-- Auto notify parents on absence --}}
+            <div class="mb-4">
+                <label class="form-label font-w600">{{ __('settings.auto_notify_absent') }}</label>
+                <select name="auto_notify_absent" class="form-control default-select">
+                    <option value="1" {{ ($autoNotifyAbsent ?? 1) == 1 ? 'selected' : '' }}>{{ __('settings.auto_notify_on') }}</option>
+                    <option value="0" {{ ($autoNotifyAbsent ?? 1) == 0 ? 'selected' : '' }}>{{ __('settings.auto_notify_off') }}</option>
+                </select>
+                <small class="text-muted d-block mt-1">{{ __('settings.auto_notify_absent_help') }}</small>
+            </div>
+
             <button type="submit" class="btn btn-primary mt-3">{{ __('settings.save_changes') }}</button>
         </div>
     </div>

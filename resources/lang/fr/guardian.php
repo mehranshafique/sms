@@ -11,4 +11,7 @@ return [
     'child_not_found' => 'Enfant introuvable.',
     'outstanding' => 'Solde impayé',
     'select_child' => 'Données pour',
+    'school_whatsapp' => 'Discuter avec l\'école sur WhatsApp',
+    'school_whatsapp_help' => 'Scannez le QR ou appuyez sur le bouton pour écrire à cette école.',
+    'open_school_whatsapp' => 'Ouvrir WhatsApp',
 ];

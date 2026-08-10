@@ -51,7 +51,12 @@ class InvoiceController extends BaseController
 
             return DataTables::of($data)
                 ->addIndexColumn()
-                ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
+                ->addColumn('student_name', function ($row) {
+                    return dt_link(
+                        $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                        $row->student->full_name ?? 'N/A'
+                    );
+                })
                 // FIXED: Advanced Flexible Multi-word search for any part of the name
                 ->filterColumn('student_name', function($query, $keyword) {
                     $query->whereHas('student', function($q) use ($keyword) {
@@ -115,7 +120,7 @@ class InvoiceController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['invoice_number', 'status', 'action'])
+                ->rawColumns(['invoice_number', 'student_name', 'status', 'action'])
                 ->make(true);
         }
         return view('finance.invoices.index');

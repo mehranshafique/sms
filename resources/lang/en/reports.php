@@ -64,6 +64,7 @@ return [
     'percentage' => 'POURCENTAGE',
     'conduct' => 'CONDUITE',
     'application' => 'APPLICATION',
+    'school_seal' => 'School seal',
     'place_eff' => 'PLACE - EFF', 
     'rank_eff' => 'PLACE - EFF',
     'made_in' => 'Fait à',

@@ -25,6 +25,7 @@ use App\Http\Controllers\SmsTemplateController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\AgentPaymentController;
 use App\Http\Controllers\SchoolEventController;
+use App\Http\Controllers\StudentConductController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\MessageLogController;
 use App\Http\Controllers\PlatformUserController;
@@ -59,6 +60,9 @@ use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
 use App\Http\Controllers\StaffLeaveController;
 use App\Http\Controllers\StudentPromotionController;
+use App\Http\Controllers\ReenrollmentController;
+use App\Http\Controllers\PreEnrollmentController;
+use App\Http\Controllers\PublicPreEnrollmentController;
 use App\Http\Controllers\TransferController; 
 use App\Http\Controllers\StudentRequestController;
 use App\Http\Controllers\AttendanceReportController;
@@ -139,6 +143,18 @@ Route::post('/pay/{token}/gateway', [OnlinePaymentController::class, 'initiateGa
 Route::post('/pay/{token}/proof', [OnlinePaymentController::class, 'submitProof'])->name('pay.proof');
 Route::get('/pay/{token}', [OnlinePaymentController::class, 'show'])->name('pay.show');
 Route::get('/verify/receipt/{token}', [\App\Http\Controllers\Finance\ReceiptVerificationController::class, 'show'])->name('receipt.verify');
+
+// Public pre-enrollment (shareable school-code link, no login)
+Route::get('/pre-enroll/{code}', [PublicPreEnrollmentController::class, 'create'])
+    ->where('code', '[A-Za-z0-9\-_]+')
+    ->name('public.pre-enrollments.create');
+Route::post('/pre-enroll/{code}', [PublicPreEnrollmentController::class, 'store'])
+    ->middleware('throttle:8,1')
+    ->where('code', '[A-Za-z0-9\-_]+')
+    ->name('public.pre-enrollments.store');
+Route::get('/pre-enroll/{code}/done/{temp}', [PublicPreEnrollmentController::class, 'done'])
+    ->where(['code' => '[A-Za-z0-9\-_]+', 'temp' => '[A-Za-z0-9\-]+'])
+    ->name('public.pre-enrollments.done');
 
 // Signed bulletin download (chatbot / external links — no session required)
 Route::get('/reports/bulletin/signed', [ReportController::class, 'bulletinSigned'])
@@ -350,6 +366,41 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('promotions', [StudentPromotionController::class, 'store'])->name('promotions.store');
     });
 
+    // Re-enrollment confirmations (separate from bulk promotion)
+    Route::middleware([CheckModuleAccess::class . ':student_promotion'])->group(function () {
+        Route::get('reenrollments', [ReenrollmentController::class, 'index'])->name('reenrollments.index');
+        Route::get('reenrollments/export', [ReenrollmentController::class, 'export'])->name('reenrollments.export');
+        Route::post('reenrollments/campaigns', [ReenrollmentController::class, 'storeCampaign'])->name('reenrollments.campaigns.store');
+        Route::post('reenrollments/campaigns/{campaign}/invite', [ReenrollmentController::class, 'sendInvitations'])->name('reenrollments.campaigns.invite');
+        Route::post('reenrollments/campaigns/{campaign}/sync', [ReenrollmentController::class, 'syncStudents'])->name('reenrollments.campaigns.sync');
+        Route::post('reenrollments/campaigns/{campaign}/close', [ReenrollmentController::class, 'closeCampaign'])->name('reenrollments.campaigns.close');
+        Route::post('reenrollments/campaigns/{campaign}/reopen', [ReenrollmentController::class, 'reopenCampaign'])->name('reenrollments.campaigns.reopen');
+        Route::get('reenrollments/{confirmation}', [ReenrollmentController::class, 'show'])->name('reenrollments.show');
+        Route::post('reenrollments/{confirmation}/physical', [ReenrollmentController::class, 'recordPhysical'])->name('reenrollments.physical');
+        Route::post('reenrollments/{confirmation}/remind', [ReenrollmentController::class, 'remind'])->name('reenrollments.remind');
+        Route::post('reenrollments/{confirmation}/approve', [ReenrollmentController::class, 'approve'])->name('reenrollments.approve');
+        Route::post('reenrollments/{confirmation}/reject', [ReenrollmentController::class, 'reject'])->name('reenrollments.reject');
+        Route::post('reenrollments/{confirmation}/reopen', [ReenrollmentController::class, 'reopen'])->name('reenrollments.reopen');
+        Route::post('reenrollments/{confirmation}/keep', [ReenrollmentController::class, 'keepPending'])->name('reenrollments.keep');
+        Route::post('reenrollments/{confirmation}/proposed-class', [ReenrollmentController::class, 'updateProposedClass'])->name('reenrollments.proposed');
+    });
+
+    // Pre-enrollment candidates
+    Route::middleware([CheckModuleAccess::class . ':students'])->group(function () {
+        Route::get('pre-enrollments', [PreEnrollmentController::class, 'index'])->name('pre-enrollments.index');
+        Route::get('pre-enrollments/create', [PreEnrollmentController::class, 'create'])->name('pre-enrollments.create');
+        Route::post('pre-enrollments', [PreEnrollmentController::class, 'store'])->name('pre-enrollments.store');
+        Route::get('pre-enrollments/{pre_enrollment}', [PreEnrollmentController::class, 'show'])->name('pre-enrollments.show');
+        Route::get('pre-enrollments/{pre_enrollment}/edit', [PreEnrollmentController::class, 'edit'])->name('pre-enrollments.edit');
+        Route::put('pre-enrollments/{pre_enrollment}', [PreEnrollmentController::class, 'update'])->name('pre-enrollments.update');
+        Route::delete('pre-enrollments/{pre_enrollment}', [PreEnrollmentController::class, 'destroy'])->name('pre-enrollments.destroy');
+        Route::post('pre-enrollments/{pre_enrollment}/invite', [PreEnrollmentController::class, 'invite'])->name('pre-enrollments.invite');
+        Route::post('pre-enrollments/{pre_enrollment}/remind', [PreEnrollmentController::class, 'remind'])->name('pre-enrollments.remind');
+        Route::post('pre-enrollments/{pre_enrollment}/result', [PreEnrollmentController::class, 'recordResult'])->name('pre-enrollments.result');
+        Route::post('pre-enrollments/{pre_enrollment}/finalize', [PreEnrollmentController::class, 'finalize'])->name('pre-enrollments.finalize');
+        Route::post('pre-enrollments/public-link/toggle', [PreEnrollmentController::class, 'togglePublicForm'])->name('pre-enrollments.public.toggle');
+    });
+
     // Student Attendance
     Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () {
         Route::get('attendance/create', [StudentAttendanceController::class, 'create'])->name('attendance.create');
@@ -387,6 +438,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Parent View
         Route::get('/pickup/my-children', [PickupWebController::class, 'parentView'])->name('pickups.parent');
         Route::post('/pickup/generate', [PickupWebController::class, 'generateParentQr'])->name('pickups.generate_parent');
+
+        // Full-screen attendance kiosk (web + same API contract for mobile)
+        Route::get('/attendance/kiosk', [\App\Http\Controllers\AttendanceKioskController::class, 'show'])->name('attendance.kiosk');
+        Route::post('/attendance/kiosk/scan', [\App\Http\Controllers\AttendanceKioskController::class, 'scan'])->name('attendance.kiosk.scan');
     });
 
     // --- Unified Attendance Analytics Flow ---
@@ -410,6 +465,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware([CheckModuleAccess::class . ':staff_attendance'])->group(function () {
+        Route::get('staff-attendance/analytics', [StaffAttendanceController::class, 'analytics'])->name('staff-attendance.analytics');
+        Route::get('staff-attendance/analytics/{staff}', [StaffAttendanceController::class, 'staffAnalytics'])->name('staff-attendance.analytics.show');
         Route::resource('staff-attendance', StaffAttendanceController::class)->only(['index', 'create', 'store']);
     });
 
@@ -436,6 +493,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::resource('exams', ExamController::class);
         
+        Route::get('conduct', [StudentConductController::class, 'index'])->name('conduct.index');
+        Route::post('conduct', [StudentConductController::class, 'store'])->name('conduct.store');
+
         // Result Cards
         Route::prefix('results')->name('results.')->group(function() {
             Route::get('/', [ResultCardController::class, 'index'])->name('index');

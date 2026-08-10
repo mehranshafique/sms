@@ -3,11 +3,11 @@
 return [
     'country' => 'Pays',
     'select_country' => 'Sélectionner le pays',
-    'state' => 'État / Province',
-    'select_state' => 'Sélectionner l\'état',
-    'city' => 'Ville / Commune',
-    'select_city' => 'Sélectionner la ville/commune',
-    'commune' => 'Commune / Lieu',
+    'state' => 'Ville/Province',
+    'select_state' => 'Sélectionner la ville/province',
+    'city' => 'Commune',
+    'select_city' => 'Sélectionner la commune',
+    'commune' => 'Commune',
     'select_commune' => 'Sélectionner la commune',
     'address' => 'Adresse',
     

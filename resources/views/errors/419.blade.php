@@ -13,7 +13,8 @@
     <p class="digitex-error-hint">{{ __('errors.419_hint') }}</p>
 
     <div class="digitex-error-actions">
-        <a href="javascript:location.reload()" class="btn btn-primary">
+        {{-- Must GET (not reload): reload() re-POSTs the expired form and loops on 419. --}}
+        <a href="{{ Auth::check() ? url()->current() : route('login') }}" class="btn btn-primary" data-419-refresh>
             <i class="fa fa-rotate-right me-2"></i>{{ __('errors.refresh_page') }}
         </a>
         @auth
@@ -26,4 +27,11 @@
             </a>
         @endauth
     </div>
+    <script>
+        // Guard: if opened via history back into a POST 419, prefer a clean GET.
+        document.querySelector('[data-419-refresh]')?.addEventListener('click', function (e) {
+            e.preventDefault();
+            window.location.replace(this.href);
+        });
+    </script>
 @endsection

@@ -198,6 +198,47 @@ class NotificationService
         return $student?->mobile_number ?? $student?->phone ?? null;
     }
 
+    public function isChannelEnabledPublic(?int $institutionId, string $eventKey, string $channel): bool
+    {
+        return $this->isChannelEnabled($institutionId, $eventKey, $channel);
+    }
+
+    /**
+     * Send an SMS/WhatsApp event template to an arbitrary phone (e.g. pre-enrollment parent).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function sendEventToPhone(string $eventKey, string $phone, array $data = [], ?int $institutionId = null): void
+    {
+        $sendSms = $this->isChannelEnabled($institutionId, $eventKey, 'sms');
+        $sendWa = $this->isChannelEnabled($institutionId, $eventKey, 'whatsapp');
+        if (! $sendSms && ! $sendWa) {
+            return;
+        }
+        if ($sendSms) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'sms');
+        }
+        if ($sendWa) {
+            $this->sendNotificationEvent($eventKey, $phone, $data, $institutionId, 'whatsapp');
+        }
+    }
+
+    /**
+     * Send an SMS/WhatsApp event template to the student's parent contact phone.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function sendEventToStudentContact(string $eventKey, Student $student, array $data = []): void
+    {
+        $student->loadMissing(['parent', 'institution']);
+        $institutionId = $student->institution_id;
+        $phone = $this->resolveStudentContactPhone($student, $student->parent);
+        if (empty($phone)) {
+            return;
+        }
+        $this->sendEventToPhone($eventKey, $phone, $data, $institutionId);
+    }
+
     private function dispatchMessage($phone, $message, $institutionId, $channel)
     {
         return $this->performSend($phone, $message, $institutionId, false, $channel, [
@@ -305,6 +346,19 @@ class NotificationService
 
         $user->refresh();
         $data = $this->buildCredentialTemplateData($user, $plainPassword, $roleLabel, $schoolName);
+
+        if ($student) {
+            $ctx = student_notification_context($student);
+            $data['Class'] = $ctx['Class'] ?? 'N/A';
+            $data['Grade'] = $ctx['Grade'] ?? '';
+            $data['Section'] = $ctx['Section'] ?? '';
+            $data['Session'] = $ctx['Session'] ?? '';
+            $data['StudentName'] = $ctx['StudentName'] ?? $data['Name'];
+            if (($data['Name'] ?? '') === ($user->name ?? '') && ! empty($ctx['StudentName'])) {
+                // Prefer student formal/full name in parent-facing welcome copy.
+                $data['Name'] = $ctx['StudentName'];
+            }
+        }
 
         if ($this->isChannelEnabled($institutionId, $eventKey, 'system')) {
             try {

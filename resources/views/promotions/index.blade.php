@@ -12,6 +12,15 @@
             </div>
         </div>
 
+        @if(!empty($requiresReenrollment))
+            <div class="alert alert-info border-0 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <span><i class="fa fa-info-circle me-2"></i>{{ __('reenrollment.workflow_hint') }}</span>
+                <a href="{{ route('reenrollments.index') }}" class="btn btn-primary btn-sm btn-rounded flex-shrink-0">
+                    {{ __('sidebar.reenrollments.title') }} <i class="fa fa-arrow-right ms-2"></i>
+                </a>
+            </div>
+        @endif
+
         {{-- Promotion Filter/Criteria --}}
         <div class="row">
             <div class="col-12">

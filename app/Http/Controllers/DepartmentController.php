@@ -34,6 +34,12 @@ class DepartmentController extends BaseController
 
             return DataTables::of($data)
                 ->addIndexColumn()
+                ->editColumn('name', function ($row) {
+                    return dt_link(dt_route('departments.edit', $row->id), $row->name);
+                })
+                ->editColumn('code', function ($row) {
+                    return dt_link(dt_route('departments.edit', $row->id), $row->code);
+                })
                 ->addColumn('head_of_department', function($row){
                     return $row->headOfDepartment ? $row->headOfDepartment->user->name : 'N/A';
                 })
@@ -51,7 +57,7 @@ class DepartmentController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['action'])
+                ->rawColumns(['name', 'code', 'action'])
                 ->make(true);
         }
 

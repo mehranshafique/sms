@@ -22,7 +22,20 @@ class GuardianPortalController extends BaseController
     public function index()
     {
         $children = $this->linkedChildren();
-        return view('guardian.index', compact('children'));
+        $institutionId = $children->first()?->institution_id
+            ?? Auth::user()->institute_id
+            ?? session('active_institution_id');
+
+        $schoolWhatsapp = null;
+        if ($institutionId) {
+            $raw = \App\Models\InstitutionSetting::get($institutionId, 'school_whatsapp_number');
+            $digits = preg_replace('/\D+/', '', (string) $raw);
+            if (strlen($digits) >= 8) {
+                $schoolWhatsapp = $digits;
+            }
+        }
+
+        return view('guardian.index', compact('children', 'schoolWhatsapp'));
     }
 
     public function fees(Request $request)

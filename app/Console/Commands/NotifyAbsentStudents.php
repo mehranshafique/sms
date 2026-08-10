@@ -2,89 +2,28 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\StudentAttendance;
-use App\Models\InstitutionSetting;
-use App\Services\NotificationService;
+use App\Services\StudentAbsenceNotificationService;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 
 class NotifyAbsentStudents extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'attendance:notify-absent';
+    protected $signature = 'attendance:notify-absent {--date= : Date Y-m-d (default: today)}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Send SMS notifications to parents of students marked absent today';
+    protected $description = 'Send SMS/WhatsApp notifications to parents of students marked absent (deduped)';
 
-    protected $notificationService;
-
-    public function __construct(NotificationService $notificationService)
+    public function handle(StudentAbsenceNotificationService $service): int
     {
-        parent::__construct();
-        $this->notificationService = $notificationService;
-    }
+        $today = $this->option('date')
+            ? Carbon::parse($this->option('date'))->toDateString()
+            : Carbon::today()->toDateString();
 
-    /**
-     * Execute the console command.
-     */
-    public function handle()
-    {
-        $today = Carbon::today()->format('Y-m-d');
-        
         $this->info("Starting absence notifications for {$today}...");
 
-        // 1. Fetch Absentees
-        // Optimize: Group by Institution to check institution settings (like school end time) if needed
-        // For simplicity, we process all active institutions.
-        
-        $absentees = StudentAttendance::with(['student', 'institution'])
-            ->whereDate('attendance_date', $today)
-            ->where('status', 'absent')
-            ->get();
+        $stats = $service->notifyPendingForDate($today);
 
-        $count = 0;
+        $this->info("Sent: {$stats['sent']} | Skipped: {$stats['skipped']} | Failed: {$stats['failed']}");
 
-        foreach ($absentees as $record) {
-            $student = $record->student;
-            $institution = $record->institution;
-
-            if (!$student || !$institution) continue;
-
-            // Check if Institution has Auto-SMS enabled (Optional, good practice)
-            // $autoSmsEnabled = InstitutionSetting::get($institution->id, 'auto_sms_absent', true);
-            // if (!$autoSmsEnabled) continue;
-
-            // Get Parent Phone
-            $parentPhone = $student->father_phone ?? $student->mother_phone ?? $student->guardian_phone;
-
-            if ($parentPhone) {
-                // Prepare Data for SMS Template
-                $smsData = [
-                    'StudentName' => $student->full_name,
-                    'Date' => $today,
-                    'SchoolName' => $institution->name
-                ];
-
-                $this->notificationService->sendNotificationEvent(
-                    'student_absent',
-                    $parentPhone,
-                    $smsData,
-                    $institution->id,
-                    'sms'
-                );
-                
-                $count++;
-            }
-        }
-
-        $this->info("Notifications sent to {$count} parents.");
+        return self::SUCCESS;
     }
 }

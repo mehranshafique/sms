@@ -31,6 +31,9 @@ class CampusController extends BaseController
                     }
                     return '';
                 })
+                ->editColumn('name', function ($row) {
+                    return dt_link(dt_route('campuses.edit', $row->id), $row->name);
+                })
                 ->addColumn('institution_name', function($row){
                     return $row->institution->name ?? '';
                 })
@@ -57,7 +60,7 @@ class CampusController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'is_active', 'action'])
+                ->rawColumns(['checkbox', 'name', 'is_active', 'action'])
                 ->make(true);
         }
 

@@ -81,8 +81,11 @@ class StudentRequestController extends BaseController
                     $deadline = $row->payment_deadline ?? $row->end_date;
                     return $deadline ? localized_date($deadline, 'd M Y') : '—';
                 })
-                ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
-                ->addColumn('ticket', fn($row) => '<span class="fw-bold">'.$row->ticket_number.'</span>')
+                ->addColumn('student_name', fn($row) => dt_link(
+                    $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                    $row->student->full_name ?? 'N/A'
+                ))
+                ->addColumn('ticket', fn($row) => dt_link(dt_route('requests.show', $row->id), $row->ticket_number))
                 ->editColumn('type', fn ($row) => $row->typeLabel())
                 ->editColumn('created_at', fn($row) => $row->created_at ? localized_date($row->created_at, 'd M Y H:i') : '-')
                 ->editColumn('status', function($row){
@@ -128,7 +131,7 @@ class StudentRequestController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['ticket', 'status', 'action', 'applicant'])
+                ->rawColumns(['ticket', 'status', 'action', 'applicant', 'student_name'])
                 ->make(true);
         }
 

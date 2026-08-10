@@ -21,13 +21,15 @@ class StudentAttendance extends Model
         'marked_by',
         'check_in',
         'check_out',
-        'method'
+        'method',
+        'parents_notified_at',
     ];
 
     protected $casts = [
         'attendance_date' => 'date',
         'check_in' => 'datetime',
         'check_out' => 'datetime',
+        'parents_notified_at' => 'datetime',
     ];
 
     public function student()

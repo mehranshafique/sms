@@ -9,7 +9,8 @@
                     <h4>{{ __('staff.attendance_title') }}</h4>
                 </div>
             </div>
-            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
+                <a href="{{ route('staff-attendance.analytics') }}" class="btn btn-outline-primary">{{ __('attendance.staff_analytics_title') }}</a>
                 <a href="{{ route('staff-attendance.create') }}" class="btn btn-primary">{{ __('staff.mark_attendance') }}</a>
             </div>
         </div>
@@ -55,7 +56,7 @@
             columns: [
                 { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false },
                 { data: 'staff_name', name: 'staff.first_name' },
-                { data: 'staff_id', name: 'staff.employee_id' },
+                { data: 'employee_id', name: 'staff.employee_id' },
                 { data: 'attendance_date', name: 'attendance_date' },
                 { data: 'status', name: 'status' },
                 { data: 'check_in', name: 'check_in' },

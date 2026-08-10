@@ -217,7 +217,9 @@ class ConfigurationController extends BaseController
             // Twilio
             'twilio_sid', 'twilio_from', 'twilio_whatsapp_from',
             // SignalWire
-            'sw_project_id', 'sw_space_url', 'sw_from'
+            'sw_project_id', 'sw_space_url', 'sw_from',
+            // Parent-facing WhatsApp contact (QR / wa.me)
+            'school_whatsapp_number',
         ];
 
         foreach ($publicKeys as $key) {
@@ -346,6 +348,17 @@ class ConfigurationController extends BaseController
             'payment_proof_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
             'notice_published' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
             'event_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
+            'reenrollment_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'reenrollment_reminder' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'reenrollment_confirmation_received' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
+            'reenrollment_partial_confirmation' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
+            'reenrollment_confirmed' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'pre_enrollment_received' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'pre_enrollment_test_invite' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'pre_enrollment_test_reminder' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'pre_enrollment_admitted' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'pre_enrollment_not_admitted' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'pre_enrollment_finalized' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
         ];
 
         foreach ($recommended as $event => $channels) {

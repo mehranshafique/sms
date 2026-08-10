@@ -47,16 +47,28 @@ class ClassSectionController extends BaseController
                     return '';
                 })
                 ->addColumn('details', function($row){
+                    $url = dt_route('class-sections.edit', $row->id);
                     return '<div class="d-flex flex-column">
-                                <span class="fw-bold text-primary">'.$row->name.'</span>
-                                <span class="fs-12 text-muted">Room: '.($row->room_number ?? 'N/A').'</span>
+                                <span class="fw-bold">'.dt_link($url, $row->name).'</span>
+                                <span class="fs-12 text-muted">Room: '.e($row->room_number ?? 'N/A').'</span>
                             </div>';
                 })
                 ->addColumn('grade', function($row){
-                    return $row->gradeLevel->name ?? 'N/A';
+                    $grade = $row->gradeLevel;
+                    if (! $grade) {
+                        return 'N/A';
+                    }
+
+                    return dt_link(dt_route('grade-levels.edit', $grade->id), $grade->name);
                 })
                 ->addColumn('teacher', function($row){
-                    return $row->classTeacher ? $row->classTeacher->user->name : '<span class="badge badge-warning">'.__('class_section.not_assigned').'</span>';
+                    if (! $row->classTeacher) {
+                        return '<span class="badge badge-warning">'.__('class_section.not_assigned').'</span>';
+                    }
+                    $staffId = $row->classTeacher->id;
+                    $name = $row->classTeacher->user->name ?? '—';
+
+                    return dt_link(dt_route('staff.show', $staffId, 'staff.edit'), $name);
                 })
                 ->editColumn('is_active', function($row){
                     return $row->is_active 
@@ -74,7 +86,7 @@ class ClassSectionController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'details', 'teacher', 'is_active', 'action'])
+                ->rawColumns(['checkbox', 'details', 'grade', 'teacher', 'is_active', 'action'])
                 ->make(true);
         }
 

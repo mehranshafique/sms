@@ -135,6 +135,10 @@ class ChatbotLogicService
 
             switch ($session->status) {
                 case 'AWAITING_ID':
+                    if (in_array($cmd, ['11', 'preenroll', 'preinscription', 'preinscrire'], true)
+                        || in_array(strtolower(trim($text)), ['preenroll', 'preinscription', 'préinscription', 'pre-enroll'], true)) {
+                        return $this->startPreEnrollmentFlow($session);
+                    }
                     return $this->processIdentity($session, $text);
                 
                 case 'AWAITING_OTP':
@@ -165,6 +169,18 @@ class ChatbotLogicService
                     return $this->processLmdFees($session, $cmd);
                 case 'LMD_RESULTS_SELECT':
                     return $this->processLmdResults($session, $cmd);
+                case 'REENROLL_CONFIRM_SELECT':
+                    return $this->processReenrollmentChoice($session, $cmd);
+                case 'PRE_ENROLL_FIRST':
+                case 'PRE_ENROLL_LAST':
+                case 'PRE_ENROLL_GENDER':
+                case 'PRE_ENROLL_DOB':
+                case 'PRE_ENROLL_PARENT':
+                case 'PRE_ENROLL_PHONE':
+                case 'PRE_ENROLL_CLASS':
+                    return $this->processPreEnrollmentStep($session, $text, $cmd);
+                case 'ATTENDANCE_SELECT':
+                    return $this->processAttendanceChoice($session, $cmd);
 
                 case 'TEACHER_ATTENDANCE_OTP':
                     return $this->processTeacherAttendanceOtp($session, $text);
@@ -682,6 +698,9 @@ class ChatbotLogicService
                 $menu .= "7️⃣ Timetable & Exams\n";
                 $menu .= "8️⃣ Academic Report Card\n";
                 $menu .= "9️⃣ Generate Pickup QR Code\n";
+                $menu .= "1️⃣0️⃣ Confirm Re-Enrollment\n";
+                $menu .= "1️⃣1️⃣ Pre-Enroll a New Student\n";
+                $menu .= "1️⃣2️⃣ My Attendance\n";
                 $menu .= "\n9️⃣9️⃣ 🌐 Changer de langue (FR)\n🚪 Send *logout* to quit";
             } else {
                 $menu = "🎓 *Portail Parents / Élèves*\n🏫 {$school}\n👤 {$name}\n📘 {$infoStr} ({$year})\n\n";
@@ -695,6 +714,9 @@ class ChatbotLogicService
                 $menu .= "7️⃣ Horaires (Cours & Examens)\n";
                 $menu .= "8️⃣ e-Bulletin\n";
                 $menu .= "9️⃣ QR Code Retrait enfant\n";
+                $menu .= "1️⃣0️⃣ Confirmer la réinscription\n";
+                $menu .= "1️⃣1️⃣ Préinscription nouvel élève\n";
+                $menu .= "1️⃣2️⃣ Mes présences\n";
                 $menu .= "\n9️⃣9️⃣ 🌐 Change Language (EN)\n🚪 Envoyer *logout* pour quitter";
             }
 
@@ -732,13 +754,19 @@ class ChatbotLogicService
                 $session->update(['status' => 'STUDENT_SCHEDULE_SELECT']);
                 $msg = $isEn ? "📅 *Schedules*\n1️⃣ Today's Classes\n2️⃣ Upcoming Exams" : "📅 *Horaires*\n1️⃣ Cours (Aujourd'hui)\n2️⃣ Epreuves/Examen (A venir)";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
-            case '8': 
-                return $this->getReportCard($session, $student); 
-            case '9': 
-                $session->update(['status' => 'QR_OTP_CONFIRM']); 
+            case '8':
+                return $this->getReportCard($session, $student);
+            case '9':
+                $session->update(['status' => 'QR_OTP_CONFIRM']);
                 $msg = $isEn ? "🔐 *Generate Pickup QR*\n1️⃣ Request OTP Code" : "🔐 *Générer un QR Code de Retrait*\n1️⃣ Demander un code de sécurité OTP";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
-            default: 
+            case '10':
+                return $this->startReenrollmentFlow($session, $student);
+            case '11':
+                return $this->startPreEnrollmentFlow($session);
+            case '12':
+                return $this->startAttendanceFlow($session, $student);
+            default:
                 $msg = $isEn ? "Invalid option. Please check the menu and try again." : "Option invalide. Veuillez vérifier le menu et réessayer.";
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
         }
@@ -841,16 +869,12 @@ class ChatbotLogicService
         $student = Student::find($session->user_id);
         $institutionId = $session->institution_id;
         $isEn = $session->locale === 'en';
-        
-        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)->where('key', 'block_reports_on_debt')->value('value');
-        if ($isBlocked == '1') {
-            $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
-            if ($unpaid > 0) {
-                $currency = $this->currencySymbol($institutionId);
-                $msg = $isEn ? "⛔ Access denied. You have an outstanding balance of " . number_format($unpaid, 2) . $currency . ". Please settle to view results." 
-                             : "⛔ Accès refusé. Vous avez un solde impayé de " . number_format($unpaid, 2) . $currency . ". Veuillez régler pour voir vos résultats.";
-                return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
-            }
+
+        $access = app(\App\Services\ReportCardAccessService::class)
+            ->check($student, (int) $institutionId, null);
+        if (! $access['allowed']) {
+            $msg = $isEn ? $access['message_en'] : $access['message_fr'];
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
         }
 
         try {
@@ -1487,26 +1511,371 @@ class ChatbotLogicService
         return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
     }
 
+    protected function startReenrollmentFlow($session, $student)
+    {
+        $isEn = $session->locale === 'en';
+        $service = app(ReenrollmentService::class);
+        $confirmation = $service->confirmationForStudent((int) $session->institution_id, (int) $student->id);
+
+        if (! $confirmation) {
+            $msg = $isEn
+                ? __('reenrollment.chatbot.no_campaign_en')
+                : __('reenrollment.chatbot.no_campaign_fr');
+
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        $confirmation->loadMissing(['campaign.toSession', 'fromClassSection.gradeLevel']);
+        $service->refreshPayment($confirmation);
+        $confirmation->refresh();
+
+        if (! in_array($confirmation->status, [
+            \App\Models\ReenrollmentConfirmation::STATUS_PENDING,
+            \App\Models\ReenrollmentConfirmation::STATUS_PARTIAL,
+            \App\Models\ReenrollmentConfirmation::STATUS_PENDING_REVIEW,
+        ], true)) {
+            $status = $confirmation->statusLabel();
+            $msg = $isEn
+                ? __('reenrollment.chatbot.already_en', ['status' => $status])
+                : __('reenrollment.chatbot.already_fr', ['status' => $status]);
+
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        $session->update(['status' => 'REENROLL_CONFIRM_SELECT']);
+
+        $currency = $this->currencySymbol($session->institution_id);
+        $msg = __($isEn ? 'reenrollment.chatbot.prompt_en' : 'reenrollment.chatbot.prompt_fr', [
+            'current' => class_section_label($confirmation->fromClassSection) ?: '—',
+            'next' => $confirmation->campaign?->toSession?->name ?? '—',
+            'fee' => $currency . ' ' . number_format((float) $confirmation->amount_required, 2),
+            'paid' => $currency . ' ' . number_format((float) $confirmation->amount_paid, 2),
+        ]);
+
+        return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+    }
+
+    protected function processReenrollmentChoice($session, $cmd)
+    {
+        $isEn = $session->locale === 'en';
+        $student = Student::find($session->user_id);
+        if (! $student) {
+            return $this->reply($session->phone_number, 'Error: Profile missing.', $session->institution_id);
+        }
+
+        if ($cmd === '0') {
+            $session->update(['status' => 'ACTIVE']);
+
+            return $this->sendStudentMenu($session);
+        }
+
+        if (! in_array($cmd, ['1', '2'], true)) {
+            $msg = $isEn ? 'Invalid option. Reply 1, 2 or 0.' : 'Option invalide. Répondez 1, 2 ou 0.';
+
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        $service = app(ReenrollmentService::class);
+        $confirmation = $service->confirmationForStudent((int) $session->institution_id, (int) $student->id);
+        if (! $confirmation) {
+            $session->update(['status' => 'ACTIVE']);
+            $msg = $isEn
+                ? __('reenrollment.chatbot.no_campaign_en')
+                : __('reenrollment.chatbot.no_campaign_fr');
+
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        try {
+            $updated = $service->recordParentConfirmation(
+                $confirmation,
+                'whatsapp',
+                null,
+                null,
+                $cmd === '2'
+            );
+        } catch (\Throwable $e) {
+            $session->update(['status' => 'ACTIVE']);
+
+            return $this->reply($session->phone_number, $e->getMessage() . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        $session->update(['status' => 'ACTIVE']);
+
+        if ($cmd === '2') {
+            $msg = $isEn
+                ? __('reenrollment.chatbot.declined_en')
+                : __('reenrollment.chatbot.declined_fr');
+        } else {
+            $msg = $isEn
+                ? __('reenrollment.chatbot.confirmed_en', ['status' => $updated->statusLabel()])
+                : __('reenrollment.chatbot.confirmed_fr', ['status' => $updated->statusLabel()]);
+        }
+
+        return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+    }
+
+    /** Accept the common date shapes parents type (dd/mm/yyyy, yyyy-mm-dd, dd-mm-yyyy). */
+    protected function parsePreEnrollmentDob(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        foreach (['d/m/Y', 'd-m-Y', 'd.m.Y', 'Y-m-d', 'Y/m/d'] as $format) {
+            try {
+                $date = Carbon::createFromFormat($format, $raw);
+                if ($date && $date->isPast() && $date->year > 1950) {
+                    return $date->toDateString();
+                }
+            } catch (\Throwable $e) {
+                // try the next format
+            }
+        }
+
+        return null;
+    }
+
+    protected function startPreEnrollmentFlow($session)
+    {
+        $isEn = $session->locale === 'en';
+        if (! $session->institution_id) {
+            $msg = $isEn
+                ? __('pre_enrollment.chatbot.need_school_en')
+                : __('pre_enrollment.chatbot.need_school_fr');
+
+            return $this->reply($session->phone_number, $msg, $session->institution_id);
+        }
+
+        $session->update([
+            'status' => 'PRE_ENROLL_FIRST',
+            'identifier_input' => null,
+        ]);
+
+        $msg = $isEn
+            ? __('pre_enrollment.chatbot.start_en')
+            : __('pre_enrollment.chatbot.start_fr');
+
+        return $this->reply($session->phone_number, $msg, $session->institution_id);
+    }
+
+    protected function processPreEnrollmentStep($session, $text, $cmd)
+    {
+        $isEn = $session->locale === 'en';
+        $raw = trim((string) $text);
+
+        if (in_array(strtolower($raw), ['0', 'cancel', 'annuler'], true)) {
+            $session->update(['status' => $session->user_id ? 'ACTIVE' : 'AWAITING_ID', 'identifier_input' => null]);
+            $msg = $isEn ? __('pre_enrollment.chatbot.cancelled_en') : __('pre_enrollment.chatbot.cancelled_fr');
+            if ($session->user_id) {
+                $this->reply($session->phone_number, $msg, $session->institution_id);
+
+                return $this->sendStudentMenu($session);
+            }
+
+            return $this->reply($session->phone_number, $msg, $session->institution_id);
+        }
+
+        $draft = [];
+        if ($session->identifier_input && str_starts_with($session->identifier_input, 'PRE:')) {
+            $decoded = json_decode(substr($session->identifier_input, 4), true);
+            $draft = is_array($decoded) ? $decoded : [];
+        }
+
+        switch ($session->status) {
+            case 'PRE_ENROLL_FIRST':
+                if ($raw === '') {
+                    break;
+                }
+                $draft['first_name'] = $raw;
+                $session->update([
+                    'status' => 'PRE_ENROLL_LAST',
+                    'identifier_input' => 'PRE:' . json_encode($draft),
+                ]);
+                $msg = $isEn ? __('pre_enrollment.chatbot.ask_last_en') : __('pre_enrollment.chatbot.ask_last_fr');
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
+
+            case 'PRE_ENROLL_LAST':
+                $draft['last_name'] = $raw;
+                $session->update([
+                    'status' => 'PRE_ENROLL_GENDER',
+                    'identifier_input' => 'PRE:' . json_encode($draft),
+                ]);
+                $msg = $isEn ? __('pre_enrollment.chatbot.ask_gender_en') : __('pre_enrollment.chatbot.ask_gender_fr');
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
+
+            case 'PRE_ENROLL_GENDER':
+                $draft['gender'] = ($cmd === '2' || stripos($raw, 'f') === 0) ? 'female' : 'male';
+                $session->update([
+                    'status' => 'PRE_ENROLL_DOB',
+                    'identifier_input' => 'PRE:' . json_encode($draft),
+                ]);
+                $msg = $isEn ? __('pre_enrollment.chatbot.ask_dob_en') : __('pre_enrollment.chatbot.ask_dob_fr');
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
+
+            case 'PRE_ENROLL_DOB':
+                $dob = $this->parsePreEnrollmentDob($raw);
+                if (! $dob) {
+                    $msg = $isEn ? __('pre_enrollment.chatbot.bad_dob_en') : __('pre_enrollment.chatbot.bad_dob_fr');
+
+                    return $this->reply($session->phone_number, $msg, $session->institution_id);
+                }
+                $draft['dob'] = $dob;
+                $session->update([
+                    'status' => 'PRE_ENROLL_PARENT',
+                    'identifier_input' => 'PRE:' . json_encode($draft),
+                ]);
+                $msg = $isEn ? __('pre_enrollment.chatbot.ask_parent_en') : __('pre_enrollment.chatbot.ask_parent_fr');
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
+
+            case 'PRE_ENROLL_PARENT':
+                $draft['parent_name'] = $raw;
+                $session->update([
+                    'status' => 'PRE_ENROLL_PHONE',
+                    'identifier_input' => 'PRE:' . json_encode($draft),
+                ]);
+                $msg = $isEn ? __('pre_enrollment.chatbot.ask_phone_en') : __('pre_enrollment.chatbot.ask_phone_fr');
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
+
+            case 'PRE_ENROLL_PHONE':
+                $draft['parent_phone'] = preg_replace('/\s+/', '', $raw) ?: $session->phone_number;
+                $session->update([
+                    'status' => 'PRE_ENROLL_CLASS',
+                    'identifier_input' => 'PRE:' . json_encode($draft),
+                ]);
+                $msg = $isEn ? __('pre_enrollment.chatbot.ask_class_en') : __('pre_enrollment.chatbot.ask_class_fr');
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
+
+            case 'PRE_ENROLL_CLASS':
+                if (! in_array(strtolower($raw), ['skip', 'passer', '-'], true)) {
+                    $draft['requested_option'] = $raw;
+                }
+                try {
+                    $pre = app(PreEnrollmentService::class)->register(
+                        $draft,
+                        (int) $session->institution_id,
+                        'whatsapp'
+                    );
+                } catch (\Throwable $e) {
+                    $session->update(['status' => $session->user_id ? 'ACTIVE' : 'AWAITING_ID', 'identifier_input' => null]);
+
+                    return $this->reply($session->phone_number, $e->getMessage(), $session->institution_id);
+                }
+
+                $session->update(['status' => $session->user_id ? 'ACTIVE' : 'AWAITING_ID', 'identifier_input' => null]);
+                $msg = __($isEn ? 'pre_enrollment.chatbot.done_en' : 'pre_enrollment.chatbot.done_fr', [
+                    'id' => $pre->temporary_id,
+                    'name' => $pre->fullName(),
+                ]);
+
+                return $this->reply($session->phone_number, $msg . ($session->user_id ? $this->getReturnPrompt($session) : ''), $session->institution_id);
+        }
+
+        return $this->reply($session->phone_number, $isEn ? 'Please reply with a valid value.' : 'Veuillez envoyer une valeur valide.', $session->institution_id);
+    }
+
+    protected function startAttendanceFlow($session, $student)
+    {
+        $isEn = $session->locale === 'en';
+        $session->update(['status' => 'ATTENDANCE_SELECT']);
+        $msg = $isEn ? __('chatbot_attendance.prompt_en') : __('chatbot_attendance.prompt_fr');
+
+        return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+    }
+
+    protected function processAttendanceChoice($session, $cmd)
+    {
+        $isEn = $session->locale === 'en';
+        $student = Student::find($session->user_id);
+        if (! $student) {
+            return $this->reply($session->phone_number, 'Error: Profile missing.', $session->institution_id);
+        }
+
+        if ($cmd === '0') {
+            $session->update(['status' => 'ACTIVE']);
+
+            return $this->sendStudentMenu($session);
+        }
+
+        $sessionId = AcademicSession::where('institution_id', $session->institution_id)
+            ->where('is_current', true)
+            ->value('id');
+
+        if ($cmd === '1') {
+            $today = now()->toDateString();
+            $row = StudentAttendance::where('student_id', $student->id)
+                ->whereDate('attendance_date', $today)
+                ->latest('id')
+                ->first();
+            if (! $row) {
+                $msg = $isEn ? __('chatbot_attendance.none_today_en') : __('chatbot_attendance.none_today_fr');
+            } else {
+                $statusKey = 'chatbot_attendance.status_' . strtolower($row->status);
+                $statusLabel = __($statusKey);
+                if ($statusLabel === $statusKey) {
+                    $statusLabel = ucfirst($row->status);
+                }
+                $msg = __($isEn ? 'chatbot_attendance.today_en' : 'chatbot_attendance.today_fr', [
+                    'date' => $today,
+                    'status' => $statusLabel,
+                ]);
+            }
+
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        $from = null;
+        $periodLabel = '';
+        if ($cmd === '2') {
+            $from = now()->startOfWeek();
+            $periodLabel = __('chatbot_attendance.week');
+        } elseif ($cmd === '3') {
+            $from = now()->startOfMonth();
+            $periodLabel = __('chatbot_attendance.month');
+        } elseif ($cmd === '4') {
+            $from = null;
+            $periodLabel = __('chatbot_attendance.session');
+        } else {
+            $msg = $isEn ? 'Invalid option.' : 'Option invalide.';
+
+            return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+        }
+
+        $query = StudentAttendance::where('student_id', $student->id);
+        if ($sessionId) {
+            $query->where('academic_session_id', $sessionId);
+        }
+        if ($from) {
+            $query->whereDate('attendance_date', '>=', $from->toDateString());
+        }
+
+        $counts = $query->selectRaw('LOWER(status) as st, COUNT(*) as total')
+            ->groupBy('st')
+            ->pluck('total', 'st');
+
+        $msg = __($isEn ? 'chatbot_attendance.period_en' : 'chatbot_attendance.period_fr', [
+            'period' => $periodLabel,
+            'present' => (int) ($counts['present'] ?? 0),
+            'absent' => (int) ($counts['absent'] ?? 0),
+            'late' => (int) ($counts['late'] ?? 0),
+            'excused' => (int) (($counts['excused'] ?? 0) + ($counts['half_day'] ?? 0)),
+        ]);
+
+        return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+    }
+
     protected function getReportCard($session, $student) {
         $institutionId = $session->institution_id;
         $isEn = $session->locale === 'en';
 
         try {
-            $isBlocked = InstitutionSetting::where('institution_id', $institutionId)->where('key', 'block_reports_on_debt')->value('value');
-
-            if ($isBlocked == '1') {
-                $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
-
-                if ($unpaid > 0) {
-                    $currency = $this->currencySymbol($institutionId);
-                    $formattedDebt = number_format($unpaid, 2) . ' ' . $currency;
-                    $msg = $isEn 
-                        ? "⛔ Access denied. You have an outstanding balance of $formattedDebt. Please settle to view results."
-                        : "⛔ Accès refusé. Vous avez un solde impayé de $formattedDebt. Veuillez régler pour voir vos résultats.";
-                    return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
-                }
-            }
-
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
             if(!$enrollment) return $this->reply($session->phone_number, ($isEn ? "Not enrolled." : "Non inscrit.") . $this->getReturnPrompt($session), $institutionId);
 
@@ -1552,10 +1921,12 @@ class ChatbotLogicService
             }
 
             $hasActiveTermExam = false;
+            $termKey = null;
             if ($cycleService->usesTrimesterModel($cycle)) {
                 foreach ([3, 2, 1] as $t) {
                     if (in_array('trimester_' . $t, $activePeriods, true) || in_array("trimester_exam_{$t}", $activePeriods, true)) {
                         $hasActiveTermExam = true;
+                        $termKey = in_array("trimester_exam_{$t}", $activePeriods, true) ? "trimester_exam_{$t}" : 'trimester_' . $t;
                         break;
                     }
                 }
@@ -1563,6 +1934,7 @@ class ChatbotLogicService
                 foreach ([2, 1] as $s) {
                     if (in_array('semester_' . $s, $activePeriods, true) || in_array("semester_exam_{$s}", $activePeriods, true)) {
                         $hasActiveTermExam = true;
+                        $termKey = in_array("semester_exam_{$s}", $activePeriods, true) ? "semester_exam_{$s}" : 'semester_' . $s;
                         break;
                     }
                 }
@@ -1596,6 +1968,18 @@ class ChatbotLogicService
             } else {
                 $reportParams['type'] = 'period';
                 $reportParams['period'] = $allowedPeriodKeys[0] ?? 'p1';
+                $chosenPeriod = $reportParams['period'];
+            }
+
+            $accessPeriodKey = $chosenPeriod
+                ?? $termKey
+                ?? ($reportParams['period'] ?? null);
+
+            $access = app(\App\Services\ReportCardAccessService::class)
+                ->check($student, (int) $institutionId, $accessPeriodKey);
+            if (! $access['allowed']) {
+                $msg = $isEn ? $access['message_en'] : $access['message_fr'];
+                return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
             }
 
             $originalUser = Auth::user();

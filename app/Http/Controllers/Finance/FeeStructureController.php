@@ -38,6 +38,9 @@ class FeeStructureController extends BaseController
 
             return DataTables::of($data)
                 ->addIndexColumn()
+                ->editColumn('name', function($row){
+                    return dt_link(dt_route('fees.show', $row->id, 'fees.edit'), $row->name);
+                })
                 ->addColumn('fee_type', function($row){
                     return $row->feeType->name ?? 'N/A';
                 })
@@ -84,7 +87,7 @@ class FeeStructureController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['action'])
+                ->rawColumns(['name', 'action'])
                 ->make(true);
         }
 

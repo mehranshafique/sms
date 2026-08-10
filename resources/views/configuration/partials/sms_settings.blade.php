@@ -221,6 +221,49 @@
                 </div>
             </div>
 
+            {{-- Parent WhatsApp contact QR --}}
+            @unless($isSuperAdmin)
+            <div class="mt-4 mb-2 p-4 border rounded-3 bg-light">
+                <h5 class="text-primary fw-bold mb-2">
+                    <i class="fab fa-whatsapp me-2"></i>{{ __('configuration.school_whatsapp_qr_title') }}
+                </h5>
+                <p class="text-muted small mb-3">{{ __('configuration.school_whatsapp_qr_help') }}</p>
+                <div class="row align-items-end g-3">
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">{{ __('configuration.school_whatsapp_number') }}</label>
+                        <input type="text"
+                               name="school_whatsapp_number"
+                               id="schoolWhatsappNumber"
+                               class="form-control"
+                               value="{{ $settings['school_whatsapp_number'] ?? ($settings['infobip_whatsapp_from'] ?? ($settings['twilio_whatsapp_from'] ?? '')) }}"
+                               placeholder="e.g. 243899xxxxxx"
+                               inputmode="tel">
+                        <small class="text-muted">{{ __('configuration.school_whatsapp_number_hint') }}</small>
+                    </div>
+                    <div class="col-md-7">
+                        <div class="d-flex flex-wrap align-items-center gap-3">
+                            <div id="schoolWaQrPreview" class="bg-white border rounded p-2 text-center" style="min-width:140px;min-height:140px;">
+                                <img id="schoolWaQrImg" src="" alt="WhatsApp QR" width="128" height="128" class="d-none">
+                                <div id="schoolWaQrEmpty" class="text-muted small py-5 px-2">{{ __('configuration.school_whatsapp_qr_empty') }}</div>
+                            </div>
+                            <div>
+                                <a id="schoolWaLink" href="#" target="_blank" rel="noopener" class="btn btn-success btn-sm mb-2 d-none">
+                                    <i class="fab fa-whatsapp me-1"></i>{{ __('configuration.open_whatsapp') }}
+                                </a>
+                                <a id="schoolWaQrDownload" href="#" download="school-whatsapp-qr.png" class="btn btn-outline-primary btn-sm mb-2 d-none">
+                                    <i class="fa fa-download me-1"></i>{{ __('configuration.download_qr') }}
+                                </a>
+                                <button type="button" id="schoolWaQrPrint" class="btn btn-outline-secondary btn-sm mb-2 d-none">
+                                    <i class="fa fa-print me-1"></i>{{ __('configuration.print_qr') }}
+                                </button>
+                                <div class="small text-muted">{{ __('configuration.school_whatsapp_qr_print_hint') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endunless
+
             <div class="text-end mt-4">
                 <button type="submit" class="btn btn-primary px-4">{{ __('configuration.save_changes') }}</button>
             </div>
@@ -277,6 +320,68 @@
                     subError.style.display = 'none';
                     this.classList.remove('is-invalid');
                 }
+            });
+        }
+
+        // School WhatsApp QR live preview
+        const waInput = document.getElementById('schoolWhatsappNumber');
+        const waImg = document.getElementById('schoolWaQrImg');
+        const waEmpty = document.getElementById('schoolWaQrEmpty');
+        const waLink = document.getElementById('schoolWaLink');
+        const waDl = document.getElementById('schoolWaQrDownload');
+        const waPrint = document.getElementById('schoolWaQrPrint');
+
+        function digitsOnly(v) {
+            return (v || '').replace(/\D+/g, '');
+        }
+
+        function refreshWaQr() {
+            if (!waInput || !waImg) return;
+            const digits = digitsOnly(waInput.value);
+            if (digits.length < 8) {
+                waImg.classList.add('d-none');
+                waEmpty?.classList.remove('d-none');
+                waLink?.classList.add('d-none');
+                waDl?.classList.add('d-none');
+                waPrint?.classList.add('d-none');
+                return;
+            }
+            const waUrl = 'https://wa.me/' + digits;
+            const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=' + encodeURIComponent(waUrl);
+            waImg.src = qrUrl;
+            waImg.classList.remove('d-none');
+            waEmpty?.classList.add('d-none');
+            if (waLink) {
+                waLink.href = waUrl;
+                waLink.classList.remove('d-none');
+            }
+            if (waDl) {
+                waDl.href = qrUrl;
+                waDl.classList.remove('d-none');
+            }
+            waPrint?.classList.remove('d-none');
+        }
+
+        if (waInput) {
+            waInput.addEventListener('input', refreshWaQr);
+            refreshWaQr();
+        }
+
+        if (waPrint) {
+            waPrint.addEventListener('click', function() {
+                const digits = digitsOnly(waInput?.value || '');
+                if (digits.length < 8) return;
+                const waUrl = 'https://wa.me/' + digits;
+                const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(waUrl);
+                const w = window.open('', '_blank');
+                if (!w) return;
+                w.document.write('<html><head><title>WhatsApp QR</title></head><body style="text-align:center;font-family:sans-serif;padding:24px;">'
+                    + '<h2>{{ __('configuration.school_whatsapp_qr_title') }}</h2>'
+                    + '<img src="' + qrUrl + '" width="280" height="280" alt="QR"/>'
+                    + '<p style="margin-top:16px;">' + waUrl + '</p>'
+                    + '<script>window.onload=function(){window.print();}<\\/script>'
+                    + '</body></html>');
+                w.document.close();
             });
         }
     });

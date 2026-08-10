@@ -19,6 +19,8 @@ use App\Models\Timetable;
 use App\Services\NotificationService;
 use App\Services\InAppNotificationService;
 use App\Services\CurrencyService;
+use App\Services\StudentAbsenceNotificationService;
+use App\Enums\RoleEnum;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -314,12 +316,19 @@ class AttendanceApiController extends Controller
             default => '#6B7280',
         };
 
+        $displayName = trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? ''));
+        $photoUrl = $student->student_photo ? asset('storage/' . $student->student_photo) : null;
+
         return response()->json([
             'status' => 'success',
             'success' => true,
             'action' => $action,
             'type' => 'student',
-            'name' => $student->first_name . ' ' . $student->last_name . ' (' . $admNo . ')',
+            'person_id' => $student->id,
+            'display_name' => $displayName,
+            'name' => $displayName . ' (' . $admNo . ')',
+            'code' => $admNo,
+            'photo_url' => $photoUrl,
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
             'subject' => $slotLabel,
@@ -463,16 +472,24 @@ class AttendanceApiController extends Controller
             $action = 'departure';
         }
 
+        $staffName = optional($staff->user)->name ?? 'Staff Member';
+        $photoPath = optional($staff->user)->profile_picture;
+        $photoUrl = $photoPath ? asset('storage/' . ltrim($photoPath, '/')) : null;
+
         return response()->json([
             'status' => 'success',
             'success' => true,
             'action' => $action,
             'type' => 'staff',
-            'name' => optional($staff->user)->name ?? 'Staff Member',
+            'person_id' => $staff->id,
+            'display_name' => $staffName,
+            'name' => $staffName,
+            'code' => $staff->employee_id,
+            'photo_url' => $photoUrl,
             'time' => $scanTime->format('h:i A'),
             'punctuality' => $status,
             'ui_color' => $status === 'late' ? '#F59E0B' : '#10B981',
-            'message' => ($action === 'arrival' ? 'Check-in recorded' : 'Check-out recorded') . ' for ' . (optional($staff->user)->name ?? 'staff'),
+            'message' => ($action === 'arrival' ? 'Check-in recorded' : 'Check-out recorded') . ' for ' . $staffName,
         ], 200);
     }
 
@@ -1017,6 +1034,7 @@ class AttendanceApiController extends Controller
         $results = [];
         $sentCount = 0;
         $failedCount = 0;
+        $absenceService = app(StudentAbsenceNotificationService::class);
 
         foreach ($request->student_ids as $studentId) {
             $student = Student::with(['parent', 'institution', 'enrollments'])->find($studentId);
@@ -1033,85 +1051,43 @@ class AttendanceApiController extends Controller
                 continue;
             }
 
-            $parentPhone = $student->parent?->father_phone
-                ?? $student->parent?->mother_phone
-                ?? $student->parent?->guardian_phone;
+            $outcome = $absenceService->notifyStudent((int) $student->institution_id, (int) $studentId, $date);
 
-            if (!$parentPhone) {
-                $results[] = [
-                    'student_id' => $studentId,
-                    'student_name' => $student->full_name,
-                    'success' => false,
-                    'message' => 'No parent phone number on file.',
-                ];
-                $failedCount++;
-                continue;
-            }
-
-            $institutionId = $student->institution_id;
-            $eventKey = 'student_absent';
-            $payload = [
-                'StudentName' => $student->full_name,
-                'Date' => Carbon::parse($date)->format('d/m/Y'),
-                'SchoolName' => $student->institution?->name ?? 'School',
-            ];
-
-            $channelsSent = [];
-            $channelErrors = [];
-
-            foreach ($channels as $channel) {
-                $response = $this->notificationService->sendNotificationEvent(
-                    $eventKey,
-                    $parentPhone,
-                    $payload,
-                    $institutionId,
-                    $channel
-                );
-
-                if (($response['success'] ?? false) === true) {
-                    $channelsSent[] = $channel;
-                } else {
-                    $channelErrors[] = $channel . ': ' . ($response['message'] ?? 'Failed');
-                }
-            }
-
-            if (!empty($channelsSent)) {
+            if ($outcome === 'sent') {
                 $sentCount++;
                 $results[] = [
                     'student_id' => $studentId,
                     'student_name' => $student->full_name,
                     'success' => true,
-                    'channels' => $channelsSent,
-                    'message' => 'Notification sent via ' . implode(', ', $channelsSent) . '.',
+                    'message' => 'Notification sent.',
+                    'channels' => $channels,
                 ];
+            } elseif ($outcome === 'skipped') {
+                $results[] = [
+                    'student_id' => $studentId,
+                    'student_name' => $student->full_name,
+                    'success' => false,
+                    'message' => 'Skipped (already notified, no phone, channels off, or not absent).',
+                ];
+                $failedCount++;
             } else {
                 $failedCount++;
                 $results[] = [
                     'student_id' => $studentId,
                     'student_name' => $student->full_name,
                     'success' => false,
-                    'message' => !empty($channelErrors)
-                        ? implode(' | ', $channelErrors)
-                        : 'No active SMS/WhatsApp template for absence alerts.',
+                    'message' => 'Notification failed.',
                 ];
             }
         }
 
-        $failureDetail = collect($results)
-            ->where('success', false)
-            ->pluck('message')
-            ->filter()
-            ->first();
-
         return response()->json([
-            'success' => $sentCount > 0,
+            'success' => true,
+            'date' => $date,
             'sent' => $sentCount,
             'failed' => $failedCount,
             'results' => $results,
-            'message' => $sentCount > 0
-                ? "Notifications sent for {$sentCount} student(s)."
-                : ($failureDetail ?: 'No notifications were sent.'),
-        ], $sentCount > 0 ? 200 : 422);
+        ]);
     }
 
     private function resolveAssignedClassIdsForUser($user): array
@@ -1163,6 +1139,11 @@ class AttendanceApiController extends Controller
 
     private function denyInvalidHardware(Request $request): ?\Illuminate\Http\JsonResponse
     {
+        // Web kiosk / mobile app: authenticated gate operators (same contract as hardware scan).
+        if ($this->isAuthorizedKioskOperator()) {
+            return null;
+        }
+
         $secret = config('services.hardware.secret', env('HARDWARE_SECRET'));
         if (empty($secret)) {
             Log::critical('HARDWARE_SECRET is not configured — hardware API disabled');
@@ -1175,6 +1156,22 @@ class AttendanceApiController extends Controller
         }
 
         return null;
+    }
+
+    public function isAuthorizedKioskOperator(): bool
+    {
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        return $user->hasRole([
+            RoleEnum::GATE_ATTENDANT->value,
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+            'Guard',
+        ]);
     }
 
     /**
@@ -1226,6 +1223,7 @@ class AttendanceApiController extends Controller
             ->where(function ($q) use ($possibleUids) {
                 $q->whereIn('nfc_uid', $possibleUids)
                     ->orWhereIn('rfid_uid', $possibleUids)
+                    ->orWhereIn('qr_code_token', $possibleUids)
                     ->orWhereIn('employee_id', $possibleUids);
             })
             ->first();

@@ -35,6 +35,9 @@ class ElectionController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
+                ->editColumn('title', function ($row) {
+                    return dt_link(dt_route('elections.show', $row->id, 'elections.edit'), $row->title);
+                })
                 ->editColumn('status', function($row){
                     $badges = [
                         'draft' => 'badge-secondary',
@@ -68,7 +71,7 @@ class ElectionController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['status', 'action'])
+                ->rawColumns(['title', 'status', 'action'])
                 ->make(true);
         }
 

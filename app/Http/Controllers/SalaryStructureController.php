@@ -30,7 +30,10 @@ class SalaryStructureController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('name', function($row){
-                    return $row->full_name ?? $row->user->name ?? 'N/A';
+                    return dt_link(
+                        dt_route('staff.show', $row->id, 'staff.edit'),
+                        $row->full_name ?? $row->user->name ?? 'N/A'
+                    );
                 })
                 ->addColumn('base_salary', function($row){
                     if($row->salaryStructure) {
@@ -81,7 +84,7 @@ class SalaryStructureController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['base_salary', 'action'])
+                ->rawColumns(['name', 'base_salary', 'action'])
                 ->make(true);
         }
 

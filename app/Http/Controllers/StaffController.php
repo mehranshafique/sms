@@ -59,6 +59,7 @@ class StaffController extends BaseController
                     $name = $row->user->name;
                     $email = $row->user->email;
                     $initial = strtoupper(substr($name, 0, 1));
+                    $url = dt_route('staff.show', $row->id, 'staff.edit');
                     
                     $avatarHtml = $img 
                         ? '<img src="'.$img.'" class="rounded-circle me-3" width="50" height="50" style="object-fit:cover;" alt="">'
@@ -67,9 +68,9 @@ class StaffController extends BaseController
                     return '<div class="d-flex align-items-center">
                                 '.$avatarHtml.'
                                 <div>
-                                    <h6 class="fs-16 font-w600 mb-0"><a href="'.route('staff.show', $row->id).'" class="text-black">'.$name.'</a></h6>
-                                    <span class="fs-13 text-muted">'.$email.'</span>
-                                    <small class="d-block text-muted">'.$row->employee_id.'</small>
+                                    <h6 class="fs-16 font-w600 mb-0">'.dt_link($url, $name, 'text-black').'</h6>
+                                    <span class="fs-13 text-muted">'.e($email).'</span>
+                                    <small class="d-block text-muted">'.dt_link($url, $row->employee_id).'</small>
                                 </div>
                             </div>';
                 })

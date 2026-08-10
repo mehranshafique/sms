@@ -35,7 +35,10 @@ class StaffLeaveController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
-                ->addColumn('staff_name', fn($row) => $row->staff->user->name ?? 'N/A')
+                ->addColumn('staff_name', fn($row) => dt_link(
+                    $row->staff_id ? dt_route('staff.show', $row->staff_id, 'staff.edit') : null,
+                    $row->staff->user->name ?? 'N/A'
+                ))
                 ->editColumn('type', fn($row) => __('staff_leave.type_' . $row->type))
                 ->editColumn('status', function($row){
                     $badges = ['pending' => 'warning', 'approved' => 'success', 'rejected' => 'danger'];
@@ -68,7 +71,7 @@ class StaffLeaveController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['status', 'action'])
+                ->rawColumns(['staff_name', 'status', 'action'])
                 ->make(true);
         }
 

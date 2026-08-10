@@ -54,8 +54,14 @@ class UniversityEnrollmentController extends BaseController
 
             return DataTables::of($data)
                 ->addIndexColumn()
-                ->addColumn('student_name', fn($row) => $row->student->full_name ?? 'N/A')
-                ->addColumn('admission_no', fn($row) => $row->student->admission_number ?? '-')
+                ->addColumn('student_name', fn($row) => dt_link(
+                    $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                    $row->student->full_name ?? 'N/A'
+                ))
+                ->addColumn('admission_no', fn($row) => dt_link(
+                    $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                    $row->student->admission_number ?? null
+                ))
                 ->addColumn('program', function($row){
                     // Display Program Name via GradeLevel relation if available, else Class Name
                     $prog = $row->classSection->gradeLevel->program->code ?? $row->classSection->name;
@@ -79,7 +85,7 @@ class UniversityEnrollmentController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['status', 'action'])
+                ->rawColumns(['student_name', 'admission_no', 'status', 'action'])
                 ->make(true);
         }
 

@@ -25,6 +25,10 @@ return [
     'lock_help' => 'If enabled, no new attendance can be marked by teachers for any date.',
     'grace_period' => 'Modification Grace Period (Days)',
     'grace_help' => 'Number of past days teachers are allowed to add or edit attendance. Set to 0 to allow only today.',
+    'auto_notify_absent' => 'Notify parents when student is absent',
+    'auto_notify_on' => 'Enabled',
+    'auto_notify_off' => 'Disabled',
+    'auto_notify_absent_help' => 'When enabled, parents receive SMS/WhatsApp (per Notification Preferences for “Student Absent”) as soon as a student is marked Absent. A daily catch-up also runs at 16:00.',
     
     // Exam Settings
     'exam_settings' => 'Exam Configuration',
@@ -53,8 +57,25 @@ return [
     'disabled' => 'Disabled (Open)',
     
     'financial_restrictions' => 'Financial Restrictions',
-    'block_reports_on_debt' => 'Block   Report Cards & Transcripts for Students with Unpaid Fees',
-    'block_reports_on_debt_help' => 'If enabled, students with an outstanding fee balance will be automatically blocked from downloading or receiving their academic reports (including via the Chatbot and Automated SMS/WhatsApp).',      
+    'block_reports_on_debt' => 'Block Report Cards & Transcripts when payment rules are not met',
+    'block_reports_on_debt_help' => 'If enabled, report cards are blocked when payment rules fail (Chatbot, SMS/WhatsApp, and web downloads). Configure a minimum paid amount per period below; if a period has no minimum, any outstanding balance blocks access.',
+    'report_min_paid_title' => 'Minimum paid amount per report period',
+    'report_min_paid_help' => 'For each period, set how much the student must have paid (current session) to unlock that report card. Leave blank to use the legacy rule (any unpaid balance blocks). The parent sees how much remains to reach this amount.',
+
+    'report_seal_title' => 'Report Card Seal / Stamp',
+    'report_seal_position' => 'Seal position',
+    'report_seal_position_help' => 'Where the school seal appears in the report card footer.',
+    'report_seal_image' => 'Seal / stamp image',
+    'report_seal_image_help' => 'Upload your official school stamp (PNG/JPG, max 2MB). If empty, the default circular seal is used.',
+    'remove_report_seal' => 'Remove uploaded seal',
+    'seal_left' => 'Left',
+    'seal_center' => 'Center',
+    'seal_right' => 'Right',
+    'seal_none' => 'Hidden',
+    'application_scale' => 'Application Scale (Report Card)',
+    'application_scale_help' => 'Maps overall percentage to Application grade on bulletins. Editable per school.',
+    'resit_pass_percentage' => 'Resit pass percentage (secondary)',
+    'resit_pass_percentage_help' => 'When Semester 2 is finalized, parents are notified of subjects below this percentage.',
     
     // Errors
     'admin_blocked' => 'Action blocked by administrator.',

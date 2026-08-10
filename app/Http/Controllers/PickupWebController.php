@@ -180,7 +180,12 @@ class PickupWebController extends BaseController
 
             return DataTables::of($query)
                 ->addIndexColumn()
-                ->addColumn('student_name', fn($row) => $row->student->full_name)
+                ->addColumn('student_name', function ($row) {
+                    return dt_link(
+                        $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                        $row->student->full_name ?? '—'
+                    );
+                })
                 ->addColumn('pickup_by', fn($row) => $row->requested_by ?? 'Parent')
                 ->addColumn('scanned_by', fn($row) => $row->scanner->name ?? '-')
                 ->editColumn('status', function($row){
@@ -207,7 +212,7 @@ class PickupWebController extends BaseController
                     }
                     return '';
                 })
-                ->rawColumns(['status', 'action'])
+                ->rawColumns(['student_name', 'status', 'action'])
                 ->make(true);
         }
 

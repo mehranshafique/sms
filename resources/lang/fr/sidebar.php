@@ -100,6 +100,7 @@ return [
     ],
     'results' => 'Relevé',
     'academic_reports' => 'e-Bulletin',
+    'conduct' => 'Conduite',
     'exam_schedules' => [
         'title' => 'Horaires d\'examen',
         'manage' => 'Gestion Horaire',
@@ -119,7 +120,13 @@ return [
     ],
     'people' => 'INSCRIPTION & Plus',
     'students' => [
-        'title' => 'Etudiant'
+        'title' => 'Etudiant',
+        'all' => 'Tous les étudiants',
+    ],
+    'enrollment_progression' => 'Inscription & Progression',
+    'student_welfare' => 'Demandes & Discipline',
+    'pre_enrollments' => [
+        'title' => 'Préinscription'
     ],
     'enrollments' => [
         'title' => 'Inscriptions'
@@ -128,15 +135,21 @@ return [
         'title' => 'Inscriptions Univ.'
     ],
     'attendance' => [
-        'title' => 'e-Registre d\'Appel'
+        'title' => 'e-Registre d\'Appel',
+        'register' => 'Registre journalier',
     ],
+    'attendance_kiosk' => 'Kiosque de présence',
     'promotions' => [
         'title' => 'Promotions'
+    ],
+    'reenrollments' => [
+        'title' => 'Réinscription'
     ],
     'staff' => [
         'title' => 'Personnel'
     ],
     'staff_attendance' => 'Présence personnel',
+    'staff_attendance_analytics' => 'Analytique personnel',
     'staff_leaves' => 'Congés personnel',
     'queue_monitor' => 'File d\'attente & Cron',
     'fee_types' => [

@@ -44,6 +44,9 @@ class AcademicSessionController extends BaseController
                 ->addColumn('institution_name', function($row){
                     return $row->institution->name ?? 'N/A';
                 })
+                ->editColumn('name', function($row){
+                    return dt_link(dt_route('academic-sessions.show', $row->id, 'academic-sessions.edit'), $row->name);
+                })
                 ->editColumn('is_current', function($row){
                     return $row->is_current 
                         ? '<span class="badge badge-success">'.__('academic_session.yes').'</span>' 
@@ -82,7 +85,7 @@ class AcademicSessionController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'is_current', 'status', 'action'])
+                ->rawColumns(['checkbox', 'name', 'is_current', 'status', 'action'])
                 ->make(true);
         }
 

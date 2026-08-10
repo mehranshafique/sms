@@ -559,26 +559,24 @@ class ExamMarkController extends BaseController
     /**
      * Centralized check for outstanding fees to restrict report access
      */
-    public function checkFinancialClearance($studentId, $institutionId, $abort = true)
+    public function checkFinancialClearance($studentId, $institutionId, $abort = true, ?string $periodKey = null)
     {
         if (!$studentId || !$institutionId) return true;
 
-        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
-                        ->where('key', 'block_reports_on_debt')
-                        ->value('value');
-                        
-        if ($isBlocked == '1') {
-            $unpaid = Invoice::where('student_id', $studentId)
-                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
-                ->sum(DB::raw('total_amount - paid_amount'));
-                
-            if ($unpaid > 0) {
-                if ($abort) {
-                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance of ' . \App\Enums\CurrencySymbol::default() . ' ' . number_format($unpaid, 2) . '. Please settle the account to access academic reports.');
-                }
-                return false;
-            }
+        $student = \App\Models\Student::find($studentId);
+        if (!$student) return true;
+
+        $result = app(\App\Services\ReportCardAccessService::class)
+            ->check($student, (int) $institutionId, $periodKey);
+
+        if ($result['allowed']) {
+            return true;
         }
-        return true;
+
+        if ($abort) {
+            abort(403, $result['message_en'] ?: (__('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance of ' . \App\Enums\CurrencySymbol::default() . ' ' . number_format($result['remaining'], 2) . '. Please settle the account to access academic reports.'));
+        }
+
+        return false;
     }
 }

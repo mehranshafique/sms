@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\NotifyAbsentParentsJob;
 use App\Models\StudentAttendance;
 use App\Models\ClassSection;
 use App\Models\StudentEnrollment;
@@ -11,6 +12,7 @@ use App\Models\Institution;
 use App\Models\Subject;
 use App\Models\ClassSubject;
 use App\Models\Timetable;
+use App\Services\StudentAbsenceNotificationService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -119,10 +121,16 @@ class StudentAttendanceController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('student_name', function($row){
-                    return $row->student->full_name ?? 'Unknown';
+                    return dt_link(
+                        $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                        $row->student->full_name ?? 'Unknown'
+                    );
                 })
                 ->addColumn('roll_no', function($row){
-                    return $row->student->admission_number ?? '-'; 
+                    return dt_link(
+                        $row->student_id ? dt_route('students.show', $row->student_id, 'students.edit') : null,
+                        $row->student->admission_number ?? null
+                    );
                 })
                 ->addColumn('class', function($row){
                     $grade = $row->classSection->gradeLevel->name ?? '';
@@ -146,7 +154,7 @@ class StudentAttendanceController extends BaseController
                 ->editColumn('attendance_date', function($row){
                     return $row->attendance_date->format('d M, Y');
                 })
-                ->rawColumns(['status'])
+                ->rawColumns(['student_name', 'roll_no', 'status'])
                 ->make(true);
         }
 
@@ -444,6 +452,18 @@ class StudentAttendanceController extends BaseController
                 );
             }
         });
+
+        $absentIds = app(StudentAbsenceNotificationService::class)
+            ->absentStudentIdsFromMap($request->attendance)
+            ->all();
+
+        if ($absentIds !== []) {
+            NotifyAbsentParentsJob::dispatch(
+                (int) $targetInstituteId,
+                $absentIds,
+                (string) $request->attendance_date
+            );
+        }
 
         return response()->json(['message' => __('attendance.messages.success_marked'), 'redirect' => route('attendance.index')]);
     }

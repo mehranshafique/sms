@@ -11,4 +11,7 @@ return [
     'child_not_found' => 'Child not found.',
     'outstanding' => 'Outstanding balance',
     'select_child' => 'Viewing data for',
+    'school_whatsapp' => 'Chat with the school on WhatsApp',
+    'school_whatsapp_help' => 'Scan the QR code or tap the button to message this school.',
+    'open_school_whatsapp' => 'Open WhatsApp',
 ];

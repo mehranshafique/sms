@@ -109,13 +109,8 @@
 
         @php
             $percentage = $totalMax > 0 ? ($totalObtained / $totalMax) * 100 : 0;
-            $application = 'F';
-            if ($percentage >= 80) $application = 'E';
-            elseif ($percentage >= 70) $application = 'TB';
-            elseif ($percentage >= 60) $application = 'B';
-            elseif ($percentage >= 50) $application = 'AB';
-            
-            $conduct = !empty($student->conduct) ? $student->conduct : '-';
+            $application = $application ?? '-';
+            $conduct = $conduct ?? '-';
         @endphp
 
         <div class="summary-container">
@@ -153,38 +148,7 @@
             @php $qrData = urlencode("{$student->first_name} {$student->last_name} | ID: {$student->admission_number}"); @endphp
             <div class="qr-code" style="background-image: url('https://api.qrserver.com/v1/create-qr-code/?size=64x64&data={{ $qrData }}');"></div>
 
-            <div class="stamp-overlay">
-                @php $svgId = isset($loop_index) ? $loop_index . '-' . $student->id : $student->id; @endphp
-                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="var(--stamp-blue)" stroke-width="3"/>
-                    <circle cx="50" cy="50" r="41" fill="none" stroke="var(--stamp-blue)" stroke-width="1.2"/>
-                    <circle cx="50" cy="50" r="26" fill="none" stroke="var(--stamp-blue)" stroke-width="0.8" stroke-dasharray="2,2"/>
-                    
-                    <path id="txt-top-{{ $svgId }}" d="M 17 50 A 33 33 0 0 1 83 50" fill="none"/>
-                    
-                    <path id="txt-bot-{{ $svgId }}" d="M 83 50 A 33 33 0 0 1 17 50" fill="none"/>
-                    
-                    <text fill="var(--stamp-blue)" font-size="11.5" font-weight="bold" font-family="Arial" letter-spacing="1">
-                        <textPath href="#txt-top-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ __('reports.bulletin_title') ?? 'BULLETIN' }}</textPath>
-                    </text>
-                    <text fill="var(--stamp-blue)" font-size="8.5" font-weight="bold" font-family="Arial" letter-spacing="1.5">
-                        <textPath href="#txt-bot-{{ $svgId }}" startOffset="50%" text-anchor="middle">{{ strtoupper(\Illuminate\Support\Str::limit($student->institution->name ?? __('reports.direction') ?? 'DIRECTION', 18, '')) }}</textPath>
-                    </text>
-                    
-                    <rect x="36" y="32" width="28" height="36" rx="2" fill="white" opacity="0.8"/>
-                    <rect x="36" y="32" width="28" height="36" rx="2" fill="none" stroke="var(--stamp-blue)" stroke-width="1" transform="rotate(-8 50 50)"/>
-                    
-                    <text x="50" y="42" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★★</text>
-                    
-                    @if(isset($student->institution->logo) && $student->institution->logo)
-                        <image href="{{ asset('storage/' . $student->institution->logo) }}" x="36" y="36" height="28" width="28" preserveAspectRatio="xMidYMid meet"/>
-                    @else
-                        <circle cx="50" cy="52" r="5" fill="#c49a45"/>
-                    @endif
-
-                    <text x="50" y="65" fill="var(--stamp-blue)" font-size="9" text-anchor="middle">★★</text>
-                </svg>
-            </div>
+            @include('reports.partials.bulletin_seal')
 
             <div class="signature-block">
                 <div>{{ __('reports.made_in') ?? 'Fait à' }} {{ $student->institution->city ?? 'Kinshasa' }}, {{ __('reports.on_date') ?? 'le' }} {{ date('d/m/Y') }}</div>

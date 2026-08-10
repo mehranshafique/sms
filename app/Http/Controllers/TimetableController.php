@@ -90,21 +90,34 @@ class TimetableController extends BaseController
                     return '';
                 })
                 ->addColumn('grade_name', function($row){
-                    return $row->classSection->gradeLevel->name ?? '—';
+                    $grade = $row->classSection->gradeLevel ?? null;
+                    return dt_link(
+                        $grade ? dt_route('grade-levels.show', $grade->id, 'grade-levels.edit') : null,
+                        $grade?->name ?? '—'
+                    );
                 })
                 ->addColumn('class', function($row){
-                    return $row->classSection->name ?? 'N/A';
+                    $section = $row->classSection;
+                    return dt_link(
+                        $section ? dt_route('class-sections.show', $section->id, 'class-sections.edit') : null,
+                        $section?->name ?? 'N/A'
+                    );
                 })
                 ->addColumn('subject', function($row){
                     // UPDATED: Show UE Code if available
-                    $name = $row->subject->name ?? 'N/A';
+                    $url = $row->subject ? dt_route('subjects.show', $row->subject->id, 'subjects.edit') : null;
+                    $html = dt_link($url, $row->subject?->name ?? 'N/A');
                     if($row->subject && $row->subject->academicUnit) {
-                         $name .= ' <small class="text-muted">(' . $row->subject->academicUnit->code . ')</small>';
+                         $html .= ' <small class="text-muted">(' . e($row->subject->academicUnit->code) . ')</small>';
                     }
-                    return $name;
+                    return $html;
                 })
                 ->addColumn('teacher', function($row){
-                    return $row->teacher ? $row->teacher->user->name : 'N/A';
+                    $teacherId = $row->teacher_id ?? $row->teacher->id ?? null;
+                    return dt_link(
+                        $teacherId ? dt_route('staff.show', $teacherId, 'staff.edit') : null,
+                        $row->teacher ? ($row->teacher->user->name ?? 'N/A') : 'N/A'
+                    );
                 })
                 ->editColumn('day', function($row){
                     return ucfirst($row->day);
@@ -126,7 +139,7 @@ class TimetableController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'action', 'subject'])
+                ->rawColumns(['checkbox', 'grade_name', 'class', 'subject', 'teacher', 'action'])
                 ->make(true);
         }
 

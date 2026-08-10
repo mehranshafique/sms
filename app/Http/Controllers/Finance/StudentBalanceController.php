@@ -42,7 +42,12 @@ class StudentBalanceController extends BaseController
                 ->addColumn('class_name', function($row){
                     // Format: Grade + Section (e.g. 1er A)
                     $grade = $row->gradeLevel->name ?? '';
-                    return ($grade ? $grade . ' ' : '') . $row->name;
+                    $fullName = ($grade ? $grade . ' ' : '') . $row->name;
+
+                    return dt_link(
+                        dt_route('class-sections.edit', $row->id),
+                        $fullName
+                    );
                 })
                 ->addColumn('students_count', function($row){
                     // Count active enrollments
@@ -92,7 +97,7 @@ class StudentBalanceController extends BaseController
                                 <i class="fa fa-eye me-1"></i> ' . __('finance.view_details') . '
                             </button>';
                 })
-                ->rawColumns(['total_collected', 'balance', 'action'])
+                ->rawColumns(['class_name', 'total_collected', 'balance', 'action'])
                 ->make(true);
         }
 

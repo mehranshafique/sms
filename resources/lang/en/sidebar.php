@@ -109,6 +109,7 @@ return [
     ],
     'results' => 'Result Cards',
     'academic_reports' => 'Reports (PDF)',
+    'conduct' => 'Student Conduct',
     
     'exam_schedules' => [
         'title' => 'Date Sheets',
@@ -132,7 +133,13 @@ return [
     
     'people' => 'People',
     'students' => [
-        'title' => 'Students'
+        'title' => 'Students',
+        'all' => 'All Students',
+    ],
+    'enrollment_progression' => 'Enrollment & Progression',
+    'student_welfare' => 'Requests & Discipline',
+    'pre_enrollments' => [
+        'title' => 'Pre-Enrollment'
     ],
     'enrollments' => [
         'title' => 'Enrollments'
@@ -141,10 +148,15 @@ return [
         'title' => 'Univ. Enrollments'
     ],
     'attendance' => [
-        'title' => 'Attendance'
+        'title' => 'Attendance',
+        'register' => 'Daily Register',
     ],
+    'attendance_kiosk' => 'Attendance Kiosk',
     'promotions' => [
         'title' => 'Promotions'
+    ],
+    'reenrollments' => [
+        'title' => 'Re-enrollment'
     ],
     'requests' => 'Derogation & Request',
     'discipline' => 'Discipline',
@@ -152,6 +164,7 @@ return [
         'title' => 'Staff'
     ],
     'staff_attendance' => 'Staff Attendance',
+    'staff_attendance_analytics' => 'Staff Analytics',
     'staff_leaves' => 'Staff Leaves',
     'queue_monitor' => 'Queue & Cron Monitor',
     

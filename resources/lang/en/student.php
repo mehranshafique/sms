@@ -78,12 +78,12 @@ return [
     'current_address' => 'Current Address',
     'permanent_address' => 'Permanent Address',
     'country' => 'Country',
-    'state' => 'State',
-    'city' => 'City',
+    'state' => 'City / Province',
+    'city' => 'Commune',
 
     'select_country' => 'Select Country',
-    'select_state' => 'Select State',
-    'select_city' => 'Select City',
+    'select_state' => 'Select city / province',
+    'select_city' => 'Select commune',
 
     'primary_guardian' => 'Primary Guardian',
     'father_name' => 'Father Name',

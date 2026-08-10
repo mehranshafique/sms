@@ -532,7 +532,9 @@ if (! function_exists('request_applicant_html')) {
             ? e($classShort) . ', ' . e($parentName)
             : e($classShort);
 
-        return '<div class="fw-bold text-dark">' . e($student->full_name) . '</div>'
+        $url = dt_route('students.show', $student->id, 'students.edit');
+
+        return '<div class="fw-bold">' . dt_link($url, $student->full_name) . '</div>'
             . '<small class="text-muted">' . $subline . '</small>';
     }
 }
@@ -552,5 +554,49 @@ if (! function_exists('localized_date')) {
             : \Carbon\Carbon::parse($date);
 
         return $carbon->locale(app()->getLocale())->translatedFormat($format);
+    }
+}
+
+if (! function_exists('dt_link')) {
+    /**
+     * Safe HTML link for DataTables cells.
+     */
+    function dt_link(?string $url, $label, string $class = 'text-primary fw-bold'): string
+    {
+        $text = e((string) ($label ?? '—'));
+        if (blank($label) && $label !== 0 && $label !== '0') {
+            $text = '—';
+        }
+        if (empty($url)) {
+            return '<span class="text-muted">'.$text.'</span>';
+        }
+
+        return '<a href="'.e($url).'" class="'.e($class).'">'.$text.'</a>';
+    }
+}
+
+if (! function_exists('dt_route')) {
+    /**
+     * Prefer named show route; fall back to edit; null if neither exists.
+     */
+    function dt_route(string $showName, $params = null, ?string $editName = null): ?string
+    {
+        try {
+            if (\Illuminate\Support\Facades\Route::has($showName)) {
+                return route($showName, $params);
+            }
+        } catch (\Throwable $e) {
+        }
+
+        if ($editName) {
+            try {
+                if (\Illuminate\Support\Facades\Route::has($editName)) {
+                    return route($editName, $params);
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        return null;
     }
 }

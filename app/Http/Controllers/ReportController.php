@@ -21,6 +21,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use App\Services\LmdCalculationService; 
 use App\Services\GradeMentionService;
 use App\Services\AcademicCycleService;
+use App\Services\ApplicationGradeService;
+use App\Services\StudentConductService;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 
@@ -69,27 +71,25 @@ class ReportController extends BaseController
         ], $extra));
     }
 
-    public function checkFinancialClearance($studentId, $institutionId, $abort = true)
+    public function checkFinancialClearance($studentId, $institutionId, $abort = true, ?string $periodKey = null)
     {
         if (!$studentId || !$institutionId) return true;
 
-        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
-                        ->where('key', 'block_reports_on_debt')
-                        ->value('value');
-                        
-        if ($isBlocked == '1') {
-            $unpaid = Invoice::where('student_id', $studentId)
-                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
-                ->sum(DB::raw('total_amount - paid_amount'));
-                
-            if ($unpaid > 0) {
-                if ($abort) {
-                    abort(403, __('reports.financial_restriction_msg') ?? 'Access denied. The student has an outstanding fee balance. Please settle the account to access academic reports.');
-                }
-                return false; 
-            }
+        $student = Student::find($studentId);
+        if (!$student) return true;
+
+        $result = app(\App\Services\ReportCardAccessService::class)
+            ->check($student, (int) $institutionId, $periodKey);
+
+        if ($result['allowed']) {
+            return true;
         }
-        return true;
+
+        if ($abort) {
+            abort(403, $result['message_en'] ?: (__('reports.financial_restriction_msg') ?? 'Access denied due to unpaid fees.'));
+        }
+
+        return false;
     }
 
     public function index()
@@ -199,7 +199,7 @@ class ReportController extends BaseController
             $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
             if ($student->institution_id != $institutionId) abort(403);
 
-            $this->checkFinancialClearance($student->id, $institutionId, true);
+            $this->checkFinancialClearance($student->id, $institutionId, true, $request->input('period'));
 
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
             if (!$enrollment) {
@@ -265,12 +265,17 @@ class ReportController extends BaseController
         }
 
         $bulkData = [];
+        $sealImage = InstitutionSetting::get($institutionId, 'report_seal_image', '');
         $settings = [
             'threshold' => InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50),
-            'gradingScale' => json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true)
+            'gradingScale' => json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true),
+            'seal_position' => InstitutionSetting::get($institutionId, 'report_seal_position', 'center') ?: 'center',
+            'seal_image' => $sealImage ?: null,
         ];
 
         $rankings = $this->calculateRankings($classSection, $request, $institutionId);
+        $applicationService = app(ApplicationGradeService::class);
+        $conductService = app(StudentConductService::class);
 
         foreach ($targetStudents as $enrollment) {
             $student = $enrollment->student;
@@ -323,6 +328,27 @@ class ReportController extends BaseController
                     'grade_total' => $studentRank['grade_total'] ?? '-',
                     'total_score' => $studentRank['total_score'] ?? 0, 
                 ];
+
+                $pct = (float) ($reportData['percentage_total'] ?? 0);
+                $reportData['application'] = $applicationService->fromPercentage($pct, $institutionId, $studentCycle);
+
+                if ($request->type === 'period') {
+                    $scopeType = 'period';
+                    $scopeKey = (string) $request->period;
+                } elseif ($this->cycleService->usesSemesterModel($studentCycle)) {
+                    $scopeType = 'semester';
+                    $scopeKey = (string) $termNumber;
+                } else {
+                    $scopeType = 'trimester';
+                    $scopeKey = (string) $termNumber;
+                }
+
+                $reportData['conduct'] = $conductService->valueOrDash(
+                    (int) $student->id,
+                    (int) $enrollment->academic_session_id,
+                    $scopeType,
+                    $scopeKey
+                );
 
                 $bulkData[] = array_merge($reportData, [
                     'student' => $student,
@@ -644,7 +670,22 @@ class ReportController extends BaseController
             ];
         }
 
-        return ['period' => $period, 'data' => $data];
+        $totalObtained = 0;
+        $totalMax = 0;
+        foreach ($data as $row) {
+            if (is_numeric($row['obtained'])) {
+                $totalObtained += (float) $row['obtained'];
+            }
+            $totalMax += (float) ($row['max'] ?? 0);
+        }
+        $percentageTotal = $totalMax > 0 ? ($totalObtained / $totalMax) * 100 : 0;
+
+        return [
+            'period' => $period,
+            'data' => $data,
+            'percentage_total' => $percentageTotal,
+            'mention' => app(GradeMentionService::class)->fromPercentage($percentageTotal),
+        ];
     }
 
     private function getPrimaryData($student, $enrollment, $trimester)

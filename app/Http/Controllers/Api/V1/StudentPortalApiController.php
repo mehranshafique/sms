@@ -435,29 +435,33 @@ class StudentPortalApiController extends Controller
             
             Log::info("[API Results] Enrollment confirmed. Class ID: {$enrollment->class_section_id}, Session ID: {$enrollment->academic_session_id}");
 
-            // --- FINANCIAL BLOCK LOGIC ---
-            $isBlocked = \App\Models\InstitutionSetting::where('institution_id', $student->institution_id)
-                ->where('key', 'block_reports_on_debt')
-                ->value('value');
+            // --- FINANCIAL BLOCK LOGIC (period min-paid or outstanding) ---
+            $periodKey = request()->input('period')
+                ?? request()->input('period_key')
+                ?? null;
+            $access = app(\App\Services\ReportCardAccessService::class)
+                ->check($student, (int) $student->institution_id, $periodKey ? (string) $periodKey : null);
 
-            Log::info("[API Results] Financial Block Setting is: " . ($isBlocked ? 'Enabled (1)' : 'Disabled (0)'));
+            Log::info('[API Results] Financial access check', [
+                'allowed' => $access['allowed'],
+                'mode' => $access['mode'],
+                'period_key' => $access['period_key'],
+                'remaining' => $access['remaining'],
+            ]);
 
-            if ($isBlocked == '1') {
-                $unpaid = \App\Models\Invoice::where('student_id', $student->id)
-                    ->whereIn('status', ['unpaid', 'partial', 'overdue'])
-                    ->sum(\Illuminate\Support\Facades\DB::raw('total_amount - paid_amount'));
-
-                Log::info("[API Results] Total unpaid debt calculated: {$unpaid}");
-
-                if ($unpaid > 0) {
-                    Log::warning("[API Results] Access Denied due to debt. Amount: {$unpaid}");
-                    return response()->json([
-                        'success' => false,
-                        'is_blocked' => true,
-                        'amount' => $this->currencyService->format($unpaid, $student->institution_id),
-                        'currency_settings' => $this->currencyService->apiPayload($student->institution_id),
-                    ]);
-                }
+            if (! $access['allowed']) {
+                Log::warning('[API Results] Access Denied due to payment rules. Remaining: ' . $access['remaining']);
+                return response()->json([
+                    'success' => false,
+                    'is_blocked' => true,
+                    'mode' => $access['mode'],
+                    'period_key' => $access['period_key'],
+                    'required' => $access['required'],
+                    'total_paid' => $access['total_paid'],
+                    'amount' => $this->currencyService->format($access['remaining'], $student->institution_id),
+                    'message' => $access['message_en'],
+                    'currency_settings' => $this->currencyService->apiPayload($student->institution_id),
+                ]);
             }
 
             Log::info("[API Results] Financial clearance passed. Fetching published exam records...");

@@ -60,6 +60,9 @@ class SubjectController extends BaseController
                 ->addColumn('credits', function($row){
                     return $row->credit_hours > 0 ? $row->credit_hours : '-';
                 })
+                ->editColumn('name', function($row){
+                    return dt_link(dt_route('subjects.show', $row->id, 'subjects.edit'), $row->name);
+                })
                 ->editColumn('type', function($row){
                     return ucfirst($row->type);
                 })
@@ -85,7 +88,7 @@ class SubjectController extends BaseController
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['checkbox', 'is_active', 'action'])
+                ->rawColumns(['checkbox', 'name', 'is_active', 'action'])
                 ->make(true);
         }
 

@@ -66,6 +66,7 @@ return [
     'late' => 'Late',
     'excused' => 'Excused',
     'half_day' => 'Half Day',
+    'no_staff_found' => 'No active staff found.',
 
     // Buttons
     'save_staff' => 'Save Staff',

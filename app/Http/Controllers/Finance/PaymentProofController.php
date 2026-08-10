@@ -33,8 +33,20 @@ class PaymentProofController extends BaseController
             }
 
             return DataTables::of($query)
-                ->addColumn('invoice_no', fn ($row) => $row->invoice?->invoice_number ?? '-')
-                ->addColumn('student', fn ($row) => $row->invoice?->student?->full_name ?? '-')
+                ->addColumn('invoice_no', function ($row) {
+                    return dt_link(
+                        $row->invoice_id ? dt_route('invoices.show', $row->invoice_id, 'invoices.edit') : null,
+                        $row->invoice?->invoice_number ?? '-'
+                    );
+                })
+                ->addColumn('student', function ($row) {
+                    $student = $row->invoice?->student;
+
+                    return dt_link(
+                        $student?->id ? dt_route('students.show', $student->id, 'students.edit') : null,
+                        $student?->full_name ?? '-'
+                    );
+                })
                 ->addColumn('amount', fn ($row) => number_format((float) $row->amount, 2))
                 ->addColumn('method_label', fn ($row) => __('payment.' . $row->method))
                 ->addColumn('paid_at_fmt', fn ($row) => $row->paid_at?->format('d M Y H:i'))
@@ -64,7 +76,7 @@ class PaymentProofController extends BaseController
                         . '<button type="button" class="btn btn-danger btn-xs reject-proof" data-id="' . $row->id . '" title="' . e(__('payment_proof.reject')) . '"><i class="fa fa-times"></i></button>'
                         . '</div>';
                 })
-                ->rawColumns(['receipt', 'status_badge', 'action'])
+                ->rawColumns(['invoice_no', 'student', 'receipt', 'status_badge', 'action'])
                 ->make(true);
         }
 

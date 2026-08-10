@@ -42,6 +42,7 @@ class RolePermissionSeeder extends Seeder
             
             // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Pre Enrollments' => ['view', 'create', 'update'],
             
             // SPLIT ENROLLMENTS: Replaces the old 'Enrollments' module
             'Student Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // Standard School
@@ -49,6 +50,7 @@ class RolePermissionSeeder extends Seeder
             
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
             'Student Promotion' => ['view', 'create'],
+            'Student Reenrollments' => ['view', 'create', 'update'],
             'Student Transfers' => ['view', 'create', 'print'],
             'Student Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
             'Discipline' => ['view', 'create', 'update', 'delete', 'viewAny'],
@@ -120,6 +122,8 @@ class RolePermissionSeeder extends Seeder
                 // Manual fix for 'Staff Leaves' and 'Student Requests' to ensure clean permission names
                 if ($slug === 'staff_leaves') $singularKey = 'staff_leave';
                 if ($slug === 'student_requests') $singularKey = 'student_request';
+                if ($slug === 'student_reenrollments') $singularKey = 'student_reenrollment';
+                if ($slug === 'pre_enrollments') $singularKey = 'pre_enrollment';
                 if ($slug === 'discipline') $singularKey = 'discipline';
 
                 $permissionName = "{$singularKey}.{$action}";

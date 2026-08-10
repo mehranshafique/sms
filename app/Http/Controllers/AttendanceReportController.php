@@ -131,7 +131,16 @@ class AttendanceReportController extends BaseController
                     );
                 })
                 ->addColumn('name', function($row) {
-                    return $row->first_name . ' ' . $row->last_name;
+                    return dt_link(
+                        dt_route('students.show', $row->id, 'students.edit'),
+                        trim($row->first_name . ' ' . $row->last_name)
+                    );
+                })
+                ->editColumn('admission_number', function($row) {
+                    return dt_link(
+                        dt_route('students.show', $row->id, 'students.edit'),
+                        $row->admission_number
+                    );
                 })
                 ->addColumn('class', function($row) {
                     $enrollment = $row->enrollments->first();
@@ -143,7 +152,7 @@ class AttendanceReportController extends BaseController
                     $url = route('attendance.analytics.show', $row->id);
                     return '<a href="'.$url.'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('attendance.view_analytics').'"><i class="fa fa-chart-line"></i></a>';
                 })
-                ->rawColumns(['action'])
+                ->rawColumns(['name', 'admission_number', 'action'])
                 ->make(true);
         }
 

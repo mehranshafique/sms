@@ -256,6 +256,29 @@
         z-index: 5;
     }
 
+    .stamp-overlay--left {
+        left: 72px;
+        transform: none;
+    }
+
+    .stamp-overlay--center {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .stamp-overlay--right {
+        left: auto;
+        right: 90px;
+        transform: none;
+    }
+
+    .stamp-overlay .stamp-image {
+        width: 58px;
+        height: 58px;
+        object-fit: contain;
+        display: block;
+    }
+
     .signature-block {
         position: absolute;
         right: 0;

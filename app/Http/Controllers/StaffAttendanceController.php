@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\StaffAttendance;
 use App\Models\Staff;
+use App\Services\StaffAttendanceAnalyticsService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -44,7 +45,18 @@ class StaffAttendanceController extends BaseController
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->addColumn('staff_name', function($row){
-                    return $row->staff->full_name ?? $row->staff->user->name ?? 'N/A';
+                    $staffId = $row->staff_id ?? $row->staff->id ?? null;
+                    return dt_link(
+                        $staffId ? dt_route('staff.show', $staffId, 'staff.edit') : null,
+                        $row->staff->full_name ?? $row->staff->user->name ?? 'N/A'
+                    );
+                })
+                ->addColumn('employee_id', function($row){
+                    $staffId = $row->staff_id ?? $row->staff->id ?? null;
+                    return dt_link(
+                        $staffId ? dt_route('staff.show', $staffId, 'staff.edit') : null,
+                        $row->staff->employee_id ?? null
+                    );
                 })
                 // FIXED: Intercept the DataTables auto-join for 'staff.first_name' and redirect it to 'users.name'
                 ->filterColumn('staff.first_name', function($query, $keyword) {
@@ -59,6 +71,12 @@ class StaffAttendanceController extends BaseController
                 })
                 ->orderColumn('staff_name', function ($query, $order) {
                     $query->orderBy('users.name', $order);
+                })
+                ->filterColumn('employee_id', function($query, $keyword) {
+                    $query->where('staff.employee_id', 'like', "%{$keyword}%");
+                })
+                ->orderColumn('employee_id', function ($query, $order) {
+                    $query->orderBy('staff.employee_id', $order);
                 })
                 ->editColumn('status', function($row) {
                     $badges = [
@@ -80,7 +98,7 @@ class StaffAttendanceController extends BaseController
                 ->editColumn('check_out', function($row){
                     return $row->check_out ? Carbon::parse($row->check_out)->format('h:i A') : '-';
                 })
-                ->rawColumns(['status'])
+                ->rawColumns(['staff_name', 'employee_id', 'status'])
                 ->make(true);
         }
 
@@ -93,7 +111,8 @@ class StaffAttendanceController extends BaseController
         $date = $request->date ?? date('Y-m-d');
 
         // Fetch Staff
-        $staffMembers = Staff::where('institution_id', $institutionId)
+        $staffMembers = Staff::with('user')
+            ->where('institution_id', $institutionId)
             ->where('status', 'active')
             ->get();
 
@@ -140,5 +159,55 @@ class StaffAttendanceController extends BaseController
         });
 
         return $this->successResponse(__('attendance.messages.success_marked'), route('staff-attendance.index'));
+    }
+
+    public function analytics(Request $request, StaffAttendanceAnalyticsService $analytics)
+    {
+        $this->authorizeAnalytics();
+        $institutionId = $this->getInstitutionId();
+        abort_unless($institutionId, 403);
+
+        $period = $request->get('period', 'week');
+        if (! in_array($period, ['week', 'month', 'quarter', 'year'], true)) {
+            $period = 'week';
+        }
+
+        $dashboard = $analytics->dashboard((int) $institutionId, $period);
+
+        return view('attendance.staff.analytics', compact('dashboard', 'period'));
+    }
+
+    public function staffAnalytics(Request $request, int $staffId, StaffAttendanceAnalyticsService $analytics)
+    {
+        $this->authorizeAnalytics();
+        $institutionId = $this->getInstitutionId();
+        abort_unless($institutionId, 403);
+
+        $staff = Staff::with('user')
+            ->where('institution_id', $institutionId)
+            ->findOrFail($staffId);
+
+        $period = $request->get('period', 'week');
+        if (! in_array($period, ['week', 'month', 'quarter', 'year'], true)) {
+            $period = 'week';
+        }
+
+        $stats = $analytics->staffStats((int) $staff->id, (int) $institutionId, $period);
+
+        return view('attendance.staff.analytics_show', compact('staff', 'stats', 'period'));
+    }
+
+    private function authorizeAnalytics(): void
+    {
+        $user = Auth::user();
+        if ($user->hasRole(['Super Admin', 'Head Officer', 'School Admin'])) {
+            return;
+        }
+
+        try {
+            abort_unless($user->can('staff_attendance.view'), 403);
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+            abort(403);
+        }
     }
 }

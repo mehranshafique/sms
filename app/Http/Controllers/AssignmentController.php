@@ -45,7 +45,7 @@ class AssignmentController extends BaseController
             return \Yajra\DataTables\Facades\DataTables::of($query)
                 ->addIndexColumn()
                 ->editColumn('title', function ($row) {
-                    $html = e($row->title);
+                    $html = dt_link(dt_route('assignments.show', $row->id, 'assignments.edit'), $row->title);
                     if ($row->file_path) {
                         $html .= ' <a href="'.asset('storage/'.$row->file_path).'" target="_blank" class="text-primary ms-1"><i class="fa fa-paperclip"></i></a>';
                     }
@@ -54,20 +54,31 @@ class AssignmentController extends BaseController
                 ->addColumn('class_name', function ($row) {
                     $grade = $row->classSection->gradeLevel->name ?? '';
                     $section = $row->classSection->name ?? '';
-                    return trim($grade.' '.$section);
+                    $label = trim($grade.' '.$section);
+                    $csId = $row->class_section_id ?? $row->classSection->id ?? null;
+                    return dt_link(
+                        $csId ? dt_route('class-sections.show', $csId, 'class-sections.edit') : null,
+                        $label !== '' ? $label : null
+                    );
                 })
                 ->editColumn('deadline', function ($row) {
                     $class = $row->deadline < now() ? 'danger' : 'success';
                     return '<span class="badge badge-'.$class.'">'.$row->deadline->format('d M, Y').'</span>';
                 })
-                ->addColumn('teacher_name', fn ($row) => e($row->teacher->user->name ?? 'Admin'))
+                ->addColumn('teacher_name', function ($row) {
+                    $teacherId = $row->teacher_id ?? $row->teacher->id ?? null;
+                    return dt_link(
+                        $teacherId ? dt_route('staff.show', $teacherId, 'staff.edit') : null,
+                        $row->teacher->user->name ?? 'Admin'
+                    );
+                })
                 ->addColumn('action', function ($row) {
                     if (! auth()->user()->can('delete', $row) && ! auth()->user()->hasRole(['Super Admin', 'Head Officer'])) {
                         return '';
                     }
                     return '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-assignment-btn" data-id="'.$row->id.'" data-url="'.route('assignments.destroy', $row->id).'"><i class="fa fa-trash"></i></button>';
                 })
-                ->rawColumns(['title', 'deadline', 'action'])
+                ->rawColumns(['title', 'class_name', 'teacher_name', 'deadline', 'action'])
                 ->make(true);
         }
         

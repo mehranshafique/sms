@@ -47,7 +47,7 @@ class ParentController extends BaseController
                 ->addIndexColumn()
                 ->addColumn('name', function($row){
                     $name = $row->guardian_name ?? $row->father_name ?? $row->mother_name ?? 'N/A';
-                    return '<a href="'.route('parents.show', $row->id).'" class="fw-bold text-primary">'.$name.'</a>';
+                    return dt_link(dt_route('parents.show', $row->id, 'parents.edit'), $name);
                 })
                 ->addColumn('phones', function($row){
                     $phones = [];
