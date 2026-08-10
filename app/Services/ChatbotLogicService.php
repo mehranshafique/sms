@@ -777,12 +777,17 @@ class ChatbotLogicService
         $isEn = $session->locale === 'en';
 
         if ($cmd == '1') {
+            // Terminal action: return to main menu so next replies (5, 6, 8…) are not trapped here.
+            $session->update(['status' => 'ACTIVE']);
+
             return $this->getStudentTimetable($session, $student);
         } elseif ($cmd == '2') {
+            $session->update(['status' => 'ACTIVE']);
+
             return $this->getStudentUpcomingExams($session, $student);
         }
         
-        return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
+        return $this->reply($session->phone_number, ($isEn ? "Invalid option. Reply 1, 2 or 0." : "Option invalide. Répondez 1, 2 ou 0.") . $this->getReturnPrompt($session), $session->institution_id);
     }
 
     // =================================================================================
@@ -858,17 +863,24 @@ class ChatbotLogicService
         $isEn = $session->locale === 'en';
 
         if ($cmd == '1' || $cmd == '2' || $cmd == '3') {
+            $session->update(['status' => 'ACTIVE']);
+
             return $this->getBalance($session, $student); 
         } elseif ($cmd == '4') {
+            $session->update(['status' => 'ACTIVE']);
+
             return $this->getPaymentHistory($session, $student);
         }
-        return $this->reply($session->phone_number, ($isEn ? "Invalid option." : "Option invalide.") . $this->getReturnPrompt($session), $session->institution_id);
+        return $this->reply($session->phone_number, ($isEn ? "Invalid option. Reply 1–4 or 0." : "Option invalide. Répondez 1–4 ou 0.") . $this->getReturnPrompt($session), $session->institution_id);
     }
 
     protected function processLmdResults($session, $cmd) {
         $student = Student::find($session->user_id);
         $institutionId = $session->institution_id;
         $isEn = $session->locale === 'en';
+
+        // Any results choice is terminal — leave the submenu so the next message hits the main menu.
+        $session->update(['status' => 'ACTIVE']);
 
         $access = app(\App\Services\ReportCardAccessService::class)
             ->check($student, (int) $institutionId, null);
@@ -1828,6 +1840,8 @@ class ChatbotLogicService
                 ]);
             }
 
+            $session->update(['status' => 'ACTIVE']);
+
             return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
         }
 
@@ -1843,7 +1857,7 @@ class ChatbotLogicService
             $from = null;
             $periodLabel = __('chatbot_attendance.session');
         } else {
-            $msg = $isEn ? 'Invalid option.' : 'Option invalide.';
+            $msg = $isEn ? 'Invalid option. Reply 1–4 or 0.' : 'Option invalide. Répondez 1–4 ou 0.';
 
             return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
         }
@@ -1867,6 +1881,8 @@ class ChatbotLogicService
             'late' => (int) ($counts['late'] ?? 0),
             'excused' => (int) (($counts['excused'] ?? 0) + ($counts['half_day'] ?? 0)),
         ]);
+
+        $session->update(['status' => 'ACTIVE']);
 
         return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
     }
