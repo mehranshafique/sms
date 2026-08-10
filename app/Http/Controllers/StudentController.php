@@ -187,7 +187,7 @@ class StudentController extends BaseController
 
                     if ($request->has('search') && !empty($request->search['value'])) {
                         $keyword = strtolower($request->search['value']);
-                        $query->where(function($q) use ($keyword) {
+                        $query->where(function ($q) use ($keyword, $currentSessionId) {
                             $q->where('students.first_name', 'LIKE', "%{$keyword}%")
                               ->orWhere('students.last_name', 'LIKE', "%{$keyword}%")
                               ->orWhereRaw("LOWER(CONCAT(students.first_name, ' ', students.last_name)) LIKE ?", ["%{$keyword}%"])
