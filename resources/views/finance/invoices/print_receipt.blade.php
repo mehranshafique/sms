@@ -2,15 +2,36 @@
 <html lang="{{ app()->getLocale() }}">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ __('invoice.payment_receipt') }}</title>
+    @php
+        $isHtml = !empty($asHtml);
+        $paperWidth = ($format ?? 'pos80') === 'pos58' ? '58mm' : '80mm';
+        $baseFont = ($format ?? 'pos80') === 'pos58' ? '9px' : '11px';
+        $titleFont = ($format ?? 'pos80') === 'pos58' ? '12px' : '14px';
+        $paidFont = ($format ?? 'pos80') === 'pos58' ? '14px' : '16px';
+    @endphp
     <style>
-        @page { margin: 0; }
+        @page { margin: 0; @if($isHtml) size: {{ $paperWidth }} auto; @endif }
         body {
-            font-family: 'Helvetica', sans-serif;
-            margin: 8px 5px;
+            font-family: 'Helvetica', Arial, sans-serif;
+            margin: {{ $isHtml ? '0' : '8px 5px' }};
             color: #000;
-            font-size: {{ ($format ?? 'pos80') === 'pos58' ? '9px' : '11px' }};
+            font-size: {{ $baseFont }};
             line-height: 1.25;
+            @if($isHtml)
+            background: #e5e7eb;
+            @endif
+        }
+        .receipt-wrap {
+            @if($isHtml)
+            width: {{ $paperWidth }};
+            max-width: 100%;
+            margin: 72px auto 24px;
+            background: #fff;
+            padding: 8px 5px;
+            box-shadow: 0 4px 16px rgba(0,0,0,.15);
+            @endif
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
@@ -28,7 +49,7 @@
             padding: 4px 0;
         }
         .paid-highlight {
-            font-size: {{ ($format ?? 'pos80') === 'pos58' ? '14px' : '16px' }};
+            font-size: {{ $paidFont }};
             font-weight: bold;
             text-align: center;
             margin: 6px 0 4px;
@@ -43,7 +64,51 @@
         .footer { margin-top: 8px; text-align: center; font-size: 8px; }
         .qr { margin-top: 8px; text-align: center; }
         .meta-small { font-size: 8px; color: #333; }
+
+        @if($isHtml)
+        .no-print {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 50;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 12px;
+            background: #0f172a;
+            box-shadow: 0 2px 10px rgba(0,0,0,.25);
+        }
+        .no-print a, .no-print button {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 700;
+            font-size: 14px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn-print { background: #2563eb; color: #fff; }
+        .btn-back { background: #334155; color: #fff; }
+        .btn-pdf { background: #16a34a; color: #fff; }
+        @media print {
+            body { background: #fff !important; margin: 0 !important; }
+            .no-print { display: none !important; }
+            .receipt-wrap {
+                margin: 0 !important;
+                box-shadow: none !important;
+                width: {{ $paperWidth }} !important;
+                max-width: 100% !important;
+            }
+        }
+        @endif
     </style>
+    @if($isHtml)
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    @endif
 </head>
 <body>
 @php
@@ -65,10 +130,28 @@
     $institution = $invoice->institution;
 @endphp
 
-<div class="text-center bold" style="font-size: {{ ($format ?? 'pos80') === 'pos58' ? '12px' : '14px' }};">
-    @if($institution?->logo)
-        <img src="{{ asset('storage/' . $institution->logo) }}" alt="Logo" style="max-height:48px;max-width:100%;object-fit:contain;margin-bottom:4px;">
-    @endif
+@if($isHtml)
+<div class="no-print">
+    <a class="btn-back" href="{{ route('invoices.show', $invoice->id) }}">
+        <i class="fa fa-arrow-left"></i> {{ __('invoice.back') }}
+    </a>
+    <button type="button" class="btn-print" onclick="window.print()">
+        <i class="fa fa-print"></i> {{ __('invoice.print') }}
+    </button>
+    <a class="btn-pdf" href="{{ route('invoices.print_receipt', array_filter(['invoice' => $invoice->id, 'format' => $format ?? 'pos80', 'pdf' => 1, 'payment_id' => $payment->id ?? null])) }}" target="_blank">
+        <i class="fa fa-file-pdf"></i> PDF
+    </a>
+</div>
+@endif
+
+<div class="receipt-wrap">
+@if($institution?->logo)
+<div class="text-center" style="margin: 0 0 6px;">
+    <img src="{{ asset('storage/' . $institution->logo) }}" alt="Logo"
+         style="display:block;margin:0 auto;max-height:56px;max-width:70%;width:auto;height:auto;object-fit:contain;">
+</div>
+@endif
+<div class="text-center bold" style="font-size: {{ $titleFont }};">
     {{ $institution->name ?? config('app.name') }}
 </div>
 @if($institution?->address || $institution?->phone)
@@ -161,5 +244,14 @@
     {{ __('invoice.print_date') }}: {{ now()->format('d/m/Y H:i') }}<br>
     {{ __('invoice.thank_you') }}
 </div>
+</div>{{-- /.receipt-wrap --}}
+
+@if($isHtml && !empty($autoPrint))
+<script>
+    window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 400);
+    });
+</script>
+@endif
 </body>
 </html>

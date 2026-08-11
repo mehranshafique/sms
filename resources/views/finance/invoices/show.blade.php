@@ -12,15 +12,23 @@
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2">
                 <a href="{{ route('invoices.index') }}" class="btn btn-outline-dark btn-sm"><i class="fa fa-arrow-left me-1"></i> {{ __('invoice.back') }}</a>
+                <a href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos80', 'autoprint' => 1]) }}"
+                   target="_blank"
+                   class="btn btn-dark btn-sm shadow-sm">
+                    <i class="fa fa-print me-1"></i> {{ __('invoice.print_pos') }}
+                </a>
                 <a href="{{ route('invoices.print', $invoice->id) }}" target="_blank" class="btn btn-info btn-sm shadow-sm"><i class="fa fa-print me-1"></i> {{ __('invoice.print_web_view') }}</a>
                 <div class="dropdown">
                     <button class="btn btn-primary btn-sm shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
                         <i class="fa fa-receipt me-1"></i> {{ __('invoice.print_receipt') }}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos80']) }}" target="_blank">{{ __('invoice.print_pos_80') }}</a></li>
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos58']) }}" target="_blank">{{ __('invoice.print_pos_58') }}</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos80', 'pdf' => 1]) }}" target="_blank">{{ __('invoice.pos_pdf_80') }}</a></li>
+                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos58', 'pdf' => 1]) }}" target="_blank">{{ __('invoice.pos_pdf_58') }}</a></li>
                         <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'a4']) }}" target="_blank">A4 PDF</a></li>
-                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos80']) }}" target="_blank">POS 80mm</a></li>
-                        <li><a class="dropdown-item" href="{{ route('invoices.print_receipt', ['invoice' => $invoice->id, 'format' => 'pos58']) }}" target="_blank">POS 58mm</a></li>
                     </ul>
                 </div>
                 <a href="{{ route('invoices.download', $invoice->id) }}" class="btn btn-success btn-sm shadow-sm"><i class="fa fa-file-pdf me-1"></i> {{ __('invoice.download_pdf') }}</a>

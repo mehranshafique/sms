@@ -103,6 +103,7 @@ class InvoiceController extends BaseController
                     
                     if(auth()->user()->can('invoice.view')) {
                         $btn .= '<a href="'.route('invoices.show', $row->id).'" class="btn btn-info shadow btn-xs sharp me-1" title="'.__('invoice.view').'"><i class="fa fa-eye"></i></a>';
+                        $btn .= '<a href="'.route('invoices.print_receipt', ['invoice' => $row->id, 'format' => 'pos80', 'autoprint' => 1]).'" target="_blank" class="btn btn-dark shadow btn-xs sharp me-1" title="'.e(__('invoice.print_pos')).'"><i class="fa fa-print"></i></a>';
                     }
 
                     if (has_ai_access() && in_array($row->status, ['unpaid', 'partial', 'overdue'], true)) {
@@ -523,6 +524,15 @@ class InvoiceController extends BaseController
             $payment = $invoice->payments->firstWhere('id', (int) $request->query('payment_id'));
         }
 
+        // POS formats: HTML + window.print by default (works on NB80 browser).
+        // Pass ?pdf=1 to stream the DomPDF file instead.
+        if (in_array($format, ['pos80', 'pos58'], true) && ! $request->boolean('pdf')) {
+            $asHtml = true;
+            $autoPrint = $request->boolean('autoprint');
+
+            return view('finance.invoices.print_receipt', compact('invoice', 'format', 'payment', 'asHtml', 'autoPrint'));
+        }
+
         if (! class_exists('PDF')) {
             return redirect()->route('invoices.print', $id);
         }
@@ -530,7 +540,8 @@ class InvoiceController extends BaseController
         if (in_array($format, ['pos80', 'pos58'], true)) {
             $view = 'finance.invoices.print_receipt';
             $paper = $format === 'pos58' ? [0, 0, 164.41, 800] : [0, 0, 226.77, 800];
-            $pdf = PDF::loadView($view, compact('invoice', 'format', 'payment'));
+            $asHtml = false;
+            $pdf = PDF::loadView($view, compact('invoice', 'format', 'payment', 'asHtml'));
             $pdf->setPaper($paper);
         } else {
             $isPdf = true;
