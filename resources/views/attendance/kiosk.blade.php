@@ -563,13 +563,17 @@
     let webNfcActive = false;
     let webNfcReader = null;
     let cameraIds = [];
+    let camerasMeta = []; // { id, label, facing }
     let cameraIndex = 0;
     let preferredFacing = 'environment';
+    let activeCameraLabel = '';
+    let cameraPausedForNfc = false;
     let wedgeBuffer = '';
     let wedgeTimer = null;
     let lastKeyAt = 0;
     let lastSubmitted = { code: '', at: 0 };
     let focusHoldTimer = null;
+    let switchingCamera = false;
     const WEDGE_IDLE_MS = 120;
     const DEDUPE_MS = 2500;
 
@@ -577,6 +581,10 @@
         try {
             if (navigator.vibrate) navigator.vibrate(pattern || 40);
         } catch (_) {}
+    }
+
+    function sleep(ms) {
+        return new Promise((r) => setTimeout(r, ms));
     }
 
     function tickClock() {
@@ -608,6 +616,8 @@
     }
 
     function focusCapture(force) {
+        // Never steal focus during phone NFC (must match quiet student-form page).
+        if (webNfcActive || cameraPausedForNfc) return;
         if (busy && !force) return;
         if (isTypingInManual() && !force) return;
         try {
@@ -620,8 +630,7 @@
     function startFocusHold() {
         clearInterval(focusHoldTimer);
         focusHoldTimer = setInterval(() => {
-            // Do not steal focus while phone NFC is armed (same quiet page as student form).
-            if (busy || isTypingInManual() || webNfcActive) return;
+            if (busy || isTypingInManual() || webNfcActive || cameraPausedForNfc) return;
             if (document.activeElement !== nfcCapture) {
                 focusCapture();
             }
@@ -638,6 +647,13 @@
         manualCode.value = '';
         nfcCapture.value = '';
         wedgeBuffer = '';
+        // Keep camera off while phone NFC is listening — camera blocks NFC on many Androids.
+        if (webNfcActive || cameraPausedForNfc) {
+            camOverlay.classList.add('show');
+            camOverlay.textContent = labels.nfcListening;
+            setChip(chipQr, false);
+            return;
+        }
         startScanner().finally(() => focusCapture(true));
     }
 
@@ -706,7 +722,7 @@
         statusLine.textContent = labels.processing;
         nfcCapture.value = '';
         wedgeBuffer = '';
-        try { await stopScanner(); } catch (e) {}
+        try { await hardStopScanner(); } catch (e) {}
 
         try {
             const res = await fetch(scanUrl, {
@@ -728,167 +744,259 @@
     }
 
     function qrboxSize() {
-        const side = Math.min(viewport.clientWidth, viewport.clientHeight);
+        const side = Math.min(viewport.clientWidth || 300, viewport.clientHeight || 300);
         const box = Math.max(160, Math.floor(side * 0.72));
         return { width: box, height: box };
     }
 
-    async function startWithCamera(cameraConfig) {
+    function scanConfig() {
+        return { fps: 12, qrbox: qrboxSize(), aspectRatio: 1 };
+    }
+
+    async function hardStopScanner() {
+        if (html5QrCode) {
+            try {
+                if (html5QrCode.isScanning) await html5QrCode.stop();
+            } catch (_) {}
+            try {
+                await html5QrCode.clear();
+            } catch (_) {}
+        }
+        // Release any leftover MediaStream tracks attached under #reader
+        try {
+            document.querySelectorAll('#reader video').forEach((video) => {
+                const stream = video.srcObject;
+                if (stream && stream.getTracks) {
+                    stream.getTracks().forEach((t) => t.stop());
+                }
+                video.srcObject = null;
+            });
+        } catch (_) {}
+        try {
+            const el = document.getElementById('reader');
+            if (el) el.innerHTML = '';
+        } catch (_) {}
+        html5QrCode = null;
+        setChip(chipQr, false);
+    }
+
+    async function startWithConfig(cameraConfig) {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode('reader');
+        }
         await html5QrCode.start(
             cameraConfig,
-            { fps: 12, qrbox: qrboxSize(), aspectRatio: 1 },
+            scanConfig(),
             (decoded) => processUid(decoded, 'qr'),
             () => {}
         );
     }
 
+    function inferFacingFromLabel(label) {
+        const l = String(label || '').toLowerCase();
+        if (/front|user|face|selfie/.test(l)) return 'user';
+        if (/back|rear|environment|world|trás|arrière/.test(l)) return 'environment';
+        return null;
+    }
+
+    function applyVideoMirror(facing) {
+        try {
+            document.querySelectorAll('#reader video').forEach((video) => {
+                video.style.transform = facing === 'user' ? 'scaleX(-1)' : '';
+            });
+        } catch (_) {}
+    }
+
     async function refreshCameraList() {
         try {
             const cams = await Html5Qrcode.getCameras();
-            cameraIds = (cams || []).map((c) => c.id).filter(Boolean);
+            camerasMeta = (cams || []).map((c, idx) => ({
+                id: c.id,
+                label: c.label || ('Camera ' + (idx + 1)),
+                facing: inferFacingFromLabel(c.label),
+            }));
+            cameraIds = camerasMeta.map((c) => c.id).filter(Boolean);
         } catch (_) {
+            camerasMeta = [];
             cameraIds = [];
         }
+        return camerasMeta;
     }
 
-    async function hardStopScanner() {
-        if (!html5QrCode) return;
-        try {
-            if (html5QrCode.isScanning) {
-                await html5QrCode.stop();
-            }
-        } catch (_) {}
-        try {
-            await html5QrCode.clear();
-        } catch (_) {}
-        // Fresh instance avoids stuck video tracks on Android Chrome.
-        try {
-            const el = document.getElementById('reader');
-            if (el) el.innerHTML = '';
-        } catch (_) {}
-        html5QrCode = new Html5Qrcode('reader');
+    function pickCameraIndexForFacing(wantFacing, preferDifferentFrom) {
+        if (!camerasMeta.length) return -1;
+        // Prefer labeled opposite camera
+        let idx = camerasMeta.findIndex((c, i) => c.facing === wantFacing && i !== preferDifferentFrom);
+        if (idx >= 0) return idx;
+        idx = camerasMeta.findIndex((c) => c.facing === wantFacing);
+        if (idx >= 0) return idx;
+        // Fall back to next device
+        if (preferDifferentFrom >= 0 && camerasMeta.length > 1) {
+            return (preferDifferentFrom + 1) % camerasMeta.length;
+        }
+        return 0;
     }
 
     async function startScanner() {
+        if (cameraPausedForNfc || webNfcActive) {
+            camOverlay.classList.add('show');
+            camOverlay.textContent = labels.nfcListening;
+            setChip(chipQr, false);
+            return;
+        }
         if (!window.Html5Qrcode) {
             camOverlay.classList.add('show');
             camOverlay.textContent = labels.cameraFail;
             setChip(chipQr, false);
             return;
         }
-        if (!html5QrCode) html5QrCode = new Html5Qrcode('reader');
+
         try {
-            if (html5QrCode.isScanning) return;
+            await hardStopScanner();
             camOverlay.classList.remove('show');
 
-            if (!cameraIds.length) {
-                await refreshCameraList();
+            await refreshCameraList();
+
+            // Align index to preferred facing when labels are known
+            if (camerasMeta.length) {
+                const aligned = pickCameraIndexForFacing(preferredFacing, -1);
+                if (aligned >= 0) cameraIndex = aligned;
             }
 
             let started = false;
             let lastErr = null;
+            const attempts = [];
 
-            // Prefer explicit device IDs when we have several (switch camera works here).
-            if (cameraIds.length >= 2) {
-                const id = cameraIds[cameraIndex % cameraIds.length];
+            if (camerasMeta.length) {
+                attempts.push(camerasMeta[cameraIndex % camerasMeta.length].id);
+            }
+            attempts.push(
+                { facingMode: { exact: preferredFacing } },
+                { facingMode: preferredFacing },
+                { facingMode: { ideal: preferredFacing } }
+            );
+
+            for (const cfg of attempts) {
                 try {
-                    await startWithCamera(id);
+                    await startWithConfig(cfg);
                     started = true;
+                    if (typeof cfg === 'string') {
+                        const meta = camerasMeta.find((c) => c.id === cfg);
+                        activeCameraLabel = meta ? meta.label : cfg.slice(0, 8);
+                        preferredFacing = (meta && meta.facing) || preferredFacing;
+                    } else {
+                        activeCameraLabel = preferredFacing === 'user' ? 'front' : 'rear';
+                    }
+                    break;
                 } catch (e) {
                     lastErr = e;
                     await hardStopScanner();
-                    // Try other cameras
-                    for (let i = 1; i < cameraIds.length; i++) {
-                        const next = cameraIds[(cameraIndex + i) % cameraIds.length];
-                        try {
-                            await startWithCamera(next);
-                            cameraIndex = cameraIds.indexOf(next);
-                            started = true;
-                            break;
-                        } catch (err) {
-                            lastErr = err;
-                            await hardStopScanner();
-                        }
-                    }
-                }
-            }
-
-            // Single-camera devices or before enumeration: use facingMode (front/back).
-            if (!started) {
-                const attempts = [
-                    { facingMode: { ideal: preferredFacing } },
-                    { facingMode: preferredFacing },
-                    { facingMode: preferredFacing === 'environment' ? 'user' : 'environment' },
-                ];
-                if (cameraIds.length === 1) {
-                    attempts.push(cameraIds[0]);
-                }
-                for (const cfg of attempts) {
-                    try {
-                        await startWithCamera(cfg);
-                        if (cfg && cfg.facingMode) {
-                            preferredFacing = typeof cfg.facingMode === 'string'
-                                ? cfg.facingMode
-                                : (cfg.facingMode.ideal || preferredFacing);
-                        }
-                        started = true;
-                        break;
-                    } catch (e) {
-                        lastErr = e;
-                        await hardStopScanner();
-                    }
+                    await sleep(150);
                 }
             }
 
             if (!started) throw lastErr || new Error('no camera');
 
-            // After permission, re-enumerate so Switch camera can flip devices.
-            if (cameraIds.length < 2) {
+            // Re-enumerate after permission so labels/front-back become available
+            if (!camerasMeta.some((c) => c.facing)) {
                 await refreshCameraList();
             }
 
+            applyVideoMirror(preferredFacing);
             setChip(chipQr, true);
             if (switchCameraBtn) switchCameraBtn.disabled = false;
             if (!webNfcActive) statusLine.textContent = labels.ready;
-            if (!webNfcActive) focusCapture();
+            focusCapture();
         } catch (e) {
             setChip(chipQr, false);
             camOverlay.classList.add('show');
             camOverlay.textContent = labels.cameraFail;
-            if (!webNfcActive) statusLine.textContent = labels.cameraFail;
+            if (!webNfcActive) statusLine.textContent = labels.cameraFail + (e && e.message ? (' — ' + e.message) : '');
         }
     }
 
-    async function stopScanner() {
-        await hardStopScanner();
-    }
-
     async function switchCamera() {
-        if (busy || !window.Html5Qrcode || switchCameraBtn.dataset.switching === '1') return;
-        switchCameraBtn.dataset.switching = '1';
+        if (busy || switchingCamera || !window.Html5Qrcode) return;
+
+        // Leaving NFC-paused preview: resume camera on the opposite lens
+        if (cameraPausedForNfc) {
+            cameraPausedForNfc = false;
+        }
+
+        switchingCamera = true;
         statusLine.textContent = labels.cameraSwitching;
         switchCameraBtn.disabled = true;
+
         try {
             await refreshCameraList();
+            const wantFacing = preferredFacing === 'environment' ? 'user' : 'environment';
 
-            if (cameraIds.length >= 2) {
-                cameraIndex = (cameraIndex + 1) % cameraIds.length;
+            let targetId = null;
+            if (camerasMeta.length >= 2) {
+                const nextIdx = pickCameraIndexForFacing(wantFacing, cameraIndex);
+                cameraIndex = nextIdx;
+                targetId = camerasMeta[nextIdx].id;
+                preferredFacing = camerasMeta[nextIdx].facing || wantFacing;
+                activeCameraLabel = camerasMeta[nextIdx].label;
             } else {
-                // Force facingMode path on next start (ignore single stale device id).
-                preferredFacing = preferredFacing === 'environment' ? 'user' : 'environment';
-                cameraIds = [];
+                preferredFacing = wantFacing;
+                activeCameraLabel = wantFacing === 'user' ? 'front' : 'rear';
             }
 
             await hardStopScanner();
-            // Short pause helps Android release the previous track.
-            await new Promise((r) => setTimeout(r, 250));
-            await startScanner();
-            statusLine.textContent = webNfcActive ? labels.nfcListening : labels.cameraSwitched;
+            await sleep(450);
+
+            let started = false;
+            let lastErr = null;
+            const tryConfigs = [];
+            if (targetId) tryConfigs.push(targetId);
+            tryConfigs.push(
+                { facingMode: { exact: preferredFacing } },
+                { facingMode: preferredFacing },
+                { facingMode: { exact: preferredFacing } }
+            );
+
+            // If exact device id fails, try every other camera id
+            if (camerasMeta.length >= 2) {
+                camerasMeta.forEach((c, i) => {
+                    if (c.id !== targetId) tryConfigs.push(c.id);
+                });
+            }
+
+            for (const cfg of tryConfigs) {
+                try {
+                    await startWithConfig(cfg);
+                    started = true;
+                    if (typeof cfg === 'string') {
+                        const meta = camerasMeta.find((c) => c.id === cfg);
+                        if (meta) {
+                            cameraIndex = camerasMeta.indexOf(meta);
+                            preferredFacing = meta.facing || preferredFacing;
+                            activeCameraLabel = meta.label;
+                        }
+                    }
+                    break;
+                } catch (e) {
+                    lastErr = e;
+                    await hardStopScanner();
+                    await sleep(250);
+                }
+            }
+
+            if (!started) throw lastErr || new Error('switch failed');
+
+            applyVideoMirror(preferredFacing);
+            setChip(chipQr, true);
+            camOverlay.classList.remove('show');
+            const facingLabel = preferredFacing === 'user' ? 'front' : 'rear';
+            statusLine.textContent = labels.cameraSwitched + ' · ' + facingLabel + (activeCameraLabel ? (' · ' + activeCameraLabel) : '');
             vibrate(30);
-        } catch (_) {
-            statusLine.textContent = labels.cameraFail;
+        } catch (e) {
+            statusLine.textContent = labels.cameraFail + (e && e.message ? (' — ' + e.message) : '');
+            camOverlay.classList.add('show');
+            camOverlay.textContent = labels.cameraFail;
         } finally {
-            switchCameraBtn.dataset.switching = '0';
+            switchingCamera = false;
             switchCameraBtn.disabled = false;
         }
     }
@@ -900,11 +1008,10 @@
     }
 
     function onScannerKey(e) {
-        if (busy) return;
+        if (busy || webNfcActive || cameraPausedForNfc) return;
         const target = e.target;
         if (target === manualCode) return;
 
-        // Terminators used by USB NFC / barcode wedges
         if (e.key === 'Enter' || e.key === 'Tab' || e.keyCode === 13) {
             const fromField = normalizeUid(nfcCapture.value);
             if (fromField || wedgeBuffer) {
@@ -920,11 +1027,9 @@
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (e.key === 'Escape' || e.key === 'Shift' || e.key === 'CapsLock') return;
 
-        // Printable character (including keypad digits)
         const ch = (e.key && e.key.length === 1) ? e.key : '';
         if (!ch) return;
 
-        // If focus is on another real form control, don't hijack human typing.
         if (target && target !== nfcCapture && target !== document.body && target !== document.documentElement) {
             const tag = (target.tagName || '').toUpperCase();
             if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(tag) || target.isContentEditable) {
@@ -933,17 +1038,13 @@
         }
 
         const now = Date.now();
-        // Slow typing into nowhere is discarded; scanners are bursty.
         if (wedgeBuffer && (now - lastKeyAt) > 700) {
             wedgeBuffer = '';
         }
         lastKeyAt = now;
         wedgeBuffer += ch;
 
-        // Mirror into capture field so Enter-handlers see a value even if focus blips.
-        if (document.activeElement === nfcCapture) {
-            // native input already receives it
-        } else {
+        if (document.activeElement !== nfcCapture) {
             nfcCapture.value = (nfcCapture.value || '') + ch;
         }
 
@@ -960,11 +1061,10 @@
         }, WEDGE_IDLE_MS);
     }
 
-    // Capture phase so we get keys even if a child element tries to stop them.
     document.addEventListener('keydown', onScannerKey, true);
 
     nfcCapture.addEventListener('input', () => {
-        if (busy || isTypingInManual()) return;
+        if (busy || isTypingInManual() || webNfcActive) return;
         clearTimeout(wedgeTimer);
         wedgeTimer = setTimeout(() => {
             const v = normalizeUid(nfcCapture.value);
@@ -985,9 +1085,8 @@
         }
     });
 
-    // Some Android readers paste a block of text.
     document.addEventListener('paste', (e) => {
-        if (busy || isTypingInManual()) return;
+        if (busy || isTypingInManual() || webNfcActive) return;
         const text = normalizeUid((e.clipboardData || window.clipboardData)?.getData('text'));
         if (text && text.length >= 3) {
             e.preventDefault();
@@ -995,14 +1094,14 @@
         }
     });
 
-    // --- Web NFC: same pattern as students/_form.blade.php (works on Android Chrome) ---
+    // --- Web NFC (ported from students/_form.blade.php; camera MUST be stopped first) ---
     function updateNfcUi(message) {
-        setChip(chipNfc, true);
+        setChip(chipNfc, webNfcActive || true);
         if (!enableNfcBtn) return;
 
         if (webNfcActive) {
             enableNfcBtn.classList.add('is-on');
-            enableNfcBtn.disabled = true;
+            enableNfcBtn.disabled = false;
             if (enableNfcLabel) enableNfcLabel.textContent = labels.nfcListening;
             if (nfcBanner) {
                 nfcBanner.classList.add('show', 'is-on');
@@ -1022,8 +1121,6 @@
             if (message) statusLine.textContent = message;
         } else {
             enableNfcBtn.disabled = true;
-            enableNfcBtn.classList.remove('is-on');
-            if (enableNfcLabel) enableNfcLabel.textContent = labels.nfcEnable;
             if (nfcBanner) {
                 nfcBanner.classList.add('show');
                 nfcBanner.classList.remove('is-on');
@@ -1037,25 +1134,46 @@
         e.preventDefault();
         e.stopPropagation();
 
-        // Exact same Web NFC flow as student form NFC button.
         if (!('NDEFReader' in window)) {
             updateNfcUi(labels.nfcUnsupported);
             return;
         }
 
+        // Already listening — remind user (same card flow as student form).
+        if (webNfcActive) {
+            updateNfcUi(labels.nfcListening);
+            camOverlay.classList.add('show');
+            camOverlay.textContent = labels.nfcListening;
+            vibrate(25);
+            return;
+        }
+
+        enableNfcBtn.disabled = true;
+        statusLine.textContent = labels.nfcReady;
+
         try {
+            // CRITICAL: release camera before Web NFC — Android often won't
+            // vibrate/read tags while getUserMedia holds the device.
+            cameraPausedForNfc = true;
+            try { nfcCapture.blur(); } catch (_) {}
+            await hardStopScanner();
+            await sleep(300);
+
+            camOverlay.classList.add('show');
+            camOverlay.textContent = labels.nfcReady;
+
+            // Same sequence as students/_form.blade.php
             const ndef = new NDEFReader();
             await ndef.scan();
 
             webNfcReader = ndef;
             webNfcActive = true;
             updateNfcUi(labels.nfcListening);
-            vibrate(25);
+            camOverlay.textContent = labels.nfcListening;
+            vibrate(40);
 
-            // Assign handlers AFTER scan() resolves — same order as students/_form.blade.php
             ndef.onreading = (event) => {
                 if (busy) return;
-                // Use raw serialNumber like the student form (API expands colon variants).
                 const serialNumber = event.serialNumber;
                 if (!serialNumber) {
                     statusLine.textContent = labels.nfcNoData;
@@ -1063,6 +1181,7 @@
                     return;
                 }
                 vibrate([35, 40, 35]);
+                statusLine.textContent = 'UID: ' + serialNumber;
                 processUid(serialNumber, 'nfc');
             };
             ndef.onreadingerror = () => {
@@ -1071,7 +1190,7 @@
             };
         } catch (error) {
             webNfcActive = false;
-            enableNfcBtn.disabled = false;
+            cameraPausedForNfc = false;
             const name = (error && error.name) || '';
             let msg = labels.nfcUnsupported;
             if (name === 'NotAllowedError' || name === 'SecurityError') {
@@ -1079,19 +1198,22 @@
             } else if (name === 'NotReadableError') {
                 msg = labels.nfcOff;
             } else if (error) {
-                msg = String(labels.nfcUnsupported) + ' (' + (error.message || error) + ')';
+                msg = (error.message || String(error));
             }
             updateNfcUi(msg);
+            // Restore QR camera if NFC failed to start
+            startScanner();
+        } finally {
+            if (!webNfcActive) enableNfcBtn.disabled = false;
+            else enableNfcBtn.disabled = false;
         }
     });
 
-    if (switchCameraBtn) {
-        switchCameraBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            switchCamera();
-        });
-    }
+    switchCameraBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        switchCamera();
+    });
 
     document.getElementById('manualBtn').addEventListener('click', () => processUid(manualCode.value, 'manual'));
     manualCode.addEventListener('keydown', (e) => {
@@ -1101,24 +1223,32 @@
         }
     });
     manualCode.addEventListener('blur', () => {
-        if (!webNfcActive) setTimeout(() => focusCapture(), 80);
+        if (!webNfcActive && !cameraPausedForNfc) setTimeout(() => focusCapture(), 80);
     });
-    document.getElementById('resetBtn').addEventListener('click', resetUi);
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        // Reset also re-arms QR camera if user wants out of NFC-only view
+        if (webNfcActive) {
+            // Keep NFC; just clear result UI
+            resetUi();
+            return;
+        }
+        cameraPausedForNfc = false;
+        resetUi();
+    });
 
     window.addEventListener('resize', () => {
-        if (busy || !html5QrCode || !html5QrCode.isScanning) return;
+        if (busy || cameraPausedForNfc || webNfcActive) return;
+        if (!html5QrCode || !html5QrCode.isScanning) return;
         clearTimeout(window.__kioskResizeTimer);
         window.__kioskResizeTimer = setTimeout(async () => {
             try {
-                await hardStopScanner();
                 await startScanner();
             } catch (_) {}
         }, 350);
     });
 
-    // Any tap outside the manual field returns focus to HID capture (skip while phone NFC listens).
     document.addEventListener('pointerdown', (e) => {
-        if (webNfcActive) return;
+        if (webNfcActive || cameraPausedForNfc) return;
         if (e.target === manualCode || e.target.closest('.manual') || e.target.closest('a,button')) return;
         setTimeout(() => focusCapture(), 0);
     }, true);

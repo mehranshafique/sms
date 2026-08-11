@@ -977,10 +977,10 @@ class ChatbotLogicService
                 $menu .= "6️⃣ My Leave Requests\n";
                 $menu .= "7️⃣ Timetable & Exams\n";
                 $menu .= "8️⃣ Academic Report Card\n";
-                $menu .= "9. Generate Pickup QR Code\n";
-                $menu .= "10. Confirm Re-Enrollment\n";
-                $menu .= "11. Pre-Enroll a New Student\n";
-                $menu .= "12. My Attendance\n";
+                $menu .= "9️⃣ Generate Pickup QR Code\n";
+                $menu .= "🔟 Confirm Re-Enrollment\n";
+                $menu .= "1️⃣1️⃣ Pre-Enroll a New Student\n";
+                $menu .= "1️⃣2️⃣ My Attendance\n";
                 $menu .= "\n99. Change language (FR)\nSend *logout* to quit";
             } else {
                 $menu = "🎓 *Portail Parents / Élèves*\n🏫 {$school}\n👤 {$name}\n📘 {$infoStr} ({$year})\n\n";
@@ -994,9 +994,9 @@ class ChatbotLogicService
                 $menu .= "7️⃣ Horaires (Cours & Examens)\n";
                 $menu .= "8️⃣ e-Bulletin\n";
                 $menu .= "9️⃣ QR Code Retrait enfant\n";
-                $menu .= "10. Confirmer la réinscription\n";
-                $menu .= "11. Préinscription nouvel élève\n";
-                $menu .= "12. Mes présences\n";
+                $menu .= "🔟 Confirmer la réinscription\n";
+                $menu .= "1️⃣1️⃣ Préinscription nouvel élève\n";
+                $menu .= "1️⃣2️⃣ Mes présences\n";
                 $menu .= "\n99. Change Language (EN)\nEnvoyer *logout* pour quitter";
             }
 
