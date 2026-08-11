@@ -123,7 +123,10 @@
     $statusLabel = invoice_status_tranche_label($invoice);
     $enrollment = $invoice->student->enrollments->firstWhere('academic_session_id', $invoice->academic_session_id)
         ?? $invoice->student->enrollments->sortByDesc('created_at')->first();
-    $amountForWords = $thisPaymentAmount > 0 ? $thisPaymentAmount : ($paidTotal > 0 ? $paidTotal : $dueAmount);
+    $amountForWords = $thisPaymentAmount > 0
+        ? $thisPaymentAmount
+        : ($paidTotal > 0 ? $paidTotal : $dueAmount);
+    $highlightAmount = $amountForWords;
     $verifyUrl = $contextPayment?->receipt_verify_token
         ? route('receipt.verify', $contextPayment->receipt_verify_token)
         : null;
@@ -229,7 +232,7 @@
     </tr>
 </table>
 
-<div class="paid-highlight">{{ $currency }} {{ number_format($paidTotal, 2) }}</div>
+<div class="paid-highlight">{{ $currency }} {{ number_format($highlightAmount, 2) }}</div>
 <div class="text-center meta-small" style="margin-bottom: 4px;">
     {{ __('invoice.amount_in_words') }}: {{ ucfirst(amount_in_words($amountForWords)) }}
 </div>
