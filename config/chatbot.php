@@ -54,5 +54,15 @@ return [
         'start' => 'student',
         'salut' => 'student',
         'menu' => 'student',
+        // Public admissions / QR landing (institution resolved from WhatsApp "to" number)
+        'accueil' => 'guest',
+        'welcome' => 'guest',
+        'admission' => 'guest',
+        'admissions' => 'guest',
+        'inscription' => 'guest',
+        'preinscription' => 'guest',
+        'preenroll' => 'guest',
+        'info' => 'guest',
+        'infos' => 'guest',
     ],
 ];

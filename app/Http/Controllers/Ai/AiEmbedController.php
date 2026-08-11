@@ -30,11 +30,11 @@ class AiEmbedController extends BaseController
         try {
             $result = $this->embed->run($data['tool'], $data['params'] ?? []);
         } catch (ValidationException $e) {
-            return response()->json([
-                'ok'      => false,
-                'message' => collect($e->errors())->flatten()->first() ?? __('ai.error_generic'),
-                'errors'  => $e->errors(),
-            ], 422);
+        return response()->json([
+            'ok'      => false,
+            'message' => collect($e->errors())->flatten()->filter()->first() ?: __('ai.error_generic'),
+            'errors'  => $e->errors(),
+        ], 422);
         }
 
         return response()->json([

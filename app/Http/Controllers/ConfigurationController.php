@@ -342,7 +342,7 @@ class ConfigurationController extends BaseController
         $institutionId = $this->getInstitutionId();
         $recommended = [
             'request_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
-            'request_submitted_parent' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
+            'request_submitted_parent' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
             'request_updated' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
             'payment_received' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
             'payment_proof_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],

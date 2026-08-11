@@ -55,9 +55,31 @@
         font-size: .82rem; font-weight: 600; padding: 5px 12px;
         border-radius: 999px; border: 1px solid #ddd6fe;
         background: #f5f3ff; color: #6d28d9; cursor: pointer;
-        transition: background .12s, border-color .12s;
+        transition: background .12s, border-color .12s, box-shadow .12s, transform .12s;
     }
     .ai-embed-btn:hover { background: #ede9fe; border-color: #c4b5fd; }
+    /* Solid CTA variant — used next to forms (results bulk comments, etc.) */
+    .ai-embed-btn.ai-embed-btn--cta,
+    .btn.btn-primary.ai-embed-btn {
+        display: inline-flex;
+        width: 100%;
+        justify-content: center;
+        border-radius: 10px !important;
+        border: 0 !important;
+        padding: 11px 16px !important;
+        font-size: .92rem !important;
+        font-weight: 700 !important;
+        color: #fff !important;
+        background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 55%, #6366f1 100%) !important;
+        box-shadow: 0 8px 18px rgba(91, 33, 182, .35);
+    }
+    .ai-embed-btn.ai-embed-btn--cta:hover,
+    .btn.btn-primary.ai-embed-btn:hover {
+        color: #fff !important;
+        background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 55%, #4f46e5 100%) !important;
+        box-shadow: 0 10px 22px rgba(79, 70, 229, .4);
+        transform: translateY(-1px);
+    }
     .ai-embed-btn.is-loading { opacity: .65; pointer-events: none; }
     .ai-embed-btn i { font-size: 1rem; }
     .ai-embed-panel {

@@ -39,6 +39,7 @@ class PreEnrollment extends Model
         'parent_name',
         'parent_phone',
         'parent_email',
+        'student_parent_id',
         'requested_grade_level_id',
         'requested_class_section_id',
         'requested_option',
@@ -85,6 +86,11 @@ class PreEnrollment extends Model
     public function convertedStudent(): BelongsTo
     {
         return $this->belongsTo(Student::class, 'converted_student_id');
+    }
+
+    public function studentParent(): BelongsTo
+    {
+        return $this->belongsTo(StudentParent::class, 'student_parent_id');
     }
 
     public function createdBy(): BelongsTo

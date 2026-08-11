@@ -32,6 +32,7 @@
 
             applyTimetable: @json(__('ai.apply_timetable')),
             selectClassFirst: @json(__('ai.select_class_first')),
+            selectExamFirst: @json(__('ai.select_exam_first')),
             overrideTimetable: @json(__('ai.override_timetable')),
             overrideTimetableConfirm: @json(__('ai.override_timetable_confirm')),
         }
@@ -226,12 +227,18 @@
 
     function getSelectValue(el) {
         if (!el) return '';
-        if (typeof jQuery !== 'undefined' && jQuery(el).is('select') && jQuery.fn.selectpicker) {
-            var val = jQuery(el).selectpicker('val');
-            if (Array.isArray(val)) return val[0] || '';
-            return val || el.value || '';
-        }
-        return el.value || '';
+        try {
+            if (typeof jQuery !== 'undefined' && jQuery(el).is('select') && jQuery.fn.selectpicker) {
+                var $el = jQuery(el);
+                // Only use the plugin API when this select was actually initialised.
+                if ($el.parent().hasClass('bootstrap-select') || $el.data('selectpicker')) {
+                    var val = $el.selectpicker('val');
+                    if (Array.isArray(val)) return String(val[0] || '');
+                    if (val !== undefined && val !== null && val !== '') return String(val);
+                }
+            }
+        } catch (e) {}
+        return el.value ? String(el.value) : '';
     }
 
     function resolveFieldValue(selectors) {
@@ -240,11 +247,25 @@
             var el = document.querySelector(parts[i].trim());
             if (!el) continue;
             var val = getSelectValue(el);
-            if (val !== undefined && val !== null && val !== '') {
-                return val;
+            if (val !== undefined && val !== null && String(val).trim() !== '') {
+                return String(val).trim();
             }
         }
         return null;
+    }
+
+    function extractErrorMessage(body) {
+        if (!body) return cfg.strings.error;
+        if (body.message && String(body.message).trim()) return String(body.message);
+        if (body.errors && typeof body.errors === 'object') {
+            var keys = Object.keys(body.errors);
+            for (var i = 0; i < keys.length; i++) {
+                var list = body.errors[keys[i]];
+                if (Array.isArray(list) && list[0]) return String(list[0]);
+                if (typeof list === 'string' && list) return list;
+            }
+        }
+        return cfg.strings.error;
     }
 
 
@@ -347,9 +368,9 @@
 
             return post(tool, p).then(function (res) {
 
-                if (!res.ok || !res.body.ok) {
+                if (!res.ok || !res.body || res.body.ok === false) {
 
-                    throw new Error((res.body && res.body.message) || cfg.strings.error);
+                    throw new Error(extractErrorMessage(res.body));
 
                 }
 
@@ -459,6 +480,27 @@
                 }
                 return;
             }
+        }
+
+        if (tool === 'bulk_report_comments') {
+            if (!params.exam_id) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'warning', text: cfg.strings.selectExamFirst || 'Select an exam first.' });
+                } else {
+                    alert(cfg.strings.selectExamFirst || 'Select an exam first.');
+                }
+                return;
+            }
+            if (!params.class_section_id) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'warning', text: cfg.strings.selectClassFirst || 'Select a class first.' });
+                } else {
+                    alert(cfg.strings.selectClassFirst || 'Select a class first.');
+                }
+                return;
+            }
+            params.exam_id = parseInt(params.exam_id, 10);
+            params.class_section_id = parseInt(params.class_section_id, 10);
         }
 
         setLoading(btn, true);

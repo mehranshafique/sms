@@ -93,10 +93,10 @@
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <button type="button" class="btn btn-primary w-100 ai-embed-btn" id="ai-bulk-comments-btn"
+                                <button type="button" class="ai-embed-btn ai-embed-btn--cta" id="ai-bulk-comments-btn"
                                     data-ai-tool="bulk_report_comments"
                                     data-ai-params="{}"
-                                    data-ai-fields='{"exam_id":"#ai_bulk_exam","class_section_id":"#ai_bulk_class"}'
+                                    data-ai-fields='{"exam_id":"#ai_bulk_exam,#exam_select","class_section_id":"#ai_bulk_class,#class_select"}'
                                     data-ai-panel="#ai-bulk-comments-output">
                                     <i class="la la-magic"></i> {{ __('ai.btn_bulk_comments') }}
                                 </button>

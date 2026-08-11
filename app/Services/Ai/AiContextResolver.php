@@ -94,10 +94,6 @@ class AiContextResolver
 
     public function examClassMarks(int $examId, int $classSectionId, ?int $institutionId, User $user): ?array
     {
-        if (!$user->can('exam_mark.create') && !$user->hasAnyRole(['Super Admin', 'Head Officer', 'School Admin', 'Teacher'])) {
-            return null;
-        }
-
         $exam = Exam::when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))->find($examId);
         if (!$exam) {
             return null;

@@ -33,6 +33,7 @@ return [
     'select_institution' => 'Sélectionner l\'institution',
     'select_campus' => 'Sélectionner le campus',
     'employee_id' => 'ID Employé',
+    'scan_for_attendance' => 'Scanner pour présence ou profil',
     'designation' => 'Désignation',
     'department' => 'Département',
     'joining_date' => 'Date d\'embauche',

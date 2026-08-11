@@ -48,6 +48,7 @@ class PreEnrollmentService
             'parent_name' => $data['parent_name'] ?? null,
             'parent_phone' => $data['parent_phone'] ?? null,
             'parent_email' => $data['parent_email'] ?? null,
+            'student_parent_id' => $data['student_parent_id'] ?? null,
             'requested_grade_level_id' => $data['requested_grade_level_id'] ?? null,
             'requested_class_section_id' => $data['requested_class_section_id'] ?? null,
             'requested_option' => $data['requested_option'] ?? null,
@@ -226,13 +227,22 @@ class PreEnrollmentService
                 $pre->refresh();
             }
 
-            $parent = null;
-            if ($pre->parent_phone) {
+            $parent = $pre->student_parent_id
+                ? StudentParent::where('institution_id', $pre->institution_id)->find($pre->student_parent_id)
+                : null;
+
+            if (! $parent && $pre->parent_phone) {
+                $phoneDigits = preg_replace('/\D+/', '', (string) $pre->parent_phone);
                 $parent = StudentParent::where('institution_id', $pre->institution_id)
-                    ->where(function ($q) use ($pre) {
+                    ->where(function ($q) use ($pre, $phoneDigits) {
                         $q->where('father_phone', $pre->parent_phone)
                             ->orWhere('mother_phone', $pre->parent_phone)
                             ->orWhere('guardian_phone', $pre->parent_phone);
+                        if (strlen($phoneDigits) >= 8) {
+                            $q->orWhere('father_phone', 'like', "%{$phoneDigits}%")
+                                ->orWhere('mother_phone', 'like', "%{$phoneDigits}%")
+                                ->orWhere('guardian_phone', 'like', "%{$phoneDigits}%");
+                        }
                     })
                     ->first();
             }

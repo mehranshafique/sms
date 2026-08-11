@@ -27,6 +27,7 @@ class ChatbotInteractionController extends Controller
 
         return $this->botService->processMessage([
             'from' => $from,
+            'to' => $request->input('to'),
             'body' => $body,
         ]);
     }

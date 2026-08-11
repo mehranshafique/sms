@@ -249,7 +249,7 @@ class InAppNotificationService
 
     public function notifyStudentRequestSubmitted(StudentRequest $req): void
     {
-        if ($req->status !== 'pending') {
+        if (! in_array($req->status, ['pending', 'submitted'], true)) {
             return;
         }
 
@@ -265,12 +265,12 @@ class InAppNotificationService
         $this->notifyAdmins(
             $req->institution_id,
             $eventKey,
-            'student_request',
+            'student_request_new',
             __('header.notif_request_new_title'),
             $message,
             route('requests.index'),
             'fa-envelope',
-            ['request_id' => $req->id],
+            ['request_id' => $req->id, 'menu_key' => 'requests'],
             $req->created_by
         );
 
@@ -278,12 +278,12 @@ class InAppNotificationService
             $req->institution_id,
             [RoleEnum::TEACHER->value, RoleEnum::STAFF->value],
             $eventKey,
-            'student_request',
+            'student_request_new',
             __('header.notif_request_new_title'),
             $message,
             route('requests.index'),
             'fa-envelope',
-            ['request_id' => $req->id],
+            ['request_id' => $req->id, 'menu_key' => 'requests'],
             $req->created_by
         );
     }

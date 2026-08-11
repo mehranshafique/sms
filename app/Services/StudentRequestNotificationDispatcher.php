@@ -77,9 +77,7 @@ class StudentRequestNotificationDispatcher
         }
 
         $phone = $this->parentPhone($student);
-        if (!$phone) {
-            return;
-        }
+        $email = $this->parentEmail($student);
 
         $responseHours = (int) InstitutionSetting::get($req->institution_id, 'request_response_hours', 24);
         $data = array_merge($this->requestTemplateData($req), [
@@ -88,11 +86,14 @@ class StudentRequestNotificationDispatcher
 
         $whatsappOnly = InstitutionSetting::get($req->institution_id, 'request_submit_whatsapp_only', false);
 
-        if (!$whatsappOnly && $this->preferences->isChannelEnabled($req->institution_id, $eventKey, 'sms')) {
+        if ($phone && !$whatsappOnly && $this->preferences->isChannelEnabled($req->institution_id, $eventKey, 'sms')) {
             $this->notifications->sendNotificationEvent($eventKey, $phone, $data, $req->institution_id, 'sms');
         }
-        if ($this->preferences->isChannelEnabled($req->institution_id, $eventKey, 'whatsapp')) {
+        if ($phone && $this->preferences->isChannelEnabled($req->institution_id, $eventKey, 'whatsapp')) {
             $this->notifications->sendNotificationEvent($eventKey, $phone, $data, $req->institution_id, 'whatsapp');
+        }
+        if ($email && $this->preferences->isChannelEnabled($req->institution_id, $eventKey, 'email')) {
+            $this->notifications->sendEmailTemplate($eventKey, $email, $data, $req->institution_id);
         }
     }
 
@@ -176,5 +177,20 @@ class StudentRequestNotificationDispatcher
         }
 
         return $student->mobile_number;
+    }
+
+    private function parentEmail($student): ?string
+    {
+        $parent = $student->parent;
+        if ($parent) {
+            $email = $parent->guardian_email
+                ?? $parent->email
+                ?? optional($parent->user)->email;
+            if ($email) {
+                return $email;
+            }
+        }
+
+        return $student->email ?: optional($student->user)->email;
     }
 }

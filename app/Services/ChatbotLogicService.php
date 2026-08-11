@@ -101,7 +101,7 @@ class ChatbotLogicService
 
             if (!$session) {
                 Log::info("Chatbot Lifecycle: No active session. Triggering handleNewSession.");
-                return $this->handleNewSession($phone, $text);
+                return $this->handleNewSession($phone, $text, $data['to'] ?? null);
             }
 
             $session->update(['last_interaction_at' => now(), 'expires_at' => now()->addMinutes(30)]);
@@ -115,9 +115,24 @@ class ChatbotLogicService
                 'cleaned_command' => $cmd
             ]);
 
+            if ($session->status === 'GUEST_MENU') {
+                if ($cmd === '99') {
+                    $newLocale = $session->locale === 'en' ? 'fr' : 'en';
+                    $session->update(['locale' => $newLocale]);
+                    app()->setLocale($newLocale);
+
+                    return $this->sendGuestMenu($session);
+                }
+
+                return $this->processGuestMenu($session, $cmd, $text);
+            }
+
             if ($session->status !== 'AWAITING_ID' && $session->status !== 'AWAITING_OTP' && $session->status !== 'CHILD_SELECT') {
                 if ($cmd === '0' || $cmd === '00' || $cmd === 'menu') {
                     Log::info("Chatbot Lifecycle: User triggered return to Main Menu.");
+                    if ($session->menu_profile === ChatbotMenuProfile::GUEST->value && ! $session->user_id) {
+                        return $this->sendGuestMenu($session);
+                    }
                     $session->update(['status' => 'ACTIVE', 'identifier_input' => null, 'otp' => null]); 
                     return $this->routeToMainMenu($session);
                 }
@@ -129,6 +144,9 @@ class ChatbotLogicService
                     app()->setLocale($newLocale);
                     $msg = $newLocale === 'fr' ? "✅ Langue changée en Français." : "✅ Language changed to English.";
                     $this->reply($session->phone_number, $msg, $session->institution_id);
+                    if ($session->menu_profile === ChatbotMenuProfile::GUEST->value && ! $session->user_id) {
+                        return $this->sendGuestMenu($session);
+                    }
                     return $this->routeToMainMenu($session);
                 }
             }
@@ -227,11 +245,16 @@ class ChatbotLogicService
     // --- 1. INITIALIZATION & AUTHENTICATION ---
     // =================================================================================
 
-    protected function handleNewSession($phone, $text)
+    protected function handleNewSession($phone, $text, $botTo = null)
     {
         $textLower = strtolower(trim($text));
+        $institutionFromBot = $this->resolveInstitutionFromBotNumber($botTo);
 
-        Log::info("Chatbot Flow: New Session Initiated", ['text_received' => $textLower]);
+        Log::info("Chatbot Flow: New Session Initiated", [
+            'text_received' => $textLower,
+            'bot_to' => $botTo,
+            'institution_from_bot' => $institutionFromBot,
+        ]);
 
         $keyword = ChatbotKeyword::with('allowedRoles')
             ->whereRaw('LOWER(keyword) = ?', [$textLower])
@@ -240,11 +263,16 @@ class ChatbotLogicService
         if ($keyword) {
             $locale = $keyword->language ?? 'fr';
             $menuProfile = $keyword->menu_profile ?? $this->chatbotAccess->inferMenuProfileFromKeyword($keyword->keyword);
+            $institutionId = $keyword->institution_id ?: $institutionFromBot;
+
+            if ($menuProfile === ChatbotMenuProfile::GUEST->value && $institutionId) {
+                return $this->startGuestSession($phone, (int) $institutionId, $locale, $keyword->id, $keyword->welcome_message);
+            }
 
             return $this->startKeywordSession(
                 $phone,
                 $menuProfile,
-                $keyword->institution_id,
+                $institutionId,
                 $locale,
                 $keyword->welcome_message,
                 $keyword->id
@@ -253,9 +281,40 @@ class ChatbotLogicService
 
         $builtinMenuProfile = $this->chatbotAccess->resolveBuiltinMenuProfile($textLower);
         if ($builtinMenuProfile) {
-            $locale = in_array($textLower, ['hello', 'hi', 'start']) ? 'en' : 'fr';
+            $locale = in_array($textLower, ['hello', 'hi', 'start', 'welcome', 'admission', 'admissions', 'preenroll'], true)
+                ? 'en'
+                : 'fr';
 
-            return $this->startKeywordSession($phone, $builtinMenuProfile, null, $locale);
+            if ($builtinMenuProfile === ChatbotMenuProfile::GUEST->value) {
+                if (! $institutionFromBot) {
+                    $msg = $locale === 'en'
+                        ? "👋 Welcome. Please send your *school keyword* (from the school QR / admission leaflet) to continue."
+                        : "👋 Bienvenue. Envoyez le *mot-clé de votre école* (QR / brochure d'admission) pour continuer.";
+
+                    return $this->reply($phone, $msg, null);
+                }
+
+                return $this->startGuestSession($phone, (int) $institutionFromBot, $locale);
+            }
+
+            // Parent/student builtins without a school: if WhatsApp number maps to one school, offer guest admissions.
+            if ($institutionFromBot && in_array($builtinMenuProfile, [
+                ChatbotMenuProfile::PARENT->value,
+                ChatbotMenuProfile::STUDENT->value,
+            ], true)) {
+                return $this->startGuestSession($phone, (int) $institutionFromBot, $locale);
+            }
+
+            return $this->startKeywordSession($phone, $builtinMenuProfile, $institutionFromBot, $locale);
+        }
+
+        // Any other first message to a school WhatsApp number → public admissions menu.
+        if ($institutionFromBot) {
+            $locale = preg_match('/[éèàùç]/u', $textLower) || preg_match('/\b(bonjour|salut|inscription|infos?)\b/u', $textLower)
+                ? 'fr'
+                : (preg_match('/\b(hello|hi|info|fees|admission)\b/', $textLower) ? 'en' : 'fr');
+
+            return $this->startGuestSession($phone, (int) $institutionFromBot, $locale);
         }
 
         Log::warning("Chatbot Flow: Keyword totally unrecognized", ['text' => $textLower]);
@@ -278,6 +337,180 @@ class ChatbotLogicService
         return (bool) $this->chatbotAccess->resolveBuiltinMenuProfile($textLower);
     }
 
+    /**
+     * Map the school's inbound WhatsApp number ("to") to a unique institution.
+     */
+    protected function resolveInstitutionFromBotNumber(?string $to): ?int
+    {
+        if (! $to) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $to);
+        if (strlen($digits) < 8) {
+            return null;
+        }
+
+        $keys = [
+            'school_whatsapp_number',
+            'infobip_whatsapp_from',
+            'twilio_whatsapp_from',
+            'meta_whatsapp_from',
+            'whatsapp_from',
+        ];
+
+        $matched = [];
+        $rows = InstitutionSetting::whereIn('key', $keys)
+            ->whereNotNull('institution_id')
+            ->whereNotNull('value')
+            ->get(['institution_id', 'value']);
+
+        foreach ($rows as $row) {
+            $valueDigits = preg_replace('/\D+/', '', (string) $row->value);
+            if ($valueDigits === '') {
+                continue;
+            }
+            if ($valueDigits === $digits
+                || str_ends_with($digits, $valueDigits)
+                || str_ends_with($valueDigits, $digits)) {
+                $matched[(int) $row->institution_id] = true;
+            }
+        }
+
+        return count($matched) === 1 ? (int) array_key_first($matched) : null;
+    }
+
+    protected function startGuestSession(
+        string $phone,
+        int $institutionId,
+        string $locale = 'fr',
+        ?int $chatbotKeywordId = null,
+        ?string $welcomeMessage = null
+    ) {
+        app()->setLocale($locale);
+
+        $session = ChatSession::create([
+            'phone_number' => $phone,
+            'institution_id' => $institutionId,
+            'chatbot_keyword_id' => $chatbotKeywordId,
+            'status' => 'GUEST_MENU',
+            'menu_profile' => ChatbotMenuProfile::GUEST->value,
+            'participant_type' => null,
+            'locale' => $locale,
+            'last_interaction_at' => now(),
+            'expires_at' => now()->addMinutes(30),
+            'user_id' => null,
+            'user_type' => null,
+            'identifier_input' => null,
+        ]);
+
+        if ($welcomeMessage) {
+            $this->reply($phone, $welcomeMessage, $institutionId);
+        }
+
+        return $this->sendGuestMenu($session);
+    }
+
+    protected function sendGuestMenu(?ChatSession $session)
+    {
+        if (! $session) {
+            return response()->json(['status' => 'error']);
+        }
+
+        $session->update(['status' => 'GUEST_MENU', 'identifier_input' => null]);
+        $school = Institution::find($session->institution_id);
+        $schoolName = $school?->name ?? config('app.name');
+        $isEn = $session->locale === 'en';
+
+        $msg = $isEn
+            ? "🏫 *Welcome to {$schoolName}*\n\n"
+                . "1️⃣ Pre-register a student\n"
+                . "2️⃣ Admission information\n"
+                . "3️⃣ School fees information\n"
+                . "4️⃣ Contact the school\n"
+                . "5️⃣ Parent / Student portal (login)\n\n"
+                . "99. Change language (FR)\n"
+                . "Send *logout* to exit."
+            : "🏫 *Bienvenue à {$schoolName}*\n\n"
+                . "1️⃣ Préinscrire un élève\n"
+                . "2️⃣ Informations d'admission\n"
+                . "3️⃣ Informations sur les frais\n"
+                . "4️⃣ Contacter l'école\n"
+                . "5️⃣ Portail Parent / Élève (connexion)\n\n"
+                . "99. Changer de langue (EN)\n"
+                . "Envoyez *logout* pour quitter.";
+
+        return $this->reply($session->phone_number, $msg, $session->institution_id);
+    }
+
+    protected function processGuestMenu(ChatSession $session, string $cmd, string $text)
+    {
+        $isEn = $session->locale === 'en';
+
+        if (in_array(strtolower(trim($text)), ['logout', 'exit', 'quit', 'deconnexion', 'déconnexion'], true)) {
+            $session->delete();
+            $msg = $isEn ? 'Goodbye.' : 'Au revoir.';
+
+            return $this->reply($session->phone_number, $msg, $session->institution_id);
+        }
+
+        return match ($cmd) {
+            '1', 'preenroll', 'preinscription', 'preinscrire', 'inscription' => $this->startPreEnrollmentFlow($session),
+            '2', 'admission', 'admissions' => $this->sendGuestInfo($session, 'admission'),
+            '3', 'fees', 'frais' => $this->sendGuestInfo($session, 'fees'),
+            '4', 'contact', 'contacts' => $this->sendGuestInfo($session, 'contact'),
+            '5', 'login', 'portail', 'portal', 'parent', 'student' => $this->startPortalLoginFromGuest($session),
+            default => $this->sendGuestMenu($session),
+        };
+    }
+
+    protected function sendGuestInfo(ChatSession $session, string $topic)
+    {
+        $isEn = $session->locale === 'en';
+        $school = Institution::find($session->institution_id);
+        $settingKey = match ($topic) {
+            'admission' => 'chatbot_admission_info',
+            'fees' => 'chatbot_fees_info',
+            default => 'chatbot_contact_info',
+        };
+
+        $custom = InstitutionSetting::get($session->institution_id, $settingKey);
+        if (is_string($custom) && trim($custom) !== '') {
+            $body = trim($custom);
+        } else {
+            $body = match ($topic) {
+                'admission' => $isEn
+                    ? "📌 *Admission*\nPre-register a new student from this menu (option 1). Existing Digitex parents are linked automatically via their WhatsApp number. After pre-registration you receive a temporary ID and test details from the school."
+                    : "📌 *Admission*\nPréinscrivez un nouvel élève via ce menu (option 1). Les parents Digitex déjà connus sont reliés automatiquement via leur numéro WhatsApp. Après la préinscription vous recevez un ID temporaire et les détails du test.",
+                'fees' => $isEn
+                    ? "💰 *School fees*\nFee details depend on the class/option. Contact the school office or log in to the parent portal (option 5) for your child's balance."
+                    : "💰 *Frais scolaires*\nLes montants dépendent de la classe/option. Contactez le secrétariat ou connectez-vous au portail parent (option 5) pour le solde de votre enfant.",
+                default => $isEn
+                    ? "📞 *Contact*\nSchool: " . ($school?->name ?? '') . "\nPhone: " . ($school?->phone ?: 'N/A') . "\nEmail: " . ($school?->email ?: 'N/A') . "\nAddress: " . ($school?->address ?: 'N/A')
+                    : "📞 *Contact*\nÉcole : " . ($school?->name ?? '') . "\nTél. : " . ($school?->phone ?: 'N/A') . "\nEmail : " . ($school?->email ?: 'N/A') . "\nAdresse : " . ($school?->address ?: 'N/A'),
+            };
+        }
+
+        $footer = $isEn
+            ? "\n\nReply *0* for the welcome menu."
+            : "\n\nRépondez *0* pour le menu d'accueil.";
+
+        return $this->reply($session->phone_number, $body . $footer, $session->institution_id);
+    }
+
+    protected function startPortalLoginFromGuest(ChatSession $session)
+    {
+        $session->update([
+            'status' => 'AWAITING_ID',
+            'menu_profile' => ChatbotMenuProfile::PARENT->value,
+            'identifier_input' => null,
+        ]);
+
+        $msg = $this->defaultWelcomeForMenuProfile(ChatbotMenuProfile::PARENT->value, $session->locale ?? 'fr');
+
+        return $this->reply($session->phone_number, $msg, $session->institution_id);
+    }
+
     protected function startKeywordSession(
         string $phone,
         string $menuProfile,
@@ -286,6 +519,18 @@ class ChatbotLogicService
         ?string $welcomeMessage = null,
         ?int $chatbotKeywordId = null
     ) {
+        if ($menuProfile === ChatbotMenuProfile::GUEST->value) {
+            if (! $institutionId) {
+                $msg = $locale === 'en'
+                    ? "👋 Welcome. Please send your school keyword to begin admissions."
+                    : "👋 Bienvenue. Envoyez le mot-clé de votre école pour l'admission.";
+
+                return $this->reply($phone, $msg, null);
+            }
+
+            return $this->startGuestSession($phone, (int) $institutionId, $locale, $chatbotKeywordId, $welcomeMessage);
+        }
+
         app()->setLocale($locale);
 
         ChatSession::create([
@@ -1660,16 +1905,69 @@ class ChatbotLogicService
             return $this->reply($session->phone_number, $msg, $session->institution_id);
         }
 
+        $draft = [];
+        $existingParent = $this->findParentByWhatsAppPhone((int) $session->institution_id, (string) $session->phone_number);
+        if ($existingParent) {
+            $draft['student_parent_id'] = $existingParent->id;
+            $draft['parent_name'] = $existingParent->father_name
+                ?: ($existingParent->mother_name ?: $existingParent->guardian_name);
+            $draft['parent_phone'] = $existingParent->father_phone
+                ?: ($existingParent->mother_phone ?: $existingParent->guardian_phone)
+                ?: $session->phone_number;
+            $draft['parent_email'] = $existingParent->guardian_email;
+            $draft['existing_parent'] = true;
+        }
+
         $session->update([
             'status' => 'PRE_ENROLL_FIRST',
-            'identifier_input' => null,
+            'identifier_input' => $draft ? ('PRE:' . json_encode($draft)) : null,
         ]);
 
         $msg = $isEn
             ? __('pre_enrollment.chatbot.start_en')
             : __('pre_enrollment.chatbot.start_fr');
 
+        if ($existingParent && ($draft['parent_name'] ?? null)) {
+            $linked = $isEn
+                ? __('pre_enrollment.chatbot.linked_parent_en', ['name' => $draft['parent_name']])
+                : __('pre_enrollment.chatbot.linked_parent_fr', ['name' => $draft['parent_name']]);
+            $msg = $linked . "\n\n" . $msg;
+        }
+
         return $this->reply($session->phone_number, $msg, $session->institution_id);
+    }
+
+    protected function findParentByWhatsAppPhone(int $institutionId, string $phone): ?StudentParent
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (strlen($digits) < 8) {
+            return null;
+        }
+
+        return StudentParent::query()
+            ->where(function ($q) use ($institutionId) {
+                $q->where('institution_id', $institutionId)
+                    ->orWhereHas('students', fn ($sq) => $sq->where('institution_id', $institutionId));
+            })
+            ->where(function ($query) use ($digits) {
+                $query->where('father_phone', 'like', "%{$digits}%")
+                    ->orWhere('mother_phone', 'like', "%{$digits}%")
+                    ->orWhere('guardian_phone', 'like', "%{$digits}%");
+            })
+            ->first();
+    }
+
+    protected function preEnrollmentIdleStatus(ChatSession $session): string
+    {
+        if ($session->user_id) {
+            return 'ACTIVE';
+        }
+
+        if ($session->menu_profile === ChatbotMenuProfile::GUEST->value) {
+            return 'GUEST_MENU';
+        }
+
+        return 'AWAITING_ID';
     }
 
     protected function processPreEnrollmentStep($session, $text, $cmd)
@@ -1678,12 +1976,18 @@ class ChatbotLogicService
         $raw = trim((string) $text);
 
         if (in_array(strtolower($raw), ['0', 'cancel', 'annuler'], true)) {
-            $session->update(['status' => $session->user_id ? 'ACTIVE' : 'AWAITING_ID', 'identifier_input' => null]);
+            $idle = $this->preEnrollmentIdleStatus($session);
+            $session->update(['status' => $idle, 'identifier_input' => null]);
             $msg = $isEn ? __('pre_enrollment.chatbot.cancelled_en') : __('pre_enrollment.chatbot.cancelled_fr');
             if ($session->user_id) {
                 $this->reply($session->phone_number, $msg, $session->institution_id);
 
                 return $this->sendStudentMenu($session);
+            }
+            if ($idle === 'GUEST_MENU') {
+                $this->reply($session->phone_number, $msg, $session->institution_id);
+
+                return $this->sendGuestMenu($session);
             }
 
             return $this->reply($session->phone_number, $msg, $session->institution_id);
@@ -1737,6 +2041,18 @@ class ChatbotLogicService
                     return $this->reply($session->phone_number, $msg, $session->institution_id);
                 }
                 $draft['dob'] = $dob;
+
+                // Existing Digitex parent (matched by WhatsApp): skip name/phone capture.
+                if (! empty($draft['existing_parent']) && ! empty($draft['parent_name']) && ! empty($draft['parent_phone'])) {
+                    $session->update([
+                        'status' => 'PRE_ENROLL_CLASS',
+                        'identifier_input' => 'PRE:' . json_encode($draft),
+                    ]);
+                    $msg = $isEn ? __('pre_enrollment.chatbot.ask_class_en') : __('pre_enrollment.chatbot.ask_class_fr');
+
+                    return $this->reply($session->phone_number, $msg, $session->institution_id);
+                }
+
                 $session->update([
                     'status' => 'PRE_ENROLL_PARENT',
                     'identifier_input' => 'PRE:' . json_encode($draft),
@@ -1751,12 +2067,32 @@ class ChatbotLogicService
                     'status' => 'PRE_ENROLL_PHONE',
                     'identifier_input' => 'PRE:' . json_encode($draft),
                 ]);
-                $msg = $isEn ? __('pre_enrollment.chatbot.ask_phone_en') : __('pre_enrollment.chatbot.ask_phone_fr');
+                $defaultHint = $isEn
+                    ? __('pre_enrollment.chatbot.ask_phone_en') . "\n" . __('pre_enrollment.chatbot.phone_default_en')
+                    : __('pre_enrollment.chatbot.ask_phone_fr') . "\n" . __('pre_enrollment.chatbot.phone_default_fr');
 
-                return $this->reply($session->phone_number, $msg, $session->institution_id);
+                return $this->reply($session->phone_number, $defaultHint, $session->institution_id);
 
             case 'PRE_ENROLL_PHONE':
-                $draft['parent_phone'] = preg_replace('/\s+/', '', $raw) ?: $session->phone_number;
+                $phoneRaw = preg_replace('/\s+/', '', $raw);
+                if (in_array(strtolower($raw), ['same', 'meme', 'même', 'ok', 'oui', 'yes', '1'], true) || $phoneRaw === '') {
+                    $phoneRaw = $session->phone_number;
+                }
+                $draft['parent_phone'] = $phoneRaw ?: $session->phone_number;
+
+                $matched = $this->findParentByWhatsAppPhone((int) $session->institution_id, (string) $draft['parent_phone']);
+                if ($matched) {
+                    $draft['student_parent_id'] = $matched->id;
+                    $draft['existing_parent'] = true;
+                    if (empty($draft['parent_name'])) {
+                        $draft['parent_name'] = $matched->father_name
+                            ?: ($matched->mother_name ?: $matched->guardian_name);
+                    }
+                    if (empty($draft['parent_email'])) {
+                        $draft['parent_email'] = $matched->guardian_email;
+                    }
+                }
+
                 $session->update([
                     'status' => 'PRE_ENROLL_CLASS',
                     'identifier_input' => 'PRE:' . json_encode($draft),
@@ -1776,18 +2112,29 @@ class ChatbotLogicService
                         'whatsapp'
                     );
                 } catch (\Throwable $e) {
-                    $session->update(['status' => $session->user_id ? 'ACTIVE' : 'AWAITING_ID', 'identifier_input' => null]);
+                    $idle = $this->preEnrollmentIdleStatus($session);
+                    $session->update(['status' => $idle, 'identifier_input' => null]);
 
                     return $this->reply($session->phone_number, $e->getMessage(), $session->institution_id);
                 }
 
-                $session->update(['status' => $session->user_id ? 'ACTIVE' : 'AWAITING_ID', 'identifier_input' => null]);
+                $idle = $this->preEnrollmentIdleStatus($session);
+                $session->update(['status' => $idle, 'identifier_input' => null]);
                 $msg = __($isEn ? 'pre_enrollment.chatbot.done_en' : 'pre_enrollment.chatbot.done_fr', [
                     'id' => $pre->temporary_id,
                     'name' => $pre->fullName(),
                 ]);
 
-                return $this->reply($session->phone_number, $msg . ($session->user_id ? $this->getReturnPrompt($session) : ''), $session->institution_id);
+                if ($session->user_id) {
+                    return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);
+                }
+                if ($idle === 'GUEST_MENU') {
+                    $this->reply($session->phone_number, $msg, $session->institution_id);
+
+                    return $this->sendGuestMenu($session);
+                }
+
+                return $this->reply($session->phone_number, $msg, $session->institution_id);
         }
 
         return $this->reply($session->phone_number, $isEn ? 'Please reply with a valid value.' : 'Veuillez envoyer une valeur valide.', $session->institution_id);

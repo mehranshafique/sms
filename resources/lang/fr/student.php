@@ -88,6 +88,7 @@ return [
     'records_autofilled' => 'Dossiers pré-remplis pour',
     'photo' => 'Photo de l\'élève',
     'scan_for_details' => 'Scanner pour détails élève',
+    'scan_for_attendance' => 'Scanner pour présence ou profil',
     'payment_mode' => 'Mode de paiement',
     'finance_dashboard' => 'Tableau financier',
     'qr_code_token' => 'Jeton QR Code',

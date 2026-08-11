@@ -101,6 +101,7 @@ return [
     
     'photo' => 'Student Photo',
     'scan_for_details' => 'Scan for Student Details',
+    'scan_for_attendance' => 'Scan for attendance or profile',
     'payment_mode' => 'Payment Mode',
     'finance_dashboard' => 'Finance Dashboard',
     

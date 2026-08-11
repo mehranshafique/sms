@@ -15,8 +15,10 @@
             markFailed: @json(__('header.notif_mark_failed')),
             newNotification: @json(__('header.new_notification_toast')),
         },
-        pollIntervalMs: 30000,
+        pollIntervalMs: 12000,
         initialCount: {{ (int) ($inAppUnreadCount ?? 0) }},
+        beepOnIncrease: true,
+        requestTypes: ['student_request', 'student_request_new'],
     };
 
     var state = {
@@ -26,6 +28,7 @@
         syncing: false,
         mutating: false,
         syncAbort: null,
+        audioCtx: null,
     };
 
     function els() {
@@ -38,6 +41,42 @@
             markAll: document.getElementById('markAllNotifications'),
             root: document.getElementById('inAppNotifRoot'),
         };
+    }
+
+    function playAlertBeep(latest) {
+        try {
+            var type = (latest && latest.type) ? String(latest.type) : '';
+            var isRequest = !cfg.requestTypes || !cfg.requestTypes.length
+                || cfg.requestTypes.indexOf(type) !== -1
+                || type.indexOf('request') !== -1
+                || type.indexOf('ticket') !== -1;
+            if (!isRequest && type !== '') {
+                // Still beep for any new unread jump (tickets, leaves, etc.)
+            }
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            if (!state.audioCtx) state.audioCtx = new Ctx();
+            var ctx = state.audioCtx;
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+            var now = ctx.currentTime;
+            [0, 0.12, 0.24].forEach(function (offset) {
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = offset === 0.12 ? 980 : 780;
+                gain.gain.setValueAtTime(0.0001, now + offset);
+                gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.1);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + offset);
+                osc.stop(now + offset + 0.12);
+            });
+        } catch (e) {
+            // Autplay / browser restrictions — toast still shows.
+        }
     }
 
     function emptyHtml() {
@@ -186,19 +225,23 @@
                     if (
                         data.unread_count > prev &&
                         data.notifications &&
-                        data.notifications.length &&
-                        typeof toastr !== 'undefined'
+                        data.notifications.length
                     ) {
                         var latest = data.notifications[0];
                         if (latest && latest.id !== state.lastToastId) {
                             state.lastToastId = latest.id;
-                            toastr.info(latest.message, latest.title, {
-                                timeOut: 9000,
-                                closeButton: true,
-                                onclick: function () {
-                                    if (latest.link) window.location.assign(latest.link);
-                                },
-                            });
+                            if (typeof toastr !== 'undefined') {
+                                toastr.info(latest.message, latest.title, {
+                                    timeOut: 9000,
+                                    closeButton: true,
+                                    onclick: function () {
+                                        if (latest.link) window.location.assign(latest.link);
+                                    },
+                                });
+                            }
+                            if (cfg.beepOnIncrease) {
+                                playAlertBeep(latest);
+                            }
                         }
                     }
                     state.lastKnownUnread = data.unread_count;
@@ -311,6 +354,18 @@
     function boot() {
         setUnreadCount(cfg.initialCount);
         bindEvents();
+        // Unlock WebAudio after first user gesture (browser autoplay policy).
+        var unlock = function () {
+            try {
+                var Ctx = window.AudioContext || window.webkitAudioContext;
+                if (Ctx && !state.audioCtx) state.audioCtx = new Ctx();
+                if (state.audioCtx && state.audioCtx.state === 'suspended') state.audioCtx.resume();
+            } catch (e) {}
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('keydown', unlock);
+        };
+        document.addEventListener('click', unlock);
+        document.addEventListener('keydown', unlock);
         syncFeed().then(function (data) {
             if (data && typeof data.unread_count !== 'undefined') {
                 state.lastKnownUnread = data.unread_count;

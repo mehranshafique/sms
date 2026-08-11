@@ -11,6 +11,7 @@ enum ChatbotMenuProfile: string
     case HEAD_OFFICER = 'head_officer';
     case FINANCE = 'finance';
     case SUPER_ADMIN = 'super_admin';
+    case GUEST = 'guest';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum ChatbotMenuProfile: string
             self::HEAD_OFFICER => 'Head Office',
             self::FINANCE => 'Finance',
             self::SUPER_ADMIN => 'Super Admin',
+            self::GUEST => 'Public / Admissions',
         };
     }
 

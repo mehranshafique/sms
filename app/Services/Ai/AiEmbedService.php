@@ -232,10 +232,21 @@ class AiEmbedService
 
     protected function bulkReportComments(array $params, ?int $institutionId, User $user): array
     {
+        $params['exam_id'] = isset($params['exam_id']) && $params['exam_id'] !== ''
+            ? (int) $params['exam_id']
+            : null;
+        $params['class_section_id'] = isset($params['class_section_id']) && $params['class_section_id'] !== ''
+            ? (int) $params['class_section_id']
+            : null;
+
         $v = Validator::make($params, [
-            'exam_id'          => 'required|integer',
-            'class_section_id' => 'required|integer',
+            'exam_id'          => 'required|integer|min:1',
+            'class_section_id' => 'required|integer|min:1',
         ])->validate();
+
+        if (!$user->can('exam_mark.create') && !$user->hasAnyRole(['Super Admin', 'Head Officer', 'School Admin', 'Teacher'])) {
+            throw ValidationException::withMessages(['auth' => __('ai.no_access_message')]);
+        }
 
         $data = $this->context->examClassMarks(
             (int) $v['exam_id'],
@@ -244,9 +255,20 @@ class AiEmbedService
             $user
         );
 
-        if (!$data || empty($data['students'])) {
+        if (!$data) {
+            throw ValidationException::withMessages(['exam_id' => __('ai.exam_or_class_not_found')]);
+        }
+
+        $withMarks = collect($data['students'] ?? [])
+            ->filter(fn ($s) => ! empty($s['marks']))
+            ->values()
+            ->all();
+
+        if (empty($withMarks)) {
             throw ValidationException::withMessages(['exam_id' => __('ai.no_marks_data')]);
         }
+
+        $data['students'] = $withMarks;
 
         $lines = ["Exam: {$data['exam']}"];
         foreach ($data['students'] as $s) {
@@ -688,6 +710,7 @@ class AiEmbedService
             'quota_exceeded' => __('ai.error_quota'),
             'not_configured' => __('ai.error_not_configured'),
             'no_access'      => __('ai.no_access_message'),
+            'provider_error', 'provider', 'empty_response', 'exception' => __('ai.error_provider'),
             default          => __('ai.error_generic'),
         };
     }

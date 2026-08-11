@@ -42,6 +42,7 @@ return [
     'select_campus' => 'Select Campus',
     
     'employee_id' => 'Employee ID',
+    'scan_for_attendance' => 'Scan for attendance or profile',
     'designation' => 'Designation',
     'department' => 'Department',
     'joining_date' => 'Joining Date',

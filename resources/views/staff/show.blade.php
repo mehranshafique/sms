@@ -44,6 +44,10 @@
 
                             <ul class="list-group list-group-flush mt-4 text-start">
                                 <li class="list-group-item d-flex justify-content-between px-0">
+                                    <span class="mb-0">{{ __('staff.employee_id') }}:</span>
+                                    <strong class="text-dark">{{ $staff->employee_id ?? 'N/A' }}</strong>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between px-0">
                                     <span class="mb-0">{{ __('staff.rfid_uid') ?? 'RFID UID' }}:</span>
                                     <strong class="text-dark">{{ $staff->rfid_uid ?? 'N/A' }}</strong>
                                 </li>
@@ -58,6 +62,22 @@
                                     </strong>
                                 </li>
                             </ul>
+
+                            @php
+                                $staffQrPayload = $staff->employee_id
+                                    ?: ($staff->qr_code_token ?? null)
+                                    ?: $staff->rfid_uid;
+                            @endphp
+                            @if($staffQrPayload)
+                                <div class="text-center bg-light p-3 rounded mt-3">
+                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ urlencode($staffQrPayload) }}"
+                                         alt="QR Code"
+                                         class="img-fluid"
+                                         style="max-width: 140px;">
+                                    <p class="fs-12 font-w600 text-dark mt-2 mb-0">{{ $staffQrPayload }}</p>
+                                    <p class="fs-11 text-muted mt-1 mb-0">{{ __('staff.scan_for_attendance') }}</p>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

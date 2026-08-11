@@ -2,8 +2,8 @@
 
 return [
     'page_title' => 'Carte de résultat (examen unique)',
-    'student_result_card' => 'Carte de résultats de l\'élève',
-    'subtitle' => 'Générer et imprimer les cartes de résultats',
+    'student_result_card' => 'Gestion de bulletins',
+    'subtitle' => 'Aperçu & Impression bulletin',
     'find_result' => 'Trouver le résultat',
     'select_exam' => 'Sélectionner l\'examen',
     'select_exam_placeholder' => '-- Sélectionner l\'examen --',
@@ -14,7 +14,7 @@ return [
     'select_student' => 'Sélectionner l\'élève',
     'select_student_first' => '-- Sélectionner la classe d\'abord --',
     'select_student_placeholder' => '-- Sélectionner l\'élève --',
-    'generate_btn' => 'Générer la carte',
+    'generate_btn' => 'Générer Bulletin',
     'loading' => 'Chargement...',
     'error_loading_classes' => 'Erreur de chargement des classes',
     'error_loading_students' => 'Erreur de chargement des élèves',

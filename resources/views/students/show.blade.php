@@ -119,11 +119,19 @@
                                 </strong>
                             </div>
 
-                            {{-- Visual QR Code --}}
-                            @if($student->qr_code_token)
+                            {{-- Attendance / profile QR (admission number, same as kiosk lookup) --}}
+                            @php
+                                $studentQrPayload = $student->admission_number
+                                    ?: ($student->qr_code_token ?: $student->rfid_uid);
+                            @endphp
+                            @if($studentQrPayload)
                                 <div class="text-center bg-light p-3 rounded mt-3">
-                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ $student->qr_code_token }}" alt="QR Code" class="img-fluid" style="max-width: 100px;">
-                                    <p class="fs-11 text-muted mt-2 mb-0">{{ __('student.scan_for_details') }}</p>
+                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ urlencode($studentQrPayload) }}"
+                                         alt="QR Code"
+                                         class="img-fluid"
+                                         style="max-width: 140px;">
+                                    <p class="fs-12 font-w600 text-dark mt-2 mb-0">{{ $studentQrPayload }}</p>
+                                    <p class="fs-11 text-muted mt-1 mb-0">{{ __('student.scan_for_attendance') }}</p>
                                 </div>
                             @endif
                         </div>
