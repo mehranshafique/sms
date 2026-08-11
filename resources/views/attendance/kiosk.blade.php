@@ -327,30 +327,74 @@
             margin-top: 10px;
         }
         .nfc-actions {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 10px;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+            width: 100%;
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
         }
         .nfc-actions button {
             border: 1px solid rgba(140,170,220,.35);
-            background: rgba(47,128,237,.16);
-            color: #cfe0ff;
-            border-radius: 999px;
-            padding: .45rem .9rem;
-            font-weight: 700;
-            font-size: .8rem;
+            background: rgba(47,128,237,.2);
+            color: #eaf2ff;
+            border-radius: 14px;
+            padding: .85rem .75rem;
+            font-weight: 800;
+            font-size: .88rem;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 48px;
         }
         .nfc-actions button:disabled {
             opacity: .55;
             cursor: default;
         }
         .nfc-actions button.is-on {
+            border-color: rgba(34,197,94,.65);
+            background: rgba(34,197,94,.22);
+            color: #bbf7d0;
+        }
+        .nfc-actions #enableNfcBtn {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-color: transparent;
+            box-shadow: 0 8px 18px rgba(37,99,235,.35);
+        }
+        .nfc-actions #enableNfcBtn.is-on {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            box-shadow: 0 8px 18px rgba(22,163,74,.35);
+        }
+        .nfc-banner {
+            display: none;
+            margin-top: 10px;
+            width: 100%;
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 14px;
+            padding: .75rem 1rem;
+            text-align: center;
+            font-weight: 700;
+            font-size: .9rem;
+            border: 1px dashed rgba(110,160,240,.45);
+            background: rgba(47,128,237,.12);
+            color: #9ec1ff;
+        }
+        .nfc-banner.show { display: block; }
+        .nfc-banner.is-on {
+            border-style: solid;
             border-color: rgba(34,197,94,.55);
-            background: rgba(34,197,94,.16);
+            background: rgba(34,197,94,.14);
             color: #86efac;
+            animation: pulse 2.2s infinite;
+        }
+        @media (max-width: 480px) {
+            .nfc-actions { grid-template-columns: 1fr; }
         }
 
         /*
@@ -420,13 +464,22 @@
                     <div class="cam-overlay-msg" id="camOverlay">{{ __('attendance.kiosk_camera_fail') }}</div>
                 </div>
 
+                <div class="nfc-actions">
+                    <button type="button" id="enableNfcBtn">
+                        <i class="fa-solid fa-wifi"></i>
+                        <span id="enableNfcLabel">{{ __('attendance.kiosk_enable_nfc') }}</span>
+                    </button>
+                    <button type="button" id="switchCameraBtn">
+                        <i class="fa-solid fa-camera-rotate"></i>
+                        <span>{{ __('attendance.kiosk_switch_camera') }}</span>
+                    </button>
+                </div>
+                <div class="nfc-banner" id="nfcBanner">{{ __('attendance.kiosk_nfc_tap_hint') }}</div>
+
                 <div class="manual">
                     <input type="text" id="manualCode" autocomplete="off" autocapitalize="off" spellcheck="false"
                            inputmode="text" placeholder="{{ __('attendance.kiosk_manual_ph') }}" enterkeyhint="go">
                     <button type="button" id="manualBtn">{{ __('attendance.kiosk_submit') }}</button>
-                </div>
-                <div class="nfc-actions">
-                    <button type="button" id="enableNfcBtn" hidden>{{ __('attendance.kiosk_enable_nfc') }}</button>
                 </div>
                 <div class="status-line" id="statusLine">{{ __('attendance.kiosk_ready') }}</div>
             </div>
@@ -478,6 +531,9 @@
     const chipQr = document.getElementById('chipQr');
     const viewport = document.getElementById('viewport');
     const enableNfcBtn = document.getElementById('enableNfcBtn');
+    const enableNfcLabel = document.getElementById('enableNfcLabel');
+    const switchCameraBtn = document.getElementById('switchCameraBtn');
+    const nfcBanner = document.getElementById('nfcBanner');
     const labels = {
         arrival: @json(__('attendance.kiosk_arrival')),
         departure: @json(__('attendance.kiosk_departure')),
@@ -490,6 +546,14 @@
         nfcUnsupported: @json(__('attendance.kiosk_nfc_unsupported')),
         nfcEnable: @json(__('attendance.kiosk_enable_nfc')),
         nfcListening: @json(__('attendance.kiosk_nfc_listening')),
+        nfcTapHint: @json(__('attendance.kiosk_nfc_tap_hint')),
+        nfcDenied: @json(__('attendance.kiosk_nfc_denied')),
+        nfcOff: @json(__('attendance.kiosk_nfc_off')),
+        nfcNoData: @json(__('attendance.kiosk_nfc_no_data')),
+        switchCamera: @json(__('attendance.kiosk_switch_camera')),
+        cameraSwitching: @json(__('attendance.kiosk_camera_switching')),
+        cameraSwitched: @json(__('attendance.kiosk_camera_switched')),
+        secureContext: @json(__('attendance.kiosk_secure_context')),
         cameraFail: @json(__('attendance.kiosk_camera_fail')),
     };
 
@@ -498,14 +562,23 @@
     let html5QrCode = null;
     let webNfcActive = false;
     let webNfcReader = null;
+    let webNfcAbort = null;
+    let cameraIds = [];
+    let cameraIndex = 0;
+    let preferredFacing = 'environment';
     let wedgeBuffer = '';
     let wedgeTimer = null;
     let lastKeyAt = 0;
     let lastSubmitted = { code: '', at: 0 };
     let focusHoldTimer = null;
-    const WEDGE_IDLE_MS = 120;   // flush after scanner finishes typing
-    const HUMAN_GAP_MS = 90;     // gaps larger than this are treated as human typing into wedge buffer
+    const WEDGE_IDLE_MS = 120;
     const DEDUPE_MS = 2500;
+
+    function vibrate(pattern) {
+        try {
+            if (navigator.vibrate) navigator.vibrate(pattern || 40);
+        } catch (_) {}
+    }
 
     function tickClock() {
         const now = new Date();
@@ -669,6 +742,18 @@
         );
     }
 
+    async function refreshCameraList() {
+        try {
+            const cams = await Html5Qrcode.getCameras();
+            cameraIds = (cams || []).map((c) => c.id).filter(Boolean);
+        } catch (_) {
+            cameraIds = [];
+        }
+        if (switchCameraBtn) {
+            switchCameraBtn.disabled = cameraIds.length < 2;
+        }
+    }
+
     async function startScanner() {
         if (!window.Html5Qrcode) {
             camOverlay.classList.add('show');
@@ -681,35 +766,52 @@
             if (html5QrCode.isScanning) return;
             camOverlay.classList.remove('show');
 
-            const attempts = [
-                { facingMode: 'environment' },
-                { facingMode: 'user' },
-            ];
+            if (!cameraIds.length) {
+                await refreshCameraList();
+            }
+
             let started = false;
             let lastErr = null;
-            for (const cfg of attempts) {
-                try {
-                    await startWithCamera(cfg);
-                    started = true;
-                    break;
-                } catch (e) {
-                    lastErr = e;
-                    try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch (_) {}
+
+            if (cameraIds.length) {
+                const order = [];
+                for (let i = 0; i < cameraIds.length; i++) {
+                    order.push(cameraIds[(cameraIndex + i) % cameraIds.length]);
                 }
-            }
-            if (!started) {
-                try {
-                    const cams = await Html5Qrcode.getCameras();
-                    if (cams && cams.length) {
-                        await startWithCamera(cams[0].id);
+                for (const id of order) {
+                    try {
+                        await startWithCamera(id);
+                        cameraIndex = cameraIds.indexOf(id);
                         started = true;
+                        break;
+                    } catch (e) {
+                        lastErr = e;
+                        try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch (_) {}
                     }
-                } catch (e) {
-                    lastErr = e;
                 }
             }
+
+            if (!started) {
+                const attempts = [
+                    { facingMode: preferredFacing },
+                    { facingMode: preferredFacing === 'environment' ? 'user' : 'environment' },
+                ];
+                for (const cfg of attempts) {
+                    try {
+                        await startWithCamera(cfg);
+                        preferredFacing = cfg.facingMode;
+                        started = true;
+                        break;
+                    } catch (e) {
+                        lastErr = e;
+                        try { if (html5QrCode.isScanning) await html5QrCode.stop(); } catch (_) {}
+                    }
+                }
+            }
+
             if (!started) throw lastErr || new Error('no camera');
             setChip(chipQr, true);
+            if (switchCameraBtn) switchCameraBtn.disabled = cameraIds.length < 2;
             if (!webNfcActive) statusLine.textContent = labels.ready;
             focusCapture();
         } catch (e) {
@@ -723,6 +825,29 @@
     async function stopScanner() {
         if (html5QrCode && html5QrCode.isScanning) {
             await html5QrCode.stop();
+        }
+    }
+
+    async function switchCamera() {
+        if (busy || !window.Html5Qrcode) return;
+        statusLine.textContent = labels.cameraSwitching;
+        switchCameraBtn.disabled = true;
+        try {
+            await refreshCameraList();
+            if (cameraIds.length < 2) {
+                preferredFacing = preferredFacing === 'environment' ? 'user' : 'environment';
+            } else {
+                cameraIndex = (cameraIndex + 1) % cameraIds.length;
+            }
+            await stopScanner();
+            await startScanner();
+            statusLine.textContent = webNfcActive ? labels.nfcListening : labels.cameraSwitched;
+            vibrate(30);
+        } catch (_) {
+            statusLine.textContent = labels.cameraFail;
+        } finally {
+            if (switchCameraBtn) switchCameraBtn.disabled = cameraIds.length < 2 && !html5QrCode?.isScanning;
+            if (switchCameraBtn && cameraIds.length < 2) switchCameraBtn.disabled = false;
         }
     }
 
@@ -828,84 +953,175 @@
         }
     });
 
-    // --- Web NFC (phone / tablet NFC) ---
-    function updateNfcUi() {
-        setChip(chipNfc, true); // USB wedge always considered available
+    // --- Web NFC (phone / tablet). Must start from a user tap (Enable NFC). ---
+    function extractUidFromNdef(event) {
+        let uid = normalizeUid(event.serialNumber || '');
+        if (uid) {
+            return uid.replace(/[^0-9a-zA-Z]/gi, '');
+        }
+        const records = event.message && event.message.records ? event.message.records : [];
+        for (const record of records) {
+            try {
+                if (record.recordType === 'text') {
+                    const decoder = new TextDecoder(record.encoding || 'utf-8');
+                    uid = normalizeUid(decoder.decode(record.data));
+                } else if (record.recordType === 'url' || record.recordType === 'absolute-url') {
+                    uid = normalizeUid(new TextDecoder().decode(record.data));
+                } else if (record.data) {
+                    const bytes = new Uint8Array(record.data.buffer
+                        ? record.data.buffer.slice(record.data.byteOffset, record.data.byteOffset + record.data.byteLength)
+                        : record.data);
+                    if (bytes.length) {
+                        uid = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+                    }
+                }
+            } catch (_) {}
+            if (uid) break;
+        }
+        return String(uid || '').replace(/[^0-9a-zA-Z:#_-]/g, '');
+    }
+
+    function updateNfcUi(message) {
+        setChip(chipNfc, true);
+        if (!enableNfcBtn) return;
+
         if (webNfcActive) {
-            enableNfcBtn.hidden = true;
             enableNfcBtn.classList.add('is-on');
-            enableNfcBtn.textContent = labels.nfcListening;
-            statusLine.textContent = labels.nfcListening;
-        } else if ('NDEFReader' in window) {
+            enableNfcBtn.disabled = false;
+            if (enableNfcLabel) enableNfcLabel.textContent = labels.nfcListening;
+            if (nfcBanner) {
+                nfcBanner.classList.add('show', 'is-on');
+                nfcBanner.textContent = labels.nfcListening;
+            }
+            statusLine.textContent = message || labels.nfcListening;
+        } else if ('NDEFReader' in window && window.isSecureContext) {
             enableNfcBtn.hidden = false;
             enableNfcBtn.disabled = false;
             enableNfcBtn.classList.remove('is-on');
-            enableNfcBtn.textContent = labels.nfcEnable;
+            if (enableNfcLabel) enableNfcLabel.textContent = labels.nfcEnable;
+            if (nfcBanner) {
+                nfcBanner.classList.add('show');
+                nfcBanner.classList.remove('is-on');
+                nfcBanner.textContent = labels.nfcTapHint;
+            }
+            if (message) statusLine.textContent = message;
         } else {
-            enableNfcBtn.hidden = true;
+            enableNfcBtn.classList.remove('is-on');
+            if (enableNfcLabel) enableNfcLabel.textContent = labels.nfcEnable;
+            if (nfcBanner) {
+                nfcBanner.classList.add('show');
+                nfcBanner.classList.remove('is-on');
+                nfcBanner.textContent = (!window.isSecureContext)
+                    ? labels.secureContext
+                    : labels.nfcUnsupported;
+            }
+            if (message) statusLine.textContent = message;
         }
+    }
+
+    function stopWebNfc() {
+        try {
+            if (webNfcAbort) webNfcAbort.abort();
+        } catch (_) {}
+        webNfcAbort = null;
+        webNfcActive = false;
+        updateNfcUi();
     }
 
     async function startWebNfc() {
-        if (!('NDEFReader' in window)) {
-            updateNfcUi();
+        if (!window.isSecureContext) {
+            updateNfcUi(labels.secureContext);
             return false;
         }
+        if (!('NDEFReader' in window)) {
+            updateNfcUi(labels.nfcUnsupported);
+            return false;
+        }
+
+        // Restart scan cleanly each Enable tap (keeps permission dialog tied to gesture).
+        try {
+            if (webNfcAbort) webNfcAbort.abort();
+        } catch (_) {}
+        webNfcAbort = new AbortController();
+
         try {
             if (!webNfcReader) {
                 webNfcReader = new NDEFReader();
-                webNfcReader.addEventListener('reading', (event) => {
-                    if (busy) return;
-                    let uid = normalizeUid(event.serialNumber || '');
-                    if (!uid && event.message && event.message.records) {
-                        for (const record of event.message.records) {
-                            try {
-                                if (record.recordType === 'text') {
-                                    const decoder = new TextDecoder(record.encoding || 'utf-8');
-                                    uid = normalizeUid(decoder.decode(record.data));
-                                } else if (record.recordType === 'url' || record.recordType === 'absolute-url') {
-                                    uid = normalizeUid(new TextDecoder().decode(record.data));
-                                } else if (record.data) {
-                                    // Fallback: hex of raw bytes (some cards only expose payload)
-                                    const bytes = new Uint8Array(record.data.buffer || record.data);
-                                    if (bytes.length) {
-                                        uid = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-                                    }
-                                }
-                            } catch (_) {}
-                            if (uid) break;
-                        }
-                    }
-                    // Normalize common serial formats: keep hex alnum
-                    uid = uid.replace(/[^0-9a-zA-Z:#_-]/g, '');
-                    if (uid) processUid(uid, 'nfc');
-                });
-                webNfcReader.addEventListener('readingerror', () => {
-                    statusLine.textContent = labels.nfcUnsupported;
-                });
             }
-            await webNfcReader.scan();
+
+            // Re-bind handlers each start so we never miss after abort/recreate.
+            webNfcReader.onreading = (event) => {
+                if (busy) return;
+                vibrate([35, 40, 35]);
+                const uid = extractUidFromNdef(event);
+                if (!uid) {
+                    statusLine.textContent = labels.nfcNoData;
+                    vibrate([80, 40, 80]);
+                    return;
+                }
+                processUid(uid, 'nfc');
+            };
+            webNfcReader.onreadingerror = () => {
+                vibrate(60);
+                statusLine.textContent = labels.nfcNoData;
+            };
+
+            await webNfcReader.scan({ signal: webNfcAbort.signal });
             webNfcActive = true;
-            updateNfcUi();
+            vibrate(25);
+            updateNfcUi(labels.nfcListening);
             return true;
         } catch (err) {
             webNfcActive = false;
-            updateNfcUi();
-            // Permission must be granted via a user gesture on many Android builds.
-            statusLine.textContent = labels.nfcUnsupported;
+            const name = (err && err.name) || '';
+            let msg = labels.nfcUnsupported;
+            if (name === 'NotAllowedError' || name === 'SecurityError') {
+                msg = labels.nfcDenied;
+            } else if (name === 'NotSupportedError') {
+                msg = labels.nfcUnsupported;
+            } else if (name === 'NotReadableError') {
+                msg = labels.nfcOff;
+            } else if (name === 'AbortError') {
+                updateNfcUi();
+                return false;
+            } else if (err && err.message) {
+                // Android often reports NFC disabled in the message.
+                const m = String(err.message).toLowerCase();
+                if (m.includes('nfc') && (m.includes('off') || m.includes('disabled') || m.includes('setting'))) {
+                    msg = labels.nfcOff;
+                }
+            }
+            updateNfcUi(msg);
             return false;
         }
     }
 
-    enableNfcBtn.addEventListener('click', async () => {
+    enableNfcBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (webNfcActive) {
+            // Allow toggle off / re-arm
+            stopWebNfc();
+            statusLine.textContent = labels.nfcTapHint;
+            if (enableNfcLabel) enableNfcLabel.textContent = labels.nfcEnable;
+            return;
+        }
         enableNfcBtn.disabled = true;
+        statusLine.textContent = labels.nfcReady;
         const ok = await startWebNfc();
         enableNfcBtn.disabled = false;
-        if (!ok) {
-            statusLine.textContent = labels.nfcUnsupported;
-        }
-        focusCapture(true);
+        if (!ok && enableNfcLabel) enableNfcLabel.textContent = labels.nfcEnable;
+        // Do not steal focus until after permission prompt resolves.
+        setTimeout(() => focusCapture(true), 300);
     });
+
+    if (switchCameraBtn) {
+        switchCameraBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            switchCamera();
+        });
+    }
 
     document.getElementById('manualBtn').addEventListener('click', () => processUid(manualCode.value, 'manual'));
     manualCode.addEventListener('keydown', (e) => {
@@ -913,9 +1129,6 @@
             e.preventDefault();
             processUid(manualCode.value, 'manual');
         }
-    });
-    manualCode.addEventListener('focus', () => {
-        // Pause focus-stealing while attendant types a code.
     });
     manualCode.addEventListener('blur', () => setTimeout(() => focusCapture(), 80));
     document.getElementById('resetBtn').addEventListener('click', resetUi);
@@ -937,22 +1150,13 @@
         setTimeout(() => focusCapture(), 0);
     }, true);
 
-    // First user gesture also tries Web NFC (required by some Android Chrome builds).
-    function gestureEnableNfcOnce() {
-        document.removeEventListener('pointerdown', gestureEnableNfcOnce, true);
-        if ('NDEFReader' in window && !webNfcActive) {
-            startWebNfc();
-        }
-    }
-    document.addEventListener('pointerdown', gestureEnableNfcOnce, true);
-
+    // NFC starts ONLY from "Enable NFC" (Chrome requires a user gesture + HTTPS).
     updateNfcUi();
     startFocusHold();
     startScanner();
-    // Attempt Web NFC immediately; if blocked, Enable button / first tap retries.
-    startWebNfc();
     focusCapture(true);
 })();
 </script>
 </body>
 </html>
+
