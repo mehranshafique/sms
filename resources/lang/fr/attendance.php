@@ -66,6 +66,8 @@ return [
     'kiosk_mode_qr' => 'Caméra QR',
     'kiosk_nfc_ready' => 'NFC prêt — approchez une carte du téléphone.',
     'kiosk_nfc_unsupported' => 'NFC téléphone limité — lecteurs USB et QR restent actifs.',
+    'kiosk_enable_nfc' => 'Activer le NFC de l\'appareil',
+    'kiosk_nfc_listening' => 'NFC appareil actif — approchez une carte de la tablette.',
     'staff_analytics_title' => 'Analytique des présences du personnel',
     'staff_analytics_subtitle' => 'Taux école, tendances et détail par membre du personnel',
     'attendance_rate' => 'Taux de présence',

@@ -81,6 +81,8 @@ return [
     'kiosk_mode_qr' => 'QR camera',
     'kiosk_nfc_ready' => 'NFC ready — tap a card near the device.',
     'kiosk_nfc_unsupported' => 'Phone NFC limited — USB readers and QR still work.',
+    'kiosk_enable_nfc' => 'Enable device NFC',
+    'kiosk_nfc_listening' => 'Device NFC on — tap a card on the tablet.',
     'staff_analytics_title' => 'Staff Attendance Analytics',
     'staff_analytics_subtitle' => 'School-wide attendance rates, trends, and per-staff insights',
     'attendance_rate' => 'Attendance rate',

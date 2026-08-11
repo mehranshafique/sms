@@ -92,8 +92,9 @@ class ChatbotLogicService
                 $session = null;
             }
 
-            // Valid restart keyword always starts a fresh flow, even if a stale session exists.
-            if ($session && $this->isRestartKeyword($text)) {
+            // Restart keywords must not wipe multi-step flows (e.g. gender reply "1"
+            // matching a short school keyword, or "menu" mid pre-enrollment).
+            if ($session && $this->isRestartKeyword($text) && ! $this->isProtectedFlowStatus($session->status)) {
                 Log::info("Chatbot Lifecycle: Restart keyword on existing session", ['phone' => $phone, 'text' => $text]);
                 $session->delete();
                 $session = null;
@@ -127,7 +128,10 @@ class ChatbotLogicService
                 return $this->processGuestMenu($session, $cmd, $text);
             }
 
-            if ($session->status !== 'AWAITING_ID' && $session->status !== 'AWAITING_OTP' && $session->status !== 'CHILD_SELECT') {
+            // Keep 0 / menu / 99 from aborting multi-step wizards before their own handlers run.
+            $allowGlobalMenuKeys = ! $this->isProtectedFlowStatus($session->status);
+
+            if ($allowGlobalMenuKeys && $session->status !== 'AWAITING_ID' && $session->status !== 'AWAITING_OTP' && $session->status !== 'CHILD_SELECT') {
                 if ($cmd === '0' || $cmd === '00' || $cmd === 'menu') {
                     Log::info("Chatbot Lifecycle: User triggered return to Main Menu.");
                     if ($session->menu_profile === ChatbotMenuProfile::GUEST->value && ! $session->user_id) {
@@ -335,6 +339,37 @@ class ChatbotLogicService
         }
 
         return (bool) $this->chatbotAccess->resolveBuiltinMenuProfile($textLower);
+    }
+
+    /**
+     * Multi-step flows where short/global keywords must not wipe progress.
+     * Example: gender answer "1" must not match a DB keyword and restart the bot.
+     */
+    protected function isProtectedFlowStatus(?string $status): bool
+    {
+        if (! $status) {
+            return false;
+        }
+
+        if (str_starts_with($status, 'PRE_ENROLL_')
+            || str_starts_with($status, 'REQUEST_')
+            || str_starts_with($status, 'REENROLL_')
+            || str_starts_with($status, 'QR_OTP_')
+            || str_starts_with($status, 'LMD_')
+            || str_starts_with($status, 'DEROGATION_')
+            || str_starts_with($status, 'PAYMENT_')
+            || str_starts_with($status, 'ATTENDANCE_')
+            || str_starts_with($status, 'TEACHER_')
+            || str_starts_with($status, 'HEADOFF_')
+            || str_starts_with($status, 'ADMIN_')
+            || str_starts_with($status, 'STUDENT_')) {
+            return true;
+        }
+
+        return in_array($status, [
+            'AWAITING_OTP',
+            'CHILD_SELECT',
+        ], true);
     }
 
     /**
@@ -942,11 +977,11 @@ class ChatbotLogicService
                 $menu .= "6️⃣ My Leave Requests\n";
                 $menu .= "7️⃣ Timetable & Exams\n";
                 $menu .= "8️⃣ Academic Report Card\n";
-                $menu .= "9️⃣ Generate Pickup QR Code\n";
-                $menu .= "1️⃣0️⃣ Confirm Re-Enrollment\n";
-                $menu .= "1️⃣1️⃣ Pre-Enroll a New Student\n";
-                $menu .= "1️⃣2️⃣ My Attendance\n";
-                $menu .= "\n9️⃣9️⃣ 🌐 Changer de langue (FR)\n🚪 Send *logout* to quit";
+                $menu .= "9. Generate Pickup QR Code\n";
+                $menu .= "10. Confirm Re-Enrollment\n";
+                $menu .= "11. Pre-Enroll a New Student\n";
+                $menu .= "12. My Attendance\n";
+                $menu .= "\n99. Change language (FR)\nSend *logout* to quit";
             } else {
                 $menu = "🎓 *Portail Parents / Élèves*\n🏫 {$school}\n👤 {$name}\n📘 {$infoStr} ({$year})\n\n";
                 $menu .= "Veuillez choisir une option:\n\n";
@@ -959,10 +994,10 @@ class ChatbotLogicService
                 $menu .= "7️⃣ Horaires (Cours & Examens)\n";
                 $menu .= "8️⃣ e-Bulletin\n";
                 $menu .= "9️⃣ QR Code Retrait enfant\n";
-                $menu .= "1️⃣0️⃣ Confirmer la réinscription\n";
-                $menu .= "1️⃣1️⃣ Préinscription nouvel élève\n";
-                $menu .= "1️⃣2️⃣ Mes présences\n";
-                $menu .= "\n9️⃣9️⃣ 🌐 Change Language (EN)\n🚪 Envoyer *logout* pour quitter";
+                $menu .= "10. Confirmer la réinscription\n";
+                $menu .= "11. Préinscription nouvel élève\n";
+                $menu .= "12. Mes présences\n";
+                $menu .= "\n99. Change Language (EN)\nEnvoyer *logout* pour quitter";
             }
 
             return $menu;
@@ -1920,7 +1955,7 @@ class ChatbotLogicService
 
         $session->update([
             'status' => 'PRE_ENROLL_FIRST',
-            'identifier_input' => $draft ? ('PRE:' . json_encode($draft)) : null,
+            'identifier_input' => $draft ? $this->encodePreEnrollmentDraft($draft) : null,
         ]);
 
         $msg = $isEn
@@ -1972,6 +2007,58 @@ class ChatbotLogicService
 
     protected function processPreEnrollmentStep($session, $text, $cmd)
     {
+        try {
+            return $this->processPreEnrollmentStepInner($session, $text, $cmd);
+        } catch (\Throwable $e) {
+            Log::error('Pre-enrollment step failed: '.$e->getMessage(), [
+                'status' => $session->status,
+                'phone' => $session->phone_number,
+            ]);
+
+            $isEn = $session->locale === 'en';
+
+            return $this->reply(
+                $session->phone_number,
+                $isEn
+                    ? '⚠️ Pre-enrollment error. Please send *0* to cancel, then choose 11 again.'
+                    : '⚠️ Erreur de préinscription. Envoyez *0* pour annuler, puis choisissez 11 à nouveau.',
+                $session->institution_id
+            );
+        }
+    }
+
+    protected function encodePreEnrollmentDraft(array $draft): string
+    {
+        return 'PRE:'.json_encode($draft, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    protected function decodePreEnrollmentDraft(?string $raw): array
+    {
+        if (! $raw || ! str_starts_with($raw, 'PRE:')) {
+            return [];
+        }
+
+        $decoded = json_decode(substr($raw, 4), true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    protected function resolvePreEnrollmentGender(string $raw, string $cmd): string
+    {
+        $normalized = strtolower(trim($raw));
+        $normalized = strtr($normalized, ['é' => 'e', 'è' => 'e', 'ê' => 'e', 'à' => 'a', 'ç' => 'c']);
+        $ascii = preg_replace('/[^a-z0-9]/', '', $normalized) ?: $cmd;
+
+        if (in_array($ascii, ['2', 'f', 'female', 'fille', 'girl', 'feminin', 'fminin'], true)
+            || str_starts_with($normalized, 'f')) {
+            return 'female';
+        }
+
+        return 'male';
+    }
+
+    protected function processPreEnrollmentStepInner($session, $text, $cmd)
+    {
         $isEn = $session->locale === 'en';
         $raw = trim((string) $text);
 
@@ -1993,11 +2080,7 @@ class ChatbotLogicService
             return $this->reply($session->phone_number, $msg, $session->institution_id);
         }
 
-        $draft = [];
-        if ($session->identifier_input && str_starts_with($session->identifier_input, 'PRE:')) {
-            $decoded = json_decode(substr($session->identifier_input, 4), true);
-            $draft = is_array($decoded) ? $decoded : [];
-        }
+        $draft = $this->decodePreEnrollmentDraft($session->identifier_input);
 
         switch ($session->status) {
             case 'PRE_ENROLL_FIRST':
@@ -2007,7 +2090,7 @@ class ChatbotLogicService
                 $draft['first_name'] = $raw;
                 $session->update([
                     'status' => 'PRE_ENROLL_LAST',
-                    'identifier_input' => 'PRE:' . json_encode($draft),
+                    'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                 ]);
                 $msg = $isEn ? __('pre_enrollment.chatbot.ask_last_en') : __('pre_enrollment.chatbot.ask_last_fr');
 
@@ -2017,17 +2100,17 @@ class ChatbotLogicService
                 $draft['last_name'] = $raw;
                 $session->update([
                     'status' => 'PRE_ENROLL_GENDER',
-                    'identifier_input' => 'PRE:' . json_encode($draft),
+                    'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                 ]);
                 $msg = $isEn ? __('pre_enrollment.chatbot.ask_gender_en') : __('pre_enrollment.chatbot.ask_gender_fr');
 
                 return $this->reply($session->phone_number, $msg, $session->institution_id);
 
             case 'PRE_ENROLL_GENDER':
-                $draft['gender'] = ($cmd === '2' || stripos($raw, 'f') === 0) ? 'female' : 'male';
+                $draft['gender'] = $this->resolvePreEnrollmentGender($raw, $cmd);
                 $session->update([
                     'status' => 'PRE_ENROLL_DOB',
-                    'identifier_input' => 'PRE:' . json_encode($draft),
+                    'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                 ]);
                 $msg = $isEn ? __('pre_enrollment.chatbot.ask_dob_en') : __('pre_enrollment.chatbot.ask_dob_fr');
 
@@ -2046,7 +2129,7 @@ class ChatbotLogicService
                 if (! empty($draft['existing_parent']) && ! empty($draft['parent_name']) && ! empty($draft['parent_phone'])) {
                     $session->update([
                         'status' => 'PRE_ENROLL_CLASS',
-                        'identifier_input' => 'PRE:' . json_encode($draft),
+                        'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                     ]);
                     $msg = $isEn ? __('pre_enrollment.chatbot.ask_class_en') : __('pre_enrollment.chatbot.ask_class_fr');
 
@@ -2055,7 +2138,7 @@ class ChatbotLogicService
 
                 $session->update([
                     'status' => 'PRE_ENROLL_PARENT',
-                    'identifier_input' => 'PRE:' . json_encode($draft),
+                    'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                 ]);
                 $msg = $isEn ? __('pre_enrollment.chatbot.ask_parent_en') : __('pre_enrollment.chatbot.ask_parent_fr');
 
@@ -2065,7 +2148,7 @@ class ChatbotLogicService
                 $draft['parent_name'] = $raw;
                 $session->update([
                     'status' => 'PRE_ENROLL_PHONE',
-                    'identifier_input' => 'PRE:' . json_encode($draft),
+                    'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                 ]);
                 $defaultHint = $isEn
                     ? __('pre_enrollment.chatbot.ask_phone_en') . "\n" . __('pre_enrollment.chatbot.phone_default_en')
@@ -2095,7 +2178,7 @@ class ChatbotLogicService
 
                 $session->update([
                     'status' => 'PRE_ENROLL_CLASS',
-                    'identifier_input' => 'PRE:' . json_encode($draft),
+                    'identifier_input' => $this->encodePreEnrollmentDraft($draft),
                 ]);
                 $msg = $isEn ? __('pre_enrollment.chatbot.ask_class_en') : __('pre_enrollment.chatbot.ask_class_fr');
 

@@ -326,16 +326,52 @@
             text-align: center;
             margin-top: 10px;
         }
+        .nfc-actions {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .nfc-actions button {
+            border: 1px solid rgba(140,170,220,.35);
+            background: rgba(47,128,237,.16);
+            color: #cfe0ff;
+            border-radius: 999px;
+            padding: .45rem .9rem;
+            font-weight: 700;
+            font-size: .8rem;
+            cursor: pointer;
+        }
+        .nfc-actions button:disabled {
+            opacity: .55;
+            cursor: default;
+        }
+        .nfc-actions button.is-on {
+            border-color: rgba(34,197,94,.55);
+            background: rgba(34,197,94,.16);
+            color: #86efac;
+        }
 
-        /* Captures HID / USB NFC wedges without stealing the UI */
+        /*
+         * HID / USB NFC readers act like keyboards. The capture field MUST stay
+         * inside the visible viewport — off-screen (-9999px) inputs often cannot
+         * receive focus on Android Chrome, so taps/types are lost.
+         */
         #nfcCapture {
-            position: absolute;
-            left: -9999px;
+            position: fixed;
+            left: 0;
             top: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0;
-            pointer-events: none;
+            width: 2px;
+            height: 2px;
+            opacity: 0.01;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            background: transparent;
+            color: transparent;
+            caret-color: transparent;
+            z-index: 50;
         }
 
         @media (max-height: 700px) {
@@ -386,8 +422,11 @@
 
                 <div class="manual">
                     <input type="text" id="manualCode" autocomplete="off" autocapitalize="off" spellcheck="false"
-                           placeholder="{{ __('attendance.kiosk_manual_ph') }}" enterkeyhint="go">
+                           inputmode="text" placeholder="{{ __('attendance.kiosk_manual_ph') }}" enterkeyhint="go">
                     <button type="button" id="manualBtn">{{ __('attendance.kiosk_submit') }}</button>
+                </div>
+                <div class="nfc-actions">
+                    <button type="button" id="enableNfcBtn" hidden>{{ __('attendance.kiosk_enable_nfc') }}</button>
                 </div>
                 <div class="status-line" id="statusLine">{{ __('attendance.kiosk_ready') }}</div>
             </div>
@@ -411,8 +450,9 @@
         </section>
     </div>
 
-    {{-- Always-available HID capture for USB/NFC keyboard wedges --}}
-    <input type="text" id="nfcCapture" autocomplete="off" autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1">
+    {{-- Always-available HID capture for USB/NFC keyboard wedges (kept in-viewport) --}}
+    <input type="text" id="nfcCapture" autocomplete="off" autocapitalize="off" spellcheck="false"
+           inputmode="none" aria-label="NFC capture">
 </div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -437,6 +477,7 @@
     const chipNfc = document.getElementById('chipNfc');
     const chipQr = document.getElementById('chipQr');
     const viewport = document.getElementById('viewport');
+    const enableNfcBtn = document.getElementById('enableNfcBtn');
     const labels = {
         arrival: @json(__('attendance.kiosk_arrival')),
         departure: @json(__('attendance.kiosk_departure')),
@@ -447,6 +488,8 @@
         unknown: @json(__('attendance.kiosk_unknown')),
         nfcReady: @json(__('attendance.kiosk_nfc_ready')),
         nfcUnsupported: @json(__('attendance.kiosk_nfc_unsupported')),
+        nfcEnable: @json(__('attendance.kiosk_enable_nfc')),
+        nfcListening: @json(__('attendance.kiosk_nfc_listening')),
         cameraFail: @json(__('attendance.kiosk_camera_fail')),
     };
 
@@ -454,9 +497,15 @@
     let resetTimer = null;
     let html5QrCode = null;
     let webNfcActive = false;
+    let webNfcReader = null;
     let wedgeBuffer = '';
     let wedgeTimer = null;
-    const WEDGE_GAP_MS = 80;
+    let lastKeyAt = 0;
+    let lastSubmitted = { code: '', at: 0 };
+    let focusHoldTimer = null;
+    const WEDGE_IDLE_MS = 120;   // flush after scanner finishes typing
+    const HUMAN_GAP_MS = 90;     // gaps larger than this are treated as human typing into wedge buffer
+    const DEDUPE_MS = 2500;
 
     function tickClock() {
         const now = new Date();
@@ -475,10 +524,35 @@
         el.classList.toggle('on', !!on);
     }
 
-    function focusCapture() {
-        // Keep HID wedge dedicated field ready when user is not typing manually.
-        if (document.activeElement === manualCode) return;
-        nfcCapture.focus({ preventScroll: true });
+    function normalizeUid(raw) {
+        return String(raw || '')
+            .replace(/[\u0000-\u001f\u007f]/g, '')
+            .replace(/[\r\n\t]+/g, '')
+            .trim();
+    }
+
+    function isTypingInManual() {
+        return document.activeElement === manualCode;
+    }
+
+    function focusCapture(force) {
+        if (busy && !force) return;
+        if (isTypingInManual() && !force) return;
+        try {
+            nfcCapture.focus({ preventScroll: true });
+        } catch (_) {
+            try { nfcCapture.focus(); } catch (__) {}
+        }
+    }
+
+    function startFocusHold() {
+        clearInterval(focusHoldTimer);
+        focusHoldTimer = setInterval(() => {
+            if (busy || isTypingInManual()) return;
+            if (document.activeElement !== nfcCapture) {
+                focusCapture();
+            }
+        }, 400);
     }
 
     function resetUi() {
@@ -487,12 +561,11 @@
         setShell('idle');
         scanArea.style.display = '';
         resultBox.classList.remove('show');
-        statusLine.textContent = labels.ready;
+        statusLine.textContent = webNfcActive ? labels.nfcListening : labels.ready;
         manualCode.value = '';
         nfcCapture.value = '';
         wedgeBuffer = '';
-        startScanner();
-        focusCapture();
+        startScanner().finally(() => focusCapture(true));
     }
 
     function showResult(payload, httpOk) {
@@ -547,10 +620,19 @@
     }
 
     async function processUid(uid, method) {
-        const code = String(uid || '').trim();
+        const code = normalizeUid(uid);
         if (!code || busy) return;
+
+        const now = Date.now();
+        if (code === lastSubmitted.code && (now - lastSubmitted.at) < DEDUPE_MS) {
+            return;
+        }
+        lastSubmitted = { code, at: now };
+
         busy = true;
         statusLine.textContent = labels.processing;
+        nfcCapture.value = '';
+        wedgeBuffer = '';
         try { await stopScanner(); } catch (e) {}
 
         try {
@@ -599,7 +681,6 @@
             if (html5QrCode.isScanning) return;
             camOverlay.classList.remove('show');
 
-            // Prefer rear camera; fall back to front (user), then any camera.
             const attempts = [
                 { facingMode: 'environment' },
                 { facingMode: 'user' },
@@ -629,12 +710,13 @@
             }
             if (!started) throw lastErr || new Error('no camera');
             setChip(chipQr, true);
-            statusLine.textContent = labels.ready;
+            if (!webNfcActive) statusLine.textContent = labels.ready;
+            focusCapture();
         } catch (e) {
             setChip(chipQr, false);
             camOverlay.classList.add('show');
             camOverlay.textContent = labels.cameraFail;
-            statusLine.textContent = labels.cameraFail;
+            if (!webNfcActive) statusLine.textContent = labels.cameraFail;
         }
     }
 
@@ -644,114 +726,186 @@
         }
     }
 
-    // --- HID / USB NFC keyboard wedge (document-level when not typing in manual) ---
     function flushWedge(method) {
-        const code = wedgeBuffer.trim();
+        const code = normalizeUid(wedgeBuffer);
         wedgeBuffer = '';
-        if (code) processUid(code, method || 'nfc');
+        if (code.length >= 3) processUid(code, method || 'nfc');
     }
 
-    document.addEventListener('keydown', (e) => {
+    function onScannerKey(e) {
         if (busy) return;
         const target = e.target;
-        const inManual = target === manualCode;
-        const inCapture = target === nfcCapture;
+        if (target === manualCode) return;
 
-        if (inManual) return; // handled separately
-
-        // Ignore shortcuts / navigation keys when not capture-focused from a scanner.
-        if (e.ctrlKey || e.metaKey || e.altKey) return;
-        if (e.key === 'Tab' || e.key === 'Escape') return;
-
-        if (e.key === 'Enter') {
-            if (wedgeBuffer.length || (inCapture && nfcCapture.value.trim())) {
+        // Terminators used by USB NFC / barcode wedges
+        if (e.key === 'Enter' || e.key === 'Tab' || e.keyCode === 13) {
+            const fromField = normalizeUid(nfcCapture.value);
+            if (fromField || wedgeBuffer) {
                 e.preventDefault();
-                if (inCapture && nfcCapture.value.trim()) {
-                    const v = nfcCapture.value.trim();
-                    nfcCapture.value = '';
-                    processUid(v, 'nfc');
-                } else {
-                    flushWedge('nfc');
-                }
+                e.stopPropagation();
+                nfcCapture.value = '';
+                if (fromField) processUid(fromField, 'nfc');
+                else flushWedge('nfc');
             }
             return;
         }
 
-        if (e.key.length === 1) {
-            // Don't steal typed characters from other focusable controls.
-            if (target && target !== document.body && target !== nfcCapture && target.tagName !== 'HTML'
-                && target.isContentEditable) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.key === 'Escape' || e.key === 'Shift' || e.key === 'CapsLock') return;
+
+        // Printable character (including keypad digits)
+        const ch = (e.key && e.key.length === 1) ? e.key : '';
+        if (!ch) return;
+
+        // If focus is on another real form control, don't hijack human typing.
+        if (target && target !== nfcCapture && target !== document.body && target !== document.documentElement) {
+            const tag = (target.tagName || '').toUpperCase();
+            if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(tag) || target.isContentEditable) {
                 return;
             }
-            if (target && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)
-                && target !== nfcCapture) {
-                return;
-            }
-            wedgeBuffer += e.key;
-            clearTimeout(wedgeTimer);
-            wedgeTimer = setTimeout(() => {
-                // Scanners type fast; slow human typing into nowhere is ignored unless Enter.
-                if (wedgeBuffer.length >= 4) flushWedge('nfc');
-                else wedgeBuffer = '';
-            }, WEDGE_GAP_MS * 6);
         }
+
+        const now = Date.now();
+        // Slow typing into nowhere is discarded; scanners are bursty.
+        if (wedgeBuffer && (now - lastKeyAt) > 700) {
+            wedgeBuffer = '';
+        }
+        lastKeyAt = now;
+        wedgeBuffer += ch;
+
+        // Mirror into capture field so Enter-handlers see a value even if focus blips.
+        if (document.activeElement === nfcCapture) {
+            // native input already receives it
+        } else {
+            nfcCapture.value = (nfcCapture.value || '') + ch;
+        }
+
+        clearTimeout(wedgeTimer);
+        wedgeTimer = setTimeout(() => {
+            if (normalizeUid(wedgeBuffer).length >= 3) flushWedge('nfc');
+            else if (normalizeUid(nfcCapture.value).length >= 3) {
+                const v = normalizeUid(nfcCapture.value);
+                nfcCapture.value = '';
+                processUid(v, 'nfc');
+            } else {
+                wedgeBuffer = '';
+            }
+        }, WEDGE_IDLE_MS);
+    }
+
+    // Capture phase so we get keys even if a child element tries to stop them.
+    document.addEventListener('keydown', onScannerKey, true);
+
+    nfcCapture.addEventListener('input', () => {
+        if (busy || isTypingInManual()) return;
+        clearTimeout(wedgeTimer);
+        wedgeTimer = setTimeout(() => {
+            const v = normalizeUid(nfcCapture.value);
+            if (v.length >= 3) {
+                nfcCapture.value = '';
+                processUid(v, 'nfc');
+            }
+        }, WEDGE_IDLE_MS);
     });
 
     nfcCapture.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' || e.key === 'Tab') {
             e.preventDefault();
-            const v = nfcCapture.value.trim();
+            const v = normalizeUid(nfcCapture.value || wedgeBuffer);
             nfcCapture.value = '';
+            wedgeBuffer = '';
             if (v) processUid(v, 'nfc');
         }
     });
 
-    // --- Web NFC (Android Chrome / supported browsers) ---
-    async function startWebNfc() {
-        if (!('NDEFReader' in window)) {
-            setChip(chipNfc, false);
-            return;
+    // Some Android readers paste a block of text.
+    document.addEventListener('paste', (e) => {
+        if (busy || isTypingInManual()) return;
+        const text = normalizeUid((e.clipboardData || window.clipboardData)?.getData('text'));
+        if (text && text.length >= 3) {
+            e.preventDefault();
+            processUid(text, 'nfc');
         }
-        try {
-            const reader = new NDEFReader();
-            await reader.scan();
-            webNfcActive = true;
-            setChip(chipNfc, true);
-            statusLine.textContent = labels.nfcReady;
-            reader.addEventListener('reading', ({ serialNumber, message }) => {
-                if (busy) return;
-                let uid = serialNumber || '';
-                if (!uid && message && message.records) {
-                    for (const record of message.records) {
-                        if (record.recordType === 'text') {
-                            try {
-                                const decoder = new TextDecoder(record.encoding || 'utf-8');
-                                uid = decoder.decode(record.data);
-                                break;
-                            } catch (_) {}
-                        } else if (record.recordType === 'url' || record.recordType === 'absolute-url') {
-                            try {
-                                uid = new TextDecoder().decode(record.data);
-                                break;
-                            } catch (_) {}
-                        }
-                    }
-                }
-                if (uid) processUid(uid, 'nfc');
-            });
-            reader.addEventListener('readingerror', () => {
-                // Keep listening; chip stays on.
-            });
-        } catch (err) {
-            // Permission denied or NFC off — USB wedges still work.
-            webNfcActive = false;
-            setChip(chipNfc, true); // HID wedge still available
-            statusLine.textContent = labels.nfcUnsupported;
+    });
+
+    // --- Web NFC (phone / tablet NFC) ---
+    function updateNfcUi() {
+        setChip(chipNfc, true); // USB wedge always considered available
+        if (webNfcActive) {
+            enableNfcBtn.hidden = true;
+            enableNfcBtn.classList.add('is-on');
+            enableNfcBtn.textContent = labels.nfcListening;
+            statusLine.textContent = labels.nfcListening;
+        } else if ('NDEFReader' in window) {
+            enableNfcBtn.hidden = false;
+            enableNfcBtn.disabled = false;
+            enableNfcBtn.classList.remove('is-on');
+            enableNfcBtn.textContent = labels.nfcEnable;
+        } else {
+            enableNfcBtn.hidden = true;
         }
     }
 
-    // Mark NFC chip ready for HID wedges even without Web NFC.
-    setChip(chipNfc, true);
+    async function startWebNfc() {
+        if (!('NDEFReader' in window)) {
+            updateNfcUi();
+            return false;
+        }
+        try {
+            if (!webNfcReader) {
+                webNfcReader = new NDEFReader();
+                webNfcReader.addEventListener('reading', (event) => {
+                    if (busy) return;
+                    let uid = normalizeUid(event.serialNumber || '');
+                    if (!uid && event.message && event.message.records) {
+                        for (const record of event.message.records) {
+                            try {
+                                if (record.recordType === 'text') {
+                                    const decoder = new TextDecoder(record.encoding || 'utf-8');
+                                    uid = normalizeUid(decoder.decode(record.data));
+                                } else if (record.recordType === 'url' || record.recordType === 'absolute-url') {
+                                    uid = normalizeUid(new TextDecoder().decode(record.data));
+                                } else if (record.data) {
+                                    // Fallback: hex of raw bytes (some cards only expose payload)
+                                    const bytes = new Uint8Array(record.data.buffer || record.data);
+                                    if (bytes.length) {
+                                        uid = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                                    }
+                                }
+                            } catch (_) {}
+                            if (uid) break;
+                        }
+                    }
+                    // Normalize common serial formats: keep hex alnum
+                    uid = uid.replace(/[^0-9a-zA-Z:#_-]/g, '');
+                    if (uid) processUid(uid, 'nfc');
+                });
+                webNfcReader.addEventListener('readingerror', () => {
+                    statusLine.textContent = labels.nfcUnsupported;
+                });
+            }
+            await webNfcReader.scan();
+            webNfcActive = true;
+            updateNfcUi();
+            return true;
+        } catch (err) {
+            webNfcActive = false;
+            updateNfcUi();
+            // Permission must be granted via a user gesture on many Android builds.
+            statusLine.textContent = labels.nfcUnsupported;
+            return false;
+        }
+    }
+
+    enableNfcBtn.addEventListener('click', async () => {
+        enableNfcBtn.disabled = true;
+        const ok = await startWebNfc();
+        enableNfcBtn.disabled = false;
+        if (!ok) {
+            statusLine.textContent = labels.nfcUnsupported;
+        }
+        focusCapture(true);
+    });
 
     document.getElementById('manualBtn').addEventListener('click', () => processUid(manualCode.value, 'manual'));
     manualCode.addEventListener('keydown', (e) => {
@@ -760,11 +914,13 @@
             processUid(manualCode.value, 'manual');
         }
     });
-    manualCode.addEventListener('blur', () => setTimeout(focusCapture, 50));
+    manualCode.addEventListener('focus', () => {
+        // Pause focus-stealing while attendant types a code.
+    });
+    manualCode.addEventListener('blur', () => setTimeout(() => focusCapture(), 80));
     document.getElementById('resetBtn').addEventListener('click', resetUi);
 
     window.addEventListener('resize', () => {
-        // Restart camera with resized qrbox when viewport changes (rotation / split screen).
         if (busy || !html5QrCode || !html5QrCode.isScanning) return;
         clearTimeout(window.__kioskResizeTimer);
         window.__kioskResizeTimer = setTimeout(async () => {
@@ -775,15 +931,27 @@
         }, 350);
     });
 
-    // Keep capture focused after taps on non-input areas (tablets).
-    document.addEventListener('click', (e) => {
+    // Any tap outside the manual field returns focus to HID capture.
+    document.addEventListener('pointerdown', (e) => {
         if (e.target === manualCode || e.target.closest('.manual') || e.target.closest('a,button')) return;
-        focusCapture();
-    });
+        setTimeout(() => focusCapture(), 0);
+    }, true);
 
+    // First user gesture also tries Web NFC (required by some Android Chrome builds).
+    function gestureEnableNfcOnce() {
+        document.removeEventListener('pointerdown', gestureEnableNfcOnce, true);
+        if ('NDEFReader' in window && !webNfcActive) {
+            startWebNfc();
+        }
+    }
+    document.addEventListener('pointerdown', gestureEnableNfcOnce, true);
+
+    updateNfcUi();
+    startFocusHold();
     startScanner();
+    // Attempt Web NFC immediately; if blocked, Enable button / first tap retries.
     startWebNfc();
-    focusCapture();
+    focusCapture(true);
 })();
 </script>
 </body>
