@@ -21,6 +21,8 @@ use App\Services\MessageLogService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class NotificationService
 {
@@ -123,6 +125,65 @@ class NotificationService
 
         if ($sendWa) {
             $this->dispatchMessage($phone, $message, $institutionId, 'whatsapp');
+            $this->sendPaymentReceiptWhatsAppDocument($payment, $phone, $institutionId);
+        }
+    }
+
+    /**
+     * Attach POS receipt PDF on WhatsApp after a successful payment.
+     */
+    protected function sendPaymentReceiptWhatsAppDocument(Payment $payment, string $phone, ?int $institutionId): void
+    {
+        try {
+            if (! class_exists(\Barryvdh\DomPDF\Facade\Pdf::class) && ! class_exists('PDF')) {
+                return;
+            }
+
+            $payment->loadMissing([
+                'invoice.student.enrollments.classSection.gradeLevel',
+                'invoice.items',
+                'invoice.institution',
+                'invoice.academicSession',
+                'invoice.payments',
+            ]);
+
+            $invoice = $payment->invoice;
+            if (! $invoice) {
+                return;
+            }
+
+            if (empty($payment->receipt_verify_token)) {
+                $payment->receipt_verify_token = \Illuminate\Support\Str::random(40);
+                $payment->save();
+            }
+
+            $format = 'pos80';
+            $pdf = Pdf::loadView('finance.invoices.print_receipt', [
+                'invoice' => $invoice,
+                'format' => $format,
+                'payment' => $payment,
+                'asHtml' => false,
+            ]);
+            $pdf->setPaper([0, 0, 226.77, 800]);
+            $pdf->setOptions(['isHtml5ParserEnabled' => true, 'isRemoteEnabled' => true]);
+
+            $receiptNo = receipt_display_number($invoice, $payment);
+            $filename = 'Receipt-' . preg_replace('/[^A-Za-z0-9\-_]/', '', $receiptNo) . '_pos80.pdf';
+            $path = 'temp/whatsapp-receipts/' . $payment->id . '_' . $filename;
+            Storage::disk('public')->put($path, $pdf->output());
+
+            $fileUrl = asset('storage/' . $path);
+            $school = $invoice->institution->name ?? config('app.name');
+            $studentName = $invoice->student->full_name ?? '';
+            $caption = "📄 *{$school}*\n"
+                . __('invoice.payment_receipt') . ": {$receiptNo}\n"
+                . __('invoice.student_name') . ": {$studentName}";
+
+            $this->performSendFile($phone, $fileUrl, $caption, $filename, $institutionId);
+        } catch (\Throwable $e) {
+            Log::error('WhatsApp payment receipt PDF failed: ' . $e->getMessage(), [
+                'payment_id' => $payment->id ?? null,
+            ]);
         }
     }
 

@@ -44,6 +44,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class ChatbotLogicService
 {
@@ -313,10 +314,18 @@ class ChatbotLogicService
         }
 
         // Any other first message to a school WhatsApp number → public admissions menu.
+        // Exception: portal menu digits (e.g. 9 = pickup QR) require parent login, not guest home.
         if ($institutionFromBot) {
             $locale = preg_match('/[éèàùç]/u', $textLower) || preg_match('/\b(bonjour|salut|inscription|infos?)\b/u', $textLower)
                 ? 'fr'
                 : (preg_match('/\b(hello|hi|info|fees|admission)\b/', $textLower) ? 'en' : 'fr');
+
+            if (preg_match('/^(6|7|8|9|10|11|12)$/', preg_replace('/\D+/', '', $textLower) ?: '')) {
+                $cmd = preg_replace('/\D+/', '', $textLower);
+                $this->rememberPendingMenuCommand($phone, $cmd);
+
+                return $this->startPortalLoginForPendingAction($phone, (int) $institutionFromBot, $locale, $cmd);
+            }
 
             return $this->startGuestSession($phone, (int) $institutionFromBot, $locale);
         }
@@ -334,11 +343,54 @@ class ChatbotLogicService
             return false;
         }
 
+        // Menu choices (1–99) must never wipe an active/logged-in session.
+        if (preg_match('/^\d{1,3}$/', $textLower)) {
+            return false;
+        }
+
         if (ChatbotKeyword::whereRaw('LOWER(keyword) = ?', [$textLower])->exists()) {
             return true;
         }
 
         return (bool) $this->chatbotAccess->resolveBuiltinMenuProfile($textLower);
+    }
+
+    protected function pendingMenuCacheKey(string $phone): string
+    {
+        return 'chatbot_pending_menu:' . preg_replace('/\D+/', '', $phone);
+    }
+
+    protected function rememberPendingMenuCommand(string $phone, string $cmd): void
+    {
+        if (preg_match('/^(6|7|8|9|10|11|12)$/', $cmd)) {
+            Cache::put($this->pendingMenuCacheKey($phone), $cmd, now()->addMinutes(45));
+        }
+    }
+
+    protected function pullPendingMenuCommand(string $phone): ?string
+    {
+        $cmd = Cache::pull($this->pendingMenuCacheKey($phone));
+
+        return is_string($cmd) && preg_match('/^(6|7|8|9|10|11|12)$/', $cmd) ? $cmd : null;
+    }
+
+    /**
+     * After login, continue the parent-portal action the user asked for (e.g. 9 = pickup QR).
+     */
+    protected function routeAfterLogin(ChatSession $session)
+    {
+        $pending = $this->pullPendingMenuCommand($session->phone_number);
+        if ($pending
+            && in_array($session->participant_type ?? $session->user_type, [
+                ChatbotParticipantType::STUDENT->value,
+                'student',
+            ], true)) {
+            $session->update(['status' => 'ACTIVE', 'otp' => null]);
+
+            return $this->processStudentMenu($session, $pending);
+        }
+
+        return $this->routeToMainMenu($session);
     }
 
     /**
@@ -495,8 +547,61 @@ class ChatbotLogicService
             '3', 'fees', 'frais' => $this->sendGuestInfo($session, 'fees'),
             '4', 'contact', 'contacts' => $this->sendGuestInfo($session, 'contact'),
             '5', 'login', 'portail', 'portal', 'parent', 'student' => $this->startPortalLoginFromGuest($session),
+            '6', '7', '8', '9', '10', '11', '12' => $this->promptPortalLoginForMenuOption($session, $cmd),
             default => $this->sendGuestMenu($session),
         };
+    }
+
+    protected function promptPortalLoginForMenuOption(ChatSession $session, string $cmd)
+    {
+        $this->rememberPendingMenuCommand($session->phone_number, $cmd);
+        $isEn = $session->locale === 'en';
+        $labels = [
+            '6' => $isEn ? 'Leave requests' : 'Mes requêtes',
+            '7' => $isEn ? 'Timetable & exams' : 'Horaires',
+            '8' => $isEn ? 'Report card' : 'e-Bulletin',
+            '9' => $isEn ? 'Pickup QR code' : 'QR Code Retrait enfant',
+            '10' => $isEn ? 'Re-enrollment' : 'Réinscription',
+            '11' => $isEn ? 'Pre-enrollment' : 'Préinscription',
+            '12' => $isEn ? 'Attendance' : 'Présences',
+        ];
+        $label = $labels[$cmd] ?? ("#" . $cmd);
+        $hint = $isEn
+            ? "🔐 *{$label}* needs Parent / Student portal login.\nSend your *parent phone* or child's *admission number*, then the OTP."
+            : "🔐 *{$label}* nécessite une connexion Portail Parent / Élève.\nEnvoyez le *numéro parent* ou le *matricule* de l'enfant, puis l'OTP.";
+
+        $this->reply($session->phone_number, $hint, $session->institution_id);
+
+        return $this->startPortalLoginFromGuest($session);
+    }
+
+    protected function startPortalLoginForPendingAction(string $phone, int $institutionId, string $locale, string $cmd)
+    {
+        app()->setLocale($locale);
+        $this->rememberPendingMenuCommand($phone, $cmd);
+
+        ChatSession::create([
+            'phone_number' => $phone,
+            'institution_id' => $institutionId,
+            'status' => 'AWAITING_ID',
+            'menu_profile' => ChatbotMenuProfile::PARENT->value,
+            'participant_type' => null,
+            'locale' => $locale,
+            'identifier_input' => null,
+            'last_interaction_at' => now(),
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        $isEn = $locale === 'en';
+        $label = $cmd === '9'
+            ? ($isEn ? 'Pickup QR code' : 'QR Code Retrait enfant')
+            : ('#' . $cmd);
+        $msg = $isEn
+            ? "🔐 To open *{$label}*, log in to the Parent / Student portal.\n\n"
+            : "🔐 Pour ouvrir *{$label}*, connectez-vous au Portail Parent / Élève.\n\n";
+        $msg .= $this->defaultWelcomeForMenuProfile(ChatbotMenuProfile::PARENT->value, $locale);
+
+        return $this->reply($phone, $msg, $institutionId);
     }
 
     protected function sendGuestInfo(ChatSession $session, string $topic)
@@ -833,7 +938,7 @@ class ChatbotLogicService
                 return $this->processChildSelection($session, null);
             }
             $session->update(['status' => 'ACTIVE', 'otp' => null]);
-            return $this->routeToMainMenu($session);
+            return $this->routeAfterLogin($session);
         }
 
         $isEn = $session->locale === 'en';
@@ -878,7 +983,7 @@ class ChatbotLogicService
                 'institution_id' => $selectedChild->institution_id,
                 'status' => 'ACTIVE'
             ]);
-            return $this->routeToMainMenu($session);
+            return $this->routeAfterLogin($session);
         }
 
         return $this->reply($session->phone_number, $isEn ? "❌ Invalid option. Please select a valid number." : "❌ Option invalide. Veuillez sélectionner un chiffre de la liste.", $session->institution_id);
