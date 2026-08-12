@@ -25,6 +25,7 @@ use App\Http\Controllers\SmsTemplateController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\AgentPaymentController;
 use App\Http\Controllers\SchoolEventController;
+use App\Http\Controllers\ParentMeetingController;
 use App\Http\Controllers\StudentConductController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\MessageLogController;
@@ -695,6 +696,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('school-events/{schoolEvent}/preview', [SchoolEventController::class, 'preview'])->name('school-events.preview');
         Route::post('school-events/{schoolEvent}/send', [SchoolEventController::class, 'send'])->name('school-events.send');
         Route::get('school-events/{schoolEvent}/send-status', [SchoolEventController::class, 'sendStatus'])->name('school-events.send-status');
+        // Parent–Teacher Meetings (PTM) — manage on web, view on mobile
+        Route::resource('ptm', ParentMeetingController::class)
+            ->parameters(['ptm' => 'parentMeeting'])
+            ->except(['edit']);
         // Student View
         Route::get('my-notices', [StudentNoticeController::class, 'index'])->name('student.notices.index');
         Route::get('my-notices/{notice}', [StudentNoticeController::class, 'show'])->name('student.notices.show');

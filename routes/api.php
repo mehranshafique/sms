@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\MobileNotificationApiController;
 use App\Http\Controllers\Api\V1\TimetableApiController;
 use App\Http\Controllers\Api\V1\TeacherAttendanceApiController;
 use App\Http\Controllers\Api\V1\MobileLookupApiController;
+use App\Http\Controllers\Api\V1\ParentMeetingApiController;
 use App\Http\Controllers\Api\V1\StudentPortalApiController;
 
 // Chatbot
@@ -127,6 +128,13 @@ Route::prefix('v1/teacher/attendance')->middleware(['auth:sanctum'])->group(func
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/v1/notices', [MobileLookupApiController::class, 'notices']);
     Route::get('/v1/staff/fee-lookup', [MobileLookupApiController::class, 'feeLookup']);
+});
+
+// --- PARENT MEETINGS (mobile) ---
+Route::prefix('v1/parent-meetings')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/', [ParentMeetingApiController::class, 'index']);
+    Route::post('/', [ParentMeetingApiController::class, 'store']);
+    Route::patch('/{id}', [ParentMeetingApiController::class, 'update'])->whereNumber('id');
 });
 
 // --- CHATBOT WEBHOOKS (public — provider callbacks) ---

@@ -46,6 +46,7 @@ return [
     'notices' => [
         'title' => 'Tableau d\'affichage',
     ],
+    'ptm' => 'PTM',
     'my_notices' => 'Mes annonces',
     'system_alerts' => 'Alertes système',
     'global_announcements' => 'Annonces globales',

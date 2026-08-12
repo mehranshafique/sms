@@ -52,6 +52,7 @@ return [
     'notices' => [
         'title' => 'Notices Board',
     ],
+    'ptm' => 'PTM',
     'reminders' => 'Reminders',
     'my_notices' => 'My Notices', 
     'system_alerts' => 'System Alerts',

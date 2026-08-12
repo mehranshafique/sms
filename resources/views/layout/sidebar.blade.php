@@ -527,6 +527,7 @@
                         @can('notice.view')
                         <li><a class="ai-icon {{ request()->routeIs('notices.*') ? 'mm-active' : '' }}" href="{{ route('notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.notices.title') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'notices'])</a></li>
                         <li><a class="ai-icon {{ request()->routeIs('school-events.*') ? 'mm-active' : '' }}" href="{{ route('school-events.index') }}"><i class="la la-calendar"></i><span class="nav-text">{{ __('school_event.page_title') }}</span></a></li>
+                        <li><a class="ai-icon {{ request()->routeIs('ptm.*') ? 'mm-active' : '' }}" href="{{ route('ptm.index') }}"><i class="la la-users"></i><span class="nav-text">{{ __('sidebar.ptm') }}</span></a></li>
                         @endcan
                         
                         @can('reminder.view')

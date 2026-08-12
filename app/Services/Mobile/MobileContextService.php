@@ -31,6 +31,21 @@ class MobileContextService
 
         $isGateAttendant = $actsAs(RoleEnum::GATE_ATTENDANT->value);
         $isSuperAdmin = $actsAs(RoleEnum::SUPER_ADMIN->value);
+        // Active-role session flags. Spatie permissions / staff rows stay attached
+        // to the user even after switching to Guardian — so menus must key off
+        // these, not raw can()/staff existence.
+        $isPortalRole = $actsAs([RoleEnum::STUDENT->value, RoleEnum::GUARDIAN->value]);
+        $isStaffRole = $actsAs([
+            RoleEnum::TEACHER->value,
+            RoleEnum::SCHOOL_ADMIN->value,
+            RoleEnum::HEAD_OFFICER->value,
+            RoleEnum::SUPER_ADMIN->value,
+            RoleEnum::STAFF->value,
+            RoleEnum::GATE_ATTENDANT->value,
+            'Accountant',
+            'accountant',
+        ]);
+        $isStaffSession = !$isPortalRole && ($isStaffRole || $user->staff !== null);
 
         $institution = $user->institute;
         $institutionId = $user->institute_id;
@@ -56,29 +71,98 @@ class MobileContextService
         );
 
         $capabilities = [
-            'student_portal' => $actsAs([RoleEnum::STUDENT->value, RoleEnum::GUARDIAN->value]) || $user->student !== null,
-            'teacher_tools' => $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value])
-                || ($user->staff !== null && !$isGateAttendant),
-            'pickup_management' => ($user->can('student.view') || $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, RoleEnum::GATE_ATTENDANT->value]))
+            'student_portal' => $isPortalRole,
+            'teacher_tools' => $isStaffSession
+                && !$isGateAttendant
+                && ($actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                ]) || $user->staff !== null),
+            'pickup_management' => $isStaffSession
+                && ($user->can('student.view') || $actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                    RoleEnum::GATE_ATTENDANT->value,
+                ]))
                 && $moduleEnabled('students'),
-            'mark_attendance' => !$isGateAttendant
-                && ($user->can('student_attendance.create') || $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value]))
+            'mark_attendance' => $isStaffSession
+                && !$isGateAttendant
+                && ($user->can('student_attendance.create') || $actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                ]))
                 && $moduleEnabled('student_attendance'),
-            'hardware_scan' => $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, 'Staff', RoleEnum::GATE_ATTENDANT->value]),
-            'fee_lookup' => !$isGateAttendant
-                && ($actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, 'Accountant', 'accountant']) || $user->can('invoice.view'))
+            'hardware_scan' => $isStaffSession && $actsAs([
+                RoleEnum::TEACHER->value,
+                RoleEnum::SCHOOL_ADMIN->value,
+                RoleEnum::HEAD_OFFICER->value,
+                RoleEnum::SUPER_ADMIN->value,
+                RoleEnum::STAFF->value,
+                RoleEnum::GATE_ATTENDANT->value,
+            ]),
+            'fee_lookup' => $isStaffSession
+                && !$isGateAttendant
+                && ($actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                    'Accountant',
+                    'accountant',
+                ]) || $user->can('invoice.view'))
                 && $moduleEnabled('invoices'),
-            'nfc_fee_check' => $isGateAttendant || $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, 'Staff', RoleEnum::GATE_ATTENDANT->value]),
-            'nfc_report_card' => $isGateAttendant || $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, 'Staff']),
-            'nfc_identity_check' => $isGateAttendant || $actsAs([RoleEnum::TEACHER->value, RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, 'Staff', RoleEnum::GATE_ATTENDANT->value]),
-            'staff_gate_attendance' => $isGateAttendant || $actsAs([RoleEnum::SCHOOL_ADMIN->value, RoleEnum::HEAD_OFFICER->value, RoleEnum::SUPER_ADMIN->value, RoleEnum::GATE_ATTENDANT->value]),
+            'nfc_fee_check' => $isStaffSession && (
+                $isGateAttendant || $actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                    RoleEnum::STAFF->value,
+                    RoleEnum::GATE_ATTENDANT->value,
+                ])
+            ),
+            'nfc_report_card' => $isStaffSession && (
+                $isGateAttendant || $actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                    RoleEnum::STAFF->value,
+                ])
+            ),
+            'nfc_identity_check' => $isStaffSession && (
+                $isGateAttendant || $actsAs([
+                    RoleEnum::TEACHER->value,
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                    RoleEnum::STAFF->value,
+                    RoleEnum::GATE_ATTENDANT->value,
+                ])
+            ),
+            'staff_gate_attendance' => $isStaffSession && (
+                $isGateAttendant || $actsAs([
+                    RoleEnum::SCHOOL_ADMIN->value,
+                    RoleEnum::HEAD_OFFICER->value,
+                    RoleEnum::SUPER_ADMIN->value,
+                    RoleEnum::GATE_ATTENDANT->value,
+                ])
+            ),
             'gate_mode' => $isGateAttendant,
             'super_admin' => $isSuperAdmin,
             'head_officer' => $actsAs(RoleEnum::HEAD_OFFICER->value),
             'multi_role' => count($switchableRoles) > 1,
         ];
 
-        if ($capabilities['super_admin']) {
+        // Super Admin only gets the all-access override while actively using
+        // that role — switching to Guardian must still hide staff tools.
+        if ($isSuperAdmin && !$isPortalRole) {
             foreach (array_keys($capabilities) as $key) {
                 if ($key !== 'multi_role') {
                     $capabilities[$key] = true;
@@ -96,7 +180,9 @@ class MobileContextService
         }
 
         $children = [];
-        if ($actsAs(RoleEnum::GUARDIAN->value) || $user->hasRole(RoleEnum::GUARDIAN->value)) {
+        // Children only belong to the guardian view, so a multi-role user does
+        // not see the child selector while acting as staff.
+        if ($actsAs(RoleEnum::GUARDIAN->value)) {
             $parent = StudentParent::where('user_id', $user->id)->first();
             if ($parent) {
                 $children = Student::where('parent_id', $parent->id)

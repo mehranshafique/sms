@@ -735,10 +735,23 @@ class AttendanceApiController extends Controller
         });
 
         $firstRecord = $records->first();
+        $exam = $firstRecord?->exam;
+
+        if (!$exam) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No published results found for this student yet.',
+                'data' => [
+                    'student_name' => $student->full_name . ' (' . $admNo . ')',
+                    'color' => '#F59E0B',
+                ],
+            ], 200);
+        }
+
         $examDetails = [
-            'name' => $firstRecord->exam->name ?? 'N/A',
-            'year' => $firstRecord->exam->academicSession->name ?? 'N/A',
-            'category' => $firstRecord->exam->category ? ucwords(str_replace('_', ' ', $firstRecord->exam->category)) : 'N/A',
+            'name' => $exam->name ?? 'N/A',
+            'year' => $exam->academicSession->name ?? 'N/A',
+            'category' => $exam->category ? ucwords(str_replace('_', ' ', $exam->category)) : 'N/A',
         ];
 
         return response()->json([
@@ -836,12 +849,41 @@ class AttendanceApiController extends Controller
      * Fetch Today's Absentees for Teacher Dashboard
      * SCOPED: Block Students & Parents
      */
+    /**
+     * Staff-side access check that tolerates multi-role users
+     * (for example a School Admin who is also a Guardian).
+     */
+    private function userIsStaffLike($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $user->staff !== null || $user->hasRole([
+            'Super Admin',
+            'Head Officer',
+            'School Admin',
+            'Teacher',
+            'Accountant',
+            'Staff',
+        ]);
+    }
+
+    private function staffOnlyResponse()
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'unauthorized_access: Staff only',
+            'error_type' => 'unauthorized',
+        ], 403);
+    }
+
     public function getTodayAbsentees(Request $request)
     {
         $user = Auth::guard('sanctum')->user() ?? Auth::user();
-        
-        if (!$user || $user->hasRole(['Student', 'Guardian'])) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized. Staff only.'], 403);
+
+        if (!$this->userIsStaffLike($user)) {
+            return $this->staffOnlyResponse();
         }
 
         $query = StudentAttendance::with('student:id,first_name,last_name,student_photo,admission_number')
@@ -881,12 +923,12 @@ class AttendanceApiController extends Controller
         
         Log::info('--- START getTeacherClassAbsentees ---', ['user_id' => $user->id ?? 'guest']);
         
-        // Strict Guard: Prevent Students/Parents from accessing staff data
-        if (!$user || $user->hasRole(['Student', 'Guardian'])) {
+        // Strict Guard: Prevent pure Students/Parents from accessing staff data
+        if (!$this->userIsStaffLike($user)) {
             Log::warning('Unauthorized access attempt in getTeacherClassAbsentees', [
-                'roles' => $user ? $user->getRoleNames() : 'none', 
+                'roles' => $user ? $user->getRoleNames() : 'none',
             ]);
-            return response()->json(['success' => false, 'message' => 'unauthorized_access: Staff only'], 403);
+            return $this->staffOnlyResponse();
         }
 
         $dayOfWeek = strtolower(now()->format('l'));
@@ -922,7 +964,11 @@ class AttendanceApiController extends Controller
 
             $allAssignedClassIds = array_unique(array_merge($homeroomIds, $timetableIds, $allocatedIds));
         } else {
-            return response()->json(['success' => false, 'message' => 'unauthorized_access'], 403);
+            return response()->json([
+                'success' => false,
+                'message' => 'unauthorized_access',
+                'error_type' => 'unauthorized',
+            ], 403);
         }
 
         $sectionsQuery = \App\Models\ClassSection::with('gradeLevel')->where('is_active', true)
@@ -1053,8 +1099,8 @@ class AttendanceApiController extends Controller
     {
         $user = Auth::guard('sanctum')->user() ?? Auth::user();
 
-        if (!$user || $user->hasRole(['Student', 'Guardian'])) {
-            return response()->json(['success' => false, 'message' => 'unauthorized_access: Staff only'], 403);
+        if (!$this->userIsStaffLike($user)) {
+            return $this->staffOnlyResponse();
         }
 
         $request->validate([

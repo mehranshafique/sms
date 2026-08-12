@@ -26,6 +26,7 @@ class MobileMenuService
             $this->tile('timetable', "Today's Timetable", 'Your schedule', 'schedule', ($capabilities['teacher_tools'] ?? false) && ($hasModule('timetables') || $isSuper), '/timetable'),
             $this->tile('today_scans', "Today's Scans", 'Live roster', 'list_alt', $capabilities['hardware_scan'] ?? false, '/today-scans'),
             $this->tile('notices_staff', 'Notices', 'Announcements', 'campaign', ($capabilities['teacher_tools'] ?? false) && ($hasModule('notices') || $hasModule('communication') || $isSuper), '/notices'),
+            $this->tile('ptm_staff', 'PTM', 'View parent–teacher meetings', 'groups', ($capabilities['teacher_tools'] ?? false) && ($hasModule('notices') || $hasModule('communication') || $isSuper), '/ptm'),
             $this->tile('support', 'Help & Support', 'Open a ticket', 'support_agent', true, '/support'),
         ], fn ($t) => $t['enabled']));
 
@@ -36,6 +37,7 @@ class MobileMenuService
             $this->tile('my_results', 'My Results', 'View Report Cards', 'school', ($capabilities['student_portal'] ?? false) && ($hasModule('exams') || $hasModule('exam_marks') || $isSuper), '/my-results'),
             $this->tile('my_homework', 'My Homework', 'View Assignments', 'assignment', ($capabilities['student_portal'] ?? false) && ($hasModule('assignments') || $isSuper), '/my-homework'),
             $this->tile('my_requests', 'My Requests', 'Submit Leave/Request', 'mail', ($capabilities['student_portal'] ?? false) && ($hasModule('student_requests') || $isSuper), '/my-requests'),
+            $this->tile('ptm_parent', 'PTM', 'View or request a meeting', 'groups', ($capabilities['student_portal'] ?? false) && ($hasModule('notices') || $hasModule('communication') || $isSuper), '/ptm'),
             $this->tile('timetable_student', "Today's Timetable", 'Your schedule', 'schedule', ($capabilities['student_portal'] ?? false) && ($hasModule('timetables') || $isSuper), '/timetable'),
             $this->tile('notices_student', 'Notices', 'Announcements', 'campaign', ($capabilities['student_portal'] ?? false) && ($hasModule('notices') || $hasModule('communication') || $isSuper), '/notices'),
         ], fn ($t) => $t['enabled']));
