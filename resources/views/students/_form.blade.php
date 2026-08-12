@@ -374,15 +374,16 @@
                             <div id="guardian_status" class="parent-status-msg d-none"></div>
                         </div>
 
-                        <!-- UPDATED: Pre-select Primary Guardian -->
+                        <!-- UPDATED: Pre-select Primary Guardian (native select — reliable on mobile) -->
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
-                            <select name="primary_guardian" id="primaryGuardianSelect" class="form-control default-select" required>
+                            <label class="form-label fw-bold" for="primaryGuardianSelect">{{ __('student.primary_guardian') }} <span class="text-danger">*</span></label>
+                            <select name="primary_guardian" id="primaryGuardianSelect" class="form-select form-control" required>
                                 <option value="">{{ __('student.select_option') }}</option>
                                 <option value="father" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'father') ? 'selected' : '' }}>{{ __('student.father_name') }}</option>
                                 <option value="mother" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'mother') ? 'selected' : '' }}>{{ __('student.mother_name') }}</option>
                                 <option value="guardian" {{ (old('primary_guardian', $student->parent->guardian_relation ?? '') == 'guardian') ? 'selected' : '' }}>{{ __('student.guardian_name') }}</option>
                             </select>
+                            <div class="form-text" id="primaryGuardianHint"></div>
                         </div>
                         
                         {{-- Step 3 Buttons --}}
@@ -532,7 +533,10 @@
                 let nextTab = document.querySelector(`[data-bs-target="${nextPaneId}"]`);
                 new bootstrap.Tab(nextTab).show();
                 if (nextPaneId === '#parents') {
-                    setTimeout(refreshPrimaryGuardianPicker, 150);
+                    setTimeout(syncPrimaryGuardianFromForm, 150);
+                }
+                if (currentPane.attr('id') === 'parents') {
+                    syncPrimaryGuardianFromForm();
                 }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
@@ -672,48 +676,101 @@
         function refreshPrimaryGuardianPicker() {
             const select = document.getElementById('primaryGuardianSelect');
             if (!select || typeof $ === 'undefined') return;
+
+            // Keep this field as a native <select> on mobile — bootstrap-select
+            // often shows "Nothing selected" even when a value is set.
             if ($.fn.selectpicker && $(select).data('selectpicker')) {
-                $(select).selectpicker('destroy');
+                try {
+                    const val = select.value;
+                    $(select).selectpicker('destroy');
+                    select.value = val;
+                } catch (_) {}
             }
-            if (typeof window.digitexReinitSelectPickers === 'function') {
-                window.digitexReinitSelectPickers();
-            } else if ($.fn.selectpicker) {
-                $(select).selectpicker({ liveSearch: false, container: 'body', dropupAuto: false });
-            }
+        }
+
+        function currentParentFormData() {
+            return {
+                father_name: document.getElementById('father_name')?.value?.trim() || '',
+                father_phone: document.getElementById('hidden_father_phone')?.value?.trim()
+                    || document.getElementById('father_phone_input')?.value?.trim() || '',
+                mother_name: document.getElementById('mother_name')?.value?.trim() || '',
+                mother_phone: document.getElementById('hidden_mother_phone')?.value?.trim()
+                    || document.getElementById('mother_phone_input')?.value?.trim() || '',
+                guardian_name: document.getElementById('guardian_name')?.value?.trim() || '',
+                guardian_phone: document.getElementById('hidden_guardian_phone')?.value?.trim()
+                    || document.getElementById('guardian_phone_input')?.value?.trim() || '',
+                guardian_relation: document.getElementById('primaryGuardianSelect')?.value || '',
+            };
         }
 
         function updatePrimaryGuardianOptions(data, preferredType) {
             const select = document.getElementById('primaryGuardianSelect');
             if (!select) return;
 
-            const preferred = data.matched_type || data.guardian_relation || preferredType || '';
+            const previous = select.value;
+            let preferred = data.matched_type || data.guardian_relation || preferredType || previous || '';
+
             const choices = [
-                { value: 'father', label: LANG.fatherLabel, name: data.father_name, phone: data.father_phone },
-                { value: 'mother', label: LANG.motherLabel, name: data.mother_name, phone: data.mother_phone },
-                { value: 'guardian', label: LANG.guardianLabel, name: data.guardian_name, phone: data.guardian_phone },
+                { value: 'father', label: LANG.fatherLabel, name: (data.father_name || '').trim(), phone: (data.father_phone || '').trim() },
+                { value: 'mother', label: LANG.motherLabel, name: (data.mother_name || '').trim(), phone: (data.mother_phone || '').trim() },
+                { value: 'guardian', label: LANG.guardianLabel, name: (data.guardian_name || '').trim(), phone: (data.guardian_phone || '').trim() },
             ];
 
-            let html = `<option value="">${LANG.selectOption}</option>`;
-            let available = 0;
+            const filled = choices.filter(function (c) { return c.name || c.phone; });
 
-            choices.forEach(function(c) {
-                if (c.name || c.phone) {
-                    available++;
-                    const text = c.name ? `${c.label} (${c.name})` : c.label;
-                    const selected = preferred === c.value ? ' selected' : '';
-                    html += `<option value="${c.value}"${selected}>${text}</option>`;
+            // If relation is empty / points at an empty role, pick a filled person.
+            const preferredChoice = choices.find(function (c) { return c.value === preferred; });
+            const preferredHasData = preferredChoice && (preferredChoice.name || preferredChoice.phone);
+            if (!preferred || (!preferredHasData && filled.length)) {
+                if (filled.length === 1) {
+                    preferred = filled[0].value;
+                } else if (filled.some(function (c) { return c.value === 'guardian'; })) {
+                    preferred = 'guardian';
+                } else if (filled.some(function (c) { return c.value === 'father'; })) {
+                    preferred = 'father';
+                } else if (filled.some(function (c) { return c.value === 'mother'; })) {
+                    preferred = 'mother';
+                } else if (previous) {
+                    preferred = previous;
                 }
+            }
+
+            let html = `<option value="">${LANG.selectOption}</option>`;
+            const source = filled.length ? filled : choices;
+
+            source.forEach(function (c) {
+                const text = c.name ? `${c.label} — ${c.name}` : c.label;
+                const selected = preferred === c.value ? ' selected' : '';
+                html += `<option value="${c.value}"${selected}>${text}</option>`;
             });
 
-            if (available === 0) {
-                choices.forEach(function(c) {
+            // Always keep all three roles available so user can change primary.
+            if (filled.length && filled.length < 3) {
+                choices.forEach(function (c) {
+                    if (filled.some(function (f) { return f.value === c.value; })) return;
                     const selected = preferred === c.value ? ' selected' : '';
                     html += `<option value="${c.value}"${selected}>${c.label}</option>`;
                 });
             }
 
             select.innerHTML = html;
+            if (preferred) {
+                select.value = preferred;
+            }
+
+            const hint = document.getElementById('primaryGuardianHint');
+            if (hint) {
+                const chosen = choices.find(function (c) { return c.value === select.value; });
+                hint.textContent = chosen && chosen.name
+                    ? `${chosen.label}: ${chosen.name}`
+                    : '';
+            }
+
             refreshPrimaryGuardianPicker();
+        }
+
+        function syncPrimaryGuardianFromForm() {
+            updatePrimaryGuardianOptions(currentParentFormData(), document.getElementById('primaryGuardianSelect')?.value || '');
         }
 
         function fillParentData(data, lookupType) {
@@ -739,7 +796,7 @@
             if (data.mother_phone) setPhoneField('mother', data.mother_phone);
             if (data.guardian_phone) setPhoneField('guardian', data.guardian_phone);
 
-            updatePrimaryGuardianOptions(data, lookupType);
+            updatePrimaryGuardianOptions(data, lookupType || data.guardian_relation || data.matched_type);
         }
 
         @if(isset($student) && $student->parent)
@@ -750,9 +807,34 @@
             mother_phone: @json($student->parent->mother_phone),
             guardian_name: @json($student->parent->guardian_name),
             guardian_phone: @json($student->parent->guardian_phone),
-            guardian_relation: @json($student->parent->guardian_relation),
-        }, @json($student->parent->guardian_relation));
+            guardian_relation: @json(old('primary_guardian', $student->parent->guardian_relation)),
+        }, @json(old('primary_guardian', $student->parent->guardian_relation)));
+        @else
+        syncPrimaryGuardianFromForm();
         @endif
+
+        ['father_name', 'mother_name', 'guardian_name', 'father_phone_input', 'mother_phone_input', 'guardian_phone_input']
+            .forEach(function (id) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', syncPrimaryGuardianFromForm);
+                el.addEventListener('change', syncPrimaryGuardianFromForm);
+                el.addEventListener('blur', syncPrimaryGuardianFromForm);
+            });
+
+        // Global selectpicker re-init must not wrap Primary Guardian again.
+        const _digitexReinit = window.digitexReinitSelectPickers;
+        if (typeof _digitexReinit === 'function') {
+            window.digitexReinitSelectPickers = function () {
+                _digitexReinit();
+                refreshPrimaryGuardianPicker();
+                syncPrimaryGuardianFromForm();
+            };
+        }
+        setTimeout(function () {
+            refreshPrimaryGuardianPicker();
+            syncPrimaryGuardianFromForm();
+        }, 400);
 
         // --- 4. NFC Reader Logic ---
         const nfcInput = document.getElementById('nfc_input');
