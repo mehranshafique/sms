@@ -54,6 +54,7 @@ class TemplateVariableRegistry
             'fund_request_processed' => 'Requester, Title, Status, SchoolName, Amount, Remaining, TicketNumber, Reason',
             'budget_consumed' => 'BudgetLine, ExpenseTitle, Amount, Remaining, SchoolName, Requester',
             'disciplinary_incident' => 'StudentName, IncidentType, Title, Severity, Date, Reference, ActionTaken, SchoolName',
+            'ptm_created' => 'ParentName, StudentName, Topic, Date, ClassName, Scope, Status, SchoolName',
             'reenrollment_invitation' => 'ParentName, StudentName, Class, Session, Campaign, AmountRequired, AmountPaid, Remaining, Deadline, SchoolName',
             'reenrollment_reminder' => 'ParentName, StudentName, Class, Session, Campaign, AmountRequired, AmountPaid, Remaining, Deadline, SchoolName',
             'reenrollment_confirmation_received' => 'ParentName, StudentName, Class, Status, Campaign, Session, AmountRequired, AmountPaid, Remaining, SchoolName',

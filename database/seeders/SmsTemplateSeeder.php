@@ -274,6 +274,13 @@ Thank you, $SchoolName.',
                 'is_active' => true,
             ],
             [
+                'event_key' => 'ptm_created',
+                'name' => 'Parent–Teacher Meeting Scheduled',
+                'body' => 'Dear $ParentName, a parent–teacher meeting ($Scope) for $StudentName is scheduled on $Date. Topic: $Topic. Class: $ClassName. Status: $Status. — $SchoolName',
+                'available_tags' => '$ParentName, $StudentName, $Topic, $Date, $ClassName, $Scope, $Status, $SchoolName',
+                'is_active' => true,
+            ],
+            [
                 'event_key' => 'reenrollment_invitation',
                 'name' => 'Re-enrollment Invitation',
                 'body' => 'Dear $ParentName, re-enrollment for $Session is now open for $StudentName ($Class). Reply to our WhatsApp menu (option 10) or visit the school to confirm. Deposit required: $AmountRequired. Deadline: $Deadline. — $SchoolName',

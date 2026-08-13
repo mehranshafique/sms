@@ -109,6 +109,8 @@ return [
     'notif_budget_consumed_message' => ':line — ":title" spent :amount. Remaining: :remaining.',
     'notif_discipline_title' => 'Disciplinary Notice',
     'notif_discipline_message' => ':student — :type: :title on :date.',
+    'notif_ptm_title' => 'Parent–Teacher Meeting',
+    'notif_ptm_message' => 'PTM for :student (:scope): :topic on :date.',
     'notif_proof_submitted_title' => 'Payment Proof Submitted',
     'notif_proof_submitted_admin_message' => ':student submitted payment proof of :amount for invoice :invoice. Review required.',
     'notif_proof_submitted_parent_message' => 'We received your payment proof of :amount for :student (invoice :invoice). Accounts will review it soon.',

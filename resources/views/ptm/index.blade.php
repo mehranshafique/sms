@@ -12,6 +12,12 @@
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex gap-2 align-items-center">
                 <form method="GET" action="{{ route('ptm.index') }}" class="d-flex gap-2">
+                    <select name="scope" class="form-control default-select shadow-sm w-auto" onchange="this.form.submit()">
+                        <option value="">{{ __('ptm.filter_all_scopes') }}</option>
+                        @foreach(\App\Models\ParentMeeting::SCOPES as $sc)
+                            <option value="{{ $sc }}" @selected(($scope ?? '') === $sc)>{{ __('ptm.scope_' . $sc) }}</option>
+                        @endforeach
+                    </select>
                     <select name="status" class="form-control default-select shadow-sm w-auto" onchange="this.form.submit()">
                         <option value="">{{ __('ptm.filter_all') }}</option>
                         @foreach(\App\Models\ParentMeeting::STATUSES as $st)
@@ -79,6 +85,7 @@
                                 <thead class="bg-light">
                                     <tr>
                                         <th>{{ __('ptm.field_student') }}</th>
+                                        <th>{{ __('ptm.field_scope') }}</th>
                                         <th>{{ __('ptm.field_topic') }}</th>
                                         <th>{{ __('ptm.field_date') }}</th>
                                         <th>{{ __('ptm.field_status') }}</th>
@@ -89,7 +96,21 @@
                                 <tbody>
                                 @forelse($meetings as $meeting)
                                     <tr>
-                                        <td class="fw-semibold">{{ $meeting->student?->full_name ?? '—' }}</td>
+                                        <td class="fw-semibold">
+                                            {{ $meeting->student?->full_name ?? '—' }}
+                                            @if($meeting->class_section_id)
+                                                <div class="small text-muted">
+                                                    {{ function_exists('class_section_label') && $meeting->classSection
+                                                        ? class_section_label($meeting->classSection)
+                                                        : ($meeting->classSection->name ?? '') }}
+                                                </div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{{ $meeting->scope === 'class' ? 'info' : 'secondary' }} light">
+                                                {{ __('ptm.scope_' . ($meeting->scope ?? 'individual')) }}
+                                            </span>
+                                        </td>
                                         <td>{{ $meeting->topic }}</td>
                                         <td>{{ $meeting->preferred_date ? localized_date($meeting->preferred_date, 'd M Y') : '—' }}</td>
                                         <td>
@@ -112,7 +133,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-5">{{ __('ptm.empty') }}</td>
+                                        <td colspan="7" class="text-center text-muted py-5">{{ __('ptm.empty') }}</td>
                                     </tr>
                                 @endforelse
                                 </tbody>

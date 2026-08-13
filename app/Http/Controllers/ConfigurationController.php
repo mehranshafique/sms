@@ -347,6 +347,7 @@ class ConfigurationController extends BaseController
             'payment_received' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
             'payment_proof_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
             'notice_published' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
+            'ptm_created' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
             'event_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
             'reenrollment_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
             'reenrollment_reminder' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],

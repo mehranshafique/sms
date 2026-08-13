@@ -6,14 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\ParentMeeting;
 use App\Models\Student;
 use App\Models\StudentParent;
+use App\Services\InAppNotificationService;
 use App\Services\Mobile\MobileActiveRoleService;
+use App\Services\ParentMeetingNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class ParentMeetingApiController extends Controller
 {
-    public function __construct(protected MobileActiveRoleService $activeRoles) {}
+    public function __construct(
+        protected MobileActiveRoleService $activeRoles,
+        protected ParentMeetingNotificationService $ptmNotifications,
+        protected InAppNotificationService $inApp,
+    ) {}
 
     private function isPortalRole($user): bool
     {
@@ -86,7 +92,9 @@ class ParentMeetingApiController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = ParentMeeting::with('student')->orderByDesc('preferred_date')->orderByDesc('id');
+        $query = ParentMeeting::with(['student', 'classSection.gradeLevel'])
+            ->orderByDesc('preferred_date')
+            ->orderByDesc('id');
 
         if ($this->isStaff($user)) {
             if ($user->institute_id) {
@@ -155,7 +163,9 @@ class ParentMeetingApiController extends Controller
 
         $meeting = ParentMeeting::create([
             'institution_id' => $student->institution_id,
+            'scope' => 'individual',
             'student_id' => $student->id,
+            'class_section_id' => $student->class_section_id,
             'requested_by' => $user->id,
             'topic' => $data['topic'],
             'preferred_date' => $data['preferred_date'],
@@ -163,7 +173,29 @@ class ParentMeetingApiController extends Controller
             'status' => 'pending',
         ]);
 
-        $meeting->load('student');
+        $meeting->load(['student', 'classSection.gradeLevel', 'institution']);
+
+        // Alert school staff that a parent/student requested a PTM.
+        try {
+            $this->inApp->notifyAdmins(
+                $meeting->institution_id,
+                ParentMeetingNotificationService::EVENT_KEY,
+                'ptm',
+                __('header.notif_ptm_title'),
+                __('header.notif_ptm_message', [
+                    'student' => $student->full_name,
+                    'topic' => $meeting->topic,
+                    'date' => $meeting->preferred_date?->format('d M Y') ?? '—',
+                    'scope' => __('ptm.scope_individual'),
+                ]),
+                route('ptm.show', $meeting),
+                'fa-users',
+                ['parent_meeting_id' => $meeting->id],
+                $user->id
+            );
+        } catch (\Throwable $e) {
+            // Non-fatal — request still succeeds.
+        }
 
         return response()->json([
             'success' => true,

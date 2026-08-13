@@ -7,6 +7,7 @@
             <div class="col-sm-6 p-md-0">
                 <div class="welcome-text">
                     <h4>{{ __('ptm.create_title') }}</h4>
+                    <p class="mb-0">{{ __('ptm.create_hint') }}</p>
                 </div>
             </div>
             <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
@@ -18,18 +19,45 @@
             <div class="col-xl-8">
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
-                        <form action="{{ route('ptm.store') }}" method="POST" class="ajax-form">
+                        <form action="{{ route('ptm.store') }}" method="POST" class="ajax-form" id="ptmCreateForm">
                             @csrf
                             <div class="row">
-                                <div class="col-md-6 mb-3">
+                                <div class="col-12 mb-3">
+                                    <label class="form-label fw-bold">{{ __('ptm.field_scope') }} <span class="text-danger">*</span></label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="scope" id="scopeIndividual" value="individual" @checked(old('scope', 'individual') === 'individual')>
+                                            <label class="form-check-label" for="scopeIndividual">{{ __('ptm.scope_individual') }}</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="scope" id="scopeClass" value="class" @checked(old('scope') === 'class')>
+                                            <label class="form-check-label" for="scopeClass">{{ __('ptm.scope_class') }}</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mb-3" id="studentField">
                                     <label class="form-label fw-bold">{{ __('ptm.field_student') }} <span class="text-danger">*</span></label>
-                                    <select name="student_id" class="form-control default-select" data-live-search="true" required>
+                                    <select name="student_id" class="form-control default-select" data-live-search="true">
                                         <option value="">{{ __('ptm.field_student') }}</option>
                                         @foreach($students as $id => $name)
                                             <option value="{{ $id }}" @selected(old('student_id') == $id)>{{ $name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
+
+                                <div class="col-md-6 mb-3 d-none" id="classField">
+                                    <label class="form-label fw-bold">{{ __('ptm.field_class') }} <span class="text-danger">*</span></label>
+                                    <select name="class_section_id" class="form-control default-select" data-live-search="true">
+                                        <option value="">{{ __('ptm.field_class') }}</option>
+                                        @foreach($sections as $section)
+                                            <option value="{{ $section->id }}" @selected(old('class_section_id') == $section->id)>
+                                                {{ function_exists('class_section_label') ? class_section_label($section) : ($section->name ?? $section->id) }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">{{ __('ptm.field_date') }} <span class="text-danger">*</span></label>
                                     <input type="date" name="preferred_date" class="form-control" value="{{ old('preferred_date', date('Y-m-d')) }}" required>
@@ -54,6 +82,13 @@
                                     <label class="form-label">{{ __('ptm.field_staff_notes') }}</label>
                                     <textarea name="staff_notes" class="form-control" rows="3" placeholder="{{ __('ptm.staff_notes_placeholder') }}">{{ old('staff_notes') }}</textarea>
                                 </div>
+                                <div class="col-12 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="notify" value="1" id="notifyParents" @checked(old('notify', true))>
+                                        <label class="form-check-label" for="notifyParents">{{ __('ptm.notify_parents') }}</label>
+                                    </div>
+                                    <small class="text-muted">{{ __('ptm.notify_parents_hint') }}</small>
+                                </div>
                             </div>
                             <button type="submit" class="btn btn-primary px-4">{{ __('ptm.save') }}</button>
                         </form>
@@ -64,3 +99,30 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const individual = document.getElementById('scopeIndividual');
+    const classRadio = document.getElementById('scopeClass');
+    const studentField = document.getElementById('studentField');
+    const classField = document.getElementById('classField');
+    const studentSelect = studentField.querySelector('select');
+    const classSelect = classField.querySelector('select');
+
+    function syncScope() {
+        const isClass = classRadio.checked;
+        studentField.classList.toggle('d-none', isClass);
+        classField.classList.toggle('d-none', !isClass);
+        studentSelect.required = !isClass;
+        classSelect.required = isClass;
+        if (isClass) studentSelect.value = '';
+        else classSelect.value = '';
+    }
+
+    individual.addEventListener('change', syncScope);
+    classRadio.addEventListener('change', syncScope);
+    syncScope();
+})();
+</script>
+@endpush

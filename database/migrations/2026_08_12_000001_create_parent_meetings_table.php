@@ -11,7 +11,10 @@ return new class extends Migration
         Schema::create('parent_meetings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('institution_id')->constrained()->cascadeOnDelete();
+            $table->string('scope', 20)->default('individual'); // individual | class
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('class_section_id')->nullable()->constrained('class_sections')->nullOnDelete();
+            $table->uuid('batch_id')->nullable();
             $table->foreignId('requested_by')->constrained('users')->cascadeOnDelete();
             $table->foreignId('handled_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('topic');
@@ -23,7 +26,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['institution_id', 'status']);
+            $table->index(['institution_id', 'scope']);
             $table->index(['student_id', 'preferred_date']);
+            $table->index('batch_id');
         });
     }
 

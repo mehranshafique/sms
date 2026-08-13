@@ -40,6 +40,7 @@ class InAppNotificationService
         'disciplinary' => 'disciplinary_incident',
         'payment_proof_submitted' => 'payment_proof_submitted',
         'payment_proof_rejected' => 'payment_proof_rejected',
+        'ptm' => 'ptm_created',
     ];
 
     private const ADMIN_ROLES = [

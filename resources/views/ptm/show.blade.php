@@ -38,6 +38,25 @@
                                 @endif
                             </dd>
 
+                            <dt class="col-sm-4 text-muted">{{ __('ptm.field_scope') }}</dt>
+                            <dd class="col-sm-8">
+                                <span class="badge badge-{{ $meeting->scope === 'class' ? 'info' : 'secondary' }} light">
+                                    {{ __('ptm.scope_' . ($meeting->scope ?? 'individual')) }}
+                                </span>
+                                @if($meeting->batch_id && $batchCount)
+                                    <span class="text-muted small ms-1">{{ __('ptm.batch_count', ['count' => $batchCount]) }}</span>
+                                @endif
+                            </dd>
+
+                            <dt class="col-sm-4 text-muted">{{ __('ptm.field_class') }}</dt>
+                            <dd class="col-sm-8">
+                                @if($meeting->classSection)
+                                    {{ function_exists('class_section_label') ? class_section_label($meeting->classSection) : ($meeting->classSection->name ?? '—') }}
+                                @else
+                                    —
+                                @endif
+                            </dd>
+
                             <dt class="col-sm-4 text-muted">{{ __('ptm.field_topic') }}</dt>
                             <dd class="col-sm-8">{{ $meeting->topic }}</dd>
 
@@ -105,6 +124,12 @@
                                 <label class="form-label">{{ __('ptm.field_staff_notes') }}</label>
                                 <textarea name="staff_notes" class="form-control" rows="4" placeholder="{{ __('ptm.staff_notes_placeholder') }}">{{ old('staff_notes', $meeting->staff_notes) }}</textarea>
                             </div>
+                            @if($meeting->batch_id)
+                                <div class="mb-3 form-check">
+                                    <input class="form-check-input" type="checkbox" name="apply_to_batch" value="1" id="applyBatch">
+                                    <label class="form-check-label" for="applyBatch">{{ __('ptm.apply_to_batch') }}</label>
+                                </div>
+                            @endif
                             <button type="submit" class="btn btn-primary w-100">{{ __('ptm.update') }}</button>
                         </form>
                     </div>

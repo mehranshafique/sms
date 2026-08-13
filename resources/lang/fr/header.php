@@ -75,6 +75,8 @@ return [
     'notif_budget_consumed_message' => ':line — « :title » :amount dépensés. Restant : :remaining.',
     'notif_discipline_title' => 'Avis disciplinaire',
     'notif_discipline_message' => ':student — :type : :title le :date.',
+    'notif_ptm_title' => 'Réunion parent–enseignant',
+    'notif_ptm_message' => 'PTM pour :student (:scope) : :topic le :date.',
     'notif_proof_submitted_title' => 'Preuve de paiement soumise',
     'notif_proof_submitted_admin_message' => ':student a soumis une preuve de :amount pour la facture :invoice. Vérification requise.',
     'notif_proof_submitted_parent_message' => 'Nous avons reçu votre preuve de paiement de :amount pour :student (facture :invoice).',
