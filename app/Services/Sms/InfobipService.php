@@ -19,7 +19,7 @@ class InfobipService implements SmsGatewayInterface
     protected $whatsappTemplateName;
     protected $whatsappTemplateLanguage = 'en';
 
-    public function __construct($institutionId = null)
+    public function __construct($institutionId = null, $fallbackInstitutionId = null)
     {
         // 1. Defaults
         $this->baseUrl = config('sms.infobip.base_url');
@@ -27,7 +27,17 @@ class InfobipService implements SmsGatewayInterface
         $this->whatsappSender = config('sms.infobip.whatsapp_from');
         $this->senderId = 'Digitex';
 
-        // 2. DB Override
+        $this->applyInfobipSettings($institutionId);
+
+        // System (platform) Infobip credentials still need the school's approved
+        // template name/language, which are saved on the institution row.
+        if (is_null($institutionId) && $fallbackInstitutionId) {
+            $this->overlaySchoolTemplateSettings((int) $fallbackInstitutionId);
+        }
+    }
+
+    protected function applyInfobipSettings($institutionId): void
+    {
         $query = InstitutionSetting::query();
         if (is_null($institutionId)) {
             $query->whereNull('institution_id');
@@ -40,12 +50,40 @@ class InfobipService implements SmsGatewayInterface
             'infobip_whatsapp_template_name', 'infobip_whatsapp_template_language',
         ])->pluck('value', 'key');
 
-        if (!empty($settings['infobip_whatsapp_template_name'])) {
-            $this->whatsappTemplateName = trim($settings['infobip_whatsapp_template_name']);
+        $this->applySettingBag($settings, overlayTemplateOnly: false);
+    }
+
+    protected function overlaySchoolTemplateSettings(int $schoolId): void
+    {
+        $settings = InstitutionSetting::query()
+            ->where('institution_id', $schoolId)
+            ->whereIn('key', [
+                'infobip_whatsapp_template_name',
+                'infobip_whatsapp_template_language',
+                'infobip_whatsapp_from',
+            ])
+            ->pluck('value', 'key');
+
+        $this->applySettingBag($settings, overlayTemplateOnly: true);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection|array<string, mixed>  $settings
+     */
+    protected function applySettingBag($settings, bool $overlayTemplateOnly): void
+    {
+        $settings = is_array($settings) ? $settings : $settings->all();
+
+        if (! empty($settings['infobip_whatsapp_template_name'])) {
+            $this->whatsappTemplateName = trim((string) $settings['infobip_whatsapp_template_name']);
         }
 
-        if (!empty($settings['infobip_whatsapp_template_language'])) {
-            $this->whatsappTemplateLanguage = trim($settings['infobip_whatsapp_template_language']);
+        if (! empty($settings['infobip_whatsapp_template_language'])) {
+            $this->whatsappTemplateLanguage = trim((string) $settings['infobip_whatsapp_template_language']);
+        }
+
+        if ($overlayTemplateOnly) {
+            return;
         }
 
         if (isset($settings['infobip_subdomain']) && $settings['infobip_subdomain'] !== '') {
@@ -64,7 +102,6 @@ class InfobipService implements SmsGatewayInterface
             try {
                 $this->apiKey = Crypt::decryptString($settings['infobip_api_key']);
             } catch (\Exception $e) {
-                // Allow plain-text keys saved before encryption was introduced.
                 $this->apiKey = $settings['infobip_api_key'];
                 Log::warning('Infobip API key used without decryption: ' . $e->getMessage());
             }
@@ -210,6 +247,35 @@ class InfobipService implements SmsGatewayInterface
      */
     protected function sendWhatsAppTemplate(string $msisdn, string $from, string $message): array
     {
+        $placeholder = preg_replace("/[ \t]{4,}/", ' ', str_replace(["\r\n", "\r"], "\n", $message));
+        $placeholder = preg_replace("/\n{3,}/", "\n\n", (string) $placeholder);
+
+        $languages = array_values(array_unique(array_filter([
+            $this->whatsappTemplateLanguage,
+            $this->whatsappTemplateLanguage === 'en' ? 'en_US' : null,
+            $this->whatsappTemplateLanguage === 'en_US' ? 'en' : null,
+            $this->whatsappTemplateLanguage === 'fr' ? 'fr_FR' : null,
+            $this->whatsappTemplateLanguage === 'fr_FR' ? 'fr' : null,
+        ])));
+
+        $last = ['success' => false, 'message' => 'Failed to send WhatsApp template', 'msisdn' => $msisdn];
+
+        foreach ($languages as $language) {
+            $last = $this->postWhatsAppTemplate($msisdn, $from, (string) $placeholder, $language);
+            if (! empty($last['success'])) {
+                return $last;
+            }
+            $hay = strtolower((string) ($last['message'] ?? ''));
+            if (! str_contains($hay, 'language') && ! str_contains($hay, 'template')) {
+                return $last;
+            }
+        }
+
+        return $last;
+    }
+
+    protected function postWhatsAppTemplate(string $msisdn, string $from, string $placeholder, string $language): array
+    {
         try {
             $url = rtrim((string) $this->baseUrl, '/') . '/whatsapp/1/message/template';
 
@@ -224,9 +290,9 @@ class InfobipService implements SmsGatewayInterface
                     'content' => [
                         'templateName' => $this->whatsappTemplateName,
                         'templateData' => [
-                            'body' => ['placeholders' => [$message]],
+                            'body' => ['placeholders' => [$placeholder]],
                         ],
-                        'language' => $this->whatsappTemplateLanguage,
+                        'language' => $language,
                     ],
                 ]],
             ]);
@@ -257,6 +323,7 @@ class InfobipService implements SmsGatewayInterface
                 'response' => $payload,
                 'http_status' => $response->status(),
                 'template' => $this->whatsappTemplateName,
+                'language' => $language,
                 'to' => MessageLogService::maskPhone($msisdn),
             ]);
 
@@ -363,7 +430,9 @@ class InfobipService implements SmsGatewayInterface
         return str_contains($haystack, 'template')
             || str_contains($haystack, '24 hour')
             || str_contains($haystack, '24-hour')
+            || str_contains($haystack, '24h')
             || str_contains($haystack, 'session')
+            || str_contains($haystack, 'customer care')
             || str_contains($haystack, 'rejected_template');
     }
 }

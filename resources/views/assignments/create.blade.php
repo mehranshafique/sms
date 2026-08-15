@@ -11,6 +11,12 @@
             </div>
         </div>
 
+        @if($needsApproval ?? false)
+            <div class="alert alert-info">
+                <i class="fa fa-info-circle me-2"></i> {{ __('assignment.approval_required_notice') }}
+            </div>
+        @endif
+
         <div class="row">
             <div class="col-xl-12">
                 <div class="card">

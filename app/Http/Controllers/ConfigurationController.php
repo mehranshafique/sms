@@ -90,6 +90,13 @@ class ConfigurationController extends BaseController
                 ->get();
         }
 
+        $homeworkApprovals = app(\App\Services\Academic\HomeworkApprovalService::class);
+        $homework = [
+            'required' => $homeworkApprovals->isRequired($institutionId),
+            'roles' => $homeworkApprovals->approverRoles($institutionId),
+            'available_roles' => $homeworkApprovals->assignableRoles($institutionId),
+        ];
+
         $globalTemplates = \App\Models\SmsTemplate::whereNull('institution_id')->get()->keyBy('event_key');
         if ($institutionId) {
             $institutionTemplates = \App\Models\SmsTemplate::where('institution_id', $institutionId)->get()->keyBy('event_key');
@@ -102,7 +109,7 @@ class ConfigurationController extends BaseController
             'institution', 'institutionId', 'settings', 'globalSettings', 'smtp', 'sms', 'whatsapp',
             'notificationPrefs', 'schoolYear', 'allModules', 'enabledModules',
             'allowedSms', 'allowedWa', 'isSuperAdminUser', 'isGlobalContext', 'platformScope',
-            'events', 'billingSettings', 'creditTransactions'
+            'events', 'billingSettings', 'creditTransactions', 'homework'
         ));
     }
 
@@ -337,6 +344,31 @@ class ConfigurationController extends BaseController
             : redirect()->back()->with('success', __('configuration.settings_saved'));
     }
 
+    public function updateHomeworkSettings(Request $request, \App\Services\Academic\HomeworkApprovalService $approvals)
+    {
+        $institutionId = $this->getInstitutionId();
+
+        if (! $institutionId) {
+            return response()->json(['message' => __('configuration.select_institution_first')], 422);
+        }
+
+        $request->validate([
+            'homework_approval_required' => 'sometimes|boolean',
+            'homework_approver_roles' => 'nullable|array',
+            'homework_approver_roles.*' => 'string',
+        ]);
+
+        $approvals->saveSettings(
+            $institutionId,
+            $request->boolean('homework_approval_required'),
+            $request->input('homework_approver_roles', [])
+        );
+
+        return $request->ajax() || $request->wantsJson()
+            ? response()->json(['message' => __('configuration.settings_saved')])
+            : redirect()->back()->with('success', __('configuration.settings_saved'));
+    }
+
     public function enableRecommendedNotifications(Request $request)
     {
         $institutionId = $this->getInstitutionId();
@@ -348,6 +380,8 @@ class ConfigurationController extends BaseController
             'payment_proof_submitted' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
             'notice_published' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => true],
             'ptm_created' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
+            'homework_published' => ['system' => true, 'whatsapp' => true, 'sms' => false, 'email' => false],
+            'resit_notification' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
             'event_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => true],
             'reenrollment_invitation' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],
             'reenrollment_reminder' => ['system' => true, 'whatsapp' => true, 'sms' => true, 'email' => false],

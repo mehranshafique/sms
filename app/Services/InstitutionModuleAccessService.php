@@ -35,6 +35,8 @@ class InstitutionModuleAccessService
         'school_backups' => 'school_backup',
         'academic_reports' => 'academic_report',
         'result_cards' => 'result_card',
+        'voice_ivr' => 'voice_ivr',
+        'medical_records' => 'medical_record',
     ];
 
     public function hasActiveSubscription(int $institutionId): bool

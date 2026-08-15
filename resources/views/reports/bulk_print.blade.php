@@ -20,15 +20,16 @@
         </button>
     </div>
 
-    @foreach (collect($reports)->chunk(4) as $chunkIndex => $chunk)
-        <div class="a4-landscape">
+    @php $cardsPerPage = (int) ($cards_per_page ?? 4); @endphp
+    @foreach (collect($reports)->chunk($cardsPerPage) as $chunkIndex => $chunk)
+        <div class="a4-landscape cards-{{ $cardsPerPage }}">
             
             @foreach ($chunk as $index => $reportData)
-                @include($viewName, array_merge($reportData, ['is_bulk' => true, 'loop_index' => $chunkIndex . '-' . $index]))
+                @include($viewName, array_merge($reportData, ['is_bulk' => true, 'loop_index' => $chunkIndex . '-' . $index, 'cards_per_page' => $cardsPerPage]))
             @endforeach
 
-            {{-- Fill empty columns to maintain the precise flex layout if the chunk has fewer than 4 students --}}
-            @for ($i = $chunk->count(); $i < 4; $i++)
+            {{-- Fill empty columns to maintain the precise flex layout if the chunk has fewer than N students --}}
+            @for ($i = $chunk->count(); $i < $cardsPerPage; $i++)
                 <div class="student-column" style="visibility: hidden; border: none;"></div>
             @endfor
 

@@ -96,6 +96,14 @@
                                         <input type="number" name="installment_order" value="{{ $feeStructure->installment_order }}" class="form-control" placeholder="1, 2, 3..." min="1">
                                     </div>
                                 </div>
+
+                                @if(($proportionalEnabled ?? false) || $feeStructure->isProportional())
+                                    @include('finance.fees._components', [
+                                        'components' => $feeStructure->components,
+                                        'isProportional' => $feeStructure->isProportional(),
+                                    ])
+                                @endif
+
                                 <button type="submit" class="btn btn-primary mt-3">{{ __('finance.save') ?? 'Update' }}</button>
                             </div>
                         </div>

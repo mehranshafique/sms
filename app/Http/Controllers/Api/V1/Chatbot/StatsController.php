@@ -80,41 +80,33 @@ class StatsController extends ChatbotBaseController
 
         if (!$student) return $this->sendError(__('chatbot.student_not_found'), 404);
 
-        // --- 1. FINANCIAL RESTRICTION CHECK ---
-        $isBlocked = InstitutionSetting::where('institution_id', $institutionId)
-                        ->where('key', 'block_reports_on_debt')
-                        ->value('value');
-                        
-        if ($isBlocked == '1') {
-            $unpaid = Invoice::where('student_id', $student->id)
-                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
-                ->sum(DB::raw('total_amount - paid_amount'));
-                
-            if ($unpaid > 0) {
-                $formattedDebt = $this->currencyService->format($unpaid, $institutionId);
-
-                return $this->sendError(__('chatbot.financial_restriction_msg', ['amount' => $formattedDebt]), 200);
-            }
-        }
-
-        // --- 2. SESSION & EMPTY BULLETIN CHECK ---
         $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
         if (!$currentSession) return $this->sendError(__('chatbot.no_session'), 200);
 
-        $hasMarks = ExamRecord::where('student_id', $student->id)
-            ->whereHas('exam', fn($q) => $q->where('academic_session_id', $currentSession->id))
-            ->exists();
+        $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+        if (! $enrollment) {
+            return $this->sendError(__('chatbot.student_not_found'), 404);
+        }
 
-        if (!$hasMarks) return $this->sendError(__('chatbot.no_results_found'), 200);
+        $cycleService = app(\App\Services\AcademicCycleService::class);
+        $cycle = $cycleService->resolveCycle($enrollment);
+        $periodService = app(\App\Services\AssessmentPeriodService::class);
+        $latest = $periodService->latestOfficialStage((int) $institutionId, (int) $currentSession->id, $cycle);
 
-        // --- 3. URL GENERATION ---
-        // Generates the exact same PDF view used in the web dashboard, ensuring perfect symmetry.
-        $downloadUrl = URL::signedRoute('reports.bulletin.signed', [
-            'student_id' => $student->id,
-            'mode' => 'single',
-            'report_scope' => 'trimester',
-            'trimester' => 1
-        ], expiration: now()->addMinutes(30));
+        if (! $latest) {
+            return $this->sendError(__('chatbot.no_results_found'), 200);
+        }
+
+        $access = app(\App\Services\ReportCardAccessService::class)
+            ->check($student, (int) $institutionId, $latest['key']);
+        if (! $access['allowed']) {
+            return $this->sendError($access['message_en'] ?: __('chatbot.financial_restriction_msg', ['amount' => '']), 200);
+        }
+
+        $downloadUrl = URL::signedRoute('reports.bulletin.signed', array_merge(
+            ['student_id' => $student->id],
+            $latest['params']
+        ), expiration: now()->addMinutes(30));
 
         return $this->sendResponse([
             'file_url' => $downloadUrl,

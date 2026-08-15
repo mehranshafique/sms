@@ -53,8 +53,19 @@ class ExamMarkController extends BaseController
             if (!empty($activePeriods)) {
                 $examsQuery->whereIn('category', $activePeriods);
             }
-            // FIXED: Removed the `else { $examsQuery->whereRaw('1 = 0'); }` 
-            // so teachers can see ongoing exams even if 'active_periods' is not configured in settings.
+
+            $sessionId = app(\App\Services\AssessmentPeriodService::class)->currentSessionId((int) $institutionId);
+            if ($sessionId) {
+                $periodService = app(\App\Services\AssessmentPeriodService::class);
+                $examsQuery->where(function ($q) use ($periodService, $institutionId, $sessionId) {
+                    $q->whereNull('category');
+                    foreach (\App\Services\AssessmentPeriodService::PERIOD_KEYS as $key) {
+                        if ($periodService->allowsMarksEntry((int) $institutionId, (int) $sessionId, $key)) {
+                            $q->orWhere('category', $key);
+                        }
+                    }
+                });
+            }
         }
 
         $exams = $examsQuery->pluck('name', 'id');
@@ -397,6 +408,18 @@ class ExamMarkController extends BaseController
              return response()->json(['message' => __('exam.messages.exam_finalized_error')], 403);
         }
 
+        if (! $isAdmin && $exam->category) {
+            $sessionId = $exam->academic_session_id
+                ?: app(\App\Services\AssessmentPeriodService::class)->currentSessionId((int) $exam->institution_id);
+            if ($sessionId && ! app(\App\Services\AssessmentPeriodService::class)->allowsMarksEntry(
+                (int) $exam->institution_id,
+                (int) $sessionId,
+                (string) $exam->category
+            )) {
+                return response()->json(['message' => __('marks.period_closed')], 403);
+            }
+        }
+
         // Determine Max Marks: Check Schedule First, then Subject
         $subject = Subject::findOrFail($request->subject_id);
         $maxMarks = $subject->total_marks ?? 100;
@@ -533,13 +556,23 @@ class ExamMarkController extends BaseController
 
         $studentId = $user->student->id ?? null;
         $institutionId = session('active_institution_id') ?? $user->institute_id;
-
-        // Block student directly before rendering their index
-        $this->checkFinancialClearance($studentId, $institutionId, true);
         $student = $user->student;
         if (!$student) abort(404);
 
+        $periodKey = null;
         $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+        if ($enrollment) {
+            $cycle = app(\App\Services\AcademicCycleService::class)->resolveCycle($enrollment);
+            $latest = app(\App\Services\AssessmentPeriodService::class)->latestOfficialStage(
+                (int) $institutionId,
+                (int) $enrollment->academic_session_id,
+                $cycle
+            );
+            $periodKey = $latest['key'] ?? null;
+        }
+
+        $this->checkFinancialClearance($studentId, $institutionId, true, $periodKey);
+
         if (!$enrollment) {
             return view('marks.my_marks', ['error' => __('marks.messages.not_enrolled')]);
         }

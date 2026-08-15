@@ -77,11 +77,21 @@ class InstitutionSetting extends Model
 
     /**
      * Check if a specific period is open for marks entry.
-     * Periods are stored as a JSON array in 'active_periods'.
+     * Official close state wins: closed stages cannot receive marks.
      */
     public static function isPeriodOpen($institutionId, $periodKey)
     {
+        $sessionId = \App\Models\AcademicSession::where('institution_id', $institutionId)
+            ->where('is_current', true)
+            ->value('id');
+
+        if ($sessionId) {
+            return app(\App\Services\AssessmentPeriodService::class)
+                ->allowsMarksEntry((int) $institutionId, (int) $sessionId, (string) $periodKey);
+        }
+
         $activePeriods = json_decode(self::get($institutionId, 'active_periods', '[]'), true);
-        return in_array($periodKey, $activePeriods);
+
+        return is_array($activePeriods) && in_array($periodKey, $activePeriods, true);
     }
 }

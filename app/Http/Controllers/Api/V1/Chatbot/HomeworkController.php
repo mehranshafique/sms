@@ -42,6 +42,7 @@ class HomeworkController extends ChatbotBaseController
 
         // 3. Fetch Latest Assignment
         $assignment = Assignment::with('subject')
+            ->published()
             ->where('institution_id', $institutionId)
             ->where('class_section_id', $enrollment->class_section_id)
             ->where('deadline', '>=', now()->subDays(7)) // Only show recent relevant homework

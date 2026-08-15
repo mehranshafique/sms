@@ -2433,14 +2433,6 @@ class ChatbotLogicService
             $currentSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
             if (!$currentSession) return $this->reply($session->phone_number, ($isEn ? "No active session." : "Aucune session active.") . $this->getReturnPrompt($session), $institutionId);
 
-            $hasMarks = ExamRecord::where('student_id', $student->id)
-                ->whereHas('exam', fn($q) => $q->where('academic_session_id', $currentSession->id))->exists();
-
-            if (!$hasMarks) {
-                $msg = $isEn ? "📭 No exam results are available for this session yet." : "📭 Aucun résultat n'est encore disponible pour cette session.";
-                return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
-            }
-
             $cycleService = app(\App\Services\AcademicCycleService::class);
             $cycle = $cycleService->resolveCycle($enrollment);
 
@@ -2451,80 +2443,18 @@ class ChatbotLogicService
                 return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
             }
 
-            $activePeriods = json_decode(InstitutionSetting::get($institutionId, 'active_periods', '[]'), true) ?? [];
-            $allowedPeriodKeys = $cycleService->allowedPeriodKeys($cycle);
-            $reportParams = ['student_id' => $student->id];
+            $periodService = app(\App\Services\AssessmentPeriodService::class);
+            $latest = $periodService->latestOfficialStage((int) $institutionId, (int) $currentSession->id, $cycle);
 
-            // Latest active period key (p6→p1) among allowed cycle periods
-            $chosenPeriod = null;
-            foreach (['p6', 'p5', 'p4', 'p3', 'p2', 'p1'] as $pk) {
-                if (!in_array($pk, $allowedPeriodKeys, true)) {
-                    continue;
-                }
-                if (empty($activePeriods) && $pk === 'p1') {
-                    $chosenPeriod = 'p1';
-                    break;
-                }
-                if (!empty($activePeriods) && in_array($pk, $activePeriods, true)) {
-                    $chosenPeriod = $pk;
-                    break;
-                }
+            if (! $latest) {
+                $msg = $isEn
+                    ? '📭 No official report card is available yet. The school has not closed an assessment stage.'
+                    : '📭 Aucun bulletin officiel n\'est encore disponible. L\'école n\'a pas clôturé de période.';
+                return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $institutionId);
             }
 
-            $hasActiveTermExam = false;
-            $termKey = null;
-            if ($cycleService->usesTrimesterModel($cycle)) {
-                foreach ([3, 2, 1] as $t) {
-                    if (in_array('trimester_' . $t, $activePeriods, true) || in_array("trimester_exam_{$t}", $activePeriods, true)) {
-                        $hasActiveTermExam = true;
-                        $termKey = in_array("trimester_exam_{$t}", $activePeriods, true) ? "trimester_exam_{$t}" : 'trimester_' . $t;
-                        break;
-                    }
-                }
-            } else {
-                foreach ([2, 1] as $s) {
-                    if (in_array('semester_' . $s, $activePeriods, true) || in_array("semester_exam_{$s}", $activePeriods, true)) {
-                        $hasActiveTermExam = true;
-                        $termKey = in_array("semester_exam_{$s}", $activePeriods, true) ? "semester_exam_{$s}" : 'semester_' . $s;
-                        break;
-                    }
-                }
-            }
-
-            // Prefer period bulletin (score + max). Term/exam format only when no period is active.
-            if ($chosenPeriod) {
-                $reportParams['type'] = 'period';
-                $reportParams['period'] = $chosenPeriod;
-            } elseif ($hasActiveTermExam) {
-                $reportParams['type'] = 'term';
-                if ($cycleService->usesTrimesterModel($cycle)) {
-                    $trimester = 1;
-                    foreach ([3, 2, 1] as $t) {
-                        if (in_array('trimester_' . $t, $activePeriods, true) || in_array("trimester_exam_{$t}", $activePeriods, true)) {
-                            $trimester = $t;
-                            break;
-                        }
-                    }
-                    $reportParams['trimester'] = $trimester;
-                } else {
-                    $semester = 1;
-                    foreach ([2, 1] as $s) {
-                        if (in_array('semester_' . $s, $activePeriods, true) || in_array("semester_exam_{$s}", $activePeriods, true)) {
-                            $semester = $s;
-                            break;
-                        }
-                    }
-                    $reportParams['semester'] = $semester;
-                }
-            } else {
-                $reportParams['type'] = 'period';
-                $reportParams['period'] = $allowedPeriodKeys[0] ?? 'p1';
-                $chosenPeriod = $reportParams['period'];
-            }
-
-            $accessPeriodKey = $chosenPeriod
-                ?? $termKey
-                ?? ($reportParams['period'] ?? null);
+            $reportParams = array_merge(['student_id' => $student->id], $latest['params']);
+            $accessPeriodKey = $latest['key'];
 
             $access = app(\App\Services\ReportCardAccessService::class)
                 ->check($student, (int) $institutionId, $accessPeriodKey);
@@ -2593,7 +2523,9 @@ class ChatbotLogicService
             Storage::disk('public')->put($path, $pdfContent);
             
             $downloadUrl = asset('storage/' . $path);
-            $caption = $isEn ? "Here is your report card." : "Voici votre bulletin de notes.";
+            $caption = $isEn
+                ? ('Here is the official report card (' . $latest['label'] . ').')
+                : ('Voici le bulletin officiel (' . $latest['label'] . ').');
             
             return $this->replyWithFile($session->phone_number, $downloadUrl, $caption . $this->getReturnPrompt($session), $filename, $institutionId);
 
@@ -2611,7 +2543,7 @@ class ChatbotLogicService
         $enrollment = $student->enrollments()->latest()->first();
         if (!$enrollment) return $this->reply($session->phone_number, ($isEn ? "Not enrolled." : "Non inscrit.") . $this->getReturnPrompt($session), $session->institution_id);
         
-        $hw = Assignment::where('class_section_id', $enrollment->class_section_id)->where('deadline', '>=', now())->latest()->take(3)->get();
+        $hw = Assignment::published()->where('class_section_id', $enrollment->class_section_id)->where('deadline', '>=', now())->latest()->take(3)->get();
         if($hw->isEmpty()) {
             $msg = $isEn ? "No homework found." : "Aucun devoir trouvé.";
             return $this->reply($session->phone_number, $msg . $this->getReturnPrompt($session), $session->institution_id);

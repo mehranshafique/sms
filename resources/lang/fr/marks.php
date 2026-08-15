@@ -10,6 +10,7 @@ return [
         'exceeds_max' => 'La note pour l\'ID élève :id dépasse la limite maximale de :max.',
         'not_enrolled' => 'Vous n\'êtes inscrit dans aucune classe active.',
     ],
+    'period_closed' => 'Cette étape d\'évaluation est clôturée. Les notes ne peuvent être saisies que lorsqu\'elle est ouverte ou rouverte.',
     'enter_marks' => 'Saisir les notes',
     'manage_subtitle' => 'Saisir les notes des élèves par matière',
     

@@ -34,9 +34,18 @@ class ResultCardController extends BaseController
         if ($this->activeRoles()->userActsAs($user, 'Student')) {
             $studentId = $user->student->id ?? null;
             $institutionId = session('active_institution_id') ?? $user->institute_id;
-            
-            // Block student directly before rendering their index
-            $this->checkFinancialClearance($studentId, $institutionId, true);
+            $periodKey = null;
+            $enrollment = $user->student?->enrollments()->where('status', 'active')->latest()->first();
+            if ($enrollment) {
+                $cycle = app(\App\Services\AcademicCycleService::class)->resolveCycle($enrollment);
+                $latest = app(\App\Services\AssessmentPeriodService::class)->latestOfficialStage(
+                    (int) $institutionId,
+                    (int) $enrollment->academic_session_id,
+                    $cycle
+                );
+                $periodKey = $latest['key'] ?? null;
+            }
+            $this->checkFinancialClearance($studentId, $institutionId, true, $periodKey);
 
             return $this->studentIndex($user);
         }

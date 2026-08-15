@@ -140,6 +140,16 @@ class Student extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function medicalProfile()
+    {
+        return $this->hasOne(StudentMedicalProfile::class);
+    }
+
+    public function infirmaryVisits()
+    {
+        return $this->hasMany(InfirmaryVisit::class);
+    }
+
     // --- Accessors ---
 
     public function getFullNameAttribute()

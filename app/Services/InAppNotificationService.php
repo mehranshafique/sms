@@ -41,6 +41,7 @@ class InAppNotificationService
         'payment_proof_submitted' => 'payment_proof_submitted',
         'payment_proof_rejected' => 'payment_proof_rejected',
         'ptm' => 'ptm_created',
+        'homework' => 'homework_published',
     ];
 
     private const ADMIN_ROLES = [

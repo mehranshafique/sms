@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AcademicSession;
+use App\Models\Institution;
 use App\Models\InstitutionSetting;
 use App\Services\ApplicationGradeService;
+use App\Services\AssessmentPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -54,6 +57,26 @@ class SettingsController extends BaseController
         $reportSealImage = $settings['report_seal_image'] ?? null;
         $resitPassPercentage = $settings['resit_pass_percentage'] ?? 50;
 
+        $institution = Institution::find($institutionId);
+        $academicSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        $periodStates = [];
+        $termCloseStatus = [];
+        if ($academicSession) {
+            $periodService = app(AssessmentPeriodService::class);
+            $periodStates = $periodService->dashboardRows(
+                (int) $institutionId,
+                (int) $academicSession->id,
+                $institution->type ?? null
+            );
+            foreach (['trimester_1', 'trimester_2', 'trimester_3', 'semester_1', 'semester_2'] as $termKey) {
+                $termCloseStatus[$termKey] = $periodService->termClosed(
+                    (int) $institutionId,
+                    (int) $academicSession->id,
+                    $termKey
+                );
+            }
+        }
+
         return view('settings.index', compact(
             'attendanceLocked',
             'attendanceGracePeriod',
@@ -68,7 +91,10 @@ class SettingsController extends BaseController
             'reportMinPaidAmounts',
             'reportSealPosition',
             'reportSealImage',
-            'resitPassPercentage'
+            'resitPassPercentage',
+            'periodStates',
+            'termCloseStatus',
+            'academicSession'
         ));
     }
 

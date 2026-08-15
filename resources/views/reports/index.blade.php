@@ -99,6 +99,11 @@
                                         <option value="p4">{{ __('reports.period') }} 4</option>
                                         <option value="p5" class="period-primary-only">{{ __('reports.period') }} 5</option>
                                         <option value="p6" class="period-primary-only">{{ __('reports.period') }} 6</option>
+                                        <option value="trimester_exam_1">{{ __('reports.exam_stage_trimester', ['n' => 1]) }}</option>
+                                        <option value="trimester_exam_2">{{ __('reports.exam_stage_trimester', ['n' => 2]) }}</option>
+                                        <option value="trimester_exam_3">{{ __('reports.exam_stage_trimester', ['n' => 3]) }}</option>
+                                        <option value="semester_exam_1">{{ __('reports.exam_stage_semester', ['n' => 1]) }}</option>
+                                        <option value="semester_exam_2">{{ __('reports.exam_stage_semester', ['n' => 2]) }}</option>
                                     </select>
                                 </div>
 
@@ -195,6 +200,8 @@
         const noEnrollmentMsg = @json(__('reports.no_enrollment'));
         const defaultScopeHint = @json(__('reports.scope_cycle_hint'));
         const infoMessages = [noRecordsMsg, noStudentsMsg, noEnrollmentMsg];
+        let latestOfficialStage = null;
+        let lastScopePayload = null;
 
         const scopesByCycle = {
             primary: ['period', 'trimester'],
@@ -341,16 +348,59 @@
             if (!payload || !reportScope) {
                 return;
             }
+            lastScopePayload = payload;
+            latestOfficialStage = payload.latest_official || null;
             const allowed = payload.scopes || [];
-            const allowedPeriods = payload.periods || [];
             const previousScope = reportScope.value;
 
             rebuildOptions(reportScope, reportScopeOptionsHtml, allowed);
-            rebuildOptions(
-                periodSelect,
-                periodOptionsHtml,
-                allowedPeriods.length ? allowedPeriods : null
-            );
+
+            if (payload.period_stages && payload.period_stages.length) {
+                const keep = periodSelect.value;
+                periodSelect.innerHTML = '';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '-- ' + @json(__('reports.select_period')) + ' --';
+                periodSelect.appendChild(placeholder);
+                payload.period_stages.forEach(function (stage) {
+                    const opt = document.createElement('option');
+                    opt.value = stage.key;
+                    opt.textContent = stage.status === 'reopened'
+                        ? @json(__('reports.reopened_option')).replace(':label', stage.label)
+                        : stage.label;
+                    opt.disabled = !stage.selectable;
+                    periodSelect.appendChild(opt);
+                });
+                if (keep && Array.from(periodSelect.options).some(function (o) { return o.value === keep && !o.disabled; })) {
+                    periodSelect.value = keep;
+                }
+            } else {
+                const allowedPeriods = payload.periods || [];
+                rebuildOptions(
+                    periodSelect,
+                    periodOptionsHtml,
+                    allowedPeriods.length ? allowedPeriods : null
+                );
+            }
+
+            if (payload.term_stages && payload.term_stages.length) {
+                const isTrimester = (payload.cycle === 'primary');
+                const termSelect = isTrimester ? trimesterSelect : semesterSelect;
+                if (termSelect) {
+                    Array.from(termSelect.options).forEach(function (opt) {
+                        if (!opt.value) return;
+                        const meta = payload.term_stages.find(function (t) { return String(t.number) === String(opt.value); });
+                        if (meta) {
+                            opt.disabled = !meta.selectable;
+                            opt.textContent = meta.selectable
+                                ? (meta.reopened
+                                    ? @json(__('reports.reopened_option')).replace(':label', meta.label)
+                                    : meta.label)
+                                : (meta.label + ' — ' + @json(__('reports.stage_not_available')).split('.')[0]);
+                        }
+                    });
+                }
+            }
 
             if (previousScope && allowed.indexOf(previousScope) === -1) {
                 setPickerVal(reportScope, '');
@@ -361,6 +411,8 @@
 
             refreshPicker(reportScope);
             refreshPicker(periodSelect);
+            refreshPicker(trimesterSelect);
+            refreshPicker(semesterSelect);
         }
 
         function applyCycleLocally(cycle) {
@@ -520,6 +572,26 @@
             radio.addEventListener('change', toggleMode);
         });
 
+        function applyLatestStage(latest) {
+            const params = latest.params || {};
+            if (params.period) {
+                setPickerVal(reportScope, 'period');
+                onScopeChange();
+                setPickerVal(periodSelect, params.period);
+            } else if (params.trimester) {
+                setPickerVal(reportScope, 'trimester');
+                onScopeChange();
+                setPickerVal(trimesterSelect, String(params.trimester));
+            } else if (params.semester) {
+                setPickerVal(reportScope, 'semester');
+                onScopeChange();
+                setPickerVal(semesterSelect, String(params.semester));
+            }
+            if (bulletinForm) {
+                HTMLFormElement.prototype.submit.call(bulletinForm);
+            }
+        }
+
         function isInfoFeedback(data) {
             if (!data) {
                 return false;
@@ -559,12 +631,24 @@
             }
 
             if (isInfoFeedback(data)) {
-                Swal.fire({
+                const latest = data.latest_official || latestOfficialStage;
+                const swalOpts = {
                     icon: 'info',
                     title: @json(__('reports.no_results_title')),
                     text: message,
                     confirmButtonColor: '#3085d6'
-                }).then(afterClose);
+                };
+                if (latest && latest.params) {
+                    swalOpts.showCancelButton = true;
+                    swalOpts.confirmButtonText = @json(__('reports.open_latest_stage')).replace(':stage', latest.label);
+                    swalOpts.cancelButtonText = @json(__('reports.select_scope'));
+                }
+                Swal.fire(swalOpts).then(function (result) {
+                    afterClose();
+                    if (result.isConfirmed && latest && latest.params) {
+                        applyLatestStage(latest);
+                    }
+                });
                 return;
             }
 

@@ -700,24 +700,33 @@ class AttendanceApiController extends Controller
 
         $institutionId = $student->institution_id;
         $admNo = $student->admission_number ?? 'N/A';
-        
-        $isBlocked = InstitutionSetting::get($institutionId, 'block_reports_on_debt', 0);
-        if ($isBlocked) {
-            $unpaid = Invoice::where('student_id', $student->id)->whereIn('status', ['unpaid', 'partial', 'overdue'])->sum(DB::raw('total_amount - paid_amount'));
-            if ($unpaid > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Financial Block: Outstanding balance of ' . $this->currencyService->format($unpaid, $institutionId),
-                    'data' => [
-                        'student_name' => $student->full_name . ' (' . $admNo . ')',
-                        'color' => '#dc2626',
-                        'currency_settings' => $this->currencyService->apiPayload($institutionId),
-                    ]
-                ], 200);
-            }
-        }
 
         $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
+        $periodKey = null;
+        $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+        if ($session && $enrollment) {
+            $cycle = app(\App\Services\AcademicCycleService::class)->resolveCycle($enrollment);
+            $latest = app(\App\Services\AssessmentPeriodService::class)->latestOfficialStage(
+                (int) $institutionId,
+                (int) $session->id,
+                $cycle
+            );
+            $periodKey = $latest['key'] ?? null;
+        }
+
+        $access = app(\App\Services\ReportCardAccessService::class)
+            ->check($student, (int) $institutionId, $periodKey);
+        if (! $access['allowed']) {
+            return response()->json([
+                'success' => false,
+                'message' => $access['message_en'] ?: ('Financial Block: Outstanding balance of ' . $this->currencyService->format($access['outstanding'], $institutionId)),
+                'data' => [
+                    'student_name' => $student->full_name . ' (' . $admNo . ')',
+                    'color' => '#dc2626',
+                    'currency_settings' => $this->currencyService->apiPayload($institutionId),
+                ]
+            ], 200);
+        }
         
         $records = ExamRecord::with(['subject', 'exam.academicSession'])
             ->where('student_id', $student->id)

@@ -479,7 +479,7 @@ class InvoiceController extends BaseController
             abort(403);
         }
 
-        $invoice->load(['student', 'items', 'academicSession', 'institution', 'payments.receivedBy']);
+        $invoice->load(['student', 'items', 'academicSession', 'institution', 'payments.receivedBy', 'payments.allocations']);
 
         $paymentMethodService = app(\App\Services\PaymentMethodService::class);
         $onlinePayEnabled = $paymentMethodService->isOnlineEnabled($invoice->institution_id);

@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\StudentDebt;
 use App\Services\Finance\AnnualFeeCalculator;
+use App\Services\Finance\FeeAllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Student;
@@ -21,7 +22,7 @@ class FinancialReportController extends BaseController
         protected AnnualFeeCalculator $annualFeeCalculator
     ) {
         $this->middleware('auth');
-        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index']);
+        $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index', 'components']);
         $this->setPageTitle(__('finance.class_financial_report'));
     }
 
@@ -121,5 +122,46 @@ class FinancialReportController extends BaseController
         }
 
         return view('finance.reports.class_summary', compact('classes', 'reportData', 'totals'));
+    }
+
+    /**
+     * Per-component collection report for schools using proportional fee allocation.
+     */
+    public function components(Request $request, FeeAllocationService $allocations)
+    {
+        $institutionId = $this->getInstitutionId();
+
+        if (! $institutionId) {
+            return redirect()->route('dashboard')->with('error', __('payment_methods.select_institution'));
+        }
+
+        $this->setPageTitle(__('finance.component_report_title'));
+
+        $classes = ClassSection::where('institution_id', $institutionId)
+            ->with('gradeLevel')
+            ->get()
+            ->mapWithKeys(fn ($item) => [$item->id => class_section_label($item)]);
+
+        $currentSession = AcademicSession::where('institution_id', $institutionId)
+            ->where('is_current', true)
+            ->first();
+
+        $filters = [
+            'academic_session_id' => $currentSession->id ?? null,
+            'class_section_id' => $request->filled('class_section_id') ? (int) $request->class_section_id : null,
+        ];
+
+        $rows = $allocations->componentSummary($institutionId, $filters);
+        $otherCollected = $allocations->collectedOutsideComponents($institutionId, $filters);
+
+        $totals = [
+            'expected' => array_sum(array_column($rows, 'expected')),
+            'collected' => array_sum(array_column($rows, 'collected')),
+            'outstanding' => array_sum(array_column($rows, 'outstanding')),
+        ];
+
+        $enabled = $allocations->isEnabledFor($institutionId);
+
+        return view('finance.reports.fee_components', compact('classes', 'rows', 'totals', 'otherCollected', 'enabled', 'currentSession'));
     }
 }

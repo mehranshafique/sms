@@ -141,7 +141,11 @@ class AcademicCycleService
         }
 
         if ($type === 'period') {
-            if (!$period || !in_array($period, $this->allowedPeriodKeys($cycle), true)) {
+            $allowed = array_merge(
+                $this->allowedPeriodKeys($cycle),
+                array_values(array_diff($this->examCategoriesForCycle($cycle), $this->allowedPeriodKeys($cycle)))
+            );
+            if (!$period || !in_array($period, $allowed, true)) {
                 return __('reports.error_invalid_period_for_cycle');
             }
 

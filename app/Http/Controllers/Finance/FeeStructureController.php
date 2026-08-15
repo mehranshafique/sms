@@ -8,6 +8,8 @@ use App\Models\FeeType;
 use App\Models\GradeLevel;
 use App\Models\ClassSection;
 use App\Models\AcademicSession;
+use App\Models\FeeComponent;
+use App\Services\Finance\FeeAllocationService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 
 class FeeStructureController extends BaseController
 {
-    public function __construct()
+    public function __construct(protected FeeAllocationService $feeAllocationService)
     {
         $this->middleware(PermissionMiddleware::class . ':fee_structure.view')->only(['index']);
         $this->middleware(PermissionMiddleware::class . ':fee_structure.create')->only(['create', 'store']);
@@ -115,8 +117,9 @@ class FeeStructureController extends BaseController
             $sessionQuery->where('institution_id', $institutionId);
         }
         $session = $sessionQuery->first();
+        $proportionalEnabled = $this->feeAllocationService->isEnabledFor($institutionId);
 
-        return view('finance.fees.create', compact('feeTypes', 'gradeLevels', 'session'));
+        return view('finance.fees.create', compact('feeTypes', 'gradeLevels', 'session', 'proportionalEnabled'));
     }
 
     public function getClassSections(Request $request)
@@ -148,8 +151,16 @@ class FeeStructureController extends BaseController
             'grade_level_id' => 'nullable|exists:grade_levels,id',
             'class_section_id' => 'nullable|exists:class_sections,id',
             'payment_mode' => 'required|in:global,installment',
-            'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
+            'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1',
+            'allocation_mode' => 'nullable|in:none,proportional',
+            'components' => 'nullable|array',
         ]);
+
+        $breakdown = $this->normalizeComponents($request, (float) $request->amount);
+
+        if ($breakdown['error']) {
+            return response()->json(['message' => $breakdown['error']], 422);
+        }
 
         if(!$institutionId) {
              $feeType = FeeType::find($request->fee_type_id);
@@ -229,7 +240,7 @@ class FeeStructureController extends BaseController
             }
         }
 
-        FeeStructure::create([
+        $feeStructure = FeeStructure::create([
             'institution_id' => $institutionId,
             'academic_session_id' => $session->id,
             'name' => $request->name,
@@ -240,7 +251,10 @@ class FeeStructureController extends BaseController
             'class_section_id' => $request->class_section_id,
             'payment_mode' => $request->payment_mode,
             'installment_order' => $request->installment_order,
+            'allocation_mode' => $breakdown['mode'],
         ]);
+
+        $this->syncComponents($feeStructure, $breakdown['components']);
 
         return response()->json(['message' => __('finance.success_create'), 'redirect' => route('fees.index')]);
     }
@@ -266,7 +280,10 @@ class FeeStructureController extends BaseController
                                          ->pluck('name', 'id');
         }
 
-        return view('finance.fees.edit', compact('feeStructure', 'feeTypes', 'gradeLevels', 'classSections'));
+        $feeStructure->load('components');
+        $proportionalEnabled = $this->feeAllocationService->isEnabledFor($targetId);
+
+        return view('finance.fees.edit', compact('feeStructure', 'feeTypes', 'gradeLevels', 'classSections', 'proportionalEnabled'));
     }
 
     public function update(Request $request, $id)
@@ -286,8 +303,16 @@ class FeeStructureController extends BaseController
             'grade_level_id' => 'nullable|exists:grade_levels,id',
             'class_section_id' => 'nullable|exists:class_sections,id',
             'payment_mode' => 'required|in:global,installment',
-            'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1'
+            'installment_order' => 'nullable|required_if:payment_mode,installment|integer|min:1',
+            'allocation_mode' => 'nullable|in:none,proportional',
+            'components' => 'nullable|array',
         ]);
+
+        $breakdown = $this->normalizeComponents($request, (float) $request->amount);
+
+        if ($breakdown['error']) {
+            return response()->json(['message' => $breakdown['error']], 422);
+        }
 
         $session = AcademicSession::where('institution_id', $feeStructure->institution_id)->where('is_current', true)->first();
 
@@ -354,7 +379,10 @@ class FeeStructureController extends BaseController
             'class_section_id' => $request->class_section_id,
             'payment_mode' => $request->payment_mode,
             'installment_order' => $request->installment_order,
+            'allocation_mode' => $breakdown['mode'],
         ]);
+
+        $this->syncComponents($feeStructure, $breakdown['components']);
 
         return response()->json(['message' => __('finance.success_update'), 'redirect' => route('fees.index')]);
     }
@@ -385,5 +413,90 @@ class FeeStructureController extends BaseController
 
         $feeStructure->delete();
         return response()->json(['message' => __('finance.success_delete')]);
+    }
+
+    /**
+     * Validate the optional proportional breakdown submitted with a fee.
+     *
+     * @return array{mode: string, components: array<int, array{id: ?int, name: string, amount: float}>, error: ?string}
+     */
+    private function normalizeComponents(Request $request, float $feeAmount): array
+    {
+        $result = ['mode' => 'none', 'components' => [], 'error' => null];
+
+        if ($request->input('allocation_mode') !== 'proportional') {
+            return $result;
+        }
+
+        $components = collect($request->input('components', []))
+            ->map(fn ($row) => [
+                'id' => isset($row['id']) && $row['id'] !== '' ? (int) $row['id'] : null,
+                'name' => trim((string) ($row['name'] ?? '')),
+                'amount' => round((float) ($row['amount'] ?? 0), 2),
+            ])
+            ->reject(fn ($row) => $row['name'] === '' && $row['amount'] <= 0)
+            ->values();
+
+        if ($components->count() < FeeAllocationService::MIN_COMPONENTS) {
+            $result['error'] = __('finance.components_min', ['count' => FeeAllocationService::MIN_COMPONENTS]);
+
+            return $result;
+        }
+
+        foreach ($components as $component) {
+            if ($component['name'] === '' || $component['amount'] <= 0) {
+                $result['error'] = __('finance.components_incomplete');
+
+                return $result;
+            }
+        }
+
+        $sum = round($components->sum('amount'), 2);
+
+        if (abs($sum - round($feeAmount, 2)) > 0.01) {
+            $result['error'] = __('finance.components_sum_mismatch', [
+                'total' => number_format($sum, 2),
+                'amount' => number_format($feeAmount, 2),
+            ]);
+
+            return $result;
+        }
+
+        $result['mode'] = 'proportional';
+        $result['components'] = $components->all();
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int, array{id: ?int, name: string, amount: float}>  $components
+     */
+    private function syncComponents(FeeStructure $feeStructure, array $components): void
+    {
+        $kept = [];
+
+        foreach ($components as $order => $row) {
+            $attributes = [
+                'institution_id' => $feeStructure->institution_id,
+                'name' => $row['name'],
+                'amount' => $row['amount'],
+                'sort_order' => $order,
+            ];
+
+            $existing = $row['id']
+                ? FeeComponent::where('fee_structure_id', $feeStructure->id)->find($row['id'])
+                : null;
+
+            if ($existing) {
+                $existing->update($attributes);
+                $kept[] = $existing->id;
+
+                continue;
+            }
+
+            $kept[] = $feeStructure->components()->create($attributes)->id;
+        }
+
+        $feeStructure->components()->whereNotIn('fee_components.id', $kept)->delete();
     }
 }

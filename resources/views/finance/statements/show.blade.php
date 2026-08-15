@@ -46,6 +46,45 @@
             </div>
         </div>
 
+        @if(!empty($componentRows))
+            {{-- Proportional fee components --}}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header border-0 pb-0">
+                            <h4 class="card-title">{{ __('finance.component_breakdown') }}</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>{{ __('finance.component_name') }}</th>
+                                            <th class="text-end">{{ __('finance.share') }}</th>
+                                            <th class="text-end">{{ __('finance.expected') }}</th>
+                                            <th class="text-end">{{ __('finance.collected') }}</th>
+                                            <th class="text-end">{{ __('finance.outstanding') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($componentRows as $row)
+                                            <tr>
+                                                <td class="fw-bold">{{ $row['label'] }}</td>
+                                                <td class="text-end">{{ $row['share'] > 0 ? number_format($row['share'], 2) . '%' : '-' }}</td>
+                                                <td class="text-end">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($row['expected'], 2) }}</td>
+                                                <td class="text-end text-success">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($row['collected'], 2) }}</td>
+                                                <td class="text-end text-warning">{{ \App\Enums\CurrencySymbol::default() }} {{ number_format($row['outstanding'], 2) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Ledger Table --}}
         <div class="row">
             <div class="col-12">

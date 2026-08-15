@@ -32,6 +32,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Speech-to-text (voice IVR AI agent)
+    |--------------------------------------------------------------------------
+    | Uses the same OpenAI-compatible provider through /audio/transcriptions.
+    | Text-to-speech is handled by Infobip, so no TTS provider is needed here.
+    */
+    'stt_model'   => env('AI_STT_MODEL', 'whisper-1'),
+    'stt_timeout' => (int) env('AI_STT_TIMEOUT', 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | Default monthly request quota
     |--------------------------------------------------------------------------
     | Used when a plan enables AI but does not set its own limit. Enterprise

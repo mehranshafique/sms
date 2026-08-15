@@ -47,6 +47,7 @@ return [
         'title' => 'Tableau d\'affichage',
     ],
     'ptm' => 'PTM',
+    'voice_ivr' => 'Voix WhatsApp',
     'my_notices' => 'Mes annonces',
     'system_alerts' => 'Alertes système',
     'global_announcements' => 'Annonces globales',
@@ -67,6 +68,7 @@ return [
     'reminders' => 'Rappels',
     'requests' => 'Dérogation & Requête',
     'discipline' => 'Discipline',
+    'infirmary' => 'Infirmerie',
     'academics' => 'Académique',
     'sessions' => [
         'title' => 'Sessions'
@@ -191,6 +193,7 @@ return [
     'generate_payroll' => 'Générer la paie',
     'state_exams' => 'Examens d\'État (EXETAT)',
     'lmd_deliberations' => 'Délibérations LMD',
+    'secondary_deliberations' => 'Délibération secondaire',
     'transport' => 'Transport scolaire',
     'operations' => 'Opérations',
     'guardian_portal' => 'Portail tuteur',

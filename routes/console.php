@@ -13,3 +13,4 @@ Schedule::command('attendance:send-weekly-reports')->weeklyOn(5, '18:00');
 Schedule::command('attendance:send-monthly-reports')->monthlyOn(1, '08:00');
 Schedule::command('derogations:process-compliance')->dailyAt('07:30');
 Schedule::command('school-backups:run-scheduled')->hourly();
+Schedule::command('assessment-periods:auto-close')->everyTenMinutes();

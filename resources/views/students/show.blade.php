@@ -225,7 +225,14 @@
                                     <div class="col-sm-4 col-5">
                                         <h5 class="f-w-500">{{ __('student.blood_group') }} <span class="pull-right">:</span></h5>
                                     </div>
-                                    <div class="col-sm-8 col-7"><span>{{ $student->blood_group ?? 'N/A' }}</span></div>
+                                    <div class="col-sm-8 col-7">
+                                        <span>{{ $student->blood_group ?? 'N/A' }}</span>
+                                        @if(auth()->user()->can('medical_record.view'))
+                                            <a href="{{ route('medical-records.show', $student->id) }}" class="btn btn-outline-primary btn-xs ms-2">
+                                                <i class="fa fa-notes-medical me-1"></i>{{ __('medical.view_medical_record') }}
+                                            </a>
+                                        @endif
+                                    </div>
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-sm-4 col-5">

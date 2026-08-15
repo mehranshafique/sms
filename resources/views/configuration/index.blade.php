@@ -64,6 +64,9 @@
                             <a href="#notifications" data-bs-toggle="pill" class="nav-link"><i class="fa fa-bell me-2"></i> {{ __('configuration.notification_settings') }}</a>
                             <a href="#test_msg" data-bs-toggle="pill" class="nav-link"><i class="fa fa-paper-plane me-2"></i> {{ __('configuration.test_notifications') }}</a>
                             <a href="#school_year" data-bs-toggle="pill" class="nav-link"><i class="fa fa-calendar me-2"></i> {{ __('configuration.school_year') }}</a>
+                            @if($institutionId)
+                                <a href="#homework" data-bs-toggle="pill" class="nav-link"><i class="fa fa-book me-2"></i> {{ __('configuration.homework_settings') }}</a>
+                            @endif
                             @if(auth()->user()->can('currency.view') || auth()->user()->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                                 <a href="{{ route('currency.index') }}" class="nav-link {{ request()->routeIs('currency.*') ? 'active' : '' }}">
                                     <i class="fa fa-coins me-2"></i> {{ __('sidebar.currency') }}
@@ -336,6 +339,50 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- Homework approval --}}
+                    @if($institutionId)
+                    <div id="homework" class="tab-pane fade">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4 class="card-title">{{ __('configuration.homework_settings') }}</h4>
+                            </div>
+                            <div class="card-body">
+                                <form action="{{ route('configuration.homework.update') }}" method="POST" id="homeworkForm">
+                                    @csrf
+                                    <div class="form-check form-switch mb-3">
+                                        <input type="hidden" name="homework_approval_required" value="0">
+                                        <input class="form-check-input" type="checkbox" name="homework_approval_required" id="homeworkApprovalRequired" value="1"
+                                            {{ !empty($homework['required']) ? 'checked' : '' }}>
+                                        <label class="form-check-label fw-bold" for="homeworkApprovalRequired">
+                                            {{ __('configuration.homework_approval_required') }}
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mb-4">{{ __('configuration.homework_approval_help') }}</small>
+
+                                    <div id="homeworkApproverWrapper" class="{{ !empty($homework['required']) ? '' : 'd-none' }}">
+                                        <label class="form-label fw-bold">{{ __('configuration.homework_approver_roles') }}</label>
+                                        <div class="row">
+                                            @foreach($homework['available_roles'] as $role)
+                                                <div class="col-md-4 mb-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="homework_approver_roles[]"
+                                                            id="approver_{{ Str::slug($role) }}" value="{{ $role }}"
+                                                            {{ in_array($role, $homework['roles'] ?? [], true) ? 'checked' : '' }}>
+                                                        <label class="form-check-label" for="approver_{{ Str::slug($role) }}">{{ $role }}</label>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                        <small class="text-muted d-block mt-2">{{ __('configuration.homework_approver_roles_help') }}</small>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary mt-4 submit-btn">{{ __('configuration.save_changes') }}</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
 
                     {{-- Modules --}}
                     @if(auth()->user()->hasRole('Super Admin'))
@@ -612,6 +659,11 @@
         handleAjaxForm('#yearForm');
         handleAjaxForm('#modulesForm');
         handleAjaxForm('#rechargeForm');
+        handleAjaxForm('#homeworkForm');
+
+        $('#homeworkApprovalRequired').on('change', function () {
+            $('#homeworkApproverWrapper').toggleClass('d-none', !this.checked);
+        });
 
         $(document).on('click', '.reverse-recharge-btn', function() {
             const id = $(this).data('id');

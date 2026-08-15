@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\BaseController;
+use App\Services\Finance\FeeAllocationService;
 use App\Services\PaymentMethodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,7 +13,8 @@ class PaymentMethodController extends BaseController
 {
     public function __construct(
         protected PaymentMethodService $paymentMethodService,
-        protected \App\Services\PaymentGateways\PaymentGatewayConfigService $gatewayConfigService
+        protected \App\Services\PaymentGateways\PaymentGatewayConfigService $gatewayConfigService,
+        protected FeeAllocationService $feeAllocationService
     ) {
         $this->middleware('auth');
         $this->middleware(PermissionMiddleware::class . ':invoice.view')->only(['index']);
@@ -36,8 +38,9 @@ class PaymentMethodController extends BaseController
         $definitions = PaymentMethodService::DEFINITIONS;
         $gatewayConfig = $this->gatewayConfigService->getConfig($institutionId);
         $gatewayProviders = config('payment_gateways.providers', []);
+        $proportionalEnabled = $this->feeAllocationService->isEnabledFor($institutionId);
 
-        return view('finance.payment_methods.index', compact('config', 'definitions', 'institutionId', 'gatewayConfig', 'gatewayProviders'));
+        return view('finance.payment_methods.index', compact('config', 'definitions', 'institutionId', 'gatewayConfig', 'gatewayProviders', 'proportionalEnabled'));
     }
 
     public function update(Request $request)
@@ -60,6 +63,7 @@ class PaymentMethodController extends BaseController
             'environment' => 'nullable|string|in:sandbox,production',
             'manual_proof_enabled' => 'sometimes|boolean',
             'credentials' => 'nullable|array',
+            'proportional_allocation_enabled' => 'sometimes|boolean',
         ]);
 
         $input = $request->all();
@@ -68,6 +72,7 @@ class PaymentMethodController extends BaseController
 
         $this->paymentMethodService->saveConfig($institutionId, $input);
         $this->gatewayConfigService->saveConfig($institutionId, $input);
+        $this->feeAllocationService->setEnabled($institutionId, $request->boolean('proportional_allocation_enabled'));
 
         return response()->json(['message' => __('payment_methods.saved')]);
     }

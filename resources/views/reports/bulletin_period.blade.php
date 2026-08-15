@@ -20,15 +20,16 @@
 
     <!-- Container wrapper centers the beautiful Single Card view on the screen natively -->
     <div class="single-card-page">
-        <div class="student-column single-card-view">
+        <div class="student-column single-card-view cards-{{ $cards_per_page ?? 4 }}">
 @else
     <div class="student-column">
 @endif
 
     <div class="card-inner">
+    @include('reports.partials.bulletin_banners')
     @php
         $labels = $column_labels ?? [];
-        $subjectCount = collect($data)->where('has_marks', true)->count();
+        $subjectCount = count($data ?? []);
         $densityClass = $subjectCount > 16 ? 'density-high' : ($subjectCount > 12 ? 'density-medium' : 'density-low');
         $principalName = __('reports.direction');
         if (isset($student->institution_id)) {
@@ -86,22 +87,20 @@
                 @endphp
 
                 @foreach($data as $row)
-                    @if($row['has_marks'])
-                        @php
-                            $val = is_numeric($row['obtained']) ? (float)$row['obtained'] : '-';
-                            $max = $row['max'] ?? 0;
-                            
-                            $val_calc = is_numeric($val) ? $val : 0;
-                            $totalObtained += $val_calc;
-                            $totalMax += $max;
-                            $isFail = ($max > 0 && ($val_calc < ($max / 2) || ($max == 20 && $val_calc < 10)));
-                        @endphp
-                        <tr>
-                            <td class="left-align subject-name">{{ $row['subject']->name }}</td>
-                            <td class="{{ $isFail ? 'fail-grade' : '' }}">{{ $val }}</td>
-                            <td>{{ $max > 0 ? $max : '-' }}</td>
-                        </tr>
-                    @endif
+                    @php
+                        $val = is_numeric($row['obtained']) ? (float)$row['obtained'] : '-';
+                        $max = $row['max'] ?? 0;
+                        
+                        $val_calc = is_numeric($val) ? $val : 0;
+                        $totalObtained += $val_calc;
+                        $totalMax += $max;
+                        $isFail = is_numeric($row['obtained']) && $max > 0 && ($val_calc < ($max / 2) || ($max == 20 && $val_calc < 10));
+                    @endphp
+                    <tr>
+                        <td class="left-align subject-name">{{ $row['subject']->name }}</td>
+                        <td class="{{ $isFail ? 'fail-grade' : '' }}">{{ $val }}</td>
+                        <td>{{ $max > 0 ? $max : '-' }}</td>
+                    </tr>
                 @endforeach
             </tbody>
         </table>
@@ -136,11 +135,7 @@
             </div>
             <div class="summary-row">
                 <span class="label">{{ __('reports.place_eff') ?? 'PLACE - EFF' }}</span>
-                @php
-                    $secRank = $ranks['section_rank'] ?? '-';
-                    $secTotal = $ranks['section_total'] ?? '-';
-                @endphp
-                <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
+                <span class="val">{{ $ranks['place_eff'] ?? ((is_numeric($ranks['section_rank'] ?? null) ? ($ranks['section_rank'] . ' / ' . ($ranks['section_total'] ?? '')) : '-')) }}</span>
             </div>
         </div>
 

@@ -22,6 +22,7 @@ use App\Services\LmdCalculationService;
 use App\Services\GradeMentionService;
 use App\Services\AcademicCycleService;
 use App\Services\ApplicationGradeService;
+use App\Services\AssessmentPeriodService;
 use App\Services\StudentConductService;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,13 @@ class ReportController extends BaseController
 {
     protected $lmdService;
     protected AcademicCycleService $cycleService;
+    protected AssessmentPeriodService $periodService;
     
-    public function __construct(LmdCalculationService $lmdService, AcademicCycleService $cycleService)
+    public function __construct(
+        LmdCalculationService $lmdService,
+        AcademicCycleService $cycleService,
+        AssessmentPeriodService $periodService
+    )
     {
         $this->middleware('auth')->except(['bulletinSigned']);
         $this->middleware(function ($request, $next) {
@@ -42,6 +48,7 @@ class ReportController extends BaseController
         $this->setPageTitle(__('reports.page_title'));
         $this->lmdService = $lmdService;
         $this->cycleService = $cycleService;
+        $this->periodService = $periodService;
     }
 
     public function bulletinSigned(Request $request)
@@ -50,7 +57,8 @@ class ReportController extends BaseController
             'student_id' => 'required|exists:students,id',
             'trimester' => 'nullable|integer|in:1,2,3',
             'semester' => 'nullable|integer|in:1,2',
-            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6',
+            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6,trimester_exam_1,trimester_exam_2,trimester_exam_3,semester_exam_1,semester_exam_2',
+            'stage_key' => 'nullable|string',
             'type' => 'nullable|in:period,term',
         ]);
 
@@ -71,7 +79,7 @@ class ReportController extends BaseController
         ], $extra));
     }
 
-    public function checkFinancialClearance($studentId, $institutionId, $abort = true, ?string $periodKey = null)
+    public function checkFinancialClearance($studentId, $institutionId, $abort = true, ?string $periodKey = null, bool $enforcePayment = true)
     {
         if (!$studentId || !$institutionId) return true;
 
@@ -79,17 +87,17 @@ class ReportController extends BaseController
         if (!$student) return true;
 
         $result = app(\App\Services\ReportCardAccessService::class)
-            ->check($student, (int) $institutionId, $periodKey);
+            ->check($student, (int) $institutionId, $periodKey, $enforcePayment);
 
         if ($result['allowed']) {
-            return true;
+            return $result;
         }
 
         if ($abort) {
             abort(403, $result['message_en'] ?: (__('reports.financial_restriction_msg') ?? 'Access denied due to unpaid fees.'));
         }
 
-        return false;
+        return $result;
     }
 
     public function index()
@@ -127,6 +135,7 @@ class ReportController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         $cycle = AcademicType::PRIMARY->value;
+        $sessionId = $this->periodService->currentSessionId((int) $institutionId);
 
         if ($request->filled('student_id')) {
             $student = Student::with(['enrollments.classSection.gradeLevel'])
@@ -137,6 +146,7 @@ class ReportController extends BaseController
                 return $this->emptyReportJson(__('reports.no_enrollment'));
             }
             $cycle = $this->cycleService->resolveCycle($enrollment);
+            $sessionId = (int) $enrollment->academic_session_id;
         } elseif ($request->filled('class_section_id')) {
             $classSection = ClassSection::with('gradeLevel')
                 ->where('institution_id', $institutionId)
@@ -144,9 +154,17 @@ class ReportController extends BaseController
             $cycle = $this->cycleService->resolveCycle($classSection);
         }
 
+        if (! $sessionId) {
+            return $this->emptyReportJson(__('settings.no_current_session'));
+        }
+
         return response()->json([
             'status' => 'success',
-            'data' => $this->cycleService->scopeOptionsPayload($cycle),
+            'data' => $this->periodService->scopeOptions(
+                (int) $institutionId,
+                (int) $sessionId,
+                $cycle
+            ),
         ]);
     }
 
@@ -164,42 +182,18 @@ class ReportController extends BaseController
             'class_section_id' => 'nullable|required_without:student_id|exists:class_sections,id',
             'trimester' => 'nullable|integer|in:1,2,3',
             'semester' => 'nullable|integer|in:1,2',
-            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6', 
-            'type' => 'nullable|in:period,term', 
+            'period' => 'nullable|string|in:p1,p2,p3,p4,p5,p6,trimester_exam_1,trimester_exam_2,trimester_exam_3,semester_exam_1,semester_exam_2',
+            'stage_key' => 'nullable|string',
+            'type' => 'nullable|in:period,term',
         ]);
-
-        // Authoritative mode: period key alone → period bulletin; term keys → examination bulletin
-        if ($request->filled('period') && !$request->filled('trimester') && !$request->filled('semester')) {
-            $request->merge(['type' => 'period']);
-        } else {
-            $request->merge(['type' => 'term']);
-        }
-
-        if (!$skipRoleChecks && Auth::check() && !Auth::user()->hasRole('Super Admin')) {
-            $activePeriodsJson = InstitutionSetting::get($institutionId, 'active_periods', '[]');
-            $activePeriods = json_decode($activePeriodsJson, true) ?? [];
-            
-            $requestedPeriod = null;
-            if ($request->type === 'period') $requestedPeriod = $request->period;
-            elseif ($request->trimester) $requestedPeriod = 'trimester_' . $request->trimester;
-            elseif ($request->semester) $requestedPeriod = 'semester_' . $request->semester;
-
-            if (!empty($activePeriods) && $requestedPeriod && !in_array($requestedPeriod, $activePeriods)) {
-                 $msg = __('reports.error_period_inactive', ['period' => strtoupper($requestedPeriod)]);
-                 if ($request->ajax() || $request->check_only) return response()->json(['status' => 'error', 'message' => $msg]);
-                 return back()->with('error', $msg);
-            }
-        }
 
         $targetStudents = collect();
         $classSection = null;
+        $accessResult = null;
 
-        // Single student takes priority over class (form may retain stale class_section_id)
         if ($request->filled('student_id')) {
             $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
             if ($student->institution_id != $institutionId) abort(403);
-
-            $this->checkFinancialClearance($student->id, $institutionId, true, $request->input('period'));
 
             $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
             if (!$enrollment) {
@@ -220,7 +214,7 @@ class ReportController extends BaseController
                 ->where('class_section_id', $request->class_section_id)
                 ->where('status', 'active')
                 ->get();
-            
+
             if ($enrollments->isEmpty()) {
                 $msg = __('reports.no_students_in_class');
                 if ($request->ajax() || $request->check_only) {
@@ -228,7 +222,7 @@ class ReportController extends BaseController
                 }
                 return back()->with('info', $msg);
             }
-            
+
             $targetStudents = $enrollments;
         } else {
             $msg = __('reports.select_student');
@@ -240,6 +234,7 @@ class ReportController extends BaseController
 
         $referenceEnrollment = $targetStudents->first();
         $cycleValue = $this->cycleService->resolveCycle($referenceEnrollment);
+        $sessionId = (int) $referenceEnrollment->academic_session_id;
 
         if ($this->cycleService->isUniversityCycle($cycleValue)) {
             $msg = __('reports.error_university_use_transcript');
@@ -248,6 +243,23 @@ class ReportController extends BaseController
             }
             return back()->with('info', $msg);
         }
+
+        $stage = $this->periodService->resolveFromRequest($request, $cycleValue);
+        if (! $stage) {
+            $msg = __('reports.error_invalid_period_for_cycle');
+            if ($request->ajax() || $request->check_only) {
+                return response()->json(['status' => 'error', 'message' => $msg]);
+            }
+            return back()->with('error', $msg);
+        }
+
+        $request->merge(array_filter([
+            'type' => $stage['type'],
+            'period' => $stage['period'],
+            'trimester' => $stage['trimester'],
+            'semester' => $stage['semester'],
+            'stage_key' => $stage['key'],
+        ], fn ($v) => $v !== null && $v !== ''));
 
         $validationError = $this->cycleService->validateReportRequest(
             $cycleValue,
@@ -264,6 +276,37 @@ class ReportController extends BaseController
             return back()->with('error', $validationError);
         }
 
+        $isStaff = ! $skipRoleChecks;
+        $adminViewable = $this->periodService->isAdminViewable($institutionId, $sessionId, $stage['key']);
+        $official = $this->periodService->isOfficial($institutionId, $sessionId, $stage['key']);
+        $underRevision = $this->periodService->isReopened($institutionId, $sessionId, $stage['key']);
+        $latest = $this->periodService->latestOfficialStage($institutionId, $sessionId, $cycleValue);
+
+        if ($isStaff) {
+            if (! $adminViewable) {
+                return $this->stageUnavailableResponse($request, $stage, $latest);
+            }
+        } elseif (! $official) {
+            return $this->stageUnavailableResponse($request, $stage, $latest, $underRevision);
+        }
+
+        if ($request->filled('student_id')) {
+            $accessResult = $this->checkFinancialClearance(
+                $request->student_id,
+                $institutionId,
+                $skipRoleChecks,
+                $stage['key'],
+                $skipRoleChecks
+            );
+            if ($skipRoleChecks && is_array($accessResult) && empty($accessResult['allowed'])) {
+                $msg = $accessResult['message_en'] ?: __('reports.financial_restriction_msg');
+                if ($request->ajax() || $request->check_only) {
+                    return response()->json(['status' => 'error', 'message' => $msg]);
+                }
+                abort(403, $msg);
+            }
+        }
+
         $bulkData = [];
         $sealImage = InstitutionSetting::get($institutionId, 'report_seal_image', '');
         $settings = [
@@ -273,9 +316,11 @@ class ReportController extends BaseController
             'seal_image' => $sealImage ?: null,
         ];
 
-        $rankings = $this->calculateRankings($classSection, $request, $institutionId);
+        $rankings = $this->calculateRankings($classSection, $request, $institutionId, $stage);
         $applicationService = app(ApplicationGradeService::class);
         $conductService = app(StudentConductService::class);
+        $viewName = 'reports.bulletin_period';
+        $subjectCount = 0;
 
         foreach ($targetStudents as $enrollment) {
             $student = $enrollment->student;
@@ -285,79 +330,83 @@ class ReportController extends BaseController
                 continue;
             }
 
-            $reportData = null;
-            $viewName = '';
-            $termNumber = (int) ($request->trimester ?: $request->semester ?: 1);
+            $termNumber = (int) ($stage['trimester'] ?: $stage['semester'] ?: 1);
+            $isPeriodCard = $stage['type'] === 'period';
 
-            if ($this->cycleService->usesSemesterModel($studentCycle)) {
+            if ($isPeriodCard) {
+                $viewName = 'reports.bulletin_period';
+                $reportData = $this->getPeriodData($student, $enrollment, $stage['period']);
+            } elseif ($this->cycleService->usesSemesterModel($studentCycle)) {
                 $viewName = 'reports.bulletin_secondary';
-                if ($request->type === 'period') {
-                    $viewName = 'reports.bulletin_period';
-                    $reportData = $this->getPeriodData($student, $enrollment, $request->period);
-                } else {
-                    $reportData = $this->getSecondaryData($student, $enrollment, $request->semester);
-                    $termNumber = (int) ($request->semester ?: 1);
-                }
+                $reportData = $this->getSecondaryData($student, $enrollment, $stage['semester']);
             } else {
                 $viewName = 'reports.bulletin_primary';
-                if ($request->type === 'period') {
-                    $viewName = 'reports.bulletin_period';
-                    $reportData = $this->getPeriodData($student, $enrollment, $request->period);
-                } else {
-                    $reportData = $this->getPrimaryData($student, $enrollment, $request->trimester);
-                    $termNumber = (int) ($request->trimester ?: 1);
-                }
+                $reportData = $this->getPrimaryData($student, $enrollment, $stage['trimester']);
             }
 
-            if ($reportData && $this->hasMarks($reportData)) {
-                $studentRank = $rankings[$student->id] ?? null;
-                $mode = $request->type === 'period' ? 'period' : 'term';
-                $reportData['column_labels'] = $this->cycleService->columnLabels(
-                    $studentCycle,
-                    $request->type === 'period' ? 1 : $termNumber,
-                    $mode
-                );
-                $reportData['term_title'] = $request->type === 'period'
-                    ? __('reports.bulletin_period_title', ['period' => strtoupper($request->period ?? '')])
-                    : $this->cycleService->termTitle($studentCycle, $termNumber);
-                $reportData['education_cycle'] = $studentCycle;
-                $reportData['ranks'] = [
-                    'section_rank' => $studentRank['section_rank'] ?? '-',
-                    'section_total' => $studentRank['section_total'] ?? '-',
-                    'grade_rank' => $studentRank['grade_rank'] ?? '-',
-                    'grade_total' => $studentRank['grade_total'] ?? '-',
-                    'total_score' => $studentRank['total_score'] ?? 0, 
-                ];
+            $studentRank = $rankings[$student->id] ?? null;
+            $mode = $isPeriodCard ? 'period' : 'term';
+            $reportData['column_labels'] = $this->cycleService->columnLabels(
+                $studentCycle,
+                $isPeriodCard ? 1 : $termNumber,
+                $mode
+            );
+            $reportData['term_title'] = $this->periodService->stageTitle($stage['key'], $studentCycle);
+            $reportData['education_cycle'] = $studentCycle;
+            $reportData['stage_key'] = $stage['key'];
+            $reportData['under_revision'] = $underRevision && $isStaff;
+            $reportData['ranks'] = [
+                'section_rank' => $studentRank['section_rank'] ?? '-',
+                'section_total' => $studentRank['section_total'] ?? '-',
+                'grade_rank' => $studentRank['grade_rank'] ?? '-',
+                'grade_total' => $studentRank['grade_total'] ?? '-',
+                'total_score' => $studentRank['total_score'] ?? 0,
+                'place_eff' => $studentRank['place_eff'] ?? '-',
+            ];
 
-                $pct = (float) ($reportData['percentage_total'] ?? 0);
-                $reportData['application'] = $applicationService->fromPercentage($pct, $institutionId, $studentCycle);
+            $pct = (float) ($reportData['percentage_total'] ?? 0);
+            $reportData['application'] = $applicationService->fromPercentage($pct, $institutionId, $studentCycle);
 
-                if ($request->type === 'period') {
-                    $scopeType = 'period';
-                    $scopeKey = (string) $request->period;
-                } elseif ($this->cycleService->usesSemesterModel($studentCycle)) {
-                    $scopeType = 'semester';
-                    $scopeKey = (string) $termNumber;
-                } else {
-                    $scopeType = 'trimester';
-                    $scopeKey = (string) $termNumber;
-                }
-
-                $reportData['conduct'] = $conductService->valueOrDash(
-                    (int) $student->id,
-                    (int) $enrollment->academic_session_id,
-                    $scopeType,
-                    $scopeKey
-                );
-
-                $bulkData[] = array_merge($reportData, [
-                    'student' => $student,
-                    'enrollment' => $enrollment,
-                    'settings' => $settings,
-                    'request' => $request->all()
-                ]);
+            if ($isPeriodCard) {
+                $scopeType = 'period';
+                $scopeKey = (string) $stage['period'];
+            } elseif ($this->cycleService->usesSemesterModel($studentCycle)) {
+                $scopeType = 'semester';
+                $scopeKey = (string) $termNumber;
+            } else {
+                $scopeType = 'trimester';
+                $scopeKey = (string) $termNumber;
             }
+
+            $reportData['conduct'] = $conductService->valueOrDash(
+                (int) $student->id,
+                (int) $enrollment->academic_session_id,
+                $scopeType,
+                $scopeKey
+            );
+
+            if ($request->filled('student_id') && is_array($accessResult) && ! empty($accessResult['staff_banner'])) {
+                $reportData['outstanding_banner'] = app()->getLocale() === 'fr'
+                    ? ($accessResult['message_fr'] ?? '')
+                    : ($accessResult['message_en'] ?? '');
+            }
+
+            $subjectCount = max($subjectCount, count($reportData['data'] ?? []));
+
+            $bulkData[] = array_merge($reportData, [
+                'student' => $student,
+                'enrollment' => $enrollment,
+                'settings' => $settings,
+                'request' => $request->all(),
+                'cards_per_page' => $this->periodService->cardsPerPage($stage['key'], $subjectCount),
+            ]);
         }
+
+        $cardsPerPage = $this->periodService->cardsPerPage($stage['key'], $subjectCount);
+        foreach ($bulkData as &$row) {
+            $row['cards_per_page'] = $cardsPerPage;
+        }
+        unset($row);
 
         if ($request->check_only) {
             if (empty($bulkData)) {
@@ -371,15 +420,36 @@ class ReportController extends BaseController
         }
 
         if (count($bulkData) === 1) {
-            $data = $bulkData[0];
-            return view($viewName, $data);
-        } else {
-            return view('reports.bulk_print', [
-                'reports' => $bulkData, 
-                'viewName' => $viewName,
-                'classSection' => $classSection
-            ]);
+            return view($viewName, $bulkData[0]);
         }
+
+        return view('reports.bulk_print', [
+            'reports' => $bulkData,
+            'viewName' => $viewName,
+            'classSection' => $classSection,
+            'cards_per_page' => $cardsPerPage,
+        ]);
+    }
+
+    protected function stageUnavailableResponse(Request $request, array $stage, ?array $latest, bool $underRevision = false)
+    {
+        $msg = $underRevision
+            ? __('reports.stage_under_revision', [
+                'requested' => $stage['label'],
+                'closed_on' => $latest['label'] ?? $stage['label'],
+            ])
+            : $this->periodService->unavailableMessage($stage['label'], $latest);
+
+        $extra = [
+            'latest_official' => $latest,
+            'stage_key' => $stage['key'],
+        ];
+
+        if ($request->ajax() || $request->check_only) {
+            return $this->emptyReportJson($msg, $extra);
+        }
+
+        return back()->with('info', $msg);
     }
 
     public function transcript(Request $request)
@@ -395,7 +465,7 @@ class ReportController extends BaseController
             abort(403, 'Unauthorized access.');
         }
 
-        $this->checkFinancialClearance($student->id, $institutionId, true);
+        $this->checkFinancialClearance($student->id, $institutionId, false, null, false);
 
         $cycle = $student->gradeLevel->education_cycle ?? 'primary';
         $cycleValue = is_object($cycle) ? $cycle->value : $cycle;
@@ -503,7 +573,8 @@ class ReportController extends BaseController
 
         if ($exams->isEmpty()) return [];
 
-        $schedules = ExamSchedule::whereIn('exam_id', $exams->pluck('id'))
+        $schedules = ExamSchedule::with('exam')
+            ->whereIn('exam_id', $exams->pluck('id'))
             ->where('class_section_id', $classSectionId)
             ->get();
 
@@ -520,7 +591,7 @@ class ReportController extends BaseController
         return $map;
     }
 
-    private function calculateRankings($classSection, Request $request, $institutionId)
+    private function calculateRankings($classSection, Request $request, $institutionId, array $stage = [])
     {
         $cycle = $this->cycleService->resolveCycle($classSection);
         $categories = $this->cycleService->categoriesForRequest(
@@ -535,49 +606,82 @@ class ReportController extends BaseController
             return [];
         }
 
-        $gradeEnrollments = StudentEnrollment::where('grade_level_id', $classSection->grade_level_id)
+        $sessionId = StudentEnrollment::where('class_section_id', $classSection->id)
+            ->where('status', 'active')
+            ->value('academic_session_id');
+
+        $gradeEnrollments = StudentEnrollment::with('student')
+            ->where('grade_level_id', $classSection->grade_level_id)
             ->where('institution_id', $institutionId)
-            ->where('status', 'active') 
+            ->where('status', 'active')
+            ->when($sessionId, fn ($q) => $q->where('academic_session_id', $sessionId))
             ->get();
 
         $studentIds = $gradeEnrollments->pluck('student_id');
-        $students = Student::whereIn('id', $studentIds)->get()->keyBy('id'); 
+        $students = $gradeEnrollments->mapWithKeys(fn ($enr) => [$enr->student_id => $enr->student]);
 
-        $marks = ExamRecord::whereIn('student_id', $studentIds)
-            ->whereHas('exam', function($q) use ($categories) {
+        $marks = ExamRecord::with('exam')
+            ->whereIn('student_id', $studentIds)
+            ->whereHas('exam', function ($q) use ($categories, $sessionId) {
                 $q->whereIn('category', $categories);
+                if ($sessionId) {
+                    $q->where('academic_session_id', $sessionId);
+                }
             })
-            ->select('student_id', 'marks_obtained')
-            ->get();
+            ->get()
+            ->groupBy('student_id');
 
-        $studentScores = [];
-        foreach ($studentIds as $id) {
-            $studentScores[$id] = 0;
-        }
+        $scheduleCache = [];
+        $studentPercents = [];
 
-        foreach ($marks as $mark) {
-            $studentScores[$mark->student_id] += $mark->marks_obtained;
-        }
-
-        uksort($studentScores, function($idA, $idB) use ($studentScores, $students) {
-            $scoreA = $studentScores[$idA];
-            $scoreB = $studentScores[$idB];
-            
-            if (abs($scoreA - $scoreB) > 0.001) {
-                return $scoreB <=> $scoreA; 
+        foreach ($gradeEnrollments as $enr) {
+            $sectionId = (int) $enr->class_section_id;
+            if (! isset($scheduleCache[$sectionId])) {
+                $scheduleCache[$sectionId] = $this->getExamScheduleMaxMarks(
+                    $sectionId,
+                    (int) $enr->academic_session_id,
+                    $categories
+                );
             }
-            
-            $nameA = isset($students[$idA]) ? strtolower($students[$idA]->first_name . ' ' . $students[$idA]->last_name) : '';
-            $nameB = isset($students[$idB]) ? strtolower($students[$idB]->first_name . ' ' . $students[$idB]->last_name) : '';
+
+            $scheduleMap = $scheduleCache[$sectionId];
+            $studentMarks = $marks->get($enr->student_id, collect());
+            $obtained = 0.0;
+            $max = 0.0;
+
+            foreach ($categories as $cat) {
+                foreach (($scheduleMap[$cat] ?? []) as $subjectId => $subjectMax) {
+                    $max += (float) $subjectMax;
+                    $rec = $studentMarks->first(function ($row) use ($cat, $subjectId) {
+                        return (int) $row->subject_id === (int) $subjectId
+                            && ($row->exam->category ?? null) === $cat;
+                    });
+                    if ($rec && is_numeric($rec->marks_obtained)) {
+                        $obtained += (float) $rec->marks_obtained;
+                    }
+                }
+            }
+
+            $studentPercents[$enr->student_id] = $max > 0 ? ($obtained / $max) * 100 : 0.0;
+        }
+
+        uksort($studentPercents, function ($idA, $idB) use ($studentPercents, $students) {
+            $scoreA = $studentPercents[$idA];
+            $scoreB = $studentPercents[$idB];
+            if (abs($scoreA - $scoreB) > 0.001) {
+                return $scoreB <=> $scoreA;
+            }
+            $nameA = isset($students[$idA]) ? strtolower(trim(($students[$idA]->first_name ?? '') . ' ' . ($students[$idA]->last_name ?? ''))) : '';
+            $nameB = isset($students[$idB]) ? strtolower(trim(($students[$idB]->first_name ?? '') . ' ' . ($students[$idB]->last_name ?? ''))) : '';
+
             return strcmp($nameA, $nameB);
-        }); 
+        });
 
         $gradeRanks = [];
         $rank = 1;
         $prevScore = -1;
         $displayRank = 1;
-        
-        foreach ($studentScores as $sId => $score) {
+        foreach ($studentPercents as $sId => $score) {
             if (abs($score - $prevScore) > 0.001) {
                 $rank = $displayRank;
             }
@@ -585,30 +689,28 @@ class ReportController extends BaseController
             $prevScore = $score;
             $displayRank++;
         }
-        
-        $sectionScores = [];
 
+        $sectionScores = [];
         foreach ($gradeEnrollments as $enr) {
-            if (isset($studentScores[$enr->student_id])) {
-                $sectionScores[$enr->class_section_id][$enr->student_id] = $studentScores[$enr->student_id];
-            }
+            $sectionScores[$enr->class_section_id][$enr->student_id] = $studentPercents[$enr->student_id] ?? 0;
         }
 
         $finalRanks = [];
-        $totalGradeStudents = count($studentScores);
+        $totalGradeStudents = count($studentPercents);
 
-        foreach ($sectionScores as $secId => $scores) {
-            uksort($scores, function($idA, $idB) use ($scores, $students) {
+        foreach ($sectionScores as $scores) {
+            uksort($scores, function ($idA, $idB) use ($scores, $students) {
                 $scoreA = $scores[$idA];
                 $scoreB = $scores[$idB];
                 if (abs($scoreA - $scoreB) > 0.001) {
                     return $scoreB <=> $scoreA;
                 }
-                $nameA = isset($students[$idA]) ? strtolower($students[$idA]->first_name . ' ' . $students[$idA]->last_name) : '';
-                $nameB = isset($students[$idB]) ? strtolower($students[$idB]->first_name . ' ' . $students[$idB]->last_name) : '';
+                $nameA = isset($students[$idA]) ? strtolower(trim(($students[$idA]->first_name ?? '') . ' ' . ($students[$idA]->last_name ?? ''))) : '';
+                $nameB = isset($students[$idB]) ? strtolower(trim(($students[$idB]->first_name ?? '') . ' ' . ($students[$idB]->last_name ?? ''))) : '';
+
                 return strcmp($nameA, $nameB);
             });
-            
+
             $sRank = 1;
             $sPrevScore = -1;
             $sDisplayRank = 1;
@@ -618,13 +720,14 @@ class ReportController extends BaseController
                 if (abs($score - $sPrevScore) > 0.001) {
                     $sRank = $sDisplayRank;
                 }
-                
+
                 $finalRanks[$sId] = [
                     'total_score' => $score,
                     'grade_rank' => $gradeRanks[$sId] ?? '-',
                     'grade_total' => $totalGradeStudents,
                     'section_rank' => $sRank,
-                    'section_total' => $totalInSection
+                    'section_total' => $totalInSection,
+                    'place_eff' => $this->formatPlaceEff($sRank, $totalInSection),
                 ];
 
                 $sPrevScore = $score;
@@ -633,6 +736,30 @@ class ReportController extends BaseController
         }
 
         return $finalRanks;
+    }
+
+    private function formatPlaceEff(int $rank, int $total): string
+    {
+        return $this->ordinalRank($rank) . ' / ' . $total;
+    }
+
+    private function ordinalRank(int $rank): string
+    {
+        if (app()->getLocale() === 'fr') {
+            return $rank === 1 ? '1er' : $rank . 'e';
+        }
+
+        $mod100 = $rank % 100;
+        if ($mod100 >= 11 && $mod100 <= 13) {
+            return $rank . 'th';
+        }
+
+        return $rank . match ($rank % 10) {
+            1 => 'st',
+            2 => 'nd',
+            3 => 'rd',
+            default => 'th',
+        };
     }
 
     private function getPeriodData($student, $enrollment, $period)

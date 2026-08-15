@@ -45,7 +45,7 @@ return [
     'whatsapp_sent_success' => 'WhatsApp message sent successfully.',
     'whatsapp_template_required' => 'WhatsApp free-form text was rejected. The recipient must message your WhatsApp Business number first (24h window), or send an approved template message instead.',
     'whatsapp_invalid_number' => 'Invalid WhatsApp number. Use full international format (e.g. +243899763122).',
-    'whatsapp_test_hint' => 'Test WhatsApp sends free-form text. Outside the 24h chat window WhatsApp requires an approved template. Ask the recipient to message your business number first, then retry.',
+    'whatsapp_test_hint' => 'If a template is configured, Digitex retries with it when free-form text is blocked (outside the 24h window). Save Template Name school_notification and Language en on the Infobip tab first.',
     'gateway_connection_error' => 'Could not connect to the gateway provider.',
     'gateway_response_error' => 'Gateway returned an error.',
     'credentials_missing' => 'API Credentials are missing for the selected provider.',
@@ -228,4 +228,11 @@ return [
     'request_response_hours' => 'Parent response time (hours)',
     'block_attendance_expired' => 'Block attendance when fee extension expired',
     'block_results_expired' => 'Block results when fee extension expired',
+
+    'homework_settings' => 'Homework',
+    'homework_approval_required' => 'Require homework approval before publishing',
+    'homework_approval_help' => 'When enabled, homework a teacher saves is held for review and is not visible to parents, students, or the WhatsApp chatbot until it is approved. When disabled, teachers publish directly.',
+    'homework_approver_roles' => 'Who can approve homework',
+    'homework_approver_roles_help' => 'Selected roles also need the "assignment.approve" permission. If you select nothing, School Admin and Head Officer keep the authority.',
+    'select_institution_first' => 'Select a school first.',
 ];

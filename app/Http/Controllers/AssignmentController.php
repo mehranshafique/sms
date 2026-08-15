@@ -12,16 +12,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use App\Enums\RoleEnum;
+use App\Jobs\NotifyHomeworkPublishedJob;
+use App\Services\Academic\HomeworkApprovalService;
+use App\Services\Academic\HomeworkNotificationService;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class AssignmentController extends BaseController
 {
-    public function __construct()
-    {
+    public function __construct(
+        protected HomeworkApprovalService $approvals,
+        protected HomeworkNotificationService $homeworkNotifications
+    ) {
         $this->middleware('auth');
         $this->middleware(PermissionMiddleware::class . ':assignment.view')->only(['index', 'create', 'getSubjects']);
         $this->middleware(PermissionMiddleware::class . ':assignment.create')->only(['store']);
         $this->middleware(PermissionMiddleware::class . ':assignment.delete')->only(['destroy']);
+        $this->middleware(PermissionMiddleware::class . ':assignment.approve')->only(['updateStatus']);
         $this->setPageTitle(__('assignment.page_title'));
     }
 
@@ -29,6 +35,8 @@ class AssignmentController extends BaseController
     {
         $user = Auth::user();
         $institutionId = $this->getInstitutionId();
+
+        $canApprove = $this->approvals->canApprove($user, $institutionId);
 
         if ($request->ajax()) {
             $query = Assignment::with(['classSection.gradeLevel', 'subject', 'teacher.user'])
@@ -40,6 +48,10 @@ class AssignmentController extends BaseController
                 if ($staff) {
                     $query->where('teacher_id', $staff->id);
                 }
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
             }
 
             return \Yajra\DataTables\Facades\DataTables::of($query)
@@ -72,13 +84,37 @@ class AssignmentController extends BaseController
                         $row->teacher->user->name ?? 'Admin'
                     );
                 })
-                ->addColumn('action', function ($row) {
-                    if (! auth()->user()->can('delete', $row) && ! auth()->user()->hasRole(['Super Admin', 'Head Officer'])) {
-                        return '';
+                ->addColumn('status_badge', function ($row) {
+                    $map = [
+                        Assignment::STATUS_APPROVED => 'success',
+                        Assignment::STATUS_PENDING => 'warning',
+                        Assignment::STATUS_REJECTED => 'danger',
+                    ];
+                    $class = $map[$row->status] ?? 'secondary';
+                    $label = __('assignment.status_' . $row->status);
+
+                    $html = '<span class="badge badge-'.$class.'">'.e($label).'</span>';
+                    if ($row->isRejected() && $row->rejection_reason) {
+                        $html .= ' <i class="fa fa-info-circle text-muted" title="'.e($row->rejection_reason).'"></i>';
                     }
-                    return '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-assignment-btn" data-id="'.$row->id.'" data-url="'.route('assignments.destroy', $row->id).'"><i class="fa fa-trash"></i></button>';
+
+                    return $html;
                 })
-                ->rawColumns(['title', 'class_name', 'teacher_name', 'deadline', 'action'])
+                ->addColumn('action', function ($row) use ($canApprove) {
+                    $btn = '';
+
+                    if ($canApprove && $row->isPending()) {
+                        $btn .= '<button type="button" class="btn btn-success shadow btn-xs sharp me-1 approve-assignment-btn" data-id="'.$row->id.'" data-url="'.route('assignments.status', $row->id).'" title="'.e(__('assignment.approve')).'"><i class="fa fa-check"></i></button>';
+                        $btn .= '<button type="button" class="btn btn-warning shadow btn-xs sharp me-1 reject-assignment-btn" data-id="'.$row->id.'" data-url="'.route('assignments.status', $row->id).'" title="'.e(__('assignment.reject')).'"><i class="fa fa-times"></i></button>';
+                    }
+
+                    if (auth()->user()->can('delete', $row) || auth()->user()->hasRole(['Super Admin', 'Head Officer'])) {
+                        $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-assignment-btn" data-id="'.$row->id.'" data-url="'.route('assignments.destroy', $row->id).'"><i class="fa fa-trash"></i></button>';
+                    }
+
+                    return $btn;
+                })
+                ->rawColumns(['title', 'class_name', 'teacher_name', 'deadline', 'status_badge', 'action'])
                 ->make(true);
         }
         
@@ -88,6 +124,7 @@ class AssignmentController extends BaseController
 
         // Role-based filtering
         if ($user->hasRole(RoleEnum::STUDENT->value)) {
+            $query->published();
             $student = $user->student;
             if ($student) {
                 $currentClassId = $student->enrollments()
@@ -106,7 +143,13 @@ class AssignmentController extends BaseController
             return view('assignments.student_index', compact('assignments'));
         }
 
-        return view('assignments.index');
+        $pendingCount = Assignment::where('institution_id', $institutionId)
+            ->awaitingApproval()
+            ->count();
+
+        $approvalRequired = $this->approvals->isRequired($institutionId);
+
+        return view('assignments.index', compact('canApprove', 'pendingCount', 'approvalRequired'));
     }
 
     public function create()
@@ -137,7 +180,10 @@ class AssignmentController extends BaseController
             return [$item->id => $name];
         });
 
-        return view('assignments.create', compact('classes'));
+        $needsApproval = $this->approvals->isRequired($institutionId)
+            && ! $this->approvals->canApprove($user, $institutionId);
+
+        return view('assignments.create', compact('classes', 'needsApproval'));
     }
 
     // UPDATE: Fetch subjects based on hybrid logic
@@ -212,19 +258,69 @@ class AssignmentController extends BaseController
             $filePath = $request->file('file')->store('assignments', 'public');
         }
 
-        Assignment::create([
+        $user = Auth::user();
+
+        $assignment = Assignment::create(array_merge([
             'institution_id' => $institutionId,
             'academic_session_id' => $session->id,
             'class_section_id' => $request->class_section_id,
             'subject_id' => $request->subject_id,
-            'teacher_id' => Auth::user()->staff->id ?? null,
+            'teacher_id' => $user->staff->id ?? null,
             'title' => $request->title,
             'description' => $request->description,
             'deadline' => $request->deadline,
             'file_path' => $filePath,
+        ], $this->approvals->attributesForNew($user, $institutionId)));
+
+        if ($assignment->isPublished()) {
+            NotifyHomeworkPublishedJob::dispatchAfterResponse($assignment->id);
+
+            return $this->successResponse(__('assignment.success_create'), route('assignments.index'));
+        }
+
+        $this->homeworkNotifications->notifyAwaitingApproval($assignment);
+
+        return $this->successResponse(__('assignment.success_create_pending'), route('assignments.index'));
+    }
+
+    /**
+     * Approve or reject homework that is waiting for review.
+     */
+    public function updateStatus(Request $request, Assignment $assignment)
+    {
+        $institutionId = $this->getInstitutionId();
+
+        if ($institutionId && (int) $assignment->institution_id !== (int) $institutionId) {
+            abort(403);
+        }
+
+        $user = Auth::user();
+
+        if (! $this->approvals->canApprove($user, $assignment->institution_id)) {
+            abort(403);
+        }
+
+        $request->validate([
+            'status' => 'required|in:approved,rejected',
+            'rejection_reason' => 'nullable|string|max:500',
         ]);
 
-        return $this->successResponse(__('assignment.success_create'), route('assignments.index'));
+        if ($request->status === Assignment::STATUS_APPROVED) {
+            $this->approvals->approve($assignment, $user);
+            NotifyHomeworkPublishedJob::dispatchAfterResponse($assignment->id);
+            $message = __('assignment.success_approved');
+        } else {
+            $this->approvals->reject($assignment, $user, $request->rejection_reason);
+            $message = __('assignment.success_rejected');
+        }
+
+        $this->homeworkNotifications->notifyTeacherDecision($assignment->refresh());
+
+        if ($request->ajax()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return back()->with('success', $message);
     }
     
     public function destroy(Assignment $assignment)

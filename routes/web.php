@@ -19,6 +19,7 @@ use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\SchoolBackupController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\AssessmentPeriodController;
 use App\Http\Controllers\InstitutionContextController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SmsTemplateController;
@@ -76,6 +77,7 @@ use App\Http\Controllers\ExamScheduleController;
 use App\Http\Controllers\StateExamController;
 use App\Http\Controllers\TransportController;
 use App\Http\Controllers\LmdDeliberationController;
+use App\Http\Controllers\SecondaryDeliberationController;
 use App\Http\Controllers\GuardianPortalController;
 
 // --- Controllers: Communication & Voting ---
@@ -85,6 +87,7 @@ use App\Http\Controllers\ElectionController;
 use App\Http\Controllers\VotingController;
 use App\Http\Controllers\StudentVotingController;
 use App\Http\Controllers\ChatbotSettingController;
+use App\Http\Controllers\VoiceSettingController;
 use App\Http\Controllers\ReminderController; // Added Reminder Controller
 // --- Controllers: Finance ---
 use App\Http\Controllers\Finance\FeeTypeController;
@@ -328,6 +331,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Assignments
     Route::middleware([CheckModuleAccess::class . ':assignments'])->group(function () {
         Route::get('assignments/get-subjects', [App\Http\Controllers\AssignmentController::class, 'getSubjects'])->name('assignments.get-subjects');
+        Route::post('assignments/{assignment}/status', [App\Http\Controllers\AssignmentController::class, 'updateStatus'])->name('assignments.status');
         Route::resource('assignments', App\Http\Controllers\AssignmentController::class);
     });
 
@@ -424,6 +428,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware([CheckModuleAccess::class . ':discipline'])->group(function () {
         Route::post('discipline/{discipline}/status', [\App\Http\Controllers\DisciplineController::class, 'updateStatus'])->name('discipline.update_status');
         Route::resource('discipline', \App\Http\Controllers\DisciplineController::class);
+    });
+
+    // Medical / Infirmary Records
+    Route::middleware([CheckModuleAccess::class . ':medical_records'])->group(function () {
+        Route::get('medical-records', [\App\Http\Controllers\MedicalRecordController::class, 'index'])->name('medical-records.index');
+        Route::get('medical-records/students/search', [\App\Http\Controllers\MedicalRecordController::class, 'searchStudents'])->name('medical-records.students.search');
+        Route::get('medical-records/visits/create', [\App\Http\Controllers\MedicalRecordController::class, 'createVisit'])->name('medical-records.visits.create');
+        Route::post('medical-records/visits', [\App\Http\Controllers\MedicalRecordController::class, 'storeVisit'])->name('medical-records.visits.store');
+        Route::delete('medical-records/visits/{visit}', [\App\Http\Controllers\MedicalRecordController::class, 'destroyVisit'])->name('medical-records.visits.destroy');
+        Route::get('medical-records/{student}', [\App\Http\Controllers\MedicalRecordController::class, 'show'])->name('medical-records.show');
+        Route::get('medical-records/{student}/edit', [\App\Http\Controllers\MedicalRecordController::class, 'edit'])->name('medical-records.edit');
+        Route::put('medical-records/{student}', [\App\Http\Controllers\MedicalRecordController::class, 'update'])->name('medical-records.update');
     });
 
     // Pickup Scanner Routes
@@ -557,6 +573,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{deliberation}/validate', [LmdDeliberationController::class, 'validateDeliberation'])->name('validate');
     });
 
+    Route::prefix('secondary-deliberations')->name('secondary-deliberations.')->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->group(function () {
+        Route::get('/', [SecondaryDeliberationController::class, 'index'])->name('index');
+        Route::post('/generate', [SecondaryDeliberationController::class, 'generate'])->name('generate');
+        Route::post('/decisions', [SecondaryDeliberationController::class, 'saveDecisions'])->name('decisions');
+        Route::post('/confirm', [SecondaryDeliberationController::class, 'confirmAndNotify'])->name('confirm');
+    });
+
     // School transport
     Route::prefix('transport')->name('transport.')->middleware([RoleMiddleware::class . ':Super Admin|Head Officer|School Admin'])->group(function () {
         Route::get('/', [TransportController::class, 'index'])->name('index');
@@ -627,6 +650,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware([CheckModuleAccess::class . ':fee_structures'])->group(function () {
             Route::get('fees/get-sections', [FeeStructureController::class, 'getClassSections'])->name('fees.get_sections'); 
             Route::get('reports/class-summary', [FinancialReportController::class, 'index'])->name('finance.reports.class_summary');
+            Route::get('reports/fee-components', [FinancialReportController::class, 'components'])->name('finance.reports.components');
             Route::resource('fees', FeeStructureController::class);
         });
         
@@ -785,6 +809,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         
         });
 
+    // --- WHATSAPP VOICE IVR SETTINGS ---
+    Route::middleware([
+        RoleMiddleware::class . ':Super Admin|Head Officer|School Admin',
+    ])->prefix('voice')->group(function () {
+        Route::get('/settings', [VoiceSettingController::class, 'index'])->name('voice.settings.index');
+        Route::post('/settings', [VoiceSettingController::class, 'store'])->name('voice.settings.store');
+        Route::post('/settings/pins', [VoiceSettingController::class, 'storePin'])->name('voice.settings.pin.store');
+        Route::delete('/settings/pins/{parentId}', [VoiceSettingController::class, 'destroyPin'])
+            ->whereNumber('parentId')
+            ->name('voice.settings.pin.destroy');
+    });
+
     // =========================================================================
     // 7. VOTING & ELECTIONS MODULE
     // =========================================================================
@@ -818,6 +854,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('settings')->group(function () {
         Route::get('/', [SettingsController::class, 'index'])->name('settings.index');
         Route::post('/update', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/assessment-periods/close', [AssessmentPeriodController::class, 'close'])->name('settings.assessment_periods.close');
+        Route::post('/assessment-periods/reopen', [AssessmentPeriodController::class, 'reopen'])->name('settings.assessment_periods.reopen');
+        Route::post('/assessment-periods/schedule', [AssessmentPeriodController::class, 'schedule'])->name('settings.assessment_periods.schedule');
     });
 
     // Currency (per institution)
@@ -880,6 +919,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/notifications/update', [ConfigurationController::class, 'updateNotifications'])->name('configuration.notifications.update');
             Route::post('/notifications/recommended', [ConfigurationController::class, 'enableRecommendedNotifications'])->name('configuration.notifications.recommended');
             Route::post('/requests/settings', [ConfigurationController::class, 'updateRequestSettings'])->name('configuration.requests.update');
+            Route::post('/homework/settings', [ConfigurationController::class, 'updateHomeworkSettings'])->name('configuration.homework.update');
             Route::post('/setup-alert/dismiss', [ConfigurationController::class, 'dismissSetupAlert'])->name('configuration.setup_alert.dismiss');
             // SMS Templates
             Route::middleware([CheckModuleAccess::class . ':sms_templates'])->group(function() {

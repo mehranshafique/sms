@@ -40,6 +40,28 @@
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white">
+                    <h5 class="mb-0">{{ __('finance.proportional_allocation') }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="proportional_allocation_enabled" value="0">
+                        <input class="form-check-input" type="checkbox" name="proportional_allocation_enabled" id="proportionalAllocationEnabled" value="1"
+                            {{ !empty($proportionalEnabled) ? 'checked' : '' }}>
+                        <label class="form-check-label fw-bold" for="proportionalAllocationEnabled">{{ __('finance.proportional_allocation_enable') }}</label>
+                    </div>
+                    <small class="text-muted d-block mt-2">{{ __('finance.proportional_allocation_help') }}</small>
+                    @if(!empty($proportionalEnabled))
+                        <div class="mt-3">
+                            <a href="{{ route('finance.reports.components') }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fa fa-chart-pie me-1"></i> {{ __('finance.component_report_title') }}
+                            </a>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
                     <h5 class="mb-0">{{ __('payment_gateway.settings_title') }}</h5>
                 </div>
                 <div class="card-body">

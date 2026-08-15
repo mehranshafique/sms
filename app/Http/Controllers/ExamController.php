@@ -378,10 +378,6 @@ class ExamController extends BaseController
 
         app(\App\Services\InAppNotificationService::class)->notifyExamPublished($exam);
 
-        if ($exam->category === 'semester_exam_2') {
-            \App\Jobs\NotifyResitParentsJob::dispatchAfterResponse($exam->id);
-        }
-        
         return back()->with('success', __('exam.messages.finalized_success'));
     }
 

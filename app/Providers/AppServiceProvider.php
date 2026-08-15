@@ -12,6 +12,8 @@ use App\Services\PlanContextService;
 use Illuminate\Support\Facades\File;
 use App\Policies\ResourcePolicy;
 use App\Interfaces\SmsGatewayInterface;
+use App\Models\Payment;
+use App\Observers\PaymentObserver;
 use App\Services\Sms\InfobipService;
 use App\Services\Sms\MobishastraService;
 use App\Services\SystemCommunicationConfigService;
@@ -37,6 +39,8 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
 
         app(SystemCommunicationConfigService::class)->applyGlobalOverrides();
+
+        Payment::observe(PaymentObserver::class);
 
         // --- Dynamic Policy Registration Start ---
         $modelsPath = app_path('Models');

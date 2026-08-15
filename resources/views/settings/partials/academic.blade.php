@@ -8,18 +8,25 @@
             
             <div class="row">
                 @php
-                    $periods = [
+                    $markEntryPeriods = [
                         'p1' => 'Period 1', 'p2' => 'Period 2', 'p3' => 'Period 3',
                         'p4' => 'Period 4', 'p5' => 'Period 5', 'p6' => 'Period 6',
                         'trimester_exam_1' => 'Trimester 1 Exam',
                         'trimester_exam_2' => 'Trimester 2 Exam',
                         'trimester_exam_3' => 'Trimester 3 Exam',
                         'semester_exam_1' => 'Semester 1 Exam',
-                        'semester_exam_2' => 'Semester 2 Exam'
+                        'semester_exam_2' => 'Semester 2 Exam',
+                    ];
+                    $periods = $markEntryPeriods + [
+                        'trimester_1' => 'Trimester 1 (TR1)',
+                        'trimester_2' => 'Trimester 2 (TR2)',
+                        'trimester_3' => 'Trimester 3 (TR3)',
+                        'semester_1' => 'Semester 1 (S1)',
+                        'semester_2' => 'Semester 2 (S2)',
                     ];
                 @endphp
 
-                @foreach($periods as $key => $label)
+                @foreach($markEntryPeriods as $key => $label)
                 <div class="col-md-3 mb-2">
                     <div class="form-check custom-checkbox mb-3">
                         <input type="checkbox" name="active_periods[]" value="{{ $key }}" class="form-check-input" id="period_{{ $key }}" 
@@ -178,6 +185,8 @@
         </div>
     </div>
 </form>
+
+@include('settings.partials.assessment_periods')
 
 <script>
     (function () {

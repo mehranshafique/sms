@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'page_title' => 'Secondary year-end deliberation',
+    'subtitle' => 'Review students below the resit threshold, record jury decisions, then notify parents.',
+    'generate' => 'Refresh failing list',
+    'generate_help' => 'Builds the list from Semester 2 (P3 + P4 + exam) against the resit pass percentage.',
+    'generated' => ':count student(s) listed with failed subjects.',
+    'save_decisions' => 'Save decisions',
+    'decisions_saved' => ':count decision(s) saved.',
+    'confirm_notify' => 'Confirm & WhatsApp',
+    'confirm_prompt' => 'Send WhatsApp/SMS to parents for all students with a recorded decision who have not been notified yet?',
+    'notified' => ':count notification(s) queued.',
+    'nothing_to_notify' => 'No pending notifications. Save a decision first, or all decided students were already notified.',
+    'student' => 'Student',
+    'class' => 'Class',
+    'average' => 'S2 %',
+    'failed_subjects' => 'Failed subjects',
+    'decision' => 'Decision',
+    'notified_at' => 'Notified',
+    'empty' => 'No failing students yet. Click “Refresh failing list”.',
+    'decision_pending' => 'Pending',
+    'decision_admitted' => 'Admitted',
+    'decision_repechage' => 'Repechage',
+    'decision_adjourned' => 'Adjourned',
+];

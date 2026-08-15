@@ -10,6 +10,7 @@ return [
         'exceeds_max' => 'Mark for Student ID :id exceeds the max limit of :max.',
         'not_enrolled' => 'You are not currently enrolled in any active class.',
     ],
+    'period_closed' => 'This assessment stage is closed. Marks can only be entered while it is open or reopened.',
     'enter_marks' => 'Enter Marks',
     'manage_subtitle' => 'Input marks for students by subject',
     

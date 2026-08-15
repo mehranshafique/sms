@@ -81,6 +81,47 @@
         border-right: none;
     }
 
+    .a4-landscape.cards-4 .student-column,
+    .single-card-view.cards-4 {
+        flex: 0 0 25%;
+        max-width: 25%;
+        width: 25%;
+        --card-width: 74.25mm;
+    }
+    .a4-landscape.cards-3 .student-column,
+    .single-card-view.cards-3 {
+        flex: 0 0 33.333%;
+        max-width: 33.333%;
+        width: 33.333%;
+        --card-width: 99mm;
+    }
+    .a4-landscape.cards-2 .student-column,
+    .single-card-view.cards-2 {
+        flex: 0 0 50%;
+        max-width: 50%;
+        width: 50%;
+        --card-width: 148.5mm;
+    }
+    .single-card-view.cards-2,
+    .single-card-view.cards-3,
+    .single-card-view.cards-4 {
+        width: var(--card-width);
+        max-width: var(--card-width);
+        flex: none;
+    }
+
+    .revision-banner,
+    .outstanding-banner {
+        font-size: 6.5px;
+        font-weight: bold;
+        text-align: center;
+        padding: 2px 4px;
+        margin-bottom: 3px;
+        line-height: 1.2;
+    }
+    .revision-banner { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .outstanding-banner { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
     .card-inner {
         display: flex;
         flex-direction: column;

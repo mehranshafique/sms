@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Chatbot\FinanceController;
 use App\Http\Controllers\Api\V1\Chatbot\CalendarController;
 use App\Http\Controllers\Api\V1\Chatbot\RequestController;
 use App\Http\Controllers\Api\V1\Chatbot\PickupController as ChatbotPickupController;
+use App\Http\Controllers\Api\V1\Voice\InfobipVoiceWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -144,6 +145,16 @@ Route::prefix('v1/chatbot')->group(function () {
     Route::post('/webhook', [ChatbotInteractionController::class, 'handleWebhook']);
 
     Route::post('/generate-qr', [ChatbotPickupController::class, 'generateQr'])->middleware('auth:sanctum');
+});
+
+// --- WHATSAPP VOICE IVR (Infobip CML callbacks) ---
+Route::prefix('v1/voice/infobip')->group(function () {
+    Route::get('/health', [InfobipVoiceWebhookController::class, 'health']);
+    Route::post('/inbound', [InfobipVoiceWebhookController::class, 'inbound']);
+    Route::post('/dtmf', [InfobipVoiceWebhookController::class, 'dtmf']);
+    Route::post('/recording', [InfobipVoiceWebhookController::class, 'recording']);
+    Route::post('/transfer', [InfobipVoiceWebhookController::class, 'transfer']);
+    Route::post('/status', [InfobipVoiceWebhookController::class, 'status']);
 });
 
 // --- CHATBOT REST API (Sanctum + tenant) ---

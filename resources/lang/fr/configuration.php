@@ -45,7 +45,7 @@ return [
     'whatsapp_sent_success' => 'Message WhatsApp envoyé avec succès.',
     'whatsapp_template_required' => 'Le texte libre WhatsApp a été refusé. Le destinataire doit écrire à votre numéro WhatsApp Business d\'abord (fenêtre 24h), ou envoyez un modèle approuvé.',
     'whatsapp_invalid_number' => 'Numéro WhatsApp invalide. Utilisez le format international complet (ex. +243899763122).',
-    'whatsapp_test_hint' => 'Le test WhatsApp envoie du texte libre. Hors fenêtre 24h, WhatsApp exige un modèle approuvé. Demandez au destinataire d\'écrire d\'abord à votre numéro professionnel, puis réessayez.',
+    'whatsapp_test_hint' => 'Si un modèle est configuré, Digitex le réessaie quand le texte libre est refusé (hors fenêtre 24h). Enregistrez d\'abord le nom school_notification et la langue en dans l\'onglet Infobip.',
     'gateway_connection_error' => 'Impossible de se connecter à la passerelle.',
     'gateway_response_error' => 'La passerelle a renvoyé une erreur.',
     'credentials_missing' => 'Identifiants API manquants pour le fournisseur sélectionné.',
@@ -219,4 +219,11 @@ return [
     'request_response_hours' => 'Délai de réponse parent (heures)',
     'block_attendance_expired' => 'Bloquer la présence si dérogation expirée',
     'block_results_expired' => 'Bloquer les résultats si dérogation expirée',
+
+    'homework_settings' => 'Devoirs',
+    'homework_approval_required' => 'Exiger la validation des devoirs avant publication',
+    'homework_approval_help' => 'Si activé, le devoir enregistré par un enseignant est mis en attente de validation et reste invisible pour les parents, les élèves et le chatbot WhatsApp jusqu\'à son approbation. Sinon, les enseignants publient directement.',
+    'homework_approver_roles' => 'Qui peut valider les devoirs',
+    'homework_approver_roles_help' => 'Les rôles sélectionnés doivent aussi disposer de la permission « assignment.approve ». Sans sélection, l\'autorité reste au School Admin et au Head Officer.',
+    'select_institution_first' => 'Sélectionnez d\'abord une école.',
 ];

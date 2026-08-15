@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'page_title' => 'Délibération de fin d\'année (secondaire)',
+    'subtitle' => 'Revoir les élèves sous le seuil de rattrapage, enregistrer les décisions, puis notifier les parents.',
+    'generate' => 'Actualiser la liste',
+    'generate_help' => 'Construit la liste à partir du Semestre 2 (P3 + P4 + examen) selon le seuil de rattrapage.',
+    'generated' => ':count élève(s) listé(s) avec des matières en échec.',
+    'save_decisions' => 'Enregistrer les décisions',
+    'decisions_saved' => ':count décision(s) enregistrée(s).',
+    'confirm_notify' => 'Confirmer et WhatsApp',
+    'confirm_prompt' => 'Envoyer WhatsApp/SMS aux parents pour tous les élèves avec une décision et pas encore notifiés ?',
+    'notified' => ':count notification(s) en file.',
+    'nothing_to_notify' => 'Aucune notification en attente. Enregistrez d\'abord une décision, ou tous les élèves concernés ont déjà été notifiés.',
+    'student' => 'Élève',
+    'class' => 'Classe',
+    'average' => '% S2',
+    'failed_subjects' => 'Matières en échec',
+    'decision' => 'Décision',
+    'notified_at' => 'Notifié',
+    'empty' => 'Aucun élève en échec pour l\'instant. Cliquez sur « Actualiser la liste ».',
+    'decision_pending' => 'En attente',
+    'decision_admitted' => 'Admis',
+    'decision_repechage' => 'Repêchage',
+    'decision_adjourned' => 'Ajourné',
+];

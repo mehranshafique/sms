@@ -24,7 +24,7 @@ class ReportCardAccessService
      *   message_fr: string
      * }
      */
-    public function check(Student $student, int $institutionId, ?string $periodKey = null): array
+    public function check(Student $student, int $institutionId, ?string $periodKey = null, bool $enforcePayment = true): array
     {
         $currency = \App\Enums\CurrencySymbol::default();
         $outstanding = (float) Invoice::where('student_id', $student->id)
@@ -33,13 +33,6 @@ class ReportCardAccessService
 
         $blockEnabled = (string) InstitutionSetting::get($institutionId, 'block_reports_on_debt', 0) === '1'
             || (bool) InstitutionSetting::get($institutionId, 'block_reports_on_debt', false);
-
-        if (! $blockEnabled) {
-            return $this->allowResult($periodKey, 0, 0, $outstanding);
-        }
-
-        $mins = $this->minPaidMap($institutionId);
-        $required = $this->requiredForPeriod($mins, $periodKey);
 
         $sessionId = AcademicSession::where('institution_id', $institutionId)
             ->where('is_current', true)
@@ -51,14 +44,21 @@ class ReportCardAccessService
         }
         $totalPaid = (float) $paidQuery->sum('paid_amount');
 
-        // Period-specific minimum paid rule.
+        $mins = $this->minPaidMap($institutionId);
+        $required = $this->requiredForPeriod($mins, $periodKey);
+
+        if (! $blockEnabled) {
+            return $this->allowResult($periodKey, $totalPaid, (float) ($required ?? 0), $outstanding);
+        }
+
+        $blocked = null;
+
         if ($required !== null && $required > 0) {
             $remaining = max(0, $required - $totalPaid);
             if ($remaining > 0) {
                 $fmtRem = number_format($remaining, 2) . ' ' . $currency;
                 $fmtReq = number_format($required, 2) . ' ' . $currency;
-
-                return [
+                $blocked = [
                     'allowed' => false,
                     'blocked' => true,
                     'mode' => 'min_paid',
@@ -71,15 +71,9 @@ class ReportCardAccessService
                     'message_fr' => "⛔ Accès refusé. Il vous reste {$fmtRem} à payer pour atteindre le minimum requis pour cette période du bulletin ({$fmtReq}). Veuillez régler pour voir vos résultats.",
                 ];
             }
-
-            return $this->allowResult($periodKey, $totalPaid, $required, $outstanding);
-        }
-
-        // Legacy fallback: any outstanding balance blocks.
-        if ($outstanding > 0) {
+        } elseif ($outstanding > 0) {
             $fmt = number_format($outstanding, 2) . ' ' . $currency;
-
-            return [
+            $blocked = [
                 'allowed' => false,
                 'blocked' => true,
                 'mode' => 'outstanding',
@@ -93,7 +87,21 @@ class ReportCardAccessService
             ];
         }
 
-        return $this->allowResult($periodKey, $totalPaid, (float) ($required ?? 0), $outstanding);
+        if ($blocked && $enforcePayment) {
+            return $blocked;
+        }
+
+        $allowed = $this->allowResult($periodKey, $totalPaid, (float) ($required ?? 0), $outstanding);
+        if ($blocked) {
+            $allowed['mode'] = $blocked['mode'];
+            $allowed['remaining'] = $blocked['remaining'];
+            $allowed['required'] = $blocked['required'];
+            $allowed['message_en'] = $blocked['message_en'];
+            $allowed['message_fr'] = $blocked['message_fr'];
+            $allowed['staff_banner'] = true;
+        }
+
+        return $allowed;
     }
 
     /**

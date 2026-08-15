@@ -22,7 +22,7 @@ class GatewayFactory
     ): SmsGatewayInterface {
         switch (strtolower($provider)) {
             case 'infobip':
-                return new InfobipService($institutionId);
+                return new InfobipService($institutionId, $fallbackInstitutionId);
             case 'mobishastra':
                 return new MobishastraService($institutionId);
             case 'meta':

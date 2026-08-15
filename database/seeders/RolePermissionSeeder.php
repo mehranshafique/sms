@@ -38,7 +38,7 @@ class RolePermissionSeeder extends Seeder
             'Subjects' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Class Subjects' => ['view', 'update'],
             'Timetables' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
-            'Assignments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
+            'Assignments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny', 'approve'],
             
             // Student & People
             'Students' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
@@ -54,6 +54,7 @@ class RolePermissionSeeder extends Seeder
             'Student Transfers' => ['view', 'create', 'print'],
             'Student Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
             'Discipline' => ['view', 'create', 'update', 'delete', 'viewAny'],
+            'Medical Records' => ['view', 'create', 'update', 'delete', 'viewAny'],
             'Fund Requests' => ['view', 'create', 'update', 'delete', 'viewAny'], // Added New Module
 
             'Staff' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
@@ -92,6 +93,7 @@ class RolePermissionSeeder extends Seeder
             'Voting' => ['view', 'create', 'update', 'delete'],
             'Elections' => ['view', 'create', 'update', 'delete', 'viewAny'],
             'Reminders' => ['view', 'create', 'update', 'delete'],
+            'Voice Ivr' => ['view', 'manage'],
             // Extra
             'Library' => ['view', 'create', 'update', 'delete'],
             'Transport' => ['view', 'create', 'update', 'delete'],

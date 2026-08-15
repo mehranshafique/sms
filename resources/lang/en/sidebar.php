@@ -53,6 +53,7 @@ return [
         'title' => 'Notices Board',
     ],
     'ptm' => 'PTM',
+    'voice_ivr' => 'WhatsApp Voice',
     'reminders' => 'Reminders',
     'my_notices' => 'My Notices', 
     'system_alerts' => 'System Alerts',
@@ -161,6 +162,7 @@ return [
     ],
     'requests' => 'Derogation & Request',
     'discipline' => 'Discipline',
+    'infirmary' => 'Infirmary',
     'staff' => [
         'title' => 'Staff'
     ],
@@ -207,6 +209,7 @@ return [
     'generate_payroll' => 'Generate Payroll',
     'state_exams' => 'State Exams (EXETAT)',
     'lmd_deliberations' => 'LMD Deliberations',
+    'secondary_deliberations' => 'Secondary Deliberation',
     'transport' => 'Transport',
     'operations' => 'Operations',
     'guardian_portal' => 'Guardian Portal',

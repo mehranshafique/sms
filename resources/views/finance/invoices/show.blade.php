@@ -252,6 +252,21 @@
                                         </td>
                                         <td class="text-success fw-bold py-3 text-end">+ {{ $currency }} {{ number_format($payment->amount, 2) }}</td>
                                     </tr>
+                                    @php $componentSplit = $payment->allocations->whereNotNull('fee_component_id'); @endphp
+                                    @if($componentSplit->isNotEmpty())
+                                    <tr>
+                                        <td colspan="5" class="pt-0 pb-3">
+                                            <div class="ps-3 border-start">
+                                                <div class="small text-muted mb-1">{{ __('finance.payment_breakdown') }}</div>
+                                                @foreach($componentSplit as $allocation)
+                                                    <span class="badge bg-light text-dark border me-1 mb-1">
+                                                        {{ $allocation->label }}: {{ $currency }} {{ number_format($allocation->amount, 2) }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @endif
                                     @empty
                                     <tr>
                                         <td colspan="5" class="text-center text-muted py-4"><i class="fa fa-info-circle me-2"></i> {{ __('finance.no_payments_found') }}</td>

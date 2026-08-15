@@ -91,6 +91,11 @@
                                         <small class="text-muted">{{ __('finance.sequence_order_hint') }}</small>
                                     </div>
                                 </div>
+
+                                @if($proportionalEnabled ?? false)
+                                    @include('finance.fees._components', ['components' => [], 'isProportional' => false])
+                                @endif
+
                                 <button type="submit" class="btn btn-primary mt-3">{{ __('finance.save') }}</button>
                             </div>
                         </div>

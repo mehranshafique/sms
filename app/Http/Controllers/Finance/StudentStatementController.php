@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\InvoiceItem;
 use App\Enums\CurrencySymbol;
+use App\Services\Finance\FeeAllocationService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 use Illuminate\Support\Facades\Auth;
@@ -121,7 +122,12 @@ class StudentStatementController extends BaseController
         $totalPaid = Payment::whereHas('invoice', fn($q) => $q->where('student_id', $studentId))->sum('amount');
         $balance = $totalInvoiced - $totalPaid;
 
-        return view('finance.statements.show', compact('student', 'totalInvoiced', 'totalPaid', 'balance'));
+        $componentRows = app(FeeAllocationService::class)->componentSummary(
+            (int) $student->institution_id,
+            ['student_id' => (int) $student->id]
+        );
+
+        return view('finance.statements.show', compact('student', 'totalInvoiced', 'totalPaid', 'balance', 'componentRows'));
     }
 
     /**

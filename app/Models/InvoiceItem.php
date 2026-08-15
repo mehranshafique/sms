@@ -25,4 +25,9 @@ class InvoiceItem extends Model
     {
         return $this->belongsTo(FeeStructure::class);
     }
+
+    public function allocations()
+    {
+        return $this->hasMany(PaymentAllocation::class);
+    }
 }

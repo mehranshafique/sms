@@ -306,6 +306,7 @@ class StudentPortalApiController extends Controller
             }
 
             $assignments = Assignment::with(['subject', 'teacher.user'])
+                ->published()
                 ->where('class_section_id', $enrollment->class_section_id)
                 ->where('deadline', '>=', now()->subDays(7))
                 ->latest('deadline')
@@ -439,6 +440,15 @@ class StudentPortalApiController extends Controller
             $periodKey = request()->input('period')
                 ?? request()->input('period_key')
                 ?? null;
+            if (! $periodKey) {
+                $cycle = app(\App\Services\AcademicCycleService::class)->resolveCycle($enrollment);
+                $latest = app(\App\Services\AssessmentPeriodService::class)->latestOfficialStage(
+                    (int) $student->institution_id,
+                    (int) $enrollment->academic_session_id,
+                    $cycle
+                );
+                $periodKey = $latest['key'] ?? null;
+            }
             $access = app(\App\Services\ReportCardAccessService::class)
                 ->check($student, (int) $student->institution_id, $periodKey ? (string) $periodKey : null);
 

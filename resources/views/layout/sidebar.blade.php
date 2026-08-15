@@ -389,7 +389,18 @@
                         </li>
                     @endif
                 @endif
-                
+
+                {{-- Infirmary / Medical Records (sidebar + horizontal top nav) --}}
+                @if($showManagementNav && $hasModule('medical_records') && ($user->can('medical_record.view') || $user->can('medical_record.viewAny') || $isAdminRole))
+                    <li class="nav-label">{{ __('sidebar.infirmary') }}</li>
+                    <li>
+                        <a class="ai-icon {{ request()->routeIs('medical-records.*') ? 'mm-active' : '' }}" href="{{ route('medical-records.index') }}">
+                            <i class="la la-heartbeat"></i>
+                            <span class="nav-text">{{ __('sidebar.infirmary') }}</span>
+                        </a>
+                    </li>
+                @endif
+
                 {{-- SECURITY / GUARD LINK --}}
                 @if($user->hasRole('Guard') || $user->hasRole(\App\Enums\RoleEnum::GATE_ATTENDANT->value))
                     <li class="nav-label">{{ __('sidebar.security') }}</li>
@@ -434,7 +445,10 @@
                                 <li><a class="{{ request()->routeIs('payment-proofs.*') ? 'mm-active' : '' }}" href="{{ route('payment-proofs.index') }}">{{ __('sidebar.payment_proofs') }}@include('layout.partials.sidebar-badge', ['key' => 'payment-proofs'])</a></li>
                             @endif
                             <li><a class="{{ request()->routeIs('finance.balances.*') ? 'mm-active' : '' }}" href="{{ route('finance.balances.index') }}">{{ __('sidebar.student_balances') }}</a></li>
-                            <li><a class="{{ request()->routeIs('finance.reports.*') ? 'mm-active' : '' }}" href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
+                            <li><a class="{{ request()->routeIs('finance.reports.class_summary') ? 'mm-active' : '' }}" href="{{ route('finance.reports.class_summary') }}">{{ __('sidebar.financial_reports') }}</a></li>
+                            @if($hasModule('fee_structures') && app(\App\Services\Finance\FeeAllocationService::class)->isEnabledFor($activeInstitution?->id))
+                                <li><a class="{{ request()->routeIs('finance.reports.components') ? 'mm-active' : '' }}" href="{{ route('finance.reports.components') }}">{{ __('finance.component_report_title') }}</a></li>
+                            @endif
                         </ul>
                     </li>
                     @endif
@@ -485,7 +499,7 @@
                 @endphp
                 @if($showExaminationsNav)
                     <li class="nav-label">{{ __('sidebar.examinations') }}</li>
-                    <li class="mega-menu-md {{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*', 'conduct.*') ? 'mm-active' : '' }}">
+                    <li class="mega-menu-md {{ request()->routeIs('exams.*', 'exam-schedules.*', 'marks.*', 'results.*', 'reports.*', 'state-exams.*', 'lmd-deliberations.*', 'secondary-deliberations.*', 'conduct.*') ? 'mm-active' : '' }}">
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-file-text"></i><span class="nav-text">{{ __('sidebar.examinations') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'examinations'])</a>
                         <ul aria-expanded="false">
                             @if($canViewExams)
@@ -512,6 +526,9 @@
                             @if($showStateExams && $isAdminRole)
                             <li><a class="{{ request()->routeIs('state-exams.*') ? 'mm-active' : '' }}" href="{{ route('state-exams.index') }}">{{ __('sidebar.state_exams') }}</a></li>
                             @endif
+                            @if($isAdminRole)
+                            <li><a class="{{ request()->routeIs('secondary-deliberations.*') ? 'mm-active' : '' }}" href="{{ route('secondary-deliberations.index') }}">{{ __('sidebar.secondary_deliberations') }}</a></li>
+                            @endif
                             @if($showLmdFeatures && $isAdminRole)
                             <li><a class="{{ request()->routeIs('lmd-deliberations.*') ? 'mm-active' : '' }}" href="{{ route('lmd-deliberations.index') }}">{{ __('sidebar.lmd_deliberations') }}</a></li>
                             @endif
@@ -520,7 +537,7 @@
                 @endif
                 
                 {{-- COMMUNICATION & VOTING --}}
-                @if($hasModule('communication') || $hasModule('voting'))
+                @if($hasModule('communication') || $hasModule('voting') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
                     <li class="nav-label">{{ __('sidebar.communication') }}</li>
                     
                     @if($hasModule('communication'))
@@ -537,6 +554,10 @@
                         @can('setting.manage')
                         <li><a class="ai-icon {{ request()->routeIs('chatbot.*') ? 'mm-active' : '' }}" href="{{ route('chatbot.settings.index') }}"><i class="fa fa-comments"></i><span class="nav-text">{{ __('chatbot.page_title') ?? 'Chatbot' }}</span></a></li>
                         @endcan
+                    @endif
+
+                    @if($hasModule('voice_ivr') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer']))
+                        <li><a class="ai-icon {{ request()->routeIs('voice.*') ? 'mm-active' : '' }}" href="{{ route('voice.settings.index') }}"><i class="fa fa-phone"></i><span class="nav-text">{{ __('sidebar.voice_ivr') }}</span></a></li>
                     @endif
 
                     @if($hasModule('voting') && $user->can('election.view'))

@@ -20,15 +20,16 @@
     </div>
 
     <div class="single-card-page">
-        <div class="student-column single-card-view">
+        <div class="student-column single-card-view cards-{{ $cards_per_page ?? 4 }}">
 @else
     <div class="student-column">
 @endif
 
     <div class="card-inner">
+    @include('reports.partials.bulletin_banners')
     @php
         $labels = $column_labels ?? [];
-        $subjectCount = collect($data)->where('has_marks', true)->count();
+        $subjectCount = count($data ?? []);
         $densityClass = $subjectCount > 16 ? 'density-high' : ($subjectCount > 12 ? 'density-medium' : 'density-low');
         $principalName = __('reports.direction');
         if (isset($student->institution_id)) {
@@ -94,8 +95,7 @@
                 @endphp
 
                 @foreach($data as $row)
-                    @if($row['has_marks'])
-                        @php
+                    @php
                             // Cast directly to (float) to completely remove .00 and decimal artifacts
                             $p1 = is_numeric($row['p1_score'] ?? null) ? (float)$row['p1_score'] : '-';
                             $p2 = is_numeric($row['p2_score'] ?? null) ? (float)$row['p2_score'] : '-';
@@ -105,9 +105,9 @@
                             $p2_val = is_numeric($p2) ? $p2 : 0;
                             $ex_val = is_numeric($ex) ? $ex : 0;
                             
-                            $tot = isset($row['total_score']) && is_numeric($row['total_score']) 
-                                ? (float)$row['total_score'] 
-                                : ($p1_val + $p2_val + $ex_val);
+                            $tot = (is_numeric($p1) || is_numeric($p2) || is_numeric($ex))
+                                ? (float) ($row['total_score'] ?? ($p1_val + $p2_val + $ex_val))
+                                : '-';
                             
                             $p1_max = $row['p1_max'] ?? 0;
                             $p2_max = $row['p2_max'] ?? 0;
@@ -139,7 +139,6 @@
                             <td class="{{ $isTotFail ? 'fail-grade' : '' }}">{{ $tot }}</td>
                             <td>{{ $tot_max > 0 ? $tot_max : '-' }}</td>
                         </tr>
-                    @endif
                 @endforeach
             </tbody>
         </table>
@@ -186,12 +185,10 @@
             <div class="summary-row">
                 <span class="label">{{ __('reports.place_eff') ?? 'PLACE - EFF' }}</span>
                 @php
-                    // Display specific Section Rank and Total for exact class size matching
-                    $secRank = $ranks['section_rank'] ?? '-';
-                    $secTotal = $ranks['section_total'] ?? '-';
+                    $placeEff = $ranks['place_eff'] ?? ((($ranks['section_rank'] ?? '-') . ' / ' . ($ranks['section_total'] ?? '-')));
                 @endphp
-                <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
-                <span class="val">{{ $secRank }}{{ is_numeric($secRank) ? 'e' : '' }} | {{ $secTotal }}</span>
+                <span class="val">{{ $placeEff }}</span>
+                <span class="val">{{ $placeEff }}</span>
             </div>
         </div>
 
