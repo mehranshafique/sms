@@ -165,6 +165,12 @@ class InfobipService implements SmsGatewayInterface
             ];
         }
 
+        // Approved templates work inside and outside the 24h window. Use them
+        // first whenever the school has registered one (tests + notifications).
+        if ($this->whatsappTemplateName) {
+            return $this->sendWhatsAppTemplate($msisdn, $from, $message);
+        }
+
         try {
             $url = rtrim((string) $this->baseUrl, '/') . '/whatsapp/1/message/text';
 
