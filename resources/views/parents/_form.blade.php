@@ -1,6 +1,11 @@
-<form action="{{ isset($parent) ? route('parents.update', $parent->id) : route('parents.store') }}" method="POST" class="ajax-form">
+@php
+    $parent = $parent ?? null;
+    $linkedUser = $parent?->user;
+    $isEdit = $parent !== null;
+@endphp
+<form action="{{ $isEdit ? route('parents.update', $parent->id) : route('parents.store') }}" method="POST" class="ajax-form">
     @csrf
-    @if(isset($parent))
+    @if($isEdit)
         @method('PUT')
     @endif
 
@@ -14,15 +19,15 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label">{{ __('parent.father_name') }}</label>
-                        <input type="text" name="father_name" class="form-control" value="{{ old('father_name', $parent->father_name ?? '') }}">
+                        <input type="text" name="father_name" class="form-control" value="{{ old('father_name', $parent?->father_name) }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ __('parent.father_phone') }}</label>
-                        <input type="text" name="father_phone" class="form-control" value="{{ old('father_phone', $parent->father_phone ?? '') }}">
+                        <input type="text" name="father_phone" class="form-control" value="{{ old('father_phone', $parent?->father_phone) }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ __('parent.father_occupation') }}</label>
-                        <input type="text" name="father_occupation" class="form-control" value="{{ old('father_occupation', $parent->father_occupation ?? '') }}">
+                        <input type="text" name="father_occupation" class="form-control" value="{{ old('father_occupation', $parent?->father_occupation) }}">
                     </div>
                 </div>
             </div>
@@ -37,15 +42,15 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label">{{ __('parent.mother_name') }}</label>
-                        <input type="text" name="mother_name" class="form-control" value="{{ old('mother_name', $parent->mother_name ?? '') }}">
+                        <input type="text" name="mother_name" class="form-control" value="{{ old('mother_name', $parent?->mother_name) }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ __('parent.mother_phone') }}</label>
-                        <input type="text" name="mother_phone" class="form-control" value="{{ old('mother_phone', $parent->mother_phone ?? '') }}">
+                        <input type="text" name="mother_phone" class="form-control" value="{{ old('mother_phone', $parent?->mother_phone) }}">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ __('parent.mother_occupation') }}</label>
-                        <input type="text" name="mother_occupation" class="form-control" value="{{ old('mother_occupation', $parent->mother_occupation ?? '') }}">
+                        <input type="text" name="mother_occupation" class="form-control" value="{{ old('mother_occupation', $parent?->mother_occupation) }}">
                     </div>
                 </div>
             </div>
@@ -59,10 +64,6 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        @php
-                            $linkedUser = isset($parent) ? $parent->user : null;
-                        @endphp
-
                         @if($linkedUser)
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.parent_id') }}</label>
@@ -78,31 +79,31 @@
 
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.username') }}</label>
-                            <input type="text" name="username" class="form-control" value="{{ old('username', $linkedUser->username ?? '') }}" placeholder="{{ __('parent.username_placeholder') }}">
+                            <input type="text" name="username" class="form-control" value="{{ old('username', $linkedUser?->username) }}" placeholder="{{ __('parent.username_placeholder') }}">
                             <small class="text-muted">{{ __('parent.username_hint') }}</small>
                         </div>
 
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.guardian_name') }}</label>
-                            <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name', optional($parent)->guardian_name) }}" placeholder="Primary Contact Name">
+                            <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name', $parent?->guardian_name) }}" placeholder="Primary Contact Name">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.guardian_email') }}</label>
-                            <input type="email" name="guardian_email" class="form-control" value="{{ old('guardian_email', optional($parent)->guardian_email) }}" placeholder="Used for Login">
+                            <input type="email" name="guardian_email" class="form-control" value="{{ old('guardian_email', $parent?->guardian_email) }}" placeholder="Used for Login">
                             <small class="text-muted">{{ __('parent.email_hint') }}</small>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.guardian_phone') }}</label>
-                            <input type="text" name="guardian_phone" class="form-control" value="{{ old('guardian_phone', optional($parent)->guardian_phone) }}">
+                            <input type="text" name="guardian_phone" class="form-control" value="{{ old('guardian_phone', $parent?->guardian_phone) }}">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">{{ __('parent.guardian_relation') }}</label>
-                            <input type="text" name="guardian_relation" class="form-control" value="{{ old('guardian_relation', optional($parent)->guardian_relation) }}" placeholder="e.g. Uncle, Brother">
+                            <input type="text" name="guardian_relation" class="form-control" value="{{ old('guardian_relation', $parent?->guardian_relation) }}" placeholder="e.g. Uncle, Brother">
                         </div>
 
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.password') }}</label>
-                            <input type="password" name="password" class="form-control" autocomplete="new-password" placeholder="{{ isset($parent) ? __('parent.password_edit_placeholder') : __('parent.password_create_placeholder') }}">
+                            <input type="password" name="password" class="form-control" autocomplete="new-password" placeholder="{{ $isEdit ? __('parent.password_edit_placeholder') : __('parent.password_create_placeholder') }}">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">{{ __('parent.password_confirm') }}</label>
@@ -111,13 +112,13 @@
 
                         <div class="col-md-12 mb-3">
                             <label class="form-label">{{ __('parent.address_label') }}</label>
-                            <textarea name="family_address" class="form-control" rows="2">{{ old('family_address', optional($parent)->family_address) }}</textarea>
+                            <textarea name="family_address" class="form-control" rows="2">{{ old('family_address', $parent?->family_address) }}</textarea>
                         </div>
                     </div>
                 </div>
                 <div class="card-footer text-end bg-white">
                     <a href="{{ route('parents.index') }}" class="btn btn-light me-2">{{ __('parent.cancel') }}</a>
-                    <button type="submit" class="btn btn-primary">{{ isset($parent) ? __('parent.update') : __('parent.save') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ $isEdit ? __('parent.update') : __('parent.save') }}</button>
                 </div>
             </div>
         </div>

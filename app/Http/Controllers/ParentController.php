@@ -85,7 +85,7 @@ class ParentController extends BaseController
 
     public function create()
     {
-        return view('parents.create');
+        return view('parents.create', ['parent' => null]);
     }
 
     public function store(Request $request)
