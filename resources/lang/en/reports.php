@@ -31,6 +31,7 @@ return [
     // Errors & Messages
     'no_records_found' => 'No academic records found for the selected criteria.',
     'no_results_title' => 'No results found',
+    'notice_title' => 'Notice',
     'unauthorized' => 'Unauthorized access.',
     'no_enrollment' => 'Student is not enrolled in any class.',
     'error_period_inactive' => 'The selected period (:period) is not currently active. Reports cannot be generated.',
@@ -94,6 +95,8 @@ return [
 
     'session_report' => 'Session Transcript (University / LMD)',
     'scope_cycle_hint' => 'Report options depend on the selected student or class level.',
+    'session_need_student' => 'A session transcript is generated for one student at a time. Switch to Single Student and select a student.',
+    'select_school_context' => 'Select a school before generating academic reports.',
     'error_university_use_transcript' => 'University and LMD students use the Academic Transcript. Please use the transcript form.',
     'error_invalid_period_for_cycle' => 'The selected period is not valid for this class level.',
     'error_semester_not_for_primary' => 'Semester reports apply to secondary classes only. Use trimester for primary.',

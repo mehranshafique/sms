@@ -38,12 +38,12 @@
         <tr>
             <td class="label">{{ __('results.student_name') }}</td>
             <td>{{ $student->full_name }}</td>
-            <td class="label">{{ __('results.roll_number') }}</td>
+            <td class="label">{{ __('results.student_id') }}</td>
             <td>{{ $student->admission_number }}</td>
         </tr>
         <tr>
             <td class="label">{{ __('results.father_name') }}</td>
-            <td>{{ $student->guardian_name }}</td>
+            <td>{{ $student->displayFatherName() }}</td>
             <td class="label">{{ __('results.generated_on') }}</td>
             <td>{{ date('d M, Y') }}</td>
         </tr>

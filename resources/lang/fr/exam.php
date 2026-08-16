@@ -73,6 +73,7 @@ return [
     'result_sheet' => 'Feuille de résultats',
     'class' => 'Classe',
     'student' => 'Élève',
+    'student_id' => 'ID élève',
     'total' => 'Total',
     'average' => 'Moyenne',
     'rank' => 'Rang',

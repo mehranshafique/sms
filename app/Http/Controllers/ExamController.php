@@ -394,7 +394,7 @@ class ExamController extends BaseController
         ]);
 
         $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
-        
+
         $records = ExamRecord::with(['student', 'subject'])
             ->where('exam_id', $exam->id)
             ->where('class_section_id', $classSection->id)
@@ -408,7 +408,23 @@ class ExamController extends BaseController
             ->pluck('subject')
             ->unique('id');
 
-        $data = compact('exam', 'classSection', 'records', 'subjects');
+        $totals = $records->map(fn ($studentRecords) => (float) $studentRecords->sum('marks_obtained'))
+            ->sortDesc();
+        $ranks = [];
+        $place = 0;
+        $previousTotal = null;
+        $index = 0;
+        foreach ($totals as $studentId => $total) {
+            $index++;
+            if ($previousTotal === null || $total < $previousTotal) {
+                $place = $index;
+                $previousTotal = $total;
+            }
+            $ranks[$studentId] = $place;
+        }
+
+        $exam->loadMissing(['institution', 'academicSession']);
+        $data = compact('exam', 'classSection', 'records', 'subjects', 'ranks');
 
         if ($request->has('download')) {
              $pdf = Pdf::loadView('exams.print_class_result', $data);

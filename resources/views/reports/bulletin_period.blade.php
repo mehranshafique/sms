@@ -59,6 +59,11 @@
             <div class="school-name">{{ strtoupper($student->institution->name ?? '') }}</div>
             <div class="student-name">{{ strtoupper($student->first_name . ' ' . $student->last_name) }}</div>
             <div class="class-name">{{ $enrollment->classSection->gradeLevel->name ?? '' }} - {{ $enrollment->classSection->name ?? '' }}</div>
+            <div class="class-name" style="font-size:10px;font-weight:normal;">
+                {{ __('results.student_id') }} {{ $student->admission_number }}
+                &nbsp;|&nbsp;
+                {{ __('results.father_name') }} {{ $student->displayFatherName() }}
+            </div>
             <div class="barcode"></div>
             <div class="term-title-bar">{{ $term_title ?? (__('reports.bulletin_period_title', ['period' => strtoupper($period ?? '')])) }}</div>
         </div>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Backup\SchoolBackupPath;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
@@ -50,6 +51,15 @@ class SchoolBackup extends Model
 
     public function isDownloadable(): bool
     {
-        return $this->status === 'completed' && $this->disk_path && is_file(storage_path('app/' . ltrim($this->disk_path, '/')));
+        return $this->status === 'completed' && $this->absolutePath() !== null;
+    }
+
+    public function absolutePath(): ?string
+    {
+        if (!$this->disk_path) {
+            return null;
+        }
+
+        return SchoolBackupPath::absolute($this->disk_path);
     }
 }

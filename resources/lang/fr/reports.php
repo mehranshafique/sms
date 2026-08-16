@@ -25,6 +25,7 @@ return [
     'generate_transcript' => 'Générer le relevé',
     'no_records_found' => 'Aucun dossier académique trouvé pour ces critères.',
     'no_results_title' => 'Aucun résultat trouvé',
+    'notice_title' => 'Information',
     'unauthorized' => 'Accès non autorisé.',
     'no_enrollment' => 'L\'élève n\'est inscrit dans aucune classe.',
     'error_period_inactive' => 'La période sélectionnée (:period) n\'est pas active.',
@@ -79,6 +80,8 @@ return [
 
     'session_report' => 'Relevé de session (Université / LMD)',
     'scope_cycle_hint' => 'Les options de rapport dépendent du niveau de la classe ou de l\'élève sélectionné.',
+    'session_need_student' => 'Le relevé de session se génère pour un élève à la fois. Passez en mode Un seul élève et choisissez un élève.',
+    'select_school_context' => 'Sélectionnez un établissement avant de générer les rapports académiques.',
     'error_university_use_transcript' => 'Les étudiants universitaires/LMD utilisent le relevé de notes. Veuillez utiliser le formulaire de relevé.',
     'error_invalid_period_for_cycle' => 'La période sélectionnée n\'est pas valide pour ce niveau de classe.',
     'error_semester_not_for_primary' => 'Les rapports semestriels concernent le secondaire. Utilisez le trimestre pour le primaire.',

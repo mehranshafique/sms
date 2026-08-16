@@ -6,7 +6,6 @@ use App\Models\Institution;
 use App\Models\SchoolBackup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
 
@@ -185,11 +184,7 @@ class SchoolBackupExporter
             file_put_contents($workDir . '/digitex-backup.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
             $relativeZip = 'school-backups/' . $institution->id . '/' . $backup->uuid . '.zip';
-            $absoluteZip = storage_path('app/' . $relativeZip);
-            $zipDir = dirname($absoluteZip);
-            if (!is_dir($zipDir)) {
-                mkdir($zipDir, 0755, true);
-            }
+            $absoluteZip = SchoolBackupPath::absoluteForWrite($relativeZip);
 
             $zip = new ZipArchive();
             if ($zip->open($absoluteZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
@@ -197,6 +192,19 @@ class SchoolBackupExporter
             }
             $this->addDirectoryToZip($zip, $workDir, '');
             $zip->close();
+            unset($zip);
+
+            if (!is_file($absoluteZip) || filesize($absoluteZip) < 22) {
+                throw new \RuntimeException('Unable to create backup ZIP.');
+            }
+
+            $verify = new ZipArchive();
+            $verifyFlags = defined('ZipArchive::RDONLY') ? ZipArchive::RDONLY : 0;
+            if ($verify->open($absoluteZip, $verifyFlags) !== true) {
+                throw new \RuntimeException('Unable to create backup ZIP.');
+            }
+            $verify->close();
+            unset($verify);
 
             $backup->update([
                 'status' => 'completed',
@@ -257,7 +265,13 @@ class SchoolBackupExporter
                 $zip->addEmptyDir($local);
                 $this->addDirectoryToZip($zip, $path, $local);
             } else {
-                $zip->addFile($path, $local);
+                // addFromString copies bytes immediately so the ZIP stays valid after
+                // the work directory is deleted (ZipArchive::addFile is deferred).
+                $contents = file_get_contents($path);
+                if ($contents === false) {
+                    throw new \RuntimeException('Unable to read file for backup ZIP: ' . $local);
+                }
+                $zip->addFromString(str_replace('\\', '/', $local), $contents);
             }
         }
     }
@@ -277,7 +291,7 @@ class SchoolBackupExporter
 
         foreach ($old as $backup) {
             if ($backup->disk_path) {
-                Storage::disk('local')->delete($backup->disk_path);
+                SchoolBackupPath::delete($backup->disk_path);
             }
             $backup->delete();
         }

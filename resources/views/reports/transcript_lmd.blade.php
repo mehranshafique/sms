@@ -72,10 +72,16 @@
             <td>{{ $student->admission_number }}</td>
         </tr>
         <tr>
+            <td class="label">{{ __('results.father_name') }}</td>
+            <td>{{ $student->displayFatherName() }}</td>
             <td class="label">{{ __('grade_level.grade_name') }}:</td>
             <td>{{ $student->gradeLevel->name ?? '-' }}</td>
+        </tr>
+        <tr>
             <td class="label">{{ __('reports.date') }}:</td>
             <td>{{ date('d M, Y') }}</td>
+            <td></td>
+            <td></td>
         </tr>
     </table>
 

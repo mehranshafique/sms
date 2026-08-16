@@ -71,12 +71,19 @@
 
             // 3. Configure Bootstrap Select (Global Fallback)
             // After AJAX repopulates a <select>, call digitexRefreshSelect(el) — refresh only, never destroy/reinit.
+            window.digitexSelectIsHidden = function($el) {
+                return $el.closest('.d-none, [hidden]').length > 0;
+            };
+
             window.digitexRefreshSelect = function(element) {
                 if (typeof jQuery === 'undefined' || typeof jQuery.fn.selectpicker === 'undefined') {
                     return;
                 }
                 var $el = jQuery(element);
-                if ($el.length && $el.data('selectpicker')) {
+                if (!$el.length || window.digitexSelectIsHidden($el)) {
+                    return;
+                }
+                if ($el.data('selectpicker')) {
                     $el.selectpicker('refresh');
                 }
             };
@@ -91,24 +98,40 @@
                         $el.selectpicker('destroy');
                     }
                 });
-                jQuery('.default-select').selectpicker({
-                    liveSearch: true,
-                    size: 10,
-                    container: 'body',
-                    dropupAuto: false,
+                jQuery('.default-select').each(function() {
+                    var $el = jQuery(this);
+                    if (window.digitexSelectIsHidden($el) || $el.prop('disabled')) {
+                        return;
+                    }
+                    $el.selectpicker({
+                        liveSearch: true,
+                        size: 10,
+                        container: 'body',
+                        dropupAuto: false,
+                    });
                 });
-                jQuery('.multi-select').selectpicker({
-                    liveSearch: true,
-                    size: 10,
-                    width: '100%',
-                    container: 'body',
-                    dropupAuto: false,
+                jQuery('.multi-select').each(function() {
+                    var $el = jQuery(this);
+                    if (window.digitexSelectIsHidden($el) || $el.prop('disabled')) {
+                        return;
+                    }
+                    $el.selectpicker({
+                        liveSearch: true,
+                        size: 10,
+                        width: '100%',
+                        container: 'body',
+                        dropupAuto: false,
+                    });
                 });
                 jQuery('.default-select, .multi-select').each(function() {
-                    if (!jQuery(this).attr('title')) {
-                        jQuery(this).attr('title', '');
+                    var $el = jQuery(this);
+                    if (!$el.attr('title')) {
+                        $el.attr('title', '');
                     }
-                }).selectpicker('refresh');
+                    if ($el.data('selectpicker') && !window.digitexSelectIsHidden($el) && !$el.prop('disabled')) {
+                        $el.selectpicker('refresh');
+                    }
+                });
             };
 
             if (typeof jQuery.fn.selectpicker !== 'undefined' && jQuery.fn.selectpicker.defaults) {

@@ -36,7 +36,7 @@
                     <div class="card-body">
                         <p class="text-muted mb-4 fs-13">{{ __('reports.bulletin_description') ?? 'Generate reports for a specific Period, Trimester, or Semester.' }}</p>
                         
-                        <form action="{{ route('reports.bulletin') }}" method="GET" target="_blank" id="bulletinForm">
+                        <form action="{{ route('reports.bulletin') }}" method="GET" id="bulletinForm">
                             
                             {{-- Mode Toggle --}}
                             <div class="mb-3">
@@ -144,7 +144,7 @@
                     <div class="card-body">
                         <p class="text-muted mb-4 fs-13">{{ __('reports.transcript_description') ?? 'Generate a comprehensive academic history report (Cumulative).' }}</p>
                         
-                        <form action="{{ route('reports.transcript') }}" method="GET" target="_blank" id="transcriptForm">
+                        <form action="{{ route('reports.transcript') }}" method="GET" id="transcriptForm">
                             <div class="mb-3">
                                 <label class="form-label">{{ __('reports.select_student') }}</label>
                                 <select class="form-control default-select" name="student_id" required>
@@ -198,8 +198,12 @@
         const noRecordsMsg = @json(__('reports.no_records_found'));
         const noStudentsMsg = @json(__('reports.no_students_in_class'));
         const noEnrollmentMsg = @json(__('reports.no_enrollment'));
+        const sessionNeedStudentMsg = @json(__('reports.session_need_student'));
+        const invalidPeriodMsg = @json(__('reports.error_invalid_period_for_cycle'));
         const defaultScopeHint = @json(__('reports.scope_cycle_hint'));
-        const infoMessages = [noRecordsMsg, noStudentsMsg, noEnrollmentMsg];
+        const noticeTitle = @json(__('reports.notice_title'));
+        const noResultsTitle = @json(__('reports.no_results_title'));
+        const infoMessages = [noRecordsMsg, noStudentsMsg, noEnrollmentMsg, sessionNeedStudentMsg, invalidPeriodMsg];
         let latestOfficialStage = null;
         let lastScopePayload = null;
 
@@ -225,24 +229,44 @@
             return typeof $ !== 'undefined' && $.fn.selectpicker;
         }
 
-        function refreshPicker(selectEl) {
-            if (!selectEl || !hasSelectpicker()) {
+        function selectIsHidden(selectEl) {
+            return !selectEl || !!selectEl.closest('.d-none, [hidden]');
+        }
+
+        function refreshPicker(selectEl, forceLiveSearch) {
+            if (!selectEl || !hasSelectpicker() || selectIsHidden(selectEl) || selectEl.disabled) {
                 return;
             }
             const $el = $(selectEl);
-            // Destroy + re-init: refresh on disabled/hidden pickers leaves an empty UI
-            // while <option> nodes remain in the DOM.
+            const liveSearch = forceLiveSearch === true || (forceLiveSearch !== false && selectEl.options.length > 12);
             try {
                 if ($el.data('selectpicker')) {
                     $el.selectpicker('destroy');
                 }
             } catch (e) {}
-            if (selectEl.disabled) {
-                return;
-            }
             try {
-                $el.selectpicker();
+                $el.selectpicker({
+                    liveSearch: liveSearch,
+                    size: 10,
+                    container: 'body',
+                    dropupAuto: false,
+                    hideDisabled: false,
+                });
             } catch (e2) {}
+        }
+
+        function pickerVal(selectEl) {
+            if (!selectEl || selectEl.disabled) {
+                return '';
+            }
+            if (hasSelectpicker()) {
+                const $el = $(selectEl);
+                if ($el.data('selectpicker')) {
+                    const v = $el.selectpicker('val');
+                    return v == null ? '' : String(v);
+                }
+            }
+            return selectEl.value || '';
         }
 
         function setPickerVal(selectEl, value) {
@@ -266,10 +290,10 @@
             }
             suppressEntityChange = true;
             try {
-                if (hasSelectpicker() && $(selectEl).data('selectpicker')) {
-                    try { $(selectEl).selectpicker('destroy'); } catch (e) {}
-                }
                 selectEl.value = '';
+                if (hasSelectpicker() && $(selectEl).data('selectpicker')) {
+                    try { $(selectEl).selectpicker('val', ''); } catch (e) {}
+                }
                 selectEl.removeAttribute('name');
                 selectEl.required = false;
                 selectEl.disabled = true;
@@ -312,6 +336,20 @@
             }
         }
 
+        function showTermGroup(groupId, selectEl, typeValue) {
+            const group = document.getElementById(groupId);
+            if (!group || !selectEl) {
+                return;
+            }
+            group.classList.remove('d-none');
+            selectEl.disabled = false;
+            selectEl.required = true;
+            document.getElementById('typeInput').value = typeValue;
+            requestAnimationFrame(function () {
+                refreshPicker(selectEl, false);
+            });
+        }
+
         function hideTermGroups(clearValues) {
             document.getElementById('periodGroup').classList.add('d-none');
             document.getElementById('trimesterGroup').classList.add('d-none');
@@ -351,7 +389,7 @@
             lastScopePayload = payload;
             latestOfficialStage = payload.latest_official || null;
             const allowed = payload.scopes || [];
-            const previousScope = reportScope.value;
+            const previousScope = pickerVal(reportScope) || reportScope.value;
 
             rebuildOptions(reportScope, reportScopeOptionsHtml, allowed);
 
@@ -365,10 +403,11 @@
                 payload.period_stages.forEach(function (stage) {
                     const opt = document.createElement('option');
                     opt.value = stage.key;
-                    opt.textContent = stage.status === 'reopened'
-                        ? @json(__('reports.reopened_option')).replace(':label', stage.label)
-                        : stage.label;
-                    opt.disabled = !stage.selectable;
+                    opt.textContent = stage.selectable
+                        ? (stage.status === 'reopened'
+                            ? @json(__('reports.reopened_option')).replace(':label', stage.label)
+                            : stage.label)
+                        : (stage.label + ' — ' + @json(__('reports.stage_not_available')).split('.')[0]);
                     periodSelect.appendChild(opt);
                 });
                 if (keep && Array.from(periodSelect.options).some(function (o) { return o.value === keep && !o.disabled; })) {
@@ -407,12 +446,24 @@
                 hideTermGroups(true);
             } else {
                 setPickerVal(reportScope, previousScope || '');
+                if (previousScope === 'period' || previousScope === 'trimester' || previousScope === 'semester') {
+                    applyVisibleTermGroup(previousScope);
+                    return;
+                }
             }
 
-            refreshPicker(reportScope);
-            refreshPicker(periodSelect);
-            refreshPicker(trimesterSelect);
-            refreshPicker(semesterSelect);
+            refreshPicker(reportScope, true);
+        }
+
+        function applyVisibleTermGroup(scope) {
+            hideTermGroups(false);
+            if (scope === 'period') {
+                showTermGroup('periodGroup', periodSelect, 'period');
+            } else if (scope === 'trimester') {
+                showTermGroup('trimesterGroup', trimesterSelect, 'term');
+            } else if (scope === 'semester') {
+                showTermGroup('semesterGroup', semesterSelect, 'term');
+            }
         }
 
         function applyCycleLocally(cycle) {
@@ -432,10 +483,11 @@
 
         function getSelectedCycle() {
             const select = isBulkMode() ? classSelect : studentSelect;
-            if (!select || !select.value) {
+            const value = pickerVal(select) || (select ? select.value : '');
+            if (!select || !value) {
                 return null;
             }
-            const option = select.options[select.selectedIndex];
+            const option = Array.from(select.options).find(function (opt) { return opt.value === value; });
             return option ? (option.getAttribute('data-cycle') || null) : null;
         }
 
@@ -496,7 +548,8 @@
             const select = bulk ? classSelect : studentSelect;
             const seq = ++scopeRequestSeq;
 
-            if (!select || !select.value || select.disabled) {
+            const selectedId = pickerVal(select) || select.value;
+            if (!select || !selectedId || select.disabled) {
                 resetReportScope();
                 repairVisiblePickers();
                 return;
@@ -506,9 +559,9 @@
 
             const params = new URLSearchParams();
             if (bulk) {
-                params.set('class_section_id', select.value);
+                params.set('class_section_id', selectedId);
             } else {
-                params.set('student_id', select.value);
+                params.set('student_id', selectedId);
             }
 
             try {
@@ -533,44 +586,77 @@
         }
 
         function onScopeChange() {
-            const scope = reportScope.value;
-            hideTermGroups(true);
+            const scope = pickerVal(reportScope) || (reportScope ? reportScope.value : '');
+            if (scope === 'period' || scope === 'trimester' || scope === 'semester') {
+                applyVisibleTermGroup(scope);
+            } else {
+                hideTermGroups(true);
+            }
 
-            if (scope === 'period') {
-                document.getElementById('periodGroup').classList.remove('d-none');
-                periodSelect.required = true;
-                document.getElementById('typeInput').value = 'period';
-                refreshPicker(periodSelect);
-            } else if (scope === 'trimester') {
-                document.getElementById('trimesterGroup').classList.remove('d-none');
-                trimesterSelect.required = true;
-                document.getElementById('typeInput').value = 'term';
-                refreshPicker(trimesterSelect);
-            } else if (scope === 'semester') {
-                document.getElementById('semesterGroup').classList.remove('d-none');
-                semesterSelect.required = true;
-                document.getElementById('typeInput').value = 'term';
-                refreshPicker(semesterSelect);
-            } else if (scope === 'session' && scopeCycleHint) {
+            if (scope === 'session' && scopeCycleHint) {
                 scopeCycleHint.textContent = @json(__('reports.error_university_use_transcript'));
-            } else if (scopeCycleHint) {
+            } else if (scopeCycleHint && scope !== 'period' && scope !== 'trimester' && scope !== 'semester') {
                 scopeCycleHint.textContent = defaultScopeHint;
             }
         }
 
-        if (hasSelectpicker()) {
-            $(studentSelect).off('changed.bs.select.reports').on('changed.bs.select.reports', onEntityPicked);
-            $(classSelect).off('changed.bs.select.reports').on('changed.bs.select.reports', onEntityPicked);
-            $(reportScope).off('changed.bs.select.reports').on('changed.bs.select.reports', onScopeChange);
-        } else {
-            studentSelect && studentSelect.addEventListener('change', onEntityPicked);
-            classSelect && classSelect.addEventListener('change', onEntityPicked);
-            reportScope && reportScope.addEventListener('change', onScopeChange);
+        function bindReportSelectEvents() {
+            if (!hasSelectpicker()) {
+                studentSelect && studentSelect.addEventListener('change', onEntityPicked);
+                classSelect && classSelect.addEventListener('change', onEntityPicked);
+                reportScope && reportScope.addEventListener('change', onScopeChange);
+                return;
+            }
+            $(studentSelect).off('changed.bs.select.reports change.reports').on('changed.bs.select.reports change.reports', onEntityPicked);
+            $(classSelect).off('changed.bs.select.reports change.reports').on('changed.bs.select.reports change.reports', onEntityPicked);
+            $(reportScope).off('changed.bs.select.reports change.reports').on('changed.bs.select.reports change.reports', onScopeChange);
         }
+
+        bindReportSelectEvents();
+        setTimeout(bindReportSelectEvents, 250);
 
         document.querySelectorAll('input[name="mode"]').forEach(function (radio) {
             radio.addEventListener('change', toggleMode);
         });
+
+        function collectBulletinParams() {
+            const bulk = isBulkMode();
+            const params = new URLSearchParams();
+            const studentId = pickerVal(studentSelect);
+            const classId = pickerVal(classSelect);
+            const scope = pickerVal(reportScope);
+            const period = pickerVal(periodSelect);
+            const trimester = pickerVal(trimesterSelect);
+            const semester = pickerVal(semesterSelect);
+            const typeVal = (document.getElementById('typeInput') || {}).value || '';
+
+            if (bulk) {
+                if (classId) params.set('class_section_id', classId);
+            } else if (studentId) {
+                params.set('student_id', studentId);
+            }
+            if (typeVal) params.set('type', typeVal);
+            if (scope === 'period' && period) params.set('period', period);
+            if (scope === 'trimester' && trimester) params.set('trimester', trimester);
+            if (scope === 'semester' && semester) params.set('semester', semester);
+
+            return { params: params, bulk: bulk, studentId: studentId, classId: classId, scope: scope, period: period, trimester: trimester, semester: semester };
+        }
+
+        function bulletinUrlFromParams(params) {
+            const qs = new URLSearchParams(params);
+            qs.delete('check_only');
+            return bulletinForm.action + '?' + qs.toString();
+        }
+
+        function openBulletinWindow(url) {
+            const win = window.open(url, 'digitexBulletin');
+            if (!win) {
+                window.location.href = url;
+                return null;
+            }
+            return win;
+        }
 
         function applyLatestStage(latest) {
             const params = latest.params || {};
@@ -587,23 +673,21 @@
                 onScopeChange();
                 setPickerVal(semesterSelect, String(params.semester));
             }
-            if (bulletinForm) {
-                HTMLFormElement.prototype.submit.call(bulletinForm);
-            }
+            const collected = collectBulletinParams();
+            openBulletinWindow(bulletinUrlFromParams(collected.params));
         }
 
         function isInfoFeedback(data) {
             if (!data) {
+                return true;
+            }
+            if (data.status === 'success') {
                 return false;
             }
-            if (data.status === 'info' || data.feedback === 'info') {
-                return true;
+            if (data.feedback === 'error' && data.status === 'error') {
+                return false;
             }
-            const message = (data.message || '').toString();
-            if (infoMessages.indexOf(message) !== -1) {
-                return true;
-            }
-            return /no academic records|aucun dossier académique|no active students|aucun élève actif|not enrolled|n'est inscrit|no records found|aucun enregistrement/i.test(message);
+            return true;
         }
 
         function showReportFeedback(data) {
@@ -621,6 +705,7 @@
                     title: @json(__('reports.transcript')),
                     text: message,
                     confirmButtonText: @json(__('reports.generate_transcript')),
+                    confirmButtonColor: '#3085d6'
                 }).then(function (result) {
                     afterClose();
                     if (result.isConfirmed) {
@@ -630,70 +715,79 @@
                 return;
             }
 
-            if (isInfoFeedback(data)) {
-                const latest = data.latest_official || latestOfficialStage;
-                const swalOpts = {
-                    icon: 'info',
-                    title: @json(__('reports.no_results_title')),
-                    text: message,
-                    confirmButtonColor: '#3085d6'
-                };
-                if (latest && latest.params) {
-                    swalOpts.showCancelButton = true;
-                    swalOpts.confirmButtonText = @json(__('reports.open_latest_stage')).replace(':stage', latest.label);
-                    swalOpts.cancelButtonText = @json(__('reports.select_scope'));
-                }
-                Swal.fire(swalOpts).then(function (result) {
-                    afterClose();
-                    if (result.isConfirmed && latest && latest.params) {
-                        applyLatestStage(latest);
-                    }
-                });
-                return;
-            }
-
-            Swal.fire({
-                icon: 'error',
-                title: @json(__('reports.error_occurred')),
+            const latest = data.latest_official || latestOfficialStage;
+            const swalOpts = {
+                icon: 'info',
+                title: (message === noRecordsMsg) ? noResultsTitle : noticeTitle,
                 text: message,
-                confirmButtonColor: '#d33'
-            }).then(afterClose);
+                confirmButtonColor: '#3085d6'
+            };
+            if (latest && latest.params) {
+                swalOpts.showCancelButton = true;
+                swalOpts.confirmButtonText = @json(__('reports.open_latest_stage')).replace(':stage', latest.label);
+                swalOpts.cancelButtonText = @json(__('reports.select_scope'));
+            }
+            Swal.fire(swalOpts).then(function (result) {
+                afterClose();
+                if (result.isConfirmed && latest && latest.params) {
+                    applyLatestStage(latest);
+                }
+            });
         }
 
         toggleMode();
+        setTimeout(repairVisiblePickers, 180);
 
         const bulletinForm = document.getElementById('bulletinForm');
         const btnBulletin = document.getElementById('btnBulletin');
 
         if (bulletinForm) {
-            let bulletinReady = false;
             bulletinForm.addEventListener('submit', function (e) {
-                if (bulletinReady) {
-                    return;
-                }
                 e.preventDefault();
 
-                // Ensure inactive mode field cannot leak into the request
-                if (isBulkMode()) {
-                    deactivateSelect(studentSelect);
-                    activateSelect(classSelect, 'class_section_id');
-                } else {
-                    deactivateSelect(classSelect);
-                    activateSelect(studentSelect, 'student_id');
-                }
-                repairVisiblePickers();
+                const collected = collectBulletinParams();
+                const bulk = collected.bulk;
+                const studentId = collected.studentId;
+                const classId = collected.classId;
+                const scope = collected.scope;
+                const period = collected.period;
+                const trimester = collected.trimester;
+                const semester = collected.semester;
 
-                if (reportScope && reportScope.value === 'session') {
-                    const studentId = studentSelect && studentSelect.value;
+                if (scope === 'session') {
                     if (!studentId) {
-                        this.reportValidity();
+                        showReportFeedback({
+                            status: 'info',
+                            feedback: 'info',
+                            message: sessionNeedStudentMsg
+                        });
                         return;
                     }
-                    window.open(@json(route('reports.transcript')) + '?student_id=' + encodeURIComponent(studentId), '_blank');
+                    openBulletinWindow(@json(route('reports.transcript')) + '?student_id=' + encodeURIComponent(studentId));
                     return;
                 }
 
-                if (!this.checkValidity()) {
+                if (bulk && !classId) {
+                    this.reportValidity();
+                    return;
+                }
+                if (!bulk && !studentId) {
+                    this.reportValidity();
+                    return;
+                }
+                if (!scope) {
+                    this.reportValidity();
+                    return;
+                }
+                if (scope === 'period' && !period) {
+                    this.reportValidity();
+                    return;
+                }
+                if (scope === 'trimester' && !trimester) {
+                    this.reportValidity();
+                    return;
+                }
+                if (scope === 'semester' && !semester) {
                     this.reportValidity();
                     return;
                 }
@@ -702,33 +796,48 @@
                 btnBulletin.disabled = true;
                 btnBulletin.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Checking...';
 
-                const formData = new FormData(this);
-                // Extra safety: strip the inactive entity key
-                if (isBulkMode()) {
-                    formData.delete('student_id');
-                } else {
-                    formData.delete('class_section_id');
+                const bulletinUrl = bulletinUrlFromParams(collected.params);
+                // Open in this click so the browser does not treat it as a popup.
+                let preview = window.open('about:blank', 'digitexBulletin');
+                if (preview) {
+                    try {
+                        preview.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Generating bulletin&hellip;</p>');
+                        preview.document.close();
+                    } catch (err) {}
                 }
 
-                const params = new URLSearchParams(formData);
-                params.append('check_only', '1');
+                const checkParams = new URLSearchParams(collected.params);
+                checkParams.set('check_only', '1');
 
-                fetch(this.action + '?' + params.toString(), {
+                fetch(this.action + '?' + checkParams.toString(), {
                     method: 'GET',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                 })
-                .then(function (response) { return response.json(); })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        data._ok = response.ok;
+                        return data;
+                    });
+                })
                 .then(function (data) {
                     btnBulletin.disabled = false;
                     btnBulletin.innerHTML = originalText;
                     repairVisiblePickers();
 
                     if (data.status === 'success') {
-                        bulletinReady = true;
-                        HTMLFormElement.prototype.submit.call(bulletinForm);
-                        bulletinReady = false;
+                        if (preview && !preview.closed) {
+                            preview.location.replace(bulletinUrl);
+                        } else {
+                            openBulletinWindow(bulletinUrl);
+                        }
                     } else {
-                        // info (no records) or real errors — never treat empty results as danger
+                        if (preview && !preview.closed) {
+                            preview.close();
+                        }
+                        if (!data.message && data.errors) {
+                            const first = Object.values(data.errors)[0];
+                            data.message = Array.isArray(first) ? first[0] : first;
+                        }
                         showReportFeedback(data);
                     }
                 })
@@ -736,10 +845,14 @@
                     btnBulletin.disabled = false;
                     btnBulletin.innerHTML = originalText;
                     repairVisiblePickers();
+                    if (preview && !preview.closed) {
+                        preview.close();
+                    }
                     Swal.fire({
-                        icon: 'error',
-                        title: @json(__('reports.error_occurred')),
-                        text: @json(__('reports.generic_error'))
+                        icon: 'info',
+                        title: noticeTitle,
+                        text: @json(__('reports.generic_error')),
+                        confirmButtonColor: '#3085d6'
                     }).then(function () {
                         setTimeout(repairVisiblePickers, 80);
                     });
@@ -751,14 +864,12 @@
         const btnTranscript = document.getElementById('btnTranscript');
 
         if (transcriptForm) {
-            let transcriptReady = false;
             transcriptForm.addEventListener('submit', function (e) {
-                if (transcriptReady) {
-                    return;
-                }
                 e.preventDefault();
 
-                if (!this.checkValidity()) {
+                const studentField = transcriptForm.querySelector('[name="student_id"]');
+                const studentId = pickerVal(studentField) || (studentField ? studentField.value : '');
+                if (!studentId) {
                     this.reportValidity();
                     return;
                 }
@@ -767,11 +878,16 @@
                 btnTranscript.disabled = true;
                 btnTranscript.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Checking...';
 
-                const formData = new FormData(this);
-                const params = new URLSearchParams(formData);
-                params.append('check_only', '1');
+                const transcriptUrl = transcriptForm.action + '?student_id=' + encodeURIComponent(studentId);
+                let preview = window.open('about:blank', 'digitexTranscript');
+                if (preview) {
+                    try {
+                        preview.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Generating transcript&hellip;</p>');
+                        preview.document.close();
+                    } catch (err) {}
+                }
 
-                fetch(this.action + '?' + params.toString(), {
+                fetch(transcriptForm.action + '?student_id=' + encodeURIComponent(studentId) + '&check_only=1', {
                     method: 'GET',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                 })
@@ -781,20 +897,29 @@
                     btnTranscript.innerHTML = originalText;
 
                     if (data.status === 'success') {
-                        transcriptReady = true;
-                        HTMLFormElement.prototype.submit.call(transcriptForm);
-                        transcriptReady = false;
+                        if (preview && !preview.closed) {
+                            preview.location.replace(transcriptUrl);
+                        } else {
+                            openBulletinWindow(transcriptUrl);
+                        }
                     } else {
+                        if (preview && !preview.closed) {
+                            preview.close();
+                        }
                         showReportFeedback(data);
                     }
                 })
                 .catch(function () {
                     btnTranscript.disabled = false;
                     btnTranscript.innerHTML = originalText;
+                    if (preview && !preview.closed) {
+                        preview.close();
+                    }
                     Swal.fire({
-                        icon: 'error',
-                        title: @json(__('reports.error_occurred')),
-                        text: @json(__('reports.generic_error'))
+                        icon: 'info',
+                        title: noticeTitle,
+                        text: @json(__('reports.generic_error')),
+                        confirmButtonColor: '#3085d6'
                     });
                 });
             });

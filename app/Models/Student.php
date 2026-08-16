@@ -174,16 +174,32 @@ class Student extends Model
     // Helpers to access parent info easily via the relationship
     public function getFatherNameAttribute()
     {
-        return $this->parent->father_name ?? null;
+        return $this->parent?->father_name ?? null;
     }
-    
+
     public function getFatherPhoneAttribute()
     {
-        return $this->parent->father_phone ?? null;
+        return $this->parent?->father_phone ?? null;
     }
-    
+
+    public function getGuardianNameAttribute()
+    {
+        return $this->parent?->guardian_name
+            ?? $this->parent?->father_name
+            ?? $this->parent?->mother_name
+            ?? null;
+    }
+
+    public function displayFatherName(): string
+    {
+        return $this->father_name
+            ?: ($this->parent?->guardian_name ?? '')
+            ?: ($this->parent?->mother_name ?? '')
+            ?: '—';
+    }
+
     public function getMotherNameAttribute()
     {
-        return $this->parent->mother_name ?? null;
+        return $this->parent?->mother_name ?? null;
     }
 }

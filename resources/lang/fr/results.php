@@ -20,6 +20,7 @@ return [
     'error_loading_students' => 'Erreur de chargement des élèves',
     'print_btn' => 'Imprimer la carte',
     'student_name' => 'Nom de l\'élève :',
+    'student_id' => 'ID élève :',
     'roll_number' => 'N° de rôle :',
     'father_name' => 'Nom du père :',
     'class' => 'Classe :',

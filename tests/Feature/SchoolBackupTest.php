@@ -10,7 +10,10 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Backup\SchoolBackupExporter;
 use App\Services\Backup\SchoolBackupImporter;
+use App\Services\Backup\SchoolBackupPath;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -84,13 +87,15 @@ it('exports a zip with digitex-backup manifest', function () {
     ]);
 
     $result = app(SchoolBackupExporter::class)->export($backup);
+    $zipPath = SchoolBackupPath::absolute($result->disk_path);
 
     expect($result->status)->toBe('completed')
         ->and($result->disk_path)->not->toBeNull()
-        ->and(is_file(storage_path('app/' . $result->disk_path)))->toBeTrue();
+        ->and($zipPath)->not->toBeNull()
+        ->and(is_file($zipPath))->toBeTrue();
 
     $zip = new ZipArchive();
-    expect($zip->open(storage_path('app/' . $result->disk_path)))->toBeTrue();
+    expect($zip->open($zipPath))->toBeTrue();
     $manifest = json_decode($zip->getFromName('digitex-backup.json'), true);
     $zip->close();
 
@@ -127,7 +132,7 @@ it('imports students into another institution with id remap', function () {
     app(SchoolBackupExporter::class)->export($backup);
 
     $result = app(SchoolBackupImporter::class)->import(
-        storage_path('app/' . $backup->fresh()->disk_path),
+        SchoolBackupPath::absolute($backup->fresh()->disk_path),
         (int) $target->id,
         false
     );
@@ -181,4 +186,47 @@ it('skips scheduled backups when schedule is off', function () {
     $this->artisan('school-backups:run-scheduled')->assertSuccessful();
 
     expect(SchoolBackup::where('institution_id', $institution->id)->where('type', 'scheduled')->count())->toBe(0);
+});
+
+it('previews the same zip that was just exported', function () {
+    $institution = backupMakeInstitution('BK500001');
+    backupEnableModule($institution);
+
+    Role::firstOrCreate([
+        'name' => RoleEnum::SCHOOL_ADMIN->value,
+        'guard_name' => 'web',
+        'institution_id' => null,
+    ]);
+
+    $user = User::factory()->create(['institute_id' => $institution->id]);
+    $role = Role::forInstitution((int) $institution->id)->where('name', RoleEnum::SCHOOL_ADMIN->value)->firstOrFail();
+    $user->assignRole($role);
+
+    $backup = SchoolBackup::create([
+        'institution_id' => $institution->id,
+        'type' => 'manual',
+        'status' => 'pending',
+        'include_files' => true,
+    ]);
+    $exported = app(SchoolBackupExporter::class)->export($backup);
+    $zipPath = SchoolBackupPath::absolute($exported->disk_path);
+    expect($zipPath)->not->toBeNull();
+
+    $copy = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'digitex-backup-upload-' . uniqid('', true) . '.zip';
+    copy($zipPath, $copy);
+
+    $this->actingAs($user)
+        ->withSession(['active_institution_id' => $institution->id])
+        ->post(route('school-backups.import.preview'), [
+            'backup_file' => new UploadedFile($copy, 'school-backup.zip', 'application/zip', null, true),
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('info')
+        ->assertSessionHas('school_backup_import_preview')
+        ->assertSessionMissing('error');
+
+    $stored = session('school_backup_import_path');
+    expect($stored)->not->toBeNull()
+        ->and(Storage::disk('local')->exists($stored))->toBeTrue()
+        ->and(is_file(Storage::disk('local')->path($stored)))->toBeTrue();
 });

@@ -103,6 +103,11 @@ class ReportController extends BaseController
     public function index()
     {
         $institutionId = $this->getInstitutionId();
+        if (!$institutionId || $institutionId === 'global') {
+            return redirect()->route('dashboard')
+                ->with('error', __('reports.select_school_context'));
+        }
+
         $institution = Institution::find($institutionId);
         $institutionType = $institution->type ?? 'mixed'; 
 
@@ -110,7 +115,14 @@ class ReportController extends BaseController
 
         $students = Student::where('institution_id', $institutionId)
             ->where('status', 'active')
-            ->with(['enrollments' => fn ($q) => $q->where('status', 'active')->latest(), 'enrollments.classSection.gradeLevel'])
+            ->with(['enrollments' => function ($q) use ($institutionId) {
+                $sessionId = $this->periodService->currentSessionId((int) $institutionId);
+                $q->where('status', 'active');
+                if ($sessionId) {
+                    $q->where('academic_session_id', $sessionId);
+                }
+                $q->latest('id');
+            }, 'enrollments.classSection.gradeLevel'])
             ->select('id', 'first_name', 'last_name', 'admission_number')
             ->orderBy('first_name')
             ->get()
@@ -134,6 +146,10 @@ class ReportController extends BaseController
     public function scopeOptions(Request $request)
     {
         $institutionId = $this->getInstitutionId();
+        if (!$institutionId || $institutionId === 'global') {
+            return $this->emptyReportJson(__('reports.select_school_context'));
+        }
+
         $cycle = AcademicType::PRIMARY->value;
         $sessionId = $this->periodService->currentSessionId((int) $institutionId);
 
@@ -141,7 +157,7 @@ class ReportController extends BaseController
             $student = Student::with(['enrollments.classSection.gradeLevel'])
                 ->where('institution_id', $institutionId)
                 ->findOrFail($request->student_id);
-            $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+            $enrollment = $this->activeEnrollment($student, (int) $institutionId);
             if (!$enrollment) {
                 return $this->emptyReportJson(__('reports.no_enrollment'));
             }
@@ -192,10 +208,10 @@ class ReportController extends BaseController
         $accessResult = null;
 
         if ($request->filled('student_id')) {
-            $student = Student::with(['institution', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
+            $student = Student::with(['institution', 'parent', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
             if ($student->institution_id != $institutionId) abort(403);
 
-            $enrollment = $student->enrollments()->where('status', 'active')->latest()->first();
+            $enrollment = $this->activeEnrollment($student, $institutionId);
             if (!$enrollment) {
                 $msg = __('reports.no_enrollment');
                 if ($request->ajax() || $request->check_only) {
@@ -210,7 +226,7 @@ class ReportController extends BaseController
             $classSection = ClassSection::with('gradeLevel')->find($request->class_section_id);
             if ($classSection->institution_id != $institutionId) abort(403);
 
-            $enrollments = StudentEnrollment::with(['student', 'classSection.gradeLevel'])
+            $enrollments = StudentEnrollment::with(['student.parent', 'classSection.gradeLevel'])
                 ->where('class_section_id', $request->class_section_id)
                 ->where('status', 'active')
                 ->get();
@@ -248,9 +264,9 @@ class ReportController extends BaseController
         if (! $stage) {
             $msg = __('reports.error_invalid_period_for_cycle');
             if ($request->ajax() || $request->check_only) {
-                return response()->json(['status' => 'error', 'message' => $msg]);
+                return $this->emptyReportJson($msg);
             }
-            return back()->with('error', $msg);
+            return back()->with('info', $msg);
         }
 
         $request->merge(array_filter([
@@ -271,9 +287,9 @@ class ReportController extends BaseController
 
         if ($validationError) {
             if ($request->ajax() || $request->check_only) {
-                return response()->json(['status' => 'error', 'message' => $validationError]);
+                return $this->emptyReportJson($validationError);
             }
-            return back()->with('error', $validationError);
+            return back()->with('info', $validationError);
         }
 
         $isStaff = ! $skipRoleChecks;
@@ -301,7 +317,7 @@ class ReportController extends BaseController
             if ($skipRoleChecks && is_array($accessResult) && empty($accessResult['allowed'])) {
                 $msg = $accessResult['message_en'] ?: __('reports.financial_restriction_msg');
                 if ($request->ajax() || $request->check_only) {
-                    return response()->json(['status' => 'error', 'message' => $msg]);
+                    return $this->emptyReportJson($msg);
                 }
                 abort(403, $msg);
             }
@@ -458,7 +474,7 @@ class ReportController extends BaseController
             'student_id' => 'required|exists:students,id',
         ]);
 
-        $student = Student::with(['institution', 'gradeLevel', 'enrollments.academicSession'])->findOrFail($request->student_id);
+        $student = Student::with(['institution', 'gradeLevel', 'parent', 'enrollments.academicSession'])->findOrFail($request->student_id);
         $institutionId = $this->getInstitutionId();
         
         if ($institutionId && $student->institution_id != $institutionId) {
@@ -535,6 +551,24 @@ class ReportController extends BaseController
     }
 
     // --- HELPERS ---
+
+    private function activeEnrollment(Student $student, int $institutionId): ?StudentEnrollment
+    {
+        $currentSessionId = $this->periodService->currentSessionId($institutionId);
+
+        if ($currentSessionId) {
+            $current = $student->enrollments()
+                ->where('status', 'active')
+                ->where('academic_session_id', $currentSessionId)
+                ->latest('id')
+                ->first();
+            if ($current) {
+                return $current;
+            }
+        }
+
+        return $student->enrollments()->where('status', 'active')->latest('id')->first();
+    }
 
     private function hasMarks($reportData) {
         if (!isset($reportData['data'])) return false;

@@ -20,6 +20,7 @@ return [
     'error_loading_students' => 'Error Loading Students',
     'print_btn' => 'Print Result Card',
     'student_name' => 'Student Name:',
+    'student_id' => 'Student ID:',
     'roll_number' => 'Roll Number:',
     'father_name' => 'Father Name:',
     'class' => 'Class:',

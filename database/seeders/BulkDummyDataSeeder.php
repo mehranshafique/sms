@@ -46,6 +46,17 @@ use App\Models\Assignment;
 use App\Models\Department;
 use App\Models\Program;
 use App\Models\AcademicUnit;
+use App\Models\Module;
+use App\Models\AssessmentPeriodState;
+use App\Models\ParentMeeting;
+use App\Models\PreEnrollment;
+use App\Models\ReenrollmentCampaign;
+use App\Models\ReenrollmentConfirmation;
+use App\Models\StudentMedicalProfile;
+use App\Models\InfirmaryVisit;
+use App\Models\StudentConductRecord;
+use App\Models\DisciplinaryRecord;
+use App\Services\ReenrollmentService;
 use App\Enums\UserType;
 use App\Enums\RoleEnum;
 use App\Models\Role;
@@ -81,6 +92,9 @@ class BulkDummyDataSeeder extends Seeder
             'payments', 'exam_records', 'timetables', 'student_attendances', 'fee_structures', 'fee_types',
             'budgets', 'budget_categories', 'fund_requests', 'salary_structures', 'payrolls', 'assignments',
             'exams', 'exam_schedules', 'notices', 'elections', 'election_positions', 'candidates', 'votes',
+            'parent_meetings', 'pre_enrollments', 'reenrollment_confirmations', 'reenrollment_campaigns',
+            'assessment_period_states', 'student_medical_profiles', 'infirmary_visits',
+            'student_conduct_records', 'disciplinary_records', 'voice_sessions', 'voice_parent_pins',
         ];
 
         foreach ($tables as $table) {
@@ -103,12 +117,15 @@ class BulkDummyDataSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Packages
+        $allModuleSlugs = Module::query()->pluck('slug')->filter()->values()->all();
         $packages = [
-            ['name' => 'Basic Plan', 'price' => 500.00, 'modules' => ['academics', 'students'], 'student_limit' => 100],
-            ['name' => 'Standard Plan', 'price' => 1000.00, 'modules' => ['academics', 'students', 'finance'], 'student_limit' => 500],
-            ['name' => 'Premium Plan', 'price' => 2000.00, 'modules' => ['academics', 'students', 'finance', 'examinations', 'communication', 'voting', 'budgets', 'payrolls', 'university_enrollments', 'departments', 'class_subjects'], 'student_limit' => 5000]
+            ['name' => 'Basic Plan', 'price' => 500.00, 'modules' => ['academics', 'students', 'student_enrollments', 'academic_sessions', 'grade_levels', 'class_sections'], 'student_limit' => 100],
+            ['name' => 'Standard Plan', 'price' => 1000.00, 'modules' => ['academics', 'students', 'finance', 'student_enrollments', 'invoices', 'payments', 'communication'], 'student_limit' => 500],
+            ['name' => 'Premium Plan', 'price' => 2000.00, 'modules' => $allModuleSlugs ?: ['academics', 'students', 'finance', 'examinations', 'communication', 'voting', 'budgets', 'payrolls', 'university_enrollments', 'departments', 'class_subjects', 'student_reenrollments', 'pre_enrollments', 'medical_records', 'voice_ivr', 'assignments', 'discipline'], 'student_limit' => 5000]
         ];
-        foreach ($packages as $pkg) Package::firstOrCreate(['name' => $pkg['name']], $pkg + ['duration_days' => 365, 'staff_limit' => 200, 'is_active' => true]);
+        foreach ($packages as $pkg) {
+            Package::updateOrCreate(['name' => $pkg['name']], $pkg + ['duration_days' => 365, 'staff_limit' => 200, 'is_active' => true]);
+        }
         $premiumPkg = Package::where('name', 'Premium Plan')->first();
 
         // ---------------------------------------------------------
@@ -230,6 +247,14 @@ class BulkDummyDataSeeder extends Seeder
         InstitutionSetting::updateOrCreate(
             ['institution_id' => $institution->id, 'key' => 'active_periods'],
             ['value' => json_encode(['p1', 'p2', 'trimester_1'])]
+        );
+        InstitutionSetting::updateOrCreate(
+            ['institution_id' => $institution->id, 'key' => 'enabled_modules'],
+            ['value' => json_encode($package->modules ?? [])]
+        );
+        InstitutionSetting::updateOrCreate(
+            ['institution_id' => $institution->id, 'key' => 'voice_ivr_enabled'],
+            ['value' => '1']
         );
         
         // 3. Roles (institution-scoped + permissions from templates)
@@ -484,7 +509,14 @@ class BulkDummyDataSeeder extends Seeder
             $guardianUsername = 'guardian_' . $s . '_' . strtolower($data['acronym']);
             $parent = StudentParent::firstOrCreate(
                 ['institution_id' => $institution->id, 'father_phone' => '+24399' . $faker->numerify('#######')],
-                ['father_name' => $faker->name('male'), 'guardian_email' => $this->yopmail($guardianUsername)]
+                [
+                    'father_name' => $faker->name('male'),
+                    'mother_name' => $faker->name('female'),
+                    'guardian_name' => $faker->name('male'),
+                    'mother_phone' => '+24399' . $faker->numerify('#######'),
+                    'guardian_phone' => '+24399' . $faker->numerify('#######'),
+                    'guardian_email' => $this->yopmail($guardianUsername),
+                ]
             );
 
             $admissionNo = IdGeneratorService::generateStudentId($institution, $session);
@@ -518,6 +550,10 @@ class BulkDummyDataSeeder extends Seeder
                 'grade_level_id' => $randClass->grade_level_id,
                 'status' => 'active',
                 'enrolled_at' => now()
+            ]);
+            $student->update([
+                'grade_level_id' => $randClass->grade_level_id,
+                'class_section_id' => $randClass->id,
             ]);
         }
 
@@ -601,42 +637,88 @@ class BulkDummyDataSeeder extends Seeder
             }
         }
         
-        // 11. Exams & Marks
-        $exam = Exam::create([
-            'institution_id' => $institution->id,
-            'academic_session_id' => $session->id,
-            'name' => 'Mid Term Exam',
-            'start_date' => now()->addDays(5),
-            'end_date' => now()->addDays(10),
-            'status' => 'scheduled'
-        ]);
+        // 11. Exams & Marks (period/exam categories used by bulletins)
+        $cycleKey = $data['type'] === 'university' ? 'university' : $data['type'];
+        $examCategories = match ($cycleKey) {
+            'primary' => ['p1', 'p2', 'trimester_exam_1'],
+            'secondary', 'vocational' => ['p1', 'p2', 'semester_exam_1'],
+            'university' => ['university_session_1'],
+            default => ['p1', 'p2'],
+        };
 
-        $classId = $classSections[0];
-        $subjects = Subject::where('grade_level_id', ClassSection::find($classId)->grade_level_id)->get();
-        
-        foreach($subjects as $sub) {
-            ExamSchedule::create([
-                'institution_id' => $institution->id,
-                'exam_id' => $exam->id,
-                'class_section_id' => $classId,
-                'subject_id' => $sub->id,
-                'exam_date' => now()->addDays(rand(5,10)),
-                'start_time' => '09:00',
-                'end_time' => '11:00',
-                'max_marks' => $sub->total_marks
-            ]);
-
-            // Add Marks for enrolled students
+        foreach ($classSections as $classId) {
+            $classModel = ClassSection::find($classId);
+            if (!$classModel) {
+                continue;
+            }
+            $subjects = Subject::where('grade_level_id', $classModel->grade_level_id)->get();
             $studentsInClass = StudentEnrollment::where('class_section_id', $classId)->get();
-            foreach($studentsInClass as $stdEnr) {
-                ExamRecord::create([
-                    'exam_id' => $exam->id,
-                    'class_section_id' => $classId,
-                    'subject_id' => $sub->id,
-                    'student_id' => $stdEnr->student_id,
-                    'marks_obtained' => rand($sub->total_marks/2, $sub->total_marks),
-                    'is_absent' => false
-                ]);
+            if ($subjects->isEmpty() || $studentsInClass->isEmpty()) {
+                continue;
+            }
+
+            foreach ($examCategories as $offset => $category) {
+                $exam = Exam::firstOrCreate(
+                    [
+                        'institution_id' => $institution->id,
+                        'academic_session_id' => $session->id,
+                        'category' => $category,
+                    ],
+                    [
+                        'name' => strtoupper(str_replace('_', ' ', $category)),
+                        'start_date' => now()->subDays(40 - ($offset * 7)),
+                        'end_date' => now()->subDays(35 - ($offset * 7)),
+                        'status' => 'completed',
+                        'finalized_at' => now()->subDays(30 - ($offset * 7)),
+                    ]
+                );
+                foreach ($subjects as $sub) {
+                    ExamSchedule::firstOrCreate(
+                        [
+                            'exam_id' => $exam->id,
+                            'class_section_id' => $classId,
+                            'subject_id' => $sub->id,
+                        ],
+                        [
+                            'institution_id' => $institution->id,
+                            'exam_date' => now()->subDays(38 - ($offset * 7)),
+                            'start_time' => '09:00',
+                            'end_time' => '11:00',
+                            'max_marks' => $sub->total_marks,
+                        ]
+                    );
+
+                    foreach ($studentsInClass as $stdEnr) {
+                        ExamRecord::firstOrCreate(
+                            [
+                                'exam_id' => $exam->id,
+                                'class_section_id' => $classId,
+                                'subject_id' => $sub->id,
+                                'student_id' => $stdEnr->student_id,
+                            ],
+                            [
+                                'marks_obtained' => rand((int) ($sub->total_marks / 2), (int) $sub->total_marks),
+                                'is_absent' => false,
+                            ]
+                        );
+                    }
+                }
+
+                if (in_array($category, ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'trimester_exam_1', 'trimester_exam_2', 'trimester_exam_3', 'semester_exam_1', 'semester_exam_2'], true)
+                    && \Illuminate\Support\Facades\Schema::hasTable('assessment_period_states')) {
+                    AssessmentPeriodState::updateOrCreate(
+                        [
+                            'institution_id' => $institution->id,
+                            'academic_session_id' => $session->id,
+                            'period_key' => $category,
+                        ],
+                        [
+                            'status' => AssessmentPeriodState::STATUS_CLOSED,
+                            'closed_at' => now()->subDays(20),
+                            'closed_by' => $adminUser->id,
+                        ]
+                    );
+                }
             }
         }
 
@@ -726,8 +808,144 @@ class BulkDummyDataSeeder extends Seeder
                     'title' => 'Homework 1: Introduction',
                     'description' => 'Complete exercises on page 10.',
                     'deadline' => now()->addDays(7),
+                    'status' => Assignment::STATUS_APPROVED,
+                    'submitted_at' => now()->subDay(),
+                    'approved_by' => $adminUser->id,
+                    'approved_at' => now(),
+                    'published_at' => now(),
                 ]);
             }
+        }
+
+        $this->seedExtendedModules($institution, $session, $campus, $adminUser, $classSections, $students, $teachers, $faker, $data['type']);
+    }
+
+    /**
+     * Newer modules: next session, re-enrollment, pre-enrollment, PTM, medical, conduct, discipline.
+     */
+    private function seedExtendedModules(
+        Institution $institution,
+        AcademicSession $session,
+        Campus $campus,
+        User $adminUser,
+        array $classSections,
+        array $students,
+        array $teachers,
+        $faker,
+        string $type
+    ): void {
+        $nextSession = AcademicSession::create([
+            'institution_id' => $institution->id,
+            'name' => '2026-2027',
+            'start_date' => '2026-09-01',
+            'end_date' => '2027-07-01',
+            'status' => 'planned',
+            'is_current' => false,
+        ]);
+
+        try {
+            app(ReenrollmentService::class)->openCampaign([
+                'name' => 'Re-enrollment ' . $nextSession->name,
+                'from_academic_session_id' => $session->id,
+                'to_academic_session_id' => $nextSession->id,
+                'min_fee_amount' => 0,
+                'opens_at' => now()->toDateString(),
+                'closes_at' => now()->addMonths(2)->toDateString(),
+                'notes' => 'Dummy campaign for testing parent confirmation.',
+            ], (int) $institution->id, (int) $adminUser->id);
+        } catch (\Throwable $e) {
+            $this->command?->warn('Re-enrollment campaign skipped: ' . $e->getMessage());
+        }
+
+        $sampleStudentId = $students[0] ?? null;
+        $sampleClassId = $classSections[0] ?? null;
+        $sampleStudent = $sampleStudentId ? Student::with('parent')->find($sampleStudentId) : null;
+        $sampleClass = $sampleClassId ? ClassSection::find($sampleClassId) : null;
+
+        if ($sampleStudent && $sampleClass) {
+            PreEnrollment::create([
+                'institution_id' => $institution->id,
+                'academic_session_id' => $nextSession->id,
+                'temporary_id' => 'PRE-' . $institution->id . '-' . str_pad((string) $sampleStudent->id, 4, '0', STR_PAD_LEFT),
+                'first_name' => $faker->firstName,
+                'last_name' => $faker->lastName,
+                'gender' => 'male',
+                'dob' => $faker->date('Y-m-d', '-8 years'),
+                'parent_name' => $sampleStudent->parent->father_name ?? $faker->name('male'),
+                'parent_phone' => $sampleStudent->parent->father_phone ?? '+243990000000',
+                'requested_grade_level_id' => $sampleClass->grade_level_id,
+                'requested_class_section_id' => $sampleClass->id,
+                'status' => PreEnrollment::STATUS_PRE_ENROLLED,
+                'source' => 'admin',
+                'created_by' => $adminUser->id,
+            ]);
+
+            ParentMeeting::create([
+                'institution_id' => $institution->id,
+                'scope' => 'individual',
+                'student_id' => $sampleStudent->id,
+                'class_section_id' => $sampleClass->id,
+                'requested_by' => $adminUser->id,
+                'handled_by' => $adminUser->id,
+                'topic' => 'Mid-year progress',
+                'preferred_date' => now()->addDays(7)->toDateString(),
+                'notes' => 'Discuss attendance and homework.',
+                'staff_notes' => 'Dummy PTM from seeder.',
+                'status' => 'confirmed',
+                'handled_at' => now(),
+            ]);
+
+            StudentMedicalProfile::create([
+                'institution_id' => $institution->id,
+                'student_id' => $sampleStudent->id,
+                'blood_group' => 'O+',
+                'allergies' => 'None recorded',
+                'emergency_contact_name' => $sampleStudent->parent->father_name ?? 'Parent',
+                'emergency_contact_relation' => 'father',
+                'emergency_contact_phone' => $sampleStudent->parent->father_phone,
+                'consent_first_aid' => true,
+                'information_date' => now()->toDateString(),
+                'updated_by' => $adminUser->id,
+            ]);
+
+            InfirmaryVisit::create([
+                'institution_id' => $institution->id,
+                'student_id' => $sampleStudent->id,
+                'academic_session_id' => $session->id,
+                'visited_at' => now()->subDays(3),
+                'reason' => 'Headache',
+                'observation' => 'Rested 20 minutes, returned to class.',
+                'action_taken' => 'Rest and water',
+                'outcome' => 'returned_to_class',
+                'parent_informed' => false,
+                'recorded_by' => $adminUser->id,
+            ]);
+
+            StudentConductRecord::create([
+                'institution_id' => $institution->id,
+                'student_id' => $sampleStudent->id,
+                'academic_session_id' => $session->id,
+                'scope_type' => 'period',
+                'scope_key' => 'p1',
+                'conduct' => 'B',
+                'notes' => 'Dummy conduct grade',
+                'entered_by' => $adminUser->id,
+            ]);
+
+            DisciplinaryRecord::create([
+                'institution_id' => $institution->id,
+                'student_id' => $sampleStudent->id,
+                'academic_session_id' => $session->id,
+                'recorded_by' => $adminUser->id,
+                'incident_type' => 'warning',
+                'severity' => 'minor',
+                'status' => 'resolved',
+                'title' => 'Late arrival',
+                'description' => 'Arrived 15 minutes late (dummy).',
+                'action_taken' => 'Verbal warning',
+                'incident_date' => now()->subWeeks(2)->toDateString(),
+                'notify_parents' => false,
+            ]);
         }
     }
 }

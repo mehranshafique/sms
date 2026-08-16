@@ -33,6 +33,7 @@
         <thead>
             <tr>
                 <th class="text-left">{{ __('exam.student') }}</th>
+                <th>{{ __('exam.student_id') }}</th>
                 @foreach($subjects as $subject)
                     <th>{{ $subject->code ?? substr($subject->name, 0, 3) }}</th>
                 @endforeach
@@ -51,6 +52,7 @@
                 @endphp
                 <tr>
                     <td class="text-left">{{ $student->full_name }}</td>
+                    <td>{{ $student->admission_number ?? $student->id }}</td>
                     @foreach($subjects as $subject)
                         @php
                             $mark = $studentRecords->firstWhere('subject_id', $subject->id);
@@ -67,7 +69,7 @@
                     @endforeach
                     <td>{{ $total }}</td>
                     <td>{{ number_format($avg, 1) }}</td>
-                    <td></td> 
+                    <td>{{ $ranks[$studentId] ?? '' }}</td> 
                 </tr>
             @endforeach
         </tbody>

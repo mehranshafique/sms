@@ -199,13 +199,13 @@ class GoogleDriveBackupService
             throw new \RuntimeException('Google Drive is not connected for this school.');
         }
 
-        if (!$backup->disk_path || !is_file(storage_path('app/' . $backup->disk_path))) {
+        $absolute = $backup->absolutePath();
+        if (!$absolute) {
             throw new \RuntimeException('Backup file is missing.');
         }
 
         $token = $this->ensureAccessToken($account);
         $folderId = $this->ensureBackupFolder($account);
-        $absolute = storage_path('app/' . $backup->disk_path);
         $filename = basename($absolute);
 
         $metadata = json_encode([

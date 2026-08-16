@@ -4,6 +4,7 @@ namespace App\Services\Backup;
 
 use App\Models\Institution;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -82,10 +83,7 @@ class SchoolBackupImporter
         mkdir($workDir, 0755, true);
 
         try {
-            $zip = new ZipArchive();
-            if ($zip->open($zipAbsolutePath) !== true) {
-                throw new \RuntimeException('Unable to open backup ZIP.');
-            }
+            $zip = $this->openZip($zipAbsolutePath);
             $zip->extractTo($workDir);
             $zip->close();
 
@@ -188,10 +186,7 @@ class SchoolBackupImporter
 
     private function readManifest(string $zipAbsolutePath): array
     {
-        $zip = new ZipArchive();
-        if ($zip->open($zipAbsolutePath) !== true) {
-            throw new \RuntimeException(__('school_backup.unable_open_zip'));
-        }
+        $zip = $this->openZip($zipAbsolutePath);
         $json = $zip->getFromName('digitex-backup.json');
         $zip->close();
         if ($json === false) {
@@ -203,6 +198,27 @@ class SchoolBackupImporter
         }
 
         return $data;
+    }
+
+    private function openZip(string $zipAbsolutePath): ZipArchive
+    {
+        if (!is_file($zipAbsolutePath) || filesize($zipAbsolutePath) < 22) {
+            throw new \RuntimeException(__('school_backup.unable_open_zip'));
+        }
+
+        $zip = new ZipArchive();
+        $flags = defined('ZipArchive::RDONLY') ? ZipArchive::RDONLY : 0;
+        $status = $zip->open($zipAbsolutePath, $flags);
+        if ($status !== true) {
+            Log::warning('School backup ZIP open failed', [
+                'path' => $zipAbsolutePath,
+                'size' => filesize($zipAbsolutePath),
+                'status' => $status,
+            ]);
+            throw new \RuntimeException(__('school_backup.unable_open_zip'));
+        }
+
+        return $zip;
     }
 
     /** @return list<array<string,mixed>> */

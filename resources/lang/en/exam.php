@@ -94,6 +94,7 @@ return [
     'result_sheet' => 'Result Sheet',
     'class' => 'Class',
     'student' => 'Student',
+    'student_id' => 'Student ID',
     'total' => 'Total',
     'average' => 'Avg',
     'rank' => 'Rank',

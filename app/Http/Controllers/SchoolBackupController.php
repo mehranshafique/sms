@@ -10,6 +10,7 @@ use App\Models\SchoolBackup;
 use App\Models\SchoolBackupDriveAccount;
 use App\Services\Backup\GoogleDriveBackupService;
 use App\Services\Backup\SchoolBackupImporter;
+use App\Services\Backup\SchoolBackupPath;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -111,8 +112,13 @@ class SchoolBackupController extends BaseController
             return back()->with('error', __('school_backup.not_ready'));
         }
 
+        $absolute = $schoolBackup->absolutePath();
+        if (!$absolute) {
+            return back()->with('error', __('school_backup.not_ready'));
+        }
+
         return response()->download(
-            storage_path('app/' . $schoolBackup->disk_path),
+            $absolute,
             'school-backup-' . ($schoolBackup->uuid) . '.zip'
         );
     }
@@ -124,7 +130,7 @@ class SchoolBackupController extends BaseController
         $this->assertOwnsBackup($schoolBackup, $institutionId);
 
         if ($schoolBackup->disk_path) {
-            Storage::disk('local')->delete($schoolBackup->disk_path);
+            SchoolBackupPath::delete($schoolBackup->disk_path);
         }
         $schoolBackup->delete();
 
@@ -137,7 +143,7 @@ class SchoolBackupController extends BaseController
         $this->requireInstitutionId();
 
         $request->validate([
-            'backup_file' => 'required|file|mimes:zip|max:512000',
+            'backup_file' => ['required', 'file', 'max:512000', 'extensions:zip'],
         ]);
 
         $path = $request->file('backup_file')->storeAs(
@@ -145,7 +151,7 @@ class SchoolBackupController extends BaseController
             Str::uuid() . '.zip',
             'local'
         );
-        $absolute = storage_path('app/' . $path);
+        $absolute = Storage::disk('local')->path($path);
 
         try {
             $preview = $this->importer->preview($absolute);
@@ -178,11 +184,16 @@ class SchoolBackupController extends BaseController
         }
 
         $replace = $request->boolean('replace') && Auth::user()->hasRole('Super Admin');
-        $absolute = storage_path('app/' . $path);
+        $absolute = Storage::disk('local')->path($path);
 
         // Move out of session-managed path so job owns cleanup
-        $jobPath = storage_path('app/school-backups/uploads/job-' . Str::uuid() . '.zip');
-        rename($absolute, $jobPath);
+        $jobPath = SchoolBackupPath::absoluteForWrite('school-backups/uploads/job-' . Str::uuid() . '.zip');
+        if (!@rename($absolute, $jobPath)) {
+            if (!@copy($absolute, $jobPath)) {
+                return back()->with('error', __('school_backup.preview_missing'));
+            }
+            @unlink($absolute);
+        }
         session()->forget(['school_backup_import_path', 'school_backup_import_preview']);
 
         ImportSchoolBackupJob::dispatch($institutionId, $jobPath, $replace, Auth::id());
