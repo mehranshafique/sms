@@ -1070,6 +1070,46 @@ Select **Grade 5 Section A** → Promote to **Grade 6 Section A** for session 20
 
 ---
 
+## Module D5b: Re-enrollment Confirmations
+
+### Purpose
+
+Ask each family whether the child **returns next year**, then approve the student into a next-session class. This is **individual confirmation + review**, not a bulk class move.
+
+### Who uses it
+
+School Admin, secretary. Parents confirm on WhatsApp (parent menu **10**) or at the office.
+
+### Depends on
+
+Current and **next** Academic Sessions, active Student Enrollments, class sections for the next year, SMS/WhatsApp templates `reenrollment_*` (Configuration → Notifications).
+
+### Step-by-step
+
+1. Create the next academic session (and next-year classes) first.
+2. People → **Re-enrollment Confirmations** → **Open Re-enrollment Campaign** (from session = this year, to session = next year, optional minimum fee).
+3. **Invite parents**. They receive SMS/WhatsApp. On WhatsApp they send **10**, then **1** (confirm) or **2** (decline).
+4. At the office you can **Record physical confirmation** on the student Review screen.
+5. Status **Pending review** (or **Partial confirmation** if the minimum fee is unpaid) → open **Review** → check results, attendance, fees, discipline → **Approve** into a next class, **Keep pending**, or **Reject**.
+6. **Sync students** if children enrolled after the campaign opened. **Close campaign** when the window ends (unanswered rows become Expired).
+
+### Statuses
+
+Pending (awaiting parent) → Partial confirmation (yes, fee short) or Pending review (yes, fee ok) → Confirmed / Rejected. Declined = parent said no. Expired = campaign closed with no answer.
+
+### Example
+
+Green Valley opens “Re-enrollment 2026-2027”, minimum fee 50 000 CDF. Parent of Nathan confirms on WhatsApp. Until 50 000 is counted as paid, the row stays Partial. After payment, Review → Approve into **6e A**. Nathan’s 2025-2026 enrollment is marked promoted; 2026-2027 enrollment is active.
+
+### Common questions
+
+- **Is this Student Promotion?** No. Promotion moves a whole class. Finish confirmations first; then promotion (if you still use it) should only list students already confirmed for the target session.
+- **Is this Pre-enrollment?** No. Pre-enrollment is for **new** applicants.
+- **Invitations do not send.** Enable `reenrollment_invitation` (and reminder) under Configuration → Notifications for SMS and/or WhatsApp.
+- **A full PDF guide** is available from the Re-enrollment page (**Download help manual**) and as `doc/pdf/Re-enrollment-Confirmation-Help-Manual.pdf`.
+
+---
+
 ## Module D6: Student Transfers
 
 ### Purpose

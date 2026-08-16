@@ -10,8 +10,11 @@ use App\Services\Voice\VoiceAiAgentService;
 use App\Services\Voice\VoiceIdentityService;
 use App\Services\Voice\VoicePinService;
 use App\Services\Voice\VoiceTransferService;
+use App\Support\MarkdownToHtml;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class VoiceSettingController extends BaseController
@@ -24,7 +27,7 @@ class VoiceSettingController extends BaseController
     ) {
         $this->middleware('auth');
         $this->middleware(PermissionMiddleware::class . ':voice_ivr.view|setting.view|setting.manage')
-            ->only(['index']);
+            ->only(['index', 'downloadManual']);
         $this->middleware(PermissionMiddleware::class . ':voice_ivr.manage|setting.manage')
             ->only(['store', 'storePin', 'destroyPin']);
         $this->setPageTitle(__('voice.page_title'));
@@ -79,6 +82,7 @@ class VoiceSettingController extends BaseController
 
         $aiReady = $institutionId ? $this->agent->isEnabled((int) $institutionId) : false;
         $endpointTypes = VoiceTransferService::ALLOWED_ENDPOINTS;
+        $whatsappFromConfigured = $institutionId && $this->schoolWhatsappFrom((int) $institutionId) !== '';
 
         return view('voice.settings', compact(
             'config',
@@ -87,8 +91,23 @@ class VoiceSettingController extends BaseController
             'sessions',
             'parentPins',
             'aiReady',
-            'endpointTypes'
+            'endpointTypes',
+            'whatsappFromConfigured'
         ));
+    }
+
+    public function downloadManual()
+    {
+        $path = base_path('doc/markdown/whatsapp-voice-ivr-help-manual.md');
+        abort_unless(File::exists($path), 404);
+
+        $body = MarkdownToHtml::convert(File::get($path));
+        $title = 'WhatsApp Voice IVR Help Manual';
+        $generatedAt = now()->format('F j, Y');
+
+        return Pdf::loadView('doc.pdf-layout', compact('title', 'body', 'generatedAt'))
+            ->setPaper('a4')
+            ->download('WhatsApp-Voice-IVR-Help-Manual.pdf');
     }
 
     public function store(Request $request)
@@ -185,5 +204,17 @@ class VoiceSettingController extends BaseController
         }
 
         return (int) $institutionId;
+    }
+
+    protected function schoolWhatsappFrom(int $institutionId): string
+    {
+        foreach (['infobip_whatsapp_from', 'school_whatsapp_number', 'whatsapp_from'] as $key) {
+            $value = trim((string) InstitutionSetting::get($institutionId, $key, ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }

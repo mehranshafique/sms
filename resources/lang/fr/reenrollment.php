@@ -4,6 +4,7 @@ return [
     'page_title' => 'Confirmations de réinscription',
     'manage_subtitle' => 'Examiner les confirmations parents avant de promouvoir les élèves',
     'open_campaign' => 'Ouvrir une campagne de réinscription',
+    'manual_download' => 'Télécharger le guide (PDF)',
     'campaign' => 'Campagne',
     'select_campaign' => 'Sélectionner une campagne',
     'from_session' => 'Session d\'origine (actuelle)',

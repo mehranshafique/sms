@@ -10,7 +10,10 @@
                     <p class="mb-0">{{ __('reenrollment.manage_subtitle') }}</p>
                 </div>
             </div>
-            <div class="col-sm-5 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
+            <div class="col-sm-5 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex flex-wrap gap-2">
+                <a href="{{ route('reenrollments.manual') }}" class="btn btn-outline-primary btn-rounded">
+                    <i class="fa fa-file-pdf-o me-2"></i> {{ __('reenrollment.manual_download') }}
+                </a>
                 @canany(['student_reenrollment.create', 'student_promotion.create'])
                     <button type="button" class="btn btn-primary btn-rounded" data-bs-toggle="modal" data-bs-target="#openCampaignModal">
                         <i class="fa fa-plus me-2"></i> {{ __('reenrollment.open_campaign') }}

@@ -14,6 +14,8 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 | `markdown/api-manual.md` | REST API for hardware scanners and mobile apps |
 | `markdown/chafon-hardware-bridge-manual.md` | **Chafon CF661** bridge: configure, test, run `chafon-script.py` |
 | `markdown/whatsapp-voice-ivr-phase1-design.md` | **DigitexVx Voice Phase 1** — WhatsApp Calling + IVR design (Infobip) |
+| `markdown/whatsapp-voice-ivr-help-manual.md` | **WhatsApp Voice IVR** — school go-live guide (readiness, Infobip, settings, test call) |
+| `markdown/reenrollment-confirmation-help-manual.md` | **Re-enrollment confirmation** — campaign, parent WhatsApp option 10, review and approve |
 | `markdown/homework-workflow-and-medical-records.md` | **Homework approval, WhatsApp homework alerts, infirmary records** — per-school settings, schema, access control |
 
 ## PDF output
@@ -25,6 +27,8 @@ Generated PDFs are written to `pdf/`:
 - `Developer-Manual.pdf`
 - `REST-API-Manual-(Hardware-&-Mobile-App).pdf`
 - `Chafon-Hardware-Bridge-Manual.pdf`
+- `WhatsApp-Voice-IVR-Help-Manual.pdf`
+- `Re-enrollment-Confirmation-Help-Manual.pdf`
 
 ## Regenerate PDFs
 

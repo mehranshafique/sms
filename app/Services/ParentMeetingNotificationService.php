@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ParentMeeting;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -23,7 +24,9 @@ class ParentMeetingNotificationService
      */
     public function notifyCreated($meetings): void
     {
-        $items = Collection::wrap($meetings)->filter()->values();
+        $items = EloquentCollection::make(
+            Collection::wrap($meetings)->filter()->values()->all()
+        );
         if ($items->isEmpty()) {
             return;
         }

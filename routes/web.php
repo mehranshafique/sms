@@ -374,6 +374,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Re-enrollment confirmations (separate from bulk promotion)
     Route::middleware([CheckModuleAccess::class . ':student_promotion'])->group(function () {
         Route::get('reenrollments', [ReenrollmentController::class, 'index'])->name('reenrollments.index');
+        Route::get('reenrollments/manual.pdf', [ReenrollmentController::class, 'downloadManual'])->name('reenrollments.manual');
         Route::get('reenrollments/export', [ReenrollmentController::class, 'export'])->name('reenrollments.export');
         Route::post('reenrollments/campaigns', [ReenrollmentController::class, 'storeCampaign'])->name('reenrollments.campaigns.store');
         Route::post('reenrollments/campaigns/{campaign}/invite', [ReenrollmentController::class, 'sendInvitations'])->name('reenrollments.campaigns.invite');
@@ -814,6 +815,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         RoleMiddleware::class . ':Super Admin|Head Officer|School Admin',
     ])->prefix('voice')->group(function () {
         Route::get('/settings', [VoiceSettingController::class, 'index'])->name('voice.settings.index');
+        Route::get('/settings/manual.pdf', [VoiceSettingController::class, 'downloadManual'])->name('voice.settings.manual');
         Route::post('/settings', [VoiceSettingController::class, 'store'])->name('voice.settings.store');
         Route::post('/settings/pins', [VoiceSettingController::class, 'storePin'])->name('voice.settings.pin.store');
         Route::delete('/settings/pins/{parentId}', [VoiceSettingController::class, 'destroyPin'])

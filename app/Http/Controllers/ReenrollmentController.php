@@ -8,7 +8,10 @@ use App\Models\ClassSection;
 use App\Models\ReenrollmentCampaign;
 use App\Models\ReenrollmentConfirmation;
 use App\Services\ReenrollmentService;
+use App\Support\MarkdownToHtml;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 
 class ReenrollmentController extends BaseController
 {
@@ -28,7 +31,7 @@ class ReenrollmentController extends BaseController
             }
 
             return $next($request);
-        })->only(['index', 'show']);
+        })->only(['index', 'show', 'downloadManual']);
 
         $this->middleware(function ($request, $next) {
             $user = $request->user();
@@ -130,6 +133,20 @@ class ReenrollmentController extends BaseController
             'sessions',
             'messagingReady'
         ));
+    }
+
+    public function downloadManual()
+    {
+        $path = base_path('doc/markdown/reenrollment-confirmation-help-manual.md');
+        abort_unless(File::exists($path), 404);
+
+        $body = MarkdownToHtml::convert(File::get($path));
+        $title = 'Re-enrollment Confirmation Help Manual';
+        $generatedAt = now()->format('F j, Y');
+
+        return Pdf::loadView('doc.pdf-layout', compact('title', 'body', 'generatedAt'))
+            ->setPaper('a4')
+            ->download('Re-enrollment-Confirmation-Help-Manual.pdf');
     }
 
     public function storeCampaign(Request $request)

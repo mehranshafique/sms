@@ -4,6 +4,7 @@ return [
     'page_title' => 'Re-enrollment Confirmations',
     'manage_subtitle' => 'Review parent confirmations before promoting students to the next session',
     'open_campaign' => 'Open Re-enrollment Campaign',
+    'manual_download' => 'Download help manual (PDF)',
     'campaign' => 'Campaign',
     'select_campaign' => 'Select campaign',
     'from_session' => 'From session (current)',

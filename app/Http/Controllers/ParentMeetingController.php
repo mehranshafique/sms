@@ -11,6 +11,7 @@ use App\Services\ParentMeetingNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -107,7 +108,7 @@ class ParentMeetingController extends BaseController
             ]);
 
             if ($shouldNotify) {
-                $this->ptmNotifications->notifyCreated($meeting);
+                $this->safeNotifyCreated($meeting);
             }
 
             return $this->successResponse(__('ptm.created'), route('ptm.show', $meeting));
@@ -146,7 +147,7 @@ class ParentMeetingController extends BaseController
         });
 
         if ($shouldNotify) {
-            $this->ptmNotifications->notifyCreated($created);
+            $this->safeNotifyCreated($created);
         }
 
         $first = $created->first();
@@ -257,5 +258,19 @@ class ParentMeetingController extends BaseController
             ->where('status', 'active')
             ->orderBy('first_name')
             ->get();
+    }
+
+    /**
+     * @param  ParentMeeting|\Illuminate\Support\Collection<int, ParentMeeting>  $meetings
+     */
+    private function safeNotifyCreated($meetings): void
+    {
+        try {
+            $this->ptmNotifications->notifyCreated($meetings);
+        } catch (\Throwable $e) {
+            Log::warning('PTM created but notification failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

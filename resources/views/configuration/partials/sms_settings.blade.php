@@ -180,7 +180,7 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">WhatsApp Template Name <span class="text-muted fw-normal">(optional)</span></label>
                                 <input type="text" name="infobip_whatsapp_template_name" class="form-control" value="{{ $settings['infobip_whatsapp_template_name'] ?? '' }}" placeholder="e.g. school_notification">
-                                <small class="text-muted">Approved template with one placeholder <code>@{{1}}</code> in the body. Used automatically when the recipient is outside the 24h chat window (bulk invitations, notifications).</small>
+                                <small class="text-muted">Approved Infobip template with one body placeholder <code>@{{1}}</code>. Digitex puts the school message in that placeholder only. Any extra English/French sentences you typed around <code>@{{1}}</code> in Infobip (for Meta approval) are shown on every template send. Edit the template body in Infobip to change that wrapper. Session replies (parent already wrote in the last 24h) go as free text without the wrapper.</small>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Template Language</label>

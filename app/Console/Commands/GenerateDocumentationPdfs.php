@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 
 class GenerateDocumentationPdfs extends Command
 {
-    protected $signature = 'docs:generate-pdf';
+    protected $signature = 'docs:generate-pdf {slug? : Optional markdown slug, e.g. whatsapp-voice-ivr-help-manual}';
 
     protected $description = 'Generate PDF manuals from doc/markdown sources';
 
@@ -21,7 +21,19 @@ class GenerateDocumentationPdfs extends Command
             'developer-manual' => 'Developer Manual',
             'api-manual' => 'REST API Manual (Hardware & Mobile App)',
             'chafon-hardware-bridge-manual' => 'Chafon Hardware Bridge Manual',
+            'whatsapp-voice-ivr-help-manual' => 'WhatsApp Voice IVR Help Manual',
+            'reenrollment-confirmation-help-manual' => 'Re-enrollment Confirmation Help Manual',
         ];
+
+        $only = $this->argument('slug');
+        if ($only) {
+            if (! isset($manuals[$only])) {
+                $this->error("Unknown slug: {$only}");
+
+                return self::FAILURE;
+            }
+            $manuals = [$only => $manuals[$only]];
+        }
 
         $markdownDir = base_path('doc/markdown');
         $pdfDir = base_path('doc/pdf');
