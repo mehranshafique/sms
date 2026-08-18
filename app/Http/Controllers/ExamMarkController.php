@@ -13,6 +13,7 @@ use App\Models\InstitutionSetting;
 use App\Models\ClassSubject; 
 use App\Models\ExamSchedule; 
 use App\Enums\RoleEnum;
+use App\Services\ExamRecordSubjectBinder;
 use Illuminate\Http\Request;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +37,7 @@ class ExamMarkController extends BaseController
         $settingVal = InstitutionSetting::get($institutionId, 'active_periods', '[]');
         $activePeriods = json_decode($settingVal ?? '[]', true);
 
-        $examsQuery = Exam::where('status', 'ongoing');
+        $examsQuery = Exam::query();
         
         if ($institutionId) {
             $examsQuery->where('institution_id', $institutionId);
@@ -47,6 +48,11 @@ class ExamMarkController extends BaseController
             RoleEnum::HEAD_OFFICER->value, 
             RoleEnum::SCHOOL_ADMIN->value 
         ]);
+
+        // Teachers only enter marks on ongoing papers; admins must also see imported completed/published exams.
+        if (!$isAdmin) {
+            $examsQuery->where('status', 'ongoing');
+        }
 
         // Restrict Exams for Non-Admins based on active grading periods
         if (!$isAdmin) {
@@ -68,7 +74,17 @@ class ExamMarkController extends BaseController
             }
         }
 
-        $exams = $examsQuery->pluck('name', 'id');
+        $exams = $examsQuery->with('academicSession')->orderByDesc('id')->get()->mapWithKeys(function ($exam) {
+            $session = $exam->academicSession->name ?? null;
+            $label = $session ? $exam->name.' ('.$session.')' : $exam->name;
+            if ($exam->status && $exam->status !== 'ongoing') {
+                $label .= ' ['.$exam->status.']';
+            }
+
+            return [$exam->id => $label];
+        });
+
+        $preselectedExamId = $request->integer('exam_id') ?: null;
 
         $classesQuery = ClassSection::with('gradeLevel')
             ->where('is_active', true);
@@ -102,7 +118,7 @@ class ExamMarkController extends BaseController
             return [$item->id => $name];
         });
 
-        return view('marks.create', compact('exams', 'classes'));
+        return view('marks.create', compact('exams', 'classes', 'preselectedExamId'));
     }
 
     public function getGrades(Request $request)
@@ -238,7 +254,30 @@ class ExamMarkController extends BaseController
                 ->keyBy('subject_id');
         }
 
-        $formattedSubjects = $query->get()->map(function($subject) use ($classSectionId, $scheduleConfigs) {
+        $subjects = $query ? $query->get() : collect();
+
+        $recordSubjectIds = collect();
+        if ($examId && $classSectionId) {
+            $recordSubjectIds = ExamRecord::query()
+                ->where('exam_id', $examId)
+                ->where('class_section_id', $classSectionId)
+                ->distinct()
+                ->pluck('subject_id');
+
+            if ($recordSubjectIds->isNotEmpty()) {
+                $subjects = $subjects->concat(
+                    Subject::with('academicUnit')->whereIn('id', $recordSubjectIds)->get()
+                )->unique('id');
+            }
+        }
+
+        $preferRecord = array_flip($recordSubjectIds->all());
+        $subjects = $subjects
+            ->sortBy(fn ($subject) => isset($preferRecord[$subject->id]) ? 0 : 1)
+            ->unique(fn ($subject) => mb_strtolower(trim((string) $subject->name)))
+            ->values();
+
+        $formattedSubjects = $subjects->map(function($subject) use ($classSectionId, $scheduleConfigs) {
             $teacherName = $this->getSubjectTeacher($classSectionId, $subject->id);
             
             // Determine Max Marks
@@ -364,10 +403,8 @@ class ExamMarkController extends BaseController
             })
             ->values();
 
-        $marks = ExamRecord::where('exam_id', $request->exam_id)
-            ->where('subject_id', $request->subject_id)
-            ->where('class_section_id', $request->class_section_id)
-            ->get()
+        $marks = app(ExamRecordSubjectBinder::class)
+            ->recordsFor((int) $request->exam_id, (int) $request->class_section_id, (int) $request->subject_id)
             ->keyBy('student_id')
             ->map(function($record) {
                 return [
@@ -397,6 +434,11 @@ class ExamMarkController extends BaseController
         ]);
 
         $exam = Exam::findOrFail($request->exam_id);
+        $subjectId = app(ExamRecordSubjectBinder::class)->preferredSubjectId(
+            (int) $request->exam_id,
+            (int) $request->class_section_id,
+            (int) $request->subject_id
+        );
         
         $isAdmin = Auth::user()->hasRole([
             RoleEnum::SUPER_ADMIN->value, 
@@ -421,12 +463,12 @@ class ExamMarkController extends BaseController
         }
 
         // Determine Max Marks: Check Schedule First, then Subject
-        $subject = Subject::findOrFail($request->subject_id);
+        $subject = Subject::findOrFail($subjectId);
         $maxMarks = $subject->total_marks ?? 100;
 
         $schedule = ExamSchedule::where('exam_id', $request->exam_id)
             ->where('class_section_id', $request->class_section_id)
-            ->where('subject_id', $request->subject_id)
+            ->whereIn('subject_id', [$subjectId, (int) $request->subject_id])
             ->first();
 
         // Prioritize schedule max_marks if available
@@ -434,7 +476,7 @@ class ExamMarkController extends BaseController
             $maxMarks = $schedule->max_marks;
         }
 
-        DB::transaction(function () use ($request, $maxMarks) {
+        DB::transaction(function () use ($request, $maxMarks, $subjectId) {
             $marksInput = $request->input('marks', []);
             $absentInput = $request->input('absent', []);
             
@@ -459,7 +501,7 @@ class ExamMarkController extends BaseController
                     [
                         'exam_id' => $request->exam_id,
                         'student_id' => $studentId,
-                        'subject_id' => $request->subject_id,
+                        'subject_id' => $subjectId,
                     ],
                     [
                         'class_section_id' => $request->class_section_id, 
@@ -517,10 +559,8 @@ class ExamMarkController extends BaseController
             ->orderBy('roll_number')
             ->get();
 
-        $marks = ExamRecord::where('exam_id', $exam->id)
-            ->where('class_section_id', $classSection->id)
-            ->where('subject_id', $subject->id)
-            ->get()
+        $marks = app(ExamRecordSubjectBinder::class)
+            ->recordsFor((int) $exam->id, (int) $classSection->id, (int) $subject->id)
             ->keyBy('student_id');
 
         $totalStudents = $students->count();

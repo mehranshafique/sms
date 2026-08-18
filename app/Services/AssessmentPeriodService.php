@@ -459,8 +459,13 @@ class AssessmentPeriodService
     /**
      * @return list<array<string, mixed>>
      */
-    public function dashboardRows(int $institutionId, int $sessionId, ?string $institutionType = null): array
+    public function dashboardRows(int $institutionId, int $sessionId, mixed $institutionType = null): array
     {
+        if ($institutionType instanceof \BackedEnum) {
+            $institutionType = $institutionType->value;
+        }
+        $institutionType = is_string($institutionType) ? $institutionType : null;
+
         $keys = $this->cycleService->examCategoriesForInstitutionType($institutionType);
         $keys = array_values(array_intersect($keys, self::PERIOD_KEYS));
         if ($keys === []) {

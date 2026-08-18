@@ -66,7 +66,9 @@ class SettingsController extends BaseController
             $periodStates = $periodService->dashboardRows(
                 (int) $institutionId,
                 (int) $academicSession->id,
-                $institution->type ?? null
+                $institution?->type instanceof \BackedEnum
+                    ? $institution->type->value
+                    : ($institution->type ?? null)
             );
             foreach (['trimester_1', 'trimester_2', 'trimester_3', 'semester_1', 'semester_2'] as $termKey) {
                 $termCloseStatus[$termKey] = $periodService->termClosed(

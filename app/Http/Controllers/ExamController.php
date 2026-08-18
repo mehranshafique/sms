@@ -406,7 +406,9 @@ class ExamController extends BaseController
             ->with('subject')
             ->get()
             ->pluck('subject')
-            ->unique('id');
+            ->filter()
+            ->unique('id')
+            ->values();
 
         $totals = $records->map(fn ($studentRecords) => (float) $studentRecords->sum('marks_obtained'))
             ->sortDesc();

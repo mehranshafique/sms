@@ -1,16 +1,23 @@
 <?php
 
 use App\Enums\RoleEnum;
+use App\Models\AcademicSession;
+use App\Models\ClassSection;
+use App\Models\Exam;
+use App\Models\ExamRecord;
+use App\Models\GradeLevel;
 use App\Models\Institution;
 use App\Models\InstitutionSetting;
 use App\Models\Role;
 use App\Models\SchoolBackup;
 use App\Models\Student;
+use App\Models\Subject;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Backup\SchoolBackupExporter;
 use App\Services\Backup\SchoolBackupImporter;
 use App\Services\Backup\SchoolBackupPath;
+use App\Services\ExamRecordSubjectBinder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -229,4 +236,197 @@ it('previews the same zip that was just exported', function () {
     expect($stored)->not->toBeNull()
         ->and(Storage::disk('local')->exists($stored))->toBeTrue()
         ->and(is_file(Storage::disk('local')->path($stored)))->toBeTrue();
+});
+
+function backupMakeExamGraph(Institution $institution, string $subjectCode, string $admissionNumber): array
+{
+    $session = AcademicSession::query()->create([
+        'institution_id' => $institution->id,
+        'name' => '2026-2027',
+        'start_date' => '2026-09-01',
+        'end_date' => '2027-07-31',
+        'status' => 'active',
+        'is_current' => true,
+    ]);
+
+    $grade = GradeLevel::query()->create([
+        'institution_id' => $institution->id,
+        'name' => '1e',
+        'code' => '1e',
+        'order_index' => 1,
+        'education_cycle' => 'secondary',
+    ]);
+
+    $section = ClassSection::query()->create([
+        'institution_id' => $institution->id,
+        'grade_level_id' => $grade->id,
+        'name' => 'A',
+        'is_active' => true,
+    ]);
+
+    $subject = Subject::query()->create([
+        'institution_id' => $institution->id,
+        'grade_level_id' => $grade->id,
+        'name' => 'TECHNOLOGIE',
+        'code' => $subjectCode,
+        'type' => 'theory',
+        'credit_hours' => 0,
+        'coefficient' => 1,
+        'total_marks' => 20,
+        'passing_marks' => 10,
+        'is_active' => true,
+    ]);
+
+    $student = Student::query()->create([
+        'institution_id' => $institution->id,
+        'first_name' => 'Room',
+        'last_name' => 'Masuaku',
+        'admission_number' => $admissionNumber,
+        'admission_date' => now()->toDateString(),
+        'dob' => '2012-01-01',
+        'status' => 'active',
+        'gender' => 'male',
+        'grade_level_id' => $grade->id,
+        'class_section_id' => $section->id,
+    ]);
+
+    $exam = Exam::query()->create([
+        'institution_id' => $institution->id,
+        'academic_session_id' => $session->id,
+        'name' => 'PR I',
+        'start_date' => '2026-10-01',
+        'end_date' => '2026-10-15',
+        'status' => 'ongoing',
+        'category' => 'p1',
+    ]);
+
+    $record = ExamRecord::query()->create([
+        'exam_id' => $exam->id,
+        'student_id' => $student->id,
+        'subject_id' => $subject->id,
+        'class_section_id' => $section->id,
+        'marks_obtained' => 9,
+        'is_absent' => false,
+    ]);
+
+    return compact('session', 'grade', 'section', 'subject', 'student', 'exam', 'record');
+}
+
+it('exports exam records even when the table has no institution_id', function () {
+    $institution = backupMakeInstitution('BK600001');
+    backupMakeExamGraph($institution, '1eTch', 'ADM-BK-EX-1');
+
+    $backup = SchoolBackup::create([
+        'institution_id' => $institution->id,
+        'type' => 'manual',
+        'status' => 'pending',
+        'include_files' => false,
+    ]);
+
+    $result = app(SchoolBackupExporter::class)->export($backup);
+    $zipPath = SchoolBackupPath::absolute($result->disk_path);
+
+    $zip = new ZipArchive();
+    expect($zip->open($zipPath))->toBeTrue();
+    $jsonl = $zip->getFromName('data/exam_records.jsonl');
+    $manifest = json_decode($zip->getFromName('digitex-backup.json'), true);
+    $zip->close();
+
+    expect($jsonl)->not->toBeFalse()
+        ->and(trim((string) $jsonl))->not->toBe('')
+        ->and($manifest['tables']['exam_records'] ?? 0)->toBe(1);
+});
+
+it('loads enter-marks values when the stored subject id belongs to another school', function () {
+    $source = backupMakeInstitution('BK700001');
+    $target = backupMakeInstitution('BK700002');
+
+    $sourceGraph = backupMakeExamGraph($source, '1eTch', 'ADM-BK-EX-2');
+    $targetGraph = backupMakeExamGraph($target, 'TECH', 'ADM-BK-EX-3');
+
+    $targetGraph['record']->delete();
+    ExamRecord::query()->create([
+        'exam_id' => $targetGraph['exam']->id,
+        'student_id' => $targetGraph['student']->id,
+        'subject_id' => $sourceGraph['subject']->id,
+        'class_section_id' => $targetGraph['section']->id,
+        'marks_obtained' => 9,
+        'is_absent' => false,
+    ]);
+
+    $binder = app(ExamRecordSubjectBinder::class);
+    $found = $binder->recordsFor(
+        (int) $targetGraph['exam']->id,
+        (int) $targetGraph['section']->id,
+        (int) $targetGraph['subject']->id
+    );
+
+    expect($found)->toHaveCount(1)
+        ->and((float) $found->first()->marks_obtained)->toBe(9.0);
+
+    $rebound = $binder->rebindForInstitution((int) $target->id);
+    expect($rebound)->toBeGreaterThan(0);
+
+    $healed = ExamRecord::query()
+        ->where('exam_id', $targetGraph['exam']->id)
+        ->where('student_id', $targetGraph['student']->id)
+        ->first();
+
+    expect((int) $healed->subject_id)->toBe((int) $targetGraph['subject']->id)
+        ->and((float) $healed->marks_obtained)->toBe(9.0);
+});
+
+it('imports exam marks onto the destination school subject of the same name', function () {
+    $source = backupMakeInstitution('BK800001');
+    $target = backupMakeInstitution('BK800002');
+
+    backupMakeExamGraph($source, '1eTch', 'ADM-BK-EX-4');
+    $targetGraph = backupMakeExamGraph($target, 'TECH', 'ADM-BK-EX-5');
+    $targetGraph['record']->delete();
+
+    $backup = SchoolBackup::create([
+        'institution_id' => $source->id,
+        'type' => 'manual',
+        'status' => 'pending',
+        'include_files' => false,
+    ]);
+    app(SchoolBackupExporter::class)->export($backup);
+
+    $result = app(SchoolBackupImporter::class)->import(
+        SchoolBackupPath::absolute($backup->fresh()->disk_path),
+        (int) $target->id,
+        false
+    );
+
+    expect($result['imported']['exam_records'] ?? 0)->toBeGreaterThan(0);
+
+    $importedExam = Exam::query()
+        ->where('institution_id', $target->id)
+        ->where('name', 'PR I')
+        ->orderByDesc('id')
+        ->first();
+
+    $importedStudent = Student::query()
+        ->where('institution_id', $target->id)
+        ->where(function ($q) {
+            $q->where('admission_number', 'ADM-BK-EX-4')
+                ->orWhere('admission_number', 'like', 'ADM-BK-EX-4-I%');
+        })
+        ->first();
+
+    expect($importedExam)->not->toBeNull()
+        ->and($importedStudent)->not->toBeNull();
+
+    $mark = ExamRecord::query()
+        ->where('exam_id', $importedExam->id)
+        ->where('student_id', $importedStudent->id)
+        ->first();
+
+    expect($mark)->not->toBeNull()
+        ->and((float) $mark->marks_obtained)->toBe(9.0);
+
+    $markSubject = Subject::query()->find($mark->subject_id);
+    expect($markSubject)->not->toBeNull()
+        ->and((int) $markSubject->institution_id)->toBe((int) $target->id)
+        ->and($markSubject->name)->toBe('TECHNOLOGIE');
 });

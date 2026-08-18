@@ -3,6 +3,7 @@
 namespace App\Services\Backup;
 
 use App\Models\Institution;
+use App\Services\ExamRecordSubjectBinder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -39,6 +40,7 @@ class SchoolBackupImporter
         'exams',
         'exam_schedules',
         'exam_records',
+        'assessment_period_states',
         'fee_types',
         'fee_structures',
         'invoices',
@@ -159,6 +161,11 @@ class SchoolBackupImporter
 
                     $imported[$table] = $count;
                 }
+
+                $rebound = app(ExamRecordSubjectBinder::class)->rebindForInstitution($targetInstitutionId);
+                if ($rebound > 0) {
+                    $warnings[] = "Rebound {$rebound} exam mark(s) onto this school's subjects.";
+                }
             });
 
             // Copy files
@@ -254,18 +261,33 @@ class SchoolBackupImporter
             'program_id' => 'programs',
             'student_id' => 'students',
             'staff_id' => 'staff',
+            'teacher_id' => 'staff',
             'parent_id' => 'parents',
             'exam_id' => 'exams',
             'fee_type_id' => 'fee_types',
             'fee_structure_id' => 'fee_structures',
             'invoice_id' => 'invoices',
             'user_id' => 'users',
+            'closed_by' => 'users',
+            'reopened_by' => 'users',
+            'received_by' => 'users',
             'role_id' => 'roles',
+            'academic_unit_id' => 'academic_units',
+            'prerequisite_id' => 'subjects',
         ];
 
         foreach ($map as $column => $sourceTable) {
             if (!empty($row[$column]) && isset($idMaps[$sourceTable][(int) $row[$column]])) {
                 $row[$column] = $idMaps[$sourceTable][(int) $row[$column]];
+            }
+        }
+
+        foreach (['closed_by', 'reopened_by', 'received_by', 'teacher_id'] as $nullableFk) {
+            if (!empty($row[$nullableFk]) && Schema::hasTable($map[$nullableFk] === 'staff' ? 'staff' : 'users')) {
+                $tableName = $nullableFk === 'teacher_id' ? 'staff' : 'users';
+                if (! DB::table($tableName)->where('id', $row[$nullableFk])->exists()) {
+                    $row[$nullableFk] = null;
+                }
             }
         }
 
@@ -310,7 +332,40 @@ class SchoolBackupImporter
             }
         }
 
-        if (in_array($table, ['campuses', 'academic_sessions', 'departments', 'grade_levels', 'subjects', 'fee_types'], true)
+        if ($table === 'subjects') {
+            return $this->upsertSubject($row, $institutionId);
+        }
+
+        if ($table === 'class_sections' && !empty($row['name'])) {
+            $q = DB::table('class_sections')
+                ->where('institution_id', $institutionId)
+                ->where('name', $row['name']);
+            if (!empty($row['grade_level_id'])) {
+                $q->where('grade_level_id', $row['grade_level_id']);
+            }
+            $existing = $q->first();
+            if ($existing) {
+                DB::table('class_sections')->where('id', $existing->id)->update($row);
+                return (int) $existing->id;
+            }
+        }
+
+        if ($table === 'exam_records'
+            && !empty($row['exam_id'])
+            && !empty($row['student_id'])
+            && !empty($row['subject_id'])) {
+            $existing = DB::table('exam_records')
+                ->where('exam_id', $row['exam_id'])
+                ->where('student_id', $row['student_id'])
+                ->where('subject_id', $row['subject_id'])
+                ->first();
+            if ($existing) {
+                DB::table('exam_records')->where('id', $existing->id)->update($row);
+                return (int) $existing->id;
+            }
+        }
+
+        if (in_array($table, ['campuses', 'academic_sessions', 'departments', 'grade_levels', 'fee_types'], true)
             && !empty($row['name'])) {
             $q = DB::table($table)->where('institution_id', $institutionId)->where('name', $row['name']);
             if (Schema::hasColumn($table, 'code') && !empty($row['code'])) {
@@ -324,6 +379,46 @@ class SchoolBackupImporter
         }
 
         return (int) DB::table($table)->insertGetId($row);
+    }
+
+    private function upsertSubject(array $row, int $institutionId): int
+    {
+        $gradeId = $row['grade_level_id'] ?? null;
+        $code = trim((string) ($row['code'] ?? ''));
+        $name = trim((string) ($row['name'] ?? ''));
+        $existing = null;
+
+        if ($gradeId && $code !== '') {
+            $existing = DB::table('subjects')
+                ->where('institution_id', $institutionId)
+                ->where('grade_level_id', $gradeId)
+                ->where('code', $code)
+                ->first();
+        }
+
+        if (! $existing && $gradeId && $name !== '') {
+            $existing = DB::table('subjects')
+                ->where('institution_id', $institutionId)
+                ->where('grade_level_id', $gradeId)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->first();
+        }
+
+        if (! $existing && $name !== '') {
+            $q = DB::table('subjects')->where('institution_id', $institutionId)->where('name', $name);
+            if ($code !== '') {
+                $q->where('code', $code);
+            }
+            $existing = $q->first();
+        }
+
+        if ($existing) {
+            DB::table('subjects')->where('id', $existing->id)->update($row);
+
+            return (int) $existing->id;
+        }
+
+        return (int) DB::table('subjects')->insertGetId($row);
     }
 
     private function importSettings(array $rows, int $institutionId): int

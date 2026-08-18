@@ -28,7 +28,7 @@
                                     <select id="exam_select" class="form-control default-select">
                                         <option value="">-- {{ __('marks.select_exam') }} --</option>
                                         @foreach($exams as $id => $name)
-                                            <option value="{{ $id }}">{{ $name }}</option>
+                                            <option value="{{ $id }}" @selected((int) $id === (int) ($preselectedExamId ?? 0))>{{ $name }}</option>
                                         @endforeach
                                     </select>
                                 @elseif($examCount == 1)
@@ -303,10 +303,10 @@
                         document.getElementById('total_students_count').innerText = res.students.length;
 
                         res.students.forEach((s, i) => {
-                            let m = res.marks[s.id] || {marks_obtained: '', is_absent: 0};
+                            let m = (res.marks && (res.marks[s.id] || res.marks[String(s.id)])) || {marks_obtained: '', is_absent: 0};
                             let absentChecked = m.is_absent ? 'checked' : '';
                             let inputDisabled = m.is_absent ? 'disabled' : '';
-                            let markValue = m.is_absent ? '' : m.marks_obtained;
+                            let markValue = m.is_absent ? '' : (m.marks_obtained === null || m.marks_obtained === undefined ? '' : m.marks_obtained);
 
                             rows += `<tr class="s-row">
                                 <td class="ps-4 fw-bold">${i+1}</td>

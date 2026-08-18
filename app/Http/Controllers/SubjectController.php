@@ -150,6 +150,18 @@ class SubjectController extends BaseController
         return view('subjects.create', compact('grades', 'institutions', 'institutionId', 'departments', 'prerequisites', 'programs'));
     }
 
+    public function show(Subject $subject)
+    {
+        $institutionId = $this->getInstitutionId();
+        if ($institutionId && $subject->institution_id != $institutionId) {
+            abort(403);
+        }
+
+        $subject->load(['gradeLevel', 'institution', 'department', 'academicUnit', 'prerequisite']);
+
+        return view('subjects.show', compact('subject'));
+    }
+
     /**
      * AJAX: Get Academic Units based on Program and/or Grade
      */

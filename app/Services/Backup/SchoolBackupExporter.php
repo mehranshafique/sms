@@ -39,6 +39,7 @@ class SchoolBackupExporter
         'exams' => 'institution_id',
         'exam_schedules' => 'institution_id',
         'exam_records' => 'institution_id',
+        'assessment_period_states' => 'institution_id',
         'fee_types' => 'institution_id',
         'fee_structures' => 'institution_id',
         'invoices' => 'institution_id',
@@ -62,6 +63,19 @@ class SchoolBackupExporter
         'staff.photo',
         'payment_proofs.file_path',
         'payment_proofs.proof_path',
+    ];
+
+    /**
+     * Child tables that have no institution_id and must be exported via a parent row.
+     *
+     * @var array<string, array{parent: string, fk: string, parent_institution: string}>
+     */
+    private const TABLE_VIA = [
+        'exam_records' => [
+            'parent' => 'exams',
+            'fk' => 'exam_id',
+            'parent_institution' => 'institution_id',
+        ],
     ];
 
     public function export(SchoolBackup $backup): SchoolBackup
@@ -91,11 +105,28 @@ class SchoolBackupExporter
             $filePaths = array_merge($filePaths, $this->collectFilePathsFromRow('institutions', (array) $instRow));
 
             foreach (self::TABLES as $table => $column) {
-                if (!Schema::hasTable($table) || !$column || !Schema::hasColumn($table, $column)) {
+                if (!Schema::hasTable($table)) {
                     continue;
                 }
 
-                $rows = DB::table($table)->where($column, $institution->id)->orderBy('id')->get();
+                $rows = collect();
+                if ($column && Schema::hasColumn($table, $column)) {
+                    $rows = DB::table($table)->where($column, $institution->id)->orderBy('id')->get();
+                } elseif (isset(self::TABLE_VIA[$table])) {
+                    $via = self::TABLE_VIA[$table];
+                    if (! Schema::hasTable($via['parent']) || ! Schema::hasColumn($table, $via['fk'])) {
+                        continue;
+                    }
+                    $rows = DB::table($table)
+                        ->join($via['parent'], $table.'.'.$via['fk'], '=', $via['parent'].'.id')
+                        ->where($via['parent'].'.'.$via['parent_institution'], $institution->id)
+                        ->select($table.'.*')
+                        ->orderBy($table.'.id')
+                        ->get();
+                } else {
+                    continue;
+                }
+
                 $summary[$table] = $rows->count();
                 $this->writeJsonl($workDir . '/data/' . $table . '.jsonl', $rows->all());
 

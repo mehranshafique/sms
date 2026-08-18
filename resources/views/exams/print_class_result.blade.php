@@ -6,7 +6,7 @@
         body { font-family: sans-serif; font-size: 12px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #000; padding: 5px; text-align: center; }
-        th { background-color: #f0f0f0; }
+        th.subject-col { font-size: 10px; max-width: 72px; word-wrap: break-word; white-space: normal; }
         .text-left { text-align: left; }
         .header { text-align: center; margin-bottom: 20px; }
         .header h2, .header h3 { margin: 2px; }
@@ -35,7 +35,7 @@
                 <th class="text-left">{{ __('exam.student') }}</th>
                 <th>{{ __('exam.student_id') }}</th>
                 @foreach($subjects as $subject)
-                    <th>{{ $subject->code ?? substr($subject->name, 0, 3) }}</th>
+                    <th class="subject-col">{{ $subject->name }}</th>
                 @endforeach
                 <th>{{ __('exam.total') }}</th>
                 <th>{{ __('exam.average') }}</th>
