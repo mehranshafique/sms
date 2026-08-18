@@ -17,7 +17,6 @@ use App\Models\User;
 use App\Services\Backup\SchoolBackupExporter;
 use App\Services\Backup\SchoolBackupImporter;
 use App\Services\Backup\SchoolBackupPath;
-use App\Services\ExamRecordSubjectBinder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -337,50 +336,13 @@ it('exports exam records even when the table has no institution_id', function ()
         ->and($manifest['tables']['exam_records'] ?? 0)->toBe(1);
 });
 
-it('loads enter-marks values when the stored subject id belongs to another school', function () {
-    $source = backupMakeInstitution('BK700001');
-    $target = backupMakeInstitution('BK700002');
-
-    $sourceGraph = backupMakeExamGraph($source, '1eTch', 'ADM-BK-EX-2');
-    $targetGraph = backupMakeExamGraph($target, 'TECH', 'ADM-BK-EX-3');
-
-    $targetGraph['record']->delete();
-    ExamRecord::query()->create([
-        'exam_id' => $targetGraph['exam']->id,
-        'student_id' => $targetGraph['student']->id,
-        'subject_id' => $sourceGraph['subject']->id,
-        'class_section_id' => $targetGraph['section']->id,
-        'marks_obtained' => 9,
-        'is_absent' => false,
-    ]);
-
-    $binder = app(ExamRecordSubjectBinder::class);
-    $found = $binder->recordsFor(
-        (int) $targetGraph['exam']->id,
-        (int) $targetGraph['section']->id,
-        (int) $targetGraph['subject']->id
-    );
-
-    expect($found)->toHaveCount(1)
-        ->and((float) $found->first()->marks_obtained)->toBe(9.0);
-
-    $rebound = $binder->rebindForInstitution((int) $target->id);
-    expect($rebound)->toBeGreaterThan(0);
-
-    $healed = ExamRecord::query()
-        ->where('exam_id', $targetGraph['exam']->id)
-        ->where('student_id', $targetGraph['student']->id)
-        ->first();
-
-    expect((int) $healed->subject_id)->toBe((int) $targetGraph['subject']->id)
-        ->and((float) $healed->marks_obtained)->toBe(9.0);
-});
-
-it('imports exam marks onto the destination school subject of the same name', function () {
+it('merges imported PR I into the destination school empty exam of the same session', function () {
     $source = backupMakeInstitution('BK800001');
     $target = backupMakeInstitution('BK800002');
 
-    backupMakeExamGraph($source, '1eTch', 'ADM-BK-EX-4');
+    $sourceGraph = backupMakeExamGraph($source, '1eTch', 'ADM-BK-EX-4');
+    $sourceGraph['exam']->update(['status' => 'published']);
+
     $targetGraph = backupMakeExamGraph($target, 'TECH', 'ADM-BK-EX-5');
     $targetGraph['record']->delete();
 
@@ -400,11 +362,12 @@ it('imports exam marks onto the destination school subject of the same name', fu
 
     expect($result['imported']['exam_records'] ?? 0)->toBeGreaterThan(0);
 
-    $importedExam = Exam::query()
+    $prExams = Exam::query()
         ->where('institution_id', $target->id)
         ->where('name', 'PR I')
-        ->orderByDesc('id')
-        ->first();
+        ->get();
+
+    expect($prExams)->toHaveCount(1);
 
     $importedStudent = Student::query()
         ->where('institution_id', $target->id)
@@ -414,19 +377,13 @@ it('imports exam marks onto the destination school subject of the same name', fu
         })
         ->first();
 
-    expect($importedExam)->not->toBeNull()
-        ->and($importedStudent)->not->toBeNull();
+    expect($importedStudent)->not->toBeNull();
 
     $mark = ExamRecord::query()
-        ->where('exam_id', $importedExam->id)
+        ->where('exam_id', $prExams->first()->id)
         ->where('student_id', $importedStudent->id)
         ->first();
 
     expect($mark)->not->toBeNull()
         ->and((float) $mark->marks_obtained)->toBe(9.0);
-
-    $markSubject = Subject::query()->find($mark->subject_id);
-    expect($markSubject)->not->toBeNull()
-        ->and((int) $markSubject->institution_id)->toBe((int) $target->id)
-        ->and($markSubject->name)->toBe('TECHNOLOGIE');
 });

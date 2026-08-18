@@ -3,7 +3,6 @@
 namespace App\Services\Backup;
 
 use App\Models\Institution;
-use App\Services\ExamRecordSubjectBinder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -160,11 +159,6 @@ class SchoolBackupImporter
                     }
 
                     $imported[$table] = $count;
-                }
-
-                $rebound = app(ExamRecordSubjectBinder::class)->rebindForInstitution($targetInstitutionId);
-                if ($rebound > 0) {
-                    $warnings[] = "Rebound {$rebound} exam mark(s) onto this school's subjects.";
                 }
             });
 
@@ -332,40 +326,11 @@ class SchoolBackupImporter
             }
         }
 
-        if ($table === 'subjects') {
-            return $this->upsertSubject($row, $institutionId);
+        if ($table === 'exams' && !empty($row['name'])) {
+            return $this->upsertExam($row, $institutionId);
         }
 
-        if ($table === 'class_sections' && !empty($row['name'])) {
-            $q = DB::table('class_sections')
-                ->where('institution_id', $institutionId)
-                ->where('name', $row['name']);
-            if (!empty($row['grade_level_id'])) {
-                $q->where('grade_level_id', $row['grade_level_id']);
-            }
-            $existing = $q->first();
-            if ($existing) {
-                DB::table('class_sections')->where('id', $existing->id)->update($row);
-                return (int) $existing->id;
-            }
-        }
-
-        if ($table === 'exam_records'
-            && !empty($row['exam_id'])
-            && !empty($row['student_id'])
-            && !empty($row['subject_id'])) {
-            $existing = DB::table('exam_records')
-                ->where('exam_id', $row['exam_id'])
-                ->where('student_id', $row['student_id'])
-                ->where('subject_id', $row['subject_id'])
-                ->first();
-            if ($existing) {
-                DB::table('exam_records')->where('id', $existing->id)->update($row);
-                return (int) $existing->id;
-            }
-        }
-
-        if (in_array($table, ['campuses', 'academic_sessions', 'departments', 'grade_levels', 'fee_types'], true)
+        if (in_array($table, ['campuses', 'academic_sessions', 'departments', 'grade_levels', 'subjects', 'fee_types'], true)
             && !empty($row['name'])) {
             $q = DB::table($table)->where('institution_id', $institutionId)->where('name', $row['name']);
             if (Schema::hasColumn($table, 'code') && !empty($row['code'])) {
@@ -381,44 +346,48 @@ class SchoolBackupImporter
         return (int) DB::table($table)->insertGetId($row);
     }
 
-    private function upsertSubject(array $row, int $institutionId): int
+    /**
+     * A new school often already has empty PR I / P1 rows. Import must reuse them
+     * so Enter Marks is not split into "empty PR I" vs "published PR I".
+     */
+    private function upsertExam(array $row, int $institutionId): int
     {
-        $gradeId = $row['grade_level_id'] ?? null;
-        $code = trim((string) ($row['code'] ?? ''));
+        $sessionId = $row['academic_session_id'] ?? null;
+        $category = trim((string) ($row['category'] ?? ''));
         $name = trim((string) ($row['name'] ?? ''));
+
         $existing = null;
-
-        if ($gradeId && $code !== '') {
-            $existing = DB::table('subjects')
+        if ($sessionId && $category !== '' && Schema::hasColumn('exams', 'category')) {
+            $existing = DB::table('exams')
                 ->where('institution_id', $institutionId)
-                ->where('grade_level_id', $gradeId)
-                ->where('code', $code)
+                ->where('academic_session_id', $sessionId)
+                ->where('category', $category)
                 ->first();
         }
 
-        if (! $existing && $gradeId && $name !== '') {
-            $existing = DB::table('subjects')
+        if (! $existing && $sessionId && $name !== '') {
+            $existing = DB::table('exams')
                 ->where('institution_id', $institutionId)
-                ->where('grade_level_id', $gradeId)
-                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->where('academic_session_id', $sessionId)
+                ->where('name', $name)
                 ->first();
-        }
-
-        if (! $existing && $name !== '') {
-            $q = DB::table('subjects')->where('institution_id', $institutionId)->where('name', $name);
-            if ($code !== '') {
-                $q->where('code', $code);
-            }
-            $existing = $q->first();
         }
 
         if ($existing) {
-            DB::table('subjects')->where('id', $existing->id)->update($row);
+            $update = $row;
+            // Keep a published/completed imported exam over an empty placeholder.
+            $incomingStatus = $row['status'] ?? null;
+            $existingStatus = $existing->status ?? null;
+            $rank = ['scheduled' => 0, 'ongoing' => 1, 'completed' => 2, 'published' => 3];
+            if (($rank[$existingStatus] ?? 0) > ($rank[$incomingStatus] ?? 0)) {
+                unset($update['status'], $update['finalized_at']);
+            }
+            DB::table('exams')->where('id', $existing->id)->update($update);
 
             return (int) $existing->id;
         }
 
-        return (int) DB::table('subjects')->insertGetId($row);
+        return (int) DB::table('exams')->insertGetId($row);
     }
 
     private function importSettings(array $rows, int $institutionId): int

@@ -80,6 +80,7 @@ return [
     'absent_short' => 'ABS',
     'generated_on' => 'Généré le',
     'authorized_signature' => 'Signature autorisée',
+    'subject_legend' => 'Codes des matières',
     'download_pdf' => 'Télécharger le PDF',
     'fail' => 'Échec',
     'save_exam' => 'Enregistrer l\'examen',

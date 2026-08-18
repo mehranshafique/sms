@@ -101,6 +101,7 @@ return [
     'absent_short' => 'ABS',
     'generated_on' => 'Generated on',
     'authorized_signature' => 'Authorized Signature',
+    'subject_legend' => 'Subject codes',
     'download_pdf' => 'Download PDF',
     'fail' => 'Fail',
 

@@ -3,14 +3,19 @@
 <head>
     <title>{{ __('exam.result_sheet') }} - {{ $classSection->name }}</title>
     <style>
-        body { font-family: sans-serif; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #000; padding: 5px; text-align: center; }
-        th.subject-col { font-size: 10px; max-width: 72px; word-wrap: break-word; white-space: normal; }
+        @page { size: A4 landscape; margin: 8mm; }
+        body { font-family: sans-serif; font-size: 11px; }
+        table.marks { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        table.marks th, table.marks td { border: 1px solid #000; padding: 3px 2px; text-align: center; }
+        table.marks th.subject-col { font-size: 9px; white-space: nowrap; overflow: hidden; }
         .text-left { text-align: left; }
-        .header { text-align: center; margin-bottom: 20px; }
+        .header { text-align: center; margin-bottom: 12px; }
         .header h2, .header h3 { margin: 2px; }
         .fail { color: red; font-weight: bold; }
+        .legend { margin-top: 14px; font-size: 10px; }
+        .legend h4 { margin: 0 0 6px; font-size: 11px; }
+        .legend-item { display: inline-block; width: 32%; vertical-align: top; margin: 0 0 3px; }
+        .legend .code { font-weight: bold; }
         @media print {
             .no-print { display: none; }
         }
@@ -29,13 +34,13 @@
         <p>{{ __('exam.class') }}: {{ $classSection->name }} | {{ __('exam.session') }}: {{ $exam->academicSession->name }}</p>
     </div>
 
-    <table>
+    <table class="marks">
         <thead>
             <tr>
                 <th class="text-left">{{ __('exam.student') }}</th>
                 <th>{{ __('exam.student_id') }}</th>
                 @foreach($subjects as $subject)
-                    <th class="subject-col">{{ $subject->name }}</th>
+                    <th class="subject-col">{{ $subject->code ?: \Illuminate\Support\Str::limit($subject->name, 8, '') }}</th>
                 @endforeach
                 <th>{{ __('exam.total') }}</th>
                 <th>{{ __('exam.average') }}</th>
@@ -74,6 +79,16 @@
             @endforeach
         </tbody>
     </table>
+
+    <div class="legend">
+        <h4>{{ __('exam.subject_legend') }}</h4>
+        @foreach($subjects as $subject)
+            @php
+                $code = $subject->code ?: \Illuminate\Support\Str::limit($subject->name, 8, '');
+            @endphp
+            <div class="legend-item"><span class="code">{{ $code }}</span> = {{ $subject->name }}</div>
+        @endforeach
+    </div>
 
     <div style="margin-top: 40px; text-align: right; padding-right: 50px;">
         <p>__________________________</p>

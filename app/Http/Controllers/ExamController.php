@@ -429,7 +429,7 @@ class ExamController extends BaseController
         $data = compact('exam', 'classSection', 'records', 'subjects', 'ranks');
 
         if ($request->has('download')) {
-             $pdf = Pdf::loadView('exams.print_class_result', $data);
+             $pdf = Pdf::loadView('exams.print_class_result', $data)->setPaper('a4', 'landscape');
              return $pdf->download('Result_'.$exam->name.'_'.$classSection->name.'.pdf');
         }
 
