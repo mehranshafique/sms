@@ -393,7 +393,7 @@ class ExamController extends BaseController
             'class_section_id' => 'required|exists:class_sections,id'
         ]);
 
-        $classSection = ClassSection::with('gradeLevel')->findOrFail($request->class_section_id);
+        $classSection = ClassSection::with(['gradeLevel', 'classTeacher.user'])->findOrFail($request->class_section_id);
 
         $records = ExamRecord::with(['student', 'subject'])
             ->where('exam_id', $exam->id)

@@ -81,6 +81,8 @@ return [
     'generated_on' => 'Généré le',
     'authorized_signature' => 'Signature autorisée',
     'subject_legend' => 'Codes des matières',
+    'class_teacher' => 'Titulaire',
+    'fail_note' => 'Les notes en rouge sont inférieures à la note de passage de la matière.',
     'download_pdf' => 'Télécharger le PDF',
     'fail' => 'Échec',
     'save_exam' => 'Enregistrer l\'examen',

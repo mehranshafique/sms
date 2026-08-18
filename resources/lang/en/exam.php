@@ -102,6 +102,8 @@ return [
     'generated_on' => 'Generated on',
     'authorized_signature' => 'Authorized Signature',
     'subject_legend' => 'Subject codes',
+    'class_teacher' => 'Class teacher',
+    'fail_note' => 'Red marks are below the passing score for that subject.',
     'download_pdf' => 'Download PDF',
     'fail' => 'Fail',
 

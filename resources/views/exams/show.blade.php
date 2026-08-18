@@ -42,13 +42,14 @@
                     <div class="card-body">
                         <div class="text-center mb-4">
                             <div class="profile-photo">
-                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto" style="width: 80px; height: 80px; font-size: 30px;">
-                                    <i class="fa fa-file-text-o"></i>
+                                <div class="rounded-circle text-white d-flex flex-column align-items-center justify-content-center mx-auto shadow-sm"
+                                     style="width: 110px; height: 110px; background: linear-gradient(135deg, #4c2bb6 0%, #7c4dff 100%); line-height: 1.15; padding: 10px;">
+                                    <span class="fw-bold" style="font-size: 18px;">{{ $exam->name }}</span>
+                                    <span style="font-size: 10px; opacity: 0.92; margin-top: 4px;">{{ $exam->academicSession->name ?? '' }}</span>
                                 </div>
                             </div>
                             <h3 class="mt-3 mb-1">{{ $exam->name }}</h3>
                             <p class="text-muted mb-0">{{ $exam->institution->name }}</p>
-                            <span class="badge badge-primary mt-2">{{ $exam->academicSession->name }}</span>
                         </div>
                         
                         <div class="profile-personal-info">
