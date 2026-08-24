@@ -231,4 +231,22 @@
     [data-theme-version="dark"] .ai-panel .fw-bold {
         color: var(--digitex-text);
     }
+
+    /* Nested light panels (settings sub-cards, etc.) */
+    [data-theme-version="dark"] .content-body .bg-light,
+    [data-theme-version="dark"] .settings-subpanel {
+        background-color: var(--digitex-card-bg-2) !important;
+        border-color: var(--digitex-card-border) !important;
+        color: var(--digitex-text);
+    }
+
+    [data-theme-version="dark"] .settings-subpanel .form-label,
+    [data-theme-version="dark"] .settings-subpanel .form-check-label,
+    [data-theme-version="dark"] .settings-subpanel .text-muted {
+        color: var(--digitex-muted) !important;
+    }
+
+    [data-theme-version="dark"] .settings-subpanel .form-label {
+        color: var(--digitex-text) !important;
+    }
 </style>

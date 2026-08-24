@@ -32,19 +32,7 @@
         $labels = $column_labels ?? [];
         $subjectCount = count($data ?? []);
         $densityClass = $subjectCount > 16 ? 'density-high' : ($subjectCount > 12 ? 'density-medium' : 'density-low');
-        $principalName = __('reports.direction');
-        if (isset($student->institution_id)) {
-            $adminUser = \App\Models\User::where('institute_id', $student->institution_id)
-                            ->where(function($q) {
-                                $q->where('user_type', 'school_admin')
-                                  ->orWhereHas('roles', function($r) {
-                                      $r->where('name', 'School Admin');
-                                  });
-                            })->first();
-            if ($adminUser && !empty($adminUser->name)) {
-                $principalName = $adminUser->name;
-            }
-        }
+        $principalName = $authority['name'] ?? (__('reports.direction') ?? 'DIRECTION');
 
         $p1_label = $labels['p1'] ?? (($semester == 1) ? 'P1' : 'P3');
         $p2_label = $labels['p2'] ?? (($semester == 1) ? 'P2' : 'P4');
@@ -65,8 +53,10 @@
             <div class="class-name">{{ $enrollment->classSection->gradeLevel->name ?? '' }} - {{ $enrollment->classSection->name ?? '' }}</div>
             <div class="class-name" style="font-size:10px;font-weight:normal;">
                 {{ __('results.student_id') }} {{ $student->admission_number }}
-                &nbsp;|&nbsp;
-                {{ __('results.father_name') }} {{ $student->displayFatherName() }}
+                @if(!empty($student->roll_number) || !empty($enrollment->roll_number))
+                    &nbsp;|&nbsp;
+                    {{ __('results.roll_number') }} {{ $enrollment->roll_number ?? $student->roll_number }}
+                @endif
             </div>
             <div class="barcode"></div>
             <div class="term-title-bar">{{ $term_title ?? (__('reports.bulletin_title') . ' ' . ($semester ?? 1) . ' ' . __('reports.semester')) }}</div>
@@ -206,11 +196,7 @@
 
             @include('reports.partials.bulletin_seal')
 
-            <div class="signature-block">
-                <div>{{ __('reports.made_in') }} {{ $student->institution->city ?? 'Kinshasa' }}, {{ __('reports.on_date') }} {{ date('d/m/Y') }}</div>
-                <div style="margin: 2px 0;">{{ __('reports.principal') }}</div>
-                <div>{{ strtoupper($principalName) }}</div>
-            </div>
+            @include('reports.partials.bulletin_signature')
         </div>
     </div>
     </div>

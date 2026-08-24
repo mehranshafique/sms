@@ -56,6 +56,8 @@ return [
     'credit' => 'Crédit',
     'credit_valide' => 'Crédit Validé',
     'principal' => 'Le Chef d\'Établissement',
+    'authority_primary_title' => 'DIRECTEUR DU PRIMAIRE',
+    'authority_secondary_title' => 'PRÉFET DU SECONDAIRE',
     'class_teacher' => 'Titulaire',
     'parent_signature' => 'Signature des parents',
     'principal_signature' => 'Signature du Chef d\'Établissement',

@@ -24,6 +24,7 @@ use App\Services\AcademicCycleService;
 use App\Services\ApplicationGradeService;
 use App\Services\AssessmentPeriodService;
 use App\Services\StudentConductService;
+use App\Services\ReportAuthorityService;
 use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 
@@ -208,10 +209,15 @@ class ReportController extends BaseController
         $accessResult = null;
 
         if ($request->filled('student_id')) {
-            $student = Student::with(['institution', 'parent', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
+            $student = Student::with(['institution.cityRelation', 'parent', 'enrollments.classSection.gradeLevel'])->findOrFail($request->student_id);
             if ($student->institution_id != $institutionId) abort(403);
 
-            $enrollment = $this->activeEnrollment($student, $institutionId);
+            $enrollment = $this->resolveEnrollmentForReport(
+                $student,
+                $institutionId,
+                $request->filled('class_section_id') ? (int) $request->class_section_id : null,
+                $request->input('period')
+            );
             if (!$enrollment) {
                 $msg = __('reports.no_enrollment');
                 if ($request->ajax() || $request->check_only) {
@@ -226,10 +232,24 @@ class ReportController extends BaseController
             $classSection = ClassSection::with('gradeLevel')->find($request->class_section_id);
             if ($classSection->institution_id != $institutionId) abort(403);
 
-            $enrollments = StudentEnrollment::with(['student.parent', 'classSection.gradeLevel'])
+            $enrollmentsQuery = StudentEnrollment::with(['student.institution.cityRelation', 'student.parent', 'classSection.gradeLevel'])
                 ->where('class_section_id', $request->class_section_id)
-                ->where('status', 'active')
-                ->get();
+                ->where('status', 'active');
+
+            $currentSessionId = $this->periodService->currentSessionId($institutionId);
+            if ($currentSessionId) {
+                $enrollmentsQuery->where('academic_session_id', $currentSessionId);
+            }
+
+            $enrollments = $enrollmentsQuery->get();
+
+            // Fallback: section may still have active enrollments on a prior session with marks.
+            if ($enrollments->isEmpty()) {
+                $enrollments = StudentEnrollment::with(['student.institution.cityRelation', 'student.parent', 'classSection.gradeLevel'])
+                    ->where('class_section_id', $request->class_section_id)
+                    ->where('status', 'active')
+                    ->get();
+            }
 
             if ($enrollments->isEmpty()) {
                 $msg = __('reports.no_students_in_class');
@@ -276,6 +296,24 @@ class ReportController extends BaseController
             'semester' => $stage['semester'],
             'stage_key' => $stage['key'],
         ], fn ($v) => $v !== null && $v !== ''));
+
+        // Re-resolve single-student enrollment now that the stage/period is known,
+        // so we use the same session/section that holds the marks (matches bulk).
+        if ($request->filled('student_id') && $targetStudents->count() === 1) {
+            $student = $targetStudents->first()->student;
+            $categories = $this->stageExamCategories($stage, $cycleValue);
+            $refined = $this->resolveEnrollmentForReport(
+                $student,
+                $institutionId,
+                $request->filled('class_section_id') ? (int) $request->class_section_id : (int) $targetStudents->first()->class_section_id,
+                $categories
+            );
+            if ($refined) {
+                $targetStudents = collect([$refined]);
+                $classSection = $refined->classSection;
+                $sessionId = (int) $refined->academic_session_id;
+            }
+        }
 
         $validationError = $this->cycleService->validateReportRequest(
             $cycleValue,
@@ -325,6 +363,7 @@ class ReportController extends BaseController
 
         $bulkData = [];
         $sealImage = InstitutionSetting::get($institutionId, 'report_seal_image', '');
+        $authorityService = app(ReportAuthorityService::class);
         $settings = [
             'threshold' => InstitutionSetting::get($institutionId, 'lmd_validation_threshold', 50),
             'gradingScale' => json_decode(InstitutionSetting::get($institutionId, 'grading_scale', '[]'), true),
@@ -346,6 +385,7 @@ class ReportController extends BaseController
                 continue;
             }
 
+            $authority = $authorityService->forCycle((int) $institutionId, $studentCycle);
             $termNumber = (int) ($stage['trimester'] ?: $stage['semester'] ?: 1);
             $isPeriodCard = $stage['type'] === 'period';
 
@@ -413,6 +453,7 @@ class ReportController extends BaseController
                 'student' => $student,
                 'enrollment' => $enrollment,
                 'settings' => $settings,
+                'authority' => $authority,
                 'request' => $request->all(),
                 'cards_per_page' => $this->periodService->cardsPerPage($stage['key'], $subjectCount),
             ]);
@@ -554,20 +595,114 @@ class ReportController extends BaseController
 
     private function activeEnrollment(Student $student, int $institutionId): ?StudentEnrollment
     {
-        $currentSessionId = $this->periodService->currentSessionId($institutionId);
+        return $this->resolveEnrollmentForReport($student, $institutionId, null, null);
+    }
 
-        if ($currentSessionId) {
-            $current = $student->enrollments()
-                ->where('status', 'active')
-                ->where('academic_session_id', $currentSessionId)
-                ->latest('id')
-                ->first();
-            if ($current) {
-                return $current;
+    /**
+     * Prefer the enrollment that matches the selected class and has marks for the requested stage.
+     */
+    private function resolveEnrollmentForReport(
+        Student $student,
+        int $institutionId,
+        ?int $classSectionId = null,
+        string|array|null $periodCategory = null
+    ): ?StudentEnrollment {
+        $currentSessionId = $this->periodService->currentSessionId($institutionId);
+        $base = $student->enrollments()->with('classSection.gradeLevel')->where('status', 'active');
+
+        $candidates = (clone $base)
+            ->when($currentSessionId, fn ($q) => $q->where('academic_session_id', $currentSessionId))
+            ->when($classSectionId, fn ($q) => $q->where('class_section_id', $classSectionId))
+            ->orderByDesc('id')
+            ->get();
+
+        if ($candidates->isEmpty() && $classSectionId) {
+            $candidates = (clone $base)
+                ->when($currentSessionId, fn ($q) => $q->where('academic_session_id', $currentSessionId))
+                ->orderByDesc('id')
+                ->get();
+        }
+
+        if ($candidates->isEmpty()) {
+            $candidates = (clone $base)->orderByDesc('id')->get();
+        }
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        $categories = array_values(array_filter((array) $periodCategory));
+        if ($categories === []) {
+            return $candidates->first();
+        }
+
+        // Prefer an enrollment that actually has marks for this stage (Single must match Bulk).
+        $matchWithMarks = function ($pool, bool $requireClassSection) use ($student, $categories) {
+            foreach ($pool as $enrollment) {
+                $query = ExamRecord::where('student_id', $student->id)
+                    ->whereHas('exam', function ($q) use ($enrollment, $categories) {
+                        $q->where('academic_session_id', $enrollment->academic_session_id)
+                            ->whereIn('category', $categories);
+                    });
+                if ($requireClassSection) {
+                    $query->where('class_section_id', $enrollment->class_section_id);
+                }
+                if ($query->exists()) {
+                    return $enrollment;
+                }
+            }
+
+            return null;
+        };
+
+        $pools = [$candidates];
+
+        // Expand beyond current session when marks live on a prior active enrollment.
+        $sectionPool = (clone $base)
+            ->when($classSectionId, fn ($q) => $q->where('class_section_id', $classSectionId))
+            ->orderByDesc('id')
+            ->get();
+        if ($sectionPool->isNotEmpty()) {
+            $pools[] = $sectionPool;
+        }
+        $pools[] = (clone $base)->orderByDesc('id')->get();
+
+        foreach ($pools as $pool) {
+            $hit = $matchWithMarks($pool, true) ?? $matchWithMarks($pool, false);
+            if ($hit) {
+                return $hit;
             }
         }
 
-        return $student->enrollments()->where('status', 'active')->latest('id')->first();
+        return $candidates->first();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stageExamCategories(array $stage, string $cycle): array
+    {
+        if (($stage['type'] ?? '') === 'period' && ! empty($stage['period'])) {
+            return [(string) $stage['period']];
+        }
+
+        if (! empty($stage['trimester'])) {
+            $keys = $this->cycleService->periodKeysForTerm(AcademicType::PRIMARY->value, (int) $stage['trimester']);
+
+            return array_values(array_filter([$keys['pA'] ?? null, $keys['pB'] ?? null, $keys['examCat'] ?? null]));
+        }
+
+        if (! empty($stage['semester'])) {
+            $keys = $this->cycleService->periodKeysForTerm(AcademicType::SECONDARY->value, (int) $stage['semester']);
+
+            return array_values(array_filter([$keys['pA'] ?? null, $keys['pB'] ?? null, $keys['examCat'] ?? null]));
+        }
+
+        if (! empty($stage['period'])) {
+            return [(string) $stage['period']];
+        }
+
+        return [];
     }
 
     private function hasMarks($reportData) {
@@ -805,7 +940,16 @@ class ReportController extends BaseController
             ->whereHas('exam', function($q) use ($enrollment, $period) {
                 $q->where('academic_session_id', $enrollment->academic_session_id)
                   ->where('category', $period);
-            })->get()->keyBy('subject_id');
+            })->get();
+
+        $missingIds = $records->pluck('subject_id')->diff($subjects->pluck('id'));
+        if ($missingIds->isNotEmpty()) {
+            $subjects = $subjects->concat(
+                Subject::whereIn('id', $missingIds)->where('is_active', true)->get()
+            )->unique('id')->values();
+        }
+
+        $records = $records->keyBy('subject_id');
 
         $scheduleMap = $this->getExamScheduleMaxMarks(
             $enrollment->class_section_id, 
@@ -819,8 +963,9 @@ class ReportController extends BaseController
             $rec = $records->get($subject->id);
             $obtained = $rec ? $rec->marks_obtained : null; 
 
-            // STRICT MATH: Exclusively use Database limits. No hardcoded 20 or 100 assumptions.
-            $configuredMax = $scheduleMap[$period][$subject->id] ?? 0;
+            // Prefer schedule max; fall back to subject total_marks so Single cards are not all 0.
+            $configuredMax = $scheduleMap[$period][$subject->id]
+                ?? ($subject->total_marks ?? 0);
 
             $data[] = [
                 'subject' => $subject,
@@ -866,6 +1011,13 @@ class ReportController extends BaseController
                   ->whereIn('category', [$pA, $pB, $examCat]);
             })->get();
 
+        $missingIds = $records->pluck('subject_id')->diff($subjects->pluck('id'));
+        if ($missingIds->isNotEmpty()) {
+            $subjects = $subjects->concat(
+                Subject::whereIn('id', $missingIds)->where('is_active', true)->get()
+            )->unique('id')->values();
+        }
+
         $scheduleMap = $this->getExamScheduleMaxMarks(
             $enrollment->class_section_id, 
             $enrollment->academic_session_id, 
@@ -874,12 +1026,9 @@ class ReportController extends BaseController
 
         $data = [];
         foreach ($subjects as $subject) {
-            // STRICT MATH: Exact schedule values only. No fallback multipliers.
             $p1_max = $scheduleMap[$pA][$subject->id] ?? 0;
             $p2_max = $scheduleMap[$pB][$subject->id] ?? 0;
             $exam_max = $scheduleMap[$examCat][$subject->id] ?? 0;
-
-            // Strict Mathematical Rule: T. Max = P1 Max + P2 Max + Exam Max
             $total_max = $p1_max + $p2_max + $exam_max;
 
             $data[$subject->id] = [
@@ -938,6 +1087,13 @@ class ReportController extends BaseController
                   ->whereIn('category', [$pA, $pB, $examCat]);
             })->get();
 
+        $missingIds = $records->pluck('subject_id')->diff($subjects->pluck('id'));
+        if ($missingIds->isNotEmpty()) {
+            $subjects = $subjects->concat(
+                Subject::whereIn('id', $missingIds)->where('is_active', true)->get()
+            )->unique('id')->values();
+        }
+
         $scheduleMap = $this->getExamScheduleMaxMarks(
             $enrollment->class_section_id, 
             $enrollment->academic_session_id, 
@@ -947,12 +1103,9 @@ class ReportController extends BaseController
         $data = [];
         
         foreach($subjects as $subject) {
-            // STRICT MATH: Exact schedule values only. No fallback multipliers.
             $p1_max = $scheduleMap[$pA][$subject->id] ?? 0;
             $p2_max = $scheduleMap[$pB][$subject->id] ?? 0;
             $exam_max = $scheduleMap[$examCat][$subject->id] ?? 0;
-
-            // Strict Mathematical Rule: T. Max = P1 Max + P2 Max + Exam Max
             $total_max = $p1_max + $p2_max + $exam_max;
 
             $data[$subject->id] = [

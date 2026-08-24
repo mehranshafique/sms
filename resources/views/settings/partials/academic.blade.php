@@ -1,5 +1,10 @@
 <form action="{{ route('settings.update') }}" method="POST" class="ajax-form" enctype="multipart/form-data">
     @csrf
+    <style>
+        .settings-subpanel {
+            background-color: #f8f9fa;
+        }
+    </style>
     <div class="row">
         {{-- 1. Active Periods Management --}}
         <div class="col-md-12 mb-4">
@@ -85,12 +90,81 @@
             </div>
         </div>
 
+        {{-- Report authorities by education cycle --}}
+        <div class="col-md-12 mb-4">
+            <h5 class="text-primary border-bottom pb-2">{{ __('settings.report_authority_title') }}</h5>
+            <p class="text-muted small">{{ __('settings.report_authority_help') }}</p>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="p-3 border rounded settings-subpanel h-100">
+                        <h6 class="fw-bold text-primary">{{ __('settings.report_authority_primary') }}</h6>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('settings.report_authority_role_title') }}</label>
+                            <input type="text" name="report_authority_primary_title" class="form-control"
+                                   value="{{ $reportAuthorityPrimary['title'] ?? '' }}"
+                                   placeholder="{{ __('reports.authority_primary_title') }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('settings.report_authority_name') }}</label>
+                            <input type="text" name="report_authority_primary_name" class="form-control"
+                                   value="{{ $reportAuthorityPrimary['name'] ?? '' }}"
+                                   placeholder="{{ __('settings.report_authority_name_placeholder') }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('settings.report_authority_signature') }}</label>
+                            <input type="file" name="report_authority_primary_signature" class="form-control" accept="image/*">
+                            @if(!empty($reportAuthorityPrimary['signature']))
+                                <div class="mt-2 d-flex align-items-center gap-3">
+                                    <img src="{{ asset('storage/' . $reportAuthorityPrimary['signature']) }}" alt="signature" style="height:48px;object-fit:contain;border:1px solid #eee;border-radius:6px;background:#fff;padding:4px;">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="remove_report_authority_primary_signature" value="1" id="remove_report_authority_primary_signature">
+                                        <label class="form-check-label" for="remove_report_authority_primary_signature">{{ __('settings.remove_report_authority_signature') }}</label>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <div class="p-3 border rounded settings-subpanel h-100">
+                        <h6 class="fw-bold text-primary">{{ __('settings.report_authority_secondary') }}</h6>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('settings.report_authority_role_title') }}</label>
+                            <input type="text" name="report_authority_secondary_title" class="form-control"
+                                   value="{{ $reportAuthoritySecondary['title'] ?? '' }}"
+                                   placeholder="{{ __('reports.authority_secondary_title') }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('settings.report_authority_name') }}</label>
+                            <input type="text" name="report_authority_secondary_name" class="form-control"
+                                   value="{{ $reportAuthoritySecondary['name'] ?? '' }}"
+                                   placeholder="{{ __('settings.report_authority_name_placeholder') }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">{{ __('settings.report_authority_signature') }}</label>
+                            <input type="file" name="report_authority_secondary_signature" class="form-control" accept="image/*">
+                            @if(!empty($reportAuthoritySecondary['signature']))
+                                <div class="mt-2 d-flex align-items-center gap-3">
+                                    <img src="{{ asset('storage/' . $reportAuthoritySecondary['signature']) }}" alt="signature" style="height:48px;object-fit:contain;border:1px solid #eee;border-radius:6px;background:#fff;padding:4px;">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="remove_report_authority_secondary_signature" value="1" id="remove_report_authority_secondary_signature">
+                                        <label class="form-check-label" for="remove_report_authority_secondary_signature">{{ __('settings.remove_report_authority_signature') }}</label>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- 3. Grading Scale Configuration --}}
         <div class="col-md-12 mb-4">
             <h5 class="text-primary border-bottom pb-2 d-flex justify-content-between">
                 {{ __('settings.grading_scale') }}
                 <button type="button" class="btn btn-xs btn-primary" id="addGradeRow"><i class="fa fa-plus"></i></button>
             </h5>
+            <p class="text-muted small">{{ __('settings.grading_scale_help') }}</p>
             <div class="table-responsive">
                 <table class="table table-sm">
                     <thead>

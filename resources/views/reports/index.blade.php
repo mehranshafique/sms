@@ -634,6 +634,8 @@
                 if (classId) params.set('class_section_id', classId);
             } else if (studentId) {
                 params.set('student_id', studentId);
+                // Include class when selected so Single uses the same section/session as Bulk.
+                if (classId) params.set('class_section_id', classId);
             }
             if (typeVal) params.set('type', typeVal);
             if (scope === 'period' && period) params.set('period', period);

@@ -21,7 +21,7 @@ return [
     'print_btn' => 'Print Result Card',
     'student_name' => 'Student Name:',
     'student_id' => 'Student ID:',
-    'roll_number' => 'Roll Number:',
+    'roll_number' => 'Student No:',
     'father_name' => 'Father Name:',
     'class' => 'Class:',
     'subject' => 'Subject',

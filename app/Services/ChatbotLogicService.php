@@ -2409,12 +2409,19 @@ class ChatbotLogicService
             ->groupBy('st')
             ->pluck('total', 'st');
 
+        $present = (int) ($counts['present'] ?? 0);
+        $absent = (int) ($counts['absent'] ?? 0);
+        $late = (int) ($counts['late'] ?? 0);
+        $excused = (int) (($counts['excused'] ?? 0) + ($counts['half_day'] ?? 0));
+        $totalSessions = max(0, $present + $absent + $late + $excused);
+
         $msg = __($isEn ? 'chatbot_attendance.period_en' : 'chatbot_attendance.period_fr', [
             'period' => $periodLabel,
-            'present' => (int) ($counts['present'] ?? 0),
-            'absent' => (int) ($counts['absent'] ?? 0),
-            'late' => (int) ($counts['late'] ?? 0),
-            'excused' => (int) (($counts['excused'] ?? 0) + ($counts['half_day'] ?? 0)),
+            'present' => $present,
+            'absent' => $absent,
+            'late' => $late,
+            'excused' => $excused,
+            'total' => $totalSessions,
         ]);
 
         $session->update(['status' => 'ACTIVE']);

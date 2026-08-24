@@ -51,6 +51,8 @@ class ReportCardAccessService
             return $this->allowResult($periodKey, $totalPaid, (float) ($required ?? 0), $outstanding);
         }
 
+        // Gate only on the configured stage minimum (report_min_paid_amounts).
+        // Do not block on total annual outstanding when a stage has no minimum set.
         $blocked = null;
 
         if ($required !== null && $required > 0) {
@@ -71,20 +73,6 @@ class ReportCardAccessService
                     'message_fr' => "⛔ Accès refusé. Il vous reste {$fmtRem} à payer pour atteindre le minimum requis pour cette période du bulletin ({$fmtReq}). Veuillez régler pour voir vos résultats.",
                 ];
             }
-        } elseif ($outstanding > 0) {
-            $fmt = number_format($outstanding, 2) . ' ' . $currency;
-            $blocked = [
-                'allowed' => false,
-                'blocked' => true,
-                'mode' => 'outstanding',
-                'period_key' => $periodKey,
-                'total_paid' => $totalPaid,
-                'required' => 0,
-                'remaining' => $outstanding,
-                'outstanding' => $outstanding,
-                'message_en' => "⛔ Access denied. You have an outstanding balance of {$fmt}. Please settle to view results.",
-                'message_fr' => "⛔ Accès refusé. Vous avez un solde impayé de {$fmt}. Veuillez régler pour voir vos résultats.",
-            ];
         }
 
         if ($blocked && $enforcePayment) {

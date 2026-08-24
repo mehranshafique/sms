@@ -1,15 +1,26 @@
-{{-- EPST / Ministry header block for bulletins --}}
+{{-- EPST / Ministry header block for bulletins (matches official layout) --}}
 @php
     $inst = $student->institution ?? null;
-    $epstCode = $inst->epst_school_code ?? $inst->code ?? '';
-    $headName = $inst->head_person_name ?? __('reports.direction');
+    $cityName = null;
+    if ($inst) {
+        $cityName = $inst->cityRelation->name
+            ?? (is_string($inst->city ?? null) && !is_numeric($inst->city) ? $inst->city : null);
+    }
+    $addressParts = collect([
+        $inst->address ?? null,
+        $cityName,
+    ])->filter()->implode(', ');
 @endphp
-<div class="epst-header" style="text-align:center; margin-bottom:8px; font-size:11px; line-height:1.4;">
-    <div style="font-weight:bold; text-transform:uppercase;">{{ __('reports.epst_republic_line') }}</div>
-    <div>{{ __('reports.epst_ministry_line') }}</div>
-    @if($epstCode)
-        <div>{{ __('reports.epst_school_code') }}: <strong>{{ $epstCode }}</strong></div>
+<div class="epst-header">
+    <div class="epst-republic">{{ __('reports.epst_republic_line') }}</div>
+    <div class="epst-ministry">{{ __('reports.epst_ministry_line') }}</div>
+    <div class="epst-school">{{ strtoupper($inst->name ?? '') }}</div>
+    <div class="epst-ornament" aria-hidden="true">
+        <span class="epst-ornament-line"></span>
+        <span class="epst-ornament-diamond"></span>
+        <span class="epst-ornament-line"></span>
+    </div>
+    @if($addressParts !== '')
+        <div class="epst-address">Adresse : {{ $addressParts }}</div>
     @endif
-    <div style="font-size:13px; font-weight:bold; margin-top:6px;">{{ $inst->name ?? '' }}</div>
-    <div style="font-size:10px;">{{ __('reports.epst_director') }}: {{ $headName }}</div>
 </div>

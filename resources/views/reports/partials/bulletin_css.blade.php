@@ -196,6 +196,54 @@
     .student-name { font-size: 8.5px; font-weight: bold; margin: 2px 0 1px 0; }
     .class-name { font-size: 8px; font-weight: bold; margin-bottom: 3px; }
 
+    .epst-header {
+        text-align: center;
+        margin-bottom: 4px;
+        font-size: 7px;
+        line-height: 1.35;
+        color: var(--primary-blue);
+    }
+    .epst-republic {
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 7.5px;
+        letter-spacing: 0.02em;
+    }
+    .epst-ministry { font-size: 6.5px; margin-top: 1px; }
+    .epst-school {
+        font-size: 10px;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-top: 4px;
+        color: var(--primary-blue);
+        letter-spacing: 0.01em;
+    }
+    .epst-ornament {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        margin: 3px auto 2px;
+        max-width: 88%;
+    }
+    .epst-ornament-line {
+        flex: 1;
+        height: 1.5px;
+        background: linear-gradient(90deg, transparent, #c9a227 15%, #c9a227 85%, transparent);
+    }
+    .epst-ornament-diamond {
+        width: 5px;
+        height: 5px;
+        background: #c9a227;
+        transform: rotate(45deg);
+        flex-shrink: 0;
+    }
+    .epst-address {
+        font-size: 6px;
+        color: #444;
+        margin-top: 1px;
+    }
+
     .barcode {
         height: 16px;
         width: 80px;
@@ -326,9 +374,45 @@
         bottom: 0;
         font-size: 6.5px;
         text-align: center;
-        line-height: 1.3;
+        line-height: 1.25;
         font-weight: bold;
         color: #000;
+        min-width: 110px;
+    }
+
+    .signature-block .authority-date {
+        font-weight: normal;
+        margin-bottom: 2px;
+        white-space: nowrap;
+    }
+
+    .signature-block .authority-title {
+        font-size: 7px;
+        letter-spacing: 0.2px;
+        margin-bottom: 1px;
+    }
+
+    .signature-block .authority-signature-img {
+        display: block;
+        margin: 1px auto 0;
+        max-height: 28px;
+        max-width: 100px;
+        object-fit: contain;
+    }
+
+    .signature-block .authority-signature-space {
+        height: 22px;
+    }
+
+    .signature-block .authority-line {
+        border-bottom: 1px dotted #333;
+        width: 95px;
+        margin: 2px auto 2px;
+    }
+
+    .signature-block .authority-name {
+        font-size: 7px;
+        letter-spacing: 0.2px;
     }
 
     @media print {
@@ -367,6 +451,7 @@
             height: auto !important;
             max-height: var(--card-max-height) !important;
             page-break-inside: avoid;
+            overflow: visible !important;
         }
     }
 </style>

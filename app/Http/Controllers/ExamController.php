@@ -109,8 +109,9 @@ class ExamController extends BaseController
 
                     $isFinalized = !is_null($row->finalized_at);
                     $canEdit = $user->can('update', $row);
+                    $isPrivilegedAdmin = $user->hasRole(['Super Admin', 'Head Officer', 'School Admin']);
                     
-                    if($isFinalized && !$user->hasRole(['Super Admin', 'Head Officer'])) {
+                    if($isFinalized && !$isPrivilegedAdmin) {
                         $canEdit = false;
                     }
 
@@ -118,7 +119,11 @@ class ExamController extends BaseController
                         $btn .= '<a href="'.route('exams.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1"><i class="fa fa-pencil"></i></a>';
                     }
 
-                    if($user->can('delete', $row) && !$isFinalized){
+                    $canDelete = $user->can('delete', $row);
+                    if ($canDelete && $isFinalized && !$isPrivilegedAdmin) {
+                        $canDelete = false;
+                    }
+                    if($canDelete){
                         $btn .= '<button type="button" class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'"><i class="fa fa-trash"></i></button>';
                     }
                     $btn .= '</div>';
@@ -363,10 +368,21 @@ class ExamController extends BaseController
 
     public function destroy(Exam $exam)
     {
-        if($exam->finalized_at && !Auth::user()->hasRole(['Super Admin'])) {
+        $user = Auth::user();
+        $isPrivilegedAdmin = $user->hasRole(['Super Admin', 'Head Officer', 'School Admin']);
+
+        if ($exam->finalized_at && ! $isPrivilegedAdmin) {
             return response()->json(['message' => __('exam.messages.delete_finalized_error')], 403);
         }
-        $exam->delete();
+
+        try {
+            $exam->delete();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => __('exam.messages.delete_failed') ?: __('exam.something_went_wrong'),
+            ], 422);
+        }
+
         return response()->json(['message' => __('exam.messages.success_delete')]);
     }
 
@@ -438,12 +454,30 @@ class ExamController extends BaseController
 
     public function bulkDelete(Request $request)
     {
-        $this->authorize('deleteAny', Exam::class); 
-        $ids = $request->ids;
-        if (!empty($ids)) {
-            Exam::whereIn('id', $ids)->delete();
-            return response()->json(['success' => __('exam.messages.success_delete')]);
+        $this->authorize('deleteAny', Exam::class);
+        $ids = collect($request->ids ?? [])->filter()->values()->all();
+        if ($ids === []) {
+            return response()->json(['error' => __('exam.something_went_wrong')], 422);
         }
-        return response()->json(['error' => __('exam.something_went_wrong')]);
+
+        $user = Auth::user();
+        $isPrivilegedAdmin = $user->hasRole(['Super Admin', 'Head Officer', 'School Admin']);
+        $query = Exam::whereIn('id', $ids);
+
+        $allowedInstitutionIds = $this->getExamAllowedInstitutionIds();
+        if (! empty($allowedInstitutionIds)) {
+            $query->whereIn('institution_id', $allowedInstitutionIds);
+        }
+
+        if (! $isPrivilegedAdmin) {
+            $query->whereNull('finalized_at');
+        }
+
+        $deleted = $query->delete();
+        if ($deleted < 1) {
+            return response()->json(['error' => __('exam.messages.delete_finalized_error')], 403);
+        }
+
+        return response()->json(['success' => __('exam.messages.success_delete')]);
     }
 }

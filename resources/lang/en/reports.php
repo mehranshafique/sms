@@ -87,6 +87,8 @@ return [
     'credit_valide' => 'Credit Validated',
     'financial_restriction_msg' => 'Note: This student has an outstanding fee balance. Academic reports are blocked until the balance is cleared.',
     'principal' => 'Chef d\'établissement',
+    'authority_primary_title' => 'DIRECTEUR DU PRIMAIRE',
+    'authority_secondary_title' => 'PRÉFET DU SECONDAIRE',
     'class_teacher' => 'Class Teacher',
     'parent_signature' => 'Parent Signature',
     'principal_signature' => 'Principal Signature',

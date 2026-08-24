@@ -9,6 +9,7 @@ return [
         'exam_finalized' => 'L\'examen est finalisé.',
         'exam_finalized_error' => 'L\'examen est finalisé et ne peut plus être modifié.',
         'delete_finalized_error' => 'Impossible de supprimer un examen finalisé.',
+        'delete_failed' => 'Impossible de supprimer cet examen. Il est peut-être encore lié à d\'autres enregistrements.',
         'finalized_success' => 'Examen finalisé avec succès.',
         'unauthorized' => 'Action non autorisée.',
     ],

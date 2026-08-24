@@ -9,6 +9,7 @@ return [
         'exam_finalized' => 'Exam is finalized.',
         'exam_finalized_error' => 'Exam is finalized and cannot be edited.',
         'delete_finalized_error' => 'Cannot delete finalized exam.',
+        'delete_failed' => 'Could not delete this exam. It may still be linked to other records.',
         'finalized_success' => 'Exam finalized successfully.',
         'unauthorized' => 'Unauthorized action.',
     ],

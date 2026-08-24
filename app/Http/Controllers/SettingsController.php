@@ -56,6 +56,16 @@ class SettingsController extends BaseController
         $reportSealPosition = $settings['report_seal_position'] ?? 'center';
         $reportSealImage = $settings['report_seal_image'] ?? null;
         $resitPassPercentage = $settings['resit_pass_percentage'] ?? 50;
+        $reportAuthorityPrimary = [
+            'title' => $settings['report_authority_primary_title'] ?? '',
+            'name' => $settings['report_authority_primary_name'] ?? '',
+            'signature' => $settings['report_authority_primary_signature'] ?? null,
+        ];
+        $reportAuthoritySecondary = [
+            'title' => $settings['report_authority_secondary_title'] ?? '',
+            'name' => $settings['report_authority_secondary_name'] ?? '',
+            'signature' => $settings['report_authority_secondary_signature'] ?? null,
+        ];
 
         $institution = Institution::find($institutionId);
         $academicSession = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
@@ -93,6 +103,8 @@ class SettingsController extends BaseController
             'reportMinPaidAmounts',
             'reportSealPosition',
             'reportSealImage',
+            'reportAuthorityPrimary',
+            'reportAuthoritySecondary',
             'resitPassPercentage',
             'periodStates',
             'termCloseStatus',
@@ -125,6 +137,12 @@ class SettingsController extends BaseController
             'active_periods' => 'sometimes|array',
             'report_seal_position' => 'sometimes|in:left,center,right,none',
             'report_seal_image' => 'sometimes|nullable|image|max:2048',
+            'report_authority_primary_title' => 'sometimes|nullable|string|max:120',
+            'report_authority_primary_name' => 'sometimes|nullable|string|max:120',
+            'report_authority_primary_signature' => 'sometimes|nullable|image|max:2048',
+            'report_authority_secondary_title' => 'sometimes|nullable|string|max:120',
+            'report_authority_secondary_name' => 'sometimes|nullable|string|max:120',
+            'report_authority_secondary_signature' => 'sometimes|nullable|image|max:2048',
             'resit_pass_percentage' => 'sometimes|numeric|min:0|max:100',
             'app_grade' => 'sometimes|array',
             'app_min' => 'sometimes|array',
@@ -231,6 +249,33 @@ class SettingsController extends BaseController
                 Storage::disk('public')->delete($existing);
             }
             InstitutionSetting::set($institutionId, 'report_seal_image', '', 'academic');
+        }
+
+        foreach (['primary', 'secondary'] as $cycleKey) {
+            foreach (['title', 'name'] as $field) {
+                $input = "report_authority_{$cycleKey}_{$field}";
+                if ($request->exists($input)) {
+                    InstitutionSetting::set($institutionId, $input, trim((string) $request->input($input)), 'academic');
+                }
+            }
+
+            $sigInput = "report_authority_{$cycleKey}_signature";
+            $sigKey = $sigInput;
+            if ($request->hasFile($sigInput)) {
+                $existing = InstitutionSetting::get($institutionId, $sigKey);
+                if ($existing && Storage::disk('public')->exists($existing)) {
+                    Storage::disk('public')->delete($existing);
+                }
+                $path = $request->file($sigInput)->store("institutions/{$institutionId}/signatures", 'public');
+                InstitutionSetting::set($institutionId, $sigKey, $path, 'academic');
+            }
+            if ($request->boolean("remove_{$sigInput}")) {
+                $existing = InstitutionSetting::get($institutionId, $sigKey);
+                if ($existing && Storage::disk('public')->exists($existing)) {
+                    Storage::disk('public')->delete($existing);
+                }
+                InstitutionSetting::set($institutionId, $sigKey, '', 'academic');
+            }
         }
 
         if ($request->ajax()) {
