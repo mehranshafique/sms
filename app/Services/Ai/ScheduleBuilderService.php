@@ -44,14 +44,21 @@ class ScheduleBuilderService
         $examEndDate   = Carbon::parse($exam->end_date)->startOfDay();
         $today         = Carbon::now()->startOfDay();
 
-        $currentDate = $examStartDate->lte($today) ? $today->copy()->addDay() : $examStartDate->copy();
-        if ($currentDate->gt($examEndDate)) {
+        // Stay inside the exam window: start on max(exam start, today), never past exam end.
+        $currentDate = $examStartDate->greaterThan($today)
+            ? $examStartDate->copy()
+            : $today->copy();
+        if ($currentDate->greaterThan($examEndDate)) {
             $currentDate = $examEndDate->copy();
         }
+        if ($currentDate->lessThan($examStartDate)) {
+            $currentDate = $examStartDate->copy();
+        }
 
+        // Optional shorter planning window, but never wider than the exam period.
         if ($periodDays !== null) {
             $windowEnd = $currentDate->copy()->addDays($periodDays - 1);
-            if ($windowEnd->lt($examEndDate)) {
+            if ($windowEnd->lessThan($examEndDate)) {
                 $examEndDate = $windowEnd;
             }
         }
@@ -61,35 +68,56 @@ class ScheduleBuilderService
         $currentStartTime = Carbon::parse($schoolStart);
         $maxEndTime       = Carbon::parse($schoolEnd);
 
-        foreach ($subjects as $subject) {
-            while ($currentDate->isSunday()) {
-                $currentDate->addDay();
-                $currentStartTime = Carbon::parse($schoolStart);
+        $advanceToNextDay = function () use (&$currentDate, $examStartDate, $examEndDate, &$currentStartTime, $schoolStart): bool {
+            $next = $currentDate->copy()->addDay();
+            while ($next->isSunday()) {
+                $next->addDay();
             }
-
-            if ($currentDate->gt($examEndDate)) {
+            if ($next->greaterThan($examEndDate)) {
                 $currentDate = $examEndDate->copy();
-            }
+                while ($currentDate->isSunday() && $currentDate->greaterThan($examStartDate)) {
+                    $currentDate->subDay();
+                }
+                $currentStartTime = Carbon::parse($schoolStart);
 
+                return false;
+            }
+            $currentDate = $next;
+            $currentStartTime = Carbon::parse($schoolStart);
+
+            return true;
+        };
+
+        while ($currentDate->isSunday()) {
+            if (! $advanceToNextDay()) {
+                break;
+            }
+        }
+
+        foreach ($subjects as $subject) {
             $proposedEndTime = $currentStartTime->copy()->addMinutes($durationMinutes);
 
             if ($proposedEndTime->format('H:i') > $maxEndTime->format('H:i')) {
-                $currentDate->addDay();
-                while ($currentDate->isSunday()) {
-                    $currentDate->addDay();
+                $advanced = $advanceToNextDay();
+                $proposedEndTime = $currentStartTime->copy()->addMinutes($durationMinutes);
+                if (! $advanced && $proposedEndTime->format('H:i') > $maxEndTime->format('H:i')) {
+                    $proposedEndTime = $maxEndTime->copy();
                 }
-                if ($currentDate->gt($examEndDate)) {
-                    $currentDate = $examEndDate->copy();
-                }
-                $currentStartTime = Carbon::parse($schoolStart);
-                $proposedEndTime  = $currentStartTime->copy()->addMinutes($durationMinutes);
+            }
+
+            $dateToUse = $currentDate->copy();
+            if ($dateToUse->lessThan($examStartDate)) {
+                $dateToUse = $examStartDate->copy();
+            }
+            if ($dateToUse->greaterThan($examEndDate)) {
+                $dateToUse = $examEndDate->copy();
             }
 
             $roomIndex++;
             $roomNumber = 'Room ' . ((($roomIndex - 1) % $roomsCount) + 1);
 
             $schedule[$subject->id] = [
-                'date'         => $currentDate->format('Y-m-d'),
+                'date'         => $dateToUse->format('Y-m-d'),
                 'start_time'   => $currentStartTime->format('H:i'),
                 'end_time'     => $proposedEndTime->format('H:i'),
                 'room_number'  => $roomNumber,

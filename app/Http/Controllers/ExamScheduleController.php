@@ -235,37 +235,68 @@ class ExamScheduleController extends BaseController
         $examEndDate = Carbon::parse($exam->end_date)->startOfDay();
         $today = Carbon::now()->startOfDay();
 
-        if ($examStartDate->lte($today)) {
-            $currentDate = $today->copy()->addDay();
-        } else {
-            $currentDate = $examStartDate;
+        // Stay inside the exam window: start on max(exam start, today), never past exam end.
+        $currentDate = $examStartDate->greaterThan($today)
+            ? $examStartDate->copy()
+            : $today->copy();
+        if ($currentDate->greaterThan($examEndDate)) {
+            $currentDate = $examEndDate->copy();
         }
-
-        if ($currentDate->gt($examEndDate)) {
-            $currentDate = $examEndDate; 
+        if ($currentDate->lessThan($examStartDate)) {
+            $currentDate = $examStartDate->copy();
         }
 
         $currentStartTime = Carbon::parse($schoolStart);
         $maxEndTime = Carbon::parse($schoolEnd);
 
-        foreach ($subjects as $subject) {
-            while ($currentDate->isSunday()) {
-                $currentDate->addDay();
-                $currentStartTime = Carbon::parse($schoolStart);
+        $advanceToNextDay = function () use (&$currentDate, $examStartDate, $examEndDate, &$currentStartTime, $schoolStart): bool {
+            $next = $currentDate->copy()->addDay();
+            while ($next->isSunday()) {
+                $next->addDay();
             }
+            if ($next->greaterThan($examEndDate)) {
+                // No more days in the exam window — keep stacking on the last valid day.
+                $currentDate = $examEndDate->copy();
+                while ($currentDate->isSunday() && $currentDate->greaterThan($examStartDate)) {
+                    $currentDate->subDay();
+                }
+                $currentStartTime = Carbon::parse($schoolStart);
 
+                return false;
+            }
+            $currentDate = $next;
+            $currentStartTime = Carbon::parse($schoolStart);
+
+            return true;
+        };
+
+        // Skip Sundays inside the window without walking past the end date.
+        while ($currentDate->isSunday()) {
+            if (! $advanceToNextDay()) {
+                break;
+            }
+        }
+
+        foreach ($subjects as $subject) {
             $proposedEndTime = $currentStartTime->copy()->addMinutes($defaultDurationMinutes);
 
             if ($proposedEndTime->format('H:i') > $maxEndTime->format('H:i')) {
-                $currentDate->addDay();
-                while ($currentDate->isSunday()) {
-                    $currentDate->addDay();
-                }
-                $currentStartTime = Carbon::parse($schoolStart);
+                $advanced = $advanceToNextDay();
                 $proposedEndTime = $currentStartTime->copy()->addMinutes($defaultDurationMinutes);
+                // If we could not advance (last day of window), keep the slot on that day
+                // even if it slightly exceeds school end — admin can edit times.
+                if (! $advanced && $proposedEndTime->format('H:i') > $maxEndTime->format('H:i')) {
+                    $proposedEndTime = $maxEndTime->copy();
+                }
             }
 
-            $dateToUse = $currentDate->gt($examEndDate) ? $examEndDate : $currentDate;
+            $dateToUse = $currentDate->copy();
+            if ($dateToUse->lessThan($examStartDate)) {
+                $dateToUse = $examStartDate->copy();
+            }
+            if ($dateToUse->greaterThan($examEndDate)) {
+                $dateToUse = $examEndDate->copy();
+            }
 
             $scheduleProposal[$subject->id] = [
                 'date' => $dateToUse->format('Y-m-d'),
@@ -278,7 +309,9 @@ class ExamScheduleController extends BaseController
 
         return response()->json([
             'message' => __('exam_schedule.auto_fill_success'),
-            'schedule' => $scheduleProposal
+            'schedule' => $scheduleProposal,
+            'exam_start' => $examStartDate->format('Y-m-d'),
+            'exam_end' => $examEndDate->format('Y-m-d'),
         ]);
     }
 
