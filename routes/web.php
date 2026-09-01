@@ -60,6 +60,7 @@ use App\Http\Controllers\ParentController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
+use App\Http\Controllers\AttendanceOverviewController;
 use App\Http\Controllers\StaffLeaveController;
 use App\Http\Controllers\StudentPromotionController;
 use App\Http\Controllers\ReenrollmentController;
@@ -409,6 +410,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Student Attendance
     Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () {
+        Route::get('attendance/overview', [AttendanceOverviewController::class, 'index'])->name('attendance.overview');
+        Route::get('attendance/overview/details', [AttendanceOverviewController::class, 'details'])->name('attendance.overview.details');
         Route::get('attendance/create', [StudentAttendanceController::class, 'create'])->name('attendance.create');
         Route::post('attendance', [StudentAttendanceController::class, 'store'])->name('attendance.store');
         Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance.index');

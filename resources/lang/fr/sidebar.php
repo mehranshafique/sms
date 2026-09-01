@@ -139,6 +139,7 @@ return [
     ],
     'attendance' => [
         'title' => 'e-Registre d\'Appel',
+        'overview' => 'Vue du jour',
         'register' => 'Registre journalier',
     ],
     'attendance_kiosk' => 'Kiosque de présence',

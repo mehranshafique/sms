@@ -237,7 +237,14 @@ class StudentController extends BaseController
             ? GradeLevel::where('institution_id', $institutionId)->orderBy('order_index')->pluck('name', 'id')
             : collect();
 
-        return view('students.index', compact('gradeLevels'));
+        $preselectedClassSection = null;
+        if ($request->filled('class_section_id')) {
+            $preselectedClassSection = ClassSection::with('gradeLevel')
+                ->when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+                ->find($request->integer('class_section_id'));
+        }
+
+        return view('students.index', compact('gradeLevels', 'preselectedClassSection'));
     }
 
     public function create()

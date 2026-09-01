@@ -172,6 +172,7 @@ return [
     'new_students_label' => 'Nouveaux élèves',
     'teachers' => 'Enseignants',
     'todays_attendance' => "Présences du jour",
+    'view_overview' => 'Ouvrir la vue d\'ensemble',
     'late' => 'En retard',
     'absent' => 'Absent',
     'no_attendance_today' => "Aucune présence enregistrée aujourd'hui.",

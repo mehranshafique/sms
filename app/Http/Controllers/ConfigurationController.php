@@ -268,19 +268,13 @@ class ConfigurationController extends BaseController
         $request->validate(['phone' => 'required', 'channel' => 'required|in:sms,whatsapp']);
         $institutionId = $this->getInstitutionId();
 
-        if (!$institutionId) {
-            return response()->json([
-                'message' => __('configuration.global_view_required_body'),
-            ], 422);
-        }
-        
         // Resolve Notification Service
         try {
             $notificationService = app(\App\Services\NotificationService::class);
             $result = $notificationService->performSend(
                 $request->phone, 
                 "Test message from E-Digitex (" . date('H:i:s') . ")", 
-                $institutionId, // NULL handles Super Admin check in service if needed
+                $institutionId, // null = Global View / system-wide credentials
                 true, // Unlimited / No credit deduction for test
                 $request->channel
             );

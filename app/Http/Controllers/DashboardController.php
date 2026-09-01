@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
+use App\Services\AttendanceOverviewService;
 
 class DashboardController extends BaseController
 {
@@ -433,15 +434,24 @@ class DashboardController extends BaseController
         }
 
         $today = Carbon::today();
-        $todaysAttendance = StudentAttendance::where('institution_id', $institutionId)
-            ->whereDate('attendance_date', $today);
-        $presentCount = (clone $todaysAttendance)->where('status', 'present')->count();
-        $absentCount = (clone $todaysAttendance)->where('status', 'absent')->count();
-        $lateCount = (clone $todaysAttendance)->where('status', 'late')->count();
-        $attendanceMarked = $presentCount + $absentCount + $lateCount;
-        $attendanceRate = $attendanceMarked > 0
-            ? round((($presentCount + $lateCount) / $attendanceMarked) * 100)
-            : 0;
+        $attendanceOverview = app(AttendanceOverviewService::class)
+            ->dashboardWidgets((int) $institutionId, $today);
+        $studentsAtt = $attendanceOverview['students'];
+        $staffAtt = $attendanceOverview['staff'];
+        $classesByEnrollment = $attendanceOverview['classes'];
+        $presentCount = $studentsAtt['present'];
+        $absentCount = $studentsAtt['absent'];
+        $lateCount = $studentsAtt['late'];
+        $attendanceMarked = $studentsAtt['marked'];
+        $attendanceRate = $studentsAtt['rate'];
+        $studentsExpected = $studentsAtt['expected'];
+        $studentsNotCheckedIn = $studentsAtt['not_checked_in'];
+        $staffExpected = $staffAtt['expected'];
+        $staffPresent = $staffAtt['present'];
+        $staffAbsent = $staffAtt['absent'];
+        $staffLate = $staffAtt['late'];
+        $staffNotCheckedIn = $staffAtt['not_checked_in'];
+        $staffAttendanceRate = $staffAtt['rate'];
         $collectionRate = $expectedTotal > 0 ? round(($collectedTotal / $expectedTotal) * 100, 1) : 0;
 
         // Recent payments for an at-a-glance activity feed
@@ -483,6 +493,9 @@ class DashboardController extends BaseController
             'totalStudents', 'totalTeachers', 'totalStaff', 'totalCampuses', 'totalInstitutes',
             'chartLabels', 'chartValues', 'currentSession',
             'presentCount', 'absentCount', 'lateCount', 'attendanceRate', 'attendanceMarked',
+            'studentsExpected', 'studentsNotCheckedIn',
+            'staffExpected', 'staffPresent', 'staffAbsent', 'staffLate', 'staffNotCheckedIn', 'staffAttendanceRate',
+            'classesByEnrollment',
             'collectionRate', 'recentPayments', 'recentNotices',
             'totalEnrollment', 'newComers',
             'expectedTotal', 'collectedTotal', 'remainingToCollect', 'paidCount', 'unpaidCount', 'installmentStats',

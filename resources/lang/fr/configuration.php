@@ -24,6 +24,7 @@ return [
     'system_default_env_override_help' => 'Ces valeurs par défaut remplacent les variables .env (SMS_DRIVER, MOBISHASTRA_*, etc.) pour toutes les écoles qui utilisent « Système par défaut (Crédits Digitex) ». Enregistrez les identifiants ici en Vue globale.',
     'global_view_required_title' => 'Vue globale requise.',
     'global_view_required_body' => 'Pour définir les fournisseurs SMS/WhatsApp et identifiants API à l\'échelle du système, cliquez sur l\'icône bâtiment en haut à droite, passez en Vue globale, puis rouvrez Configuration → ID Sender SMS.',
+    'school_view_required_body' => 'Sélectionnez une école via l\'icône bâtiment en haut pour tester les paramètres SMS/WhatsApp de cette école. Utilisez la Vue globale pour tester les paramètres système.',
     'my_sms_provider' => 'Mon fournisseur SMS actif',
     'api_credentials' => 'Identifiants API',
 

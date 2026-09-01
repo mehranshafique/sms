@@ -317,6 +317,7 @@
                         <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="{{ $attendanceOpen ? 'true' : 'false' }}"><i class="la la-check-square-o"></i><span class="nav-text">{{ __('sidebar.attendance.title') }}</span></a>
                         <ul aria-expanded="{{ $attendanceOpen ? 'true' : 'false' }}">
                             @if($canViewAttendance)
+                                <li><a class="{{ request()->routeIs('attendance.overview*') ? 'mm-active' : '' }}" href="{{ route('attendance.overview') }}">{{ __('sidebar.attendance.overview') }}</a></li>
                                 <li><a class="{{ request()->routeIs('attendance.index', 'attendance.create', 'attendance.report', 'attendance.print_report') ? 'mm-active' : '' }}" href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.register') }}</a></li>
                                 <li><a class="{{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">{{ __('sidebar.attendance_analytics') ?? 'Analytics & Reports' }}</a></li>
                             @endif

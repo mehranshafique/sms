@@ -85,34 +85,93 @@
                 <div class="dash-panel h-100">
                     <div class="dash-panel__head">
                         <h4 class="dash-panel__title">{{ __('dashboard.todays_attendance') }}</h4>
+                        <a href="{{ route('attendance.overview') }}" class="text-tint-primary small">{{ __('dashboard.view_overview') }}</a>
                     </div>
-                    <div class="dash-panel__body text-center">
-                        @if($attendanceMarked > 0)
-                            <div class="d-flex justify-content-center align-items-center mb-3" style="position: relative;">
-                                <canvas id="attendanceDonut" height="150" width="150"></canvas>
-                                <div style="position:absolute; text-align:center;">
-                                    <div class="fw-bold" style="font-size: 26px; color: var(--dash-ink);">{{ $attendanceRate }}%</div>
-                                    <div class="dash-mini-label">{{ __('dashboard.present') }}</div>
-                                </div>
+                    <div class="dash-panel__body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="dash-mini-label">{{ __('attendance.overview_students') }}</span>
+                            <strong>{{ ($studentsExpected ?? 0) > 0 ? $attendanceRate : 0 }}%</strong>
+                        </div>
+                        <div class="row text-center mb-3">
+                            <div class="col-4 mb-2">
+                                <div class="fw-bold">{{ $studentsExpected ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('attendance.expected') }}</small>
                             </div>
-                            <div class="row">
-                                <div class="col-4">
-                                    <div class="fw-bold text-tint-success">{{ $presentCount }}</div>
-                                    <small class="dash-mini-label">{{ __('dashboard.present') }}</small>
-                                </div>
-                                <div class="col-4">
-                                    <div class="fw-bold text-tint-warning">{{ $lateCount }}</div>
-                                    <small class="dash-mini-label">{{ __('dashboard.late') }}</small>
-                                </div>
-                                <div class="col-4">
-                                    <div class="fw-bold text-tint-danger">{{ $absentCount }}</div>
-                                    <small class="dash-mini-label">{{ __('dashboard.absent') }}</small>
-                                </div>
+                            <div class="col-4 mb-2">
+                                <div class="fw-bold text-tint-success">{{ $presentCount }}</div>
+                                <small class="dash-mini-label">{{ __('dashboard.present') }}</small>
+                            </div>
+                            <div class="col-4 mb-2">
+                                <div class="fw-bold text-tint-danger">{{ $absentCount }}</div>
+                                <small class="dash-mini-label">{{ __('dashboard.absent') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="fw-bold text-tint-warning">{{ $lateCount }}</div>
+                                <small class="dash-mini-label">{{ __('dashboard.late') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="fw-bold text-tint-info">{{ $studentsNotCheckedIn ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('attendance.not_checked_in') }}</small>
+                            </div>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="dash-mini-label">{{ __('attendance.overview_staff') }}</span>
+                            <strong>{{ $staffAttendanceRate ?? 0 }}%</strong>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-4 mb-2">
+                                <div class="fw-bold">{{ $staffExpected ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('attendance.expected') }}</small>
+                            </div>
+                            <div class="col-4 mb-2">
+                                <div class="fw-bold text-tint-success">{{ $staffPresent ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('dashboard.present') }}</small>
+                            </div>
+                            <div class="col-4 mb-2">
+                                <div class="fw-bold text-tint-danger">{{ $staffAbsent ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('dashboard.absent') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="fw-bold text-tint-warning">{{ $staffLate ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('dashboard.late') }}</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="fw-bold text-tint-info">{{ $staffNotCheckedIn ?? 0 }}</div>
+                                <small class="dash-mini-label">{{ __('attendance.not_checked_in') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Students by class --}}
+        <div class="row g-3">
+            <div class="col-12 mb-3">
+                <div class="dash-panel">
+                    <div class="dash-panel__head">
+                        <h4 class="dash-panel__title">{{ __('attendance.students_by_class') }}</h4>
+                        <span class="dash-mini-label">{{ __('attendance.total_enrollment_label', ['count' => $totalEnrollment]) }}</span>
+                    </div>
+                    <div class="dash-panel__body">
+                        @if(!empty($classesByEnrollment) && count($classesByEnrollment) > 0)
+                            <div class="row g-2">
+                                @foreach($classesByEnrollment as $class)
+                                    <div class="col-xl-2 col-md-3 col-sm-4 col-6">
+                                        <a href="{{ route('students.index', ['class_section_id' => $class['class_section_id']]) }}" class="dash-link d-block h-100">
+                                            <div class="dash-link__value">{{ $class['enrollment'] }}</div>
+                                            <div class="dash-link__label">{{ $class['label'] }}</div>
+                                        </a>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ route('attendance.overview') }}" class="text-tint-primary small">{{ __('dashboard.view_overview') }}</a>
                             </div>
                         @else
-                            <div class="py-5 text-muted">
-                                <i class="la la-calendar-check-o" style="font-size: 32px;"></i>
-                                <p class="mb-0 mt-2 dash-mini-label">{{ __('dashboard.no_attendance_today') }}</p>
+                            <div class="text-center py-3 text-muted">
+                                <span class="dash-mini-label">{{ __('attendance.no_classes_enrolled') }}</span>
                             </div>
                         @endif
                     </div>
@@ -273,27 +332,6 @@
                     maintainAspectRatio: false,
                     legend: { display: false },
                     scales: { yAxes: [{ ticks: { beginAtZero: true, precision: 0 } }] }
-                }
-            });
-        }
-
-        var donutEl = document.getElementById("attendanceDonut");
-        if (donutEl) {
-            new Chart(donutEl.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: [@json(__('dashboard.present')), @json(__('dashboard.late')), @json(__('dashboard.absent'))],
-                    datasets: [{
-                        data: [{{ $presentCount }}, {{ $lateCount }}, {{ $absentCount }}],
-                        backgroundColor: ['#2bb673', '#f5a623', '#ef5675'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    maintainAspectRatio: false,
-                    cutoutPercentage: 72,
-                    legend: { display: false }
                 }
             });
         }

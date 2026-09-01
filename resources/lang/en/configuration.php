@@ -24,6 +24,7 @@ return [
     'system_default_env_override_help' => 'These system defaults override .env values (SMS_DRIVER, MOBISHASTRA_*, etc.) for all schools that use "System Default (Digitex Credits)". Save credentials here in Global View.',
     'global_view_required_title' => 'Global View required.',
     'global_view_required_body' => 'To set system-wide SMS/WhatsApp defaults and API credentials, click the building icon in the top header and switch to Global View, then open Configuration → ID Sender SMS again.',
+    'school_view_required_body' => 'Select a school from the building icon in the top header to test that school\'s SMS/WhatsApp settings. Use Global View to test system-wide defaults.',
     'my_sms_provider' => 'My Active SMS Provider',
     'api_credentials' => 'API Credentials',
 

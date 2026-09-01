@@ -172,6 +172,7 @@ return [
     'new_students_label' => 'New Students',
     'teachers' => 'Teachers',
     'todays_attendance' => "Today's Attendance",
+    'view_overview' => 'Open overview',
     'late' => 'Late',
     'absent' => 'Absent',
     'no_attendance_today' => 'No attendance recorded today.',
