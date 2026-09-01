@@ -12,7 +12,8 @@ class AppDeploy extends Command
                             {--skip-migrate : Skip database migrations}
                             {--skip-seed : Skip RolePermissionSeeder}
                             {--skip-cache : Skip config/route/view cache}
-                            {--seed-templates : Also run SmsTemplateSeeder}';
+                            {--seed-templates : Also run SmsTemplateSeeder}
+                            {--production : Run ProductionDatabaseSeeder instead of RolePermissionSeeder only (fresh prod DB)}';
 
     protected $description = 'Run standard post-deploy tasks (migrate, permissions, cache)';
 
@@ -29,7 +30,11 @@ class AppDeploy extends Command
         }
 
         if (!$this->option('skip-seed')) {
-            $this->runStep('db:seed --class=RolePermissionSeeder --force', 'Syncing roles & permissions');
+            if ($this->option('production')) {
+                $this->runStep('db:seed --class=ProductionDatabaseSeeder --force', 'Seeding production-safe data (no dummy schools)');
+            } else {
+                $this->runStep('db:seed --class=RolePermissionSeeder --force', 'Syncing roles & permissions');
+            }
         }
 
         if ($this->option('seed-templates')) {

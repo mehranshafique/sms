@@ -11,40 +11,12 @@
         margin-left: 0.5em;
         outline: none;
     }
-    .att-overview .kpi-card {
+    .att-overview .dash-stat.open-details {
         cursor: pointer;
-        border: 1px solid var(--dash-border, #eef1f6);
-        border-radius: 14px;
-        background: #fff;
-        transition: transform .15s ease, box-shadow .15s ease;
-        height: 100%;
     }
-    .att-overview .kpi-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(31, 37, 51, .08);
-    }
-    .att-overview .kpi-card .kpi-value { font-size: 1.75rem; font-weight: 700; margin: 0; color: var(--dash-ink, #1f2533); }
-    .att-overview .kpi-card .kpi-label { font-size: .8rem; color: var(--dash-muted, #8a93a6); margin: 0; text-transform: uppercase; letter-spacing: .02em; }
-    .att-overview .kpi-card .kpi-icon {
-        width: 42px; height: 42px; border-radius: 12px;
-        display: inline-flex; align-items: center; justify-content: center; font-size: 1.25rem;
-    }
-    .att-overview .tint-primary { background: rgba(91,83,232,.12); color: var(--dash-primary, #5b53e8); }
-    .att-overview .tint-success { background: rgba(43,182,115,.12); color: var(--dash-success, #2bb673); }
-    .att-overview .tint-danger { background: rgba(239,86,117,.12); color: var(--dash-danger, #ef5675); }
-    .att-overview .tint-warning { background: rgba(245,166,35,.12); color: var(--dash-warning, #f5a623); }
-    .att-overview .tint-info { background: rgba(42,169,224,.12); color: var(--dash-info, #2aa9e0); }
     .att-overview .class-row { cursor: pointer; }
-    .att-overview .class-row:hover { background: rgba(91,83,232,.04); }
-    .att-overview .section-title { font-size: 1.05rem; font-weight: 700; color: var(--dash-ink, #1f2533); }
-    [data-theme-version="dark"] .att-overview .kpi-card {
-        background: var(--digitex-card-bg, #1e2746);
-        border-color: var(--digitex-card-border, rgba(255,255,255,.08));
-    }
-    [data-theme-version="dark"] .att-overview .kpi-card .kpi-value,
-    [data-theme-version="dark"] .att-overview .section-title { color: var(--digitex-text, #e8ebf5); }
-    [data-theme-version="dark"] .att-overview .kpi-card .kpi-label { color: var(--digitex-muted, #9ca3af); }
-    [data-theme-version="dark"] .att-overview .class-row:hover { background: rgba(255,255,255,.04); }
+    .att-overview .class-row:hover { background: rgba(91, 83, 232, .04); }
+    [data-theme-version="dark"] .att-overview .class-row:hover { background: rgba(255, 255, 255, .04); }
 </style>
 @endsection
 
@@ -53,99 +25,129 @@
     $students = $overview['students'];
     $staff = $overview['staff'];
     $classes = $overview['classes'];
+    $todayLabel = \Carbon\Carbon::parse($date)->translatedFormat('l, d F Y');
+    $studentKpis = [
+        ['bucket' => 'expected', 'value' => $students['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-users', 'valueClass' => ''],
+        ['bucket' => 'present', 'value' => $students['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle', 'valueClass' => 'text-tint-success'],
+        ['bucket' => 'absent', 'value' => $students['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle', 'valueClass' => 'text-tint-danger'],
+        ['bucket' => 'late', 'value' => $students['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock', 'valueClass' => 'text-tint-warning'],
+        ['bucket' => 'not_checked_in', 'value' => $students['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half', 'valueClass' => 'text-tint-info'],
+    ];
+    $staffKpis = [
+        ['bucket' => 'expected', 'value' => $staff['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-user-tie', 'valueClass' => ''],
+        ['bucket' => 'present', 'value' => $staff['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle', 'valueClass' => 'text-tint-success'],
+        ['bucket' => 'absent', 'value' => $staff['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle', 'valueClass' => 'text-tint-danger'],
+        ['bucket' => 'late', 'value' => $staff['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock', 'valueClass' => 'text-tint-warning'],
+        ['bucket' => 'not_checked_in', 'value' => $staff['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half', 'valueClass' => 'text-tint-info'],
+    ];
 @endphp
 <div class="content-body att-overview">
     <div class="container-fluid">
-        <div class="row page-titles mx-0 mb-3 align-items-center">
-            <div class="col-md-6 p-md-0">
-                <div class="welcome-text">
-                    <h4>{{ __('attendance.overview_title') }}</h4>
-                    <p class="mb-0">{{ __('attendance.overview_subtitle') }}</p>
-                </div>
-            </div>
-            <div class="col-md-6 p-md-0 d-flex justify-content-md-end align-items-center gap-2 flex-wrap mt-2 mt-md-0">
-                <form method="GET" action="{{ route('attendance.overview') }}" class="d-flex align-items-center gap-2">
-                    <label class="mb-0 small text-muted" for="overview_date">{{ __('attendance.date') }}</label>
-                    <input type="date" id="overview_date" name="date" value="{{ $date }}" class="form-control form-control-sm" style="min-width:150px;" onchange="this.form.submit()">
-                </form>
-                <a href="{{ route('attendance.create') }}" class="btn btn-primary btn-sm">{{ __('attendance.mark_attendance') }}</a>
-                @if($canViewStaff)
-                    <a href="{{ route('staff-attendance.create') }}" class="btn btn-outline-primary btn-sm">{{ __('staff.mark_staff_attendance') ?? __('attendance.staff_attendance_title') }}</a>
-                @endif
-            </div>
-        </div>
 
-        {{-- Students KPIs --}}
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="section-title mb-0">{{ __('attendance.overview_students') }}</h5>
-            <div class="d-flex gap-2">
-                <a href="{{ route('attendance.analytics.index') }}" class="small">{{ __('attendance.analytics_title') }}</a>
-                <span class="badge light badge-primary">{{ __('attendance.attendance_rate') }}: {{ $students['rate'] }}%</span>
-            </div>
-        </div>
-        <div class="row g-3 mb-4">
-            @foreach([
-                ['bucket' => 'expected', 'value' => $students['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-users'],
-                ['bucket' => 'present', 'value' => $students['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle'],
-                ['bucket' => 'absent', 'value' => $students['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle'],
-                ['bucket' => 'late', 'value' => $students['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock'],
-                ['bucket' => 'not_checked_in', 'value' => $students['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half'],
-            ] as $kpi)
-            <div class="col-xl col-md-4 col-6">
-                <div class="kpi-card p-3 open-details" data-audience="students" data-bucket="{{ $kpi['bucket'] }}" role="button" tabindex="0">
-                    <div class="d-flex align-items-center justify-content-between">
+        {{-- Hero header (dashboard palette) --}}
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="dash-hero shadow-sm">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 p-4" style="position:relative;z-index:1;">
                         <div>
-                            <p class="kpi-label">{{ $kpi['label'] }}</p>
-                            <p class="kpi-value">{{ $kpi['value'] }}</p>
+                            <span class="dash-hero__chip mb-2"><i class="la la-calendar"></i> {{ $todayLabel }}</span>
+                            <h3 class="text-white fw-bold mb-1">{{ __('attendance.overview_title') }}</h3>
+                            <p class="mb-0 text-white opacity-75">{{ __('attendance.overview_subtitle') }}</p>
                         </div>
-                        <span class="kpi-icon tint-{{ $kpi['tint'] }}"><i class="{{ $kpi['icon'] }}"></i></span>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <form method="GET" action="{{ route('attendance.overview') }}" class="d-flex align-items-center gap-2">
+                                <input type="date" id="overview_date" name="date" value="{{ $date }}" class="form-control form-control-sm" style="min-width:150px;" onchange="this.form.submit()">
+                            </form>
+                            <a href="{{ route('attendance.create') }}" class="btn btn-light btn-sm fw-bold">{{ __('attendance.mark_attendance') }}</a>
+                            @if($canViewStaff)
+                                <a href="{{ route('staff-attendance.create') }}" class="btn btn-outline-light btn-sm">{{ __('staff.mark_staff_attendance') ?? __('attendance.staff_attendance_title') }}</a>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
-            @endforeach
+        </div>
+
+        {{-- Students --}}
+        <div class="dash-panel mb-3">
+            <div class="dash-panel__head">
+                <h4 class="dash-panel__title">{{ __('attendance.overview_students') }}</h4>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('attendance.analytics.index') }}" class="text-tint-primary small">{{ __('attendance.analytics_title') }}</a>
+                    <span class="badge rounded-pill" style="background:rgba(91,83,232,.12);color:var(--dash-primary);">
+                        {{ __('attendance.attendance_rate') }}: {{ $students['rate'] }}%
+                    </span>
+                </div>
+            </div>
+            <div class="dash-panel__body pt-0">
+                <div class="row g-3">
+                    @foreach($studentKpis as $kpi)
+                    <div class="col-xl col-md-4 col-6">
+                        <div class="dash-stat open-details"
+                             data-audience="students"
+                             data-bucket="{{ $kpi['bucket'] }}"
+                             role="button"
+                             tabindex="0">
+                            <div class="d-flex align-items-center" style="gap:14px;">
+                                <span class="dash-stat__icon tint-{{ $kpi['tint'] }}"><i class="{{ $kpi['icon'] }}"></i></span>
+                                <div>
+                                    <p class="dash-stat__label">{{ $kpi['label'] }}</p>
+                                    <h4 class="dash-stat__value {{ $kpi['valueClass'] }}">{{ $kpi['value'] }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
         </div>
 
         @if($canViewStaff)
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="section-title mb-0">{{ __('attendance.overview_staff') }}</h5>
-            <div class="d-flex gap-2">
-                <a href="{{ route('staff-attendance.analytics') }}" class="small">{{ __('attendance.staff_analytics_title') }}</a>
-                <span class="badge light badge-primary">{{ __('attendance.attendance_rate') }}: {{ $staff['rate'] }}%</span>
-            </div>
-        </div>
-        <div class="row g-3 mb-4">
-            @foreach([
-                ['bucket' => 'expected', 'value' => $staff['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-user-tie'],
-                ['bucket' => 'present', 'value' => $staff['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle'],
-                ['bucket' => 'absent', 'value' => $staff['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle'],
-                ['bucket' => 'late', 'value' => $staff['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock'],
-                ['bucket' => 'not_checked_in', 'value' => $staff['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half'],
-            ] as $kpi)
-            <div class="col-xl col-md-4 col-6">
-                <div class="kpi-card p-3 open-details" data-audience="staff" data-bucket="{{ $kpi['bucket'] }}" role="button" tabindex="0">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <p class="kpi-label">{{ $kpi['label'] }}</p>
-                            <p class="kpi-value">{{ $kpi['value'] }}</p>
-                        </div>
-                        <span class="kpi-icon tint-{{ $kpi['tint'] }}"><i class="{{ $kpi['icon'] }}"></i></span>
-                    </div>
+        {{-- Staff --}}
+        <div class="dash-panel mb-3">
+            <div class="dash-panel__head">
+                <h4 class="dash-panel__title">{{ __('attendance.overview_staff') }}</h4>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ route('staff-attendance.analytics') }}" class="text-tint-primary small">{{ __('attendance.staff_analytics_title') }}</a>
+                    <span class="badge rounded-pill" style="background:rgba(43,182,115,.12);color:var(--dash-success);">
+                        {{ __('attendance.attendance_rate') }}: {{ $staff['rate'] }}%
+                    </span>
                 </div>
             </div>
-            @endforeach
+            <div class="dash-panel__body pt-0">
+                <div class="row g-3">
+                    @foreach($staffKpis as $kpi)
+                    <div class="col-xl col-md-4 col-6">
+                        <div class="dash-stat open-details"
+                             data-audience="staff"
+                             data-bucket="{{ $kpi['bucket'] }}"
+                             role="button"
+                             tabindex="0">
+                            <div class="d-flex align-items-center" style="gap:14px;">
+                                <span class="dash-stat__icon tint-{{ $kpi['tint'] }}"><i class="{{ $kpi['icon'] }}"></i></span>
+                                <div>
+                                    <p class="dash-stat__label">{{ $kpi['label'] }}</p>
+                                    <h4 class="dash-stat__value {{ $kpi['valueClass'] }}">{{ $kpi['value'] }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
         </div>
         @endif
 
         {{-- Students by class --}}
-        <div class="card">
-            <div class="card-header border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="dash-panel">
+            <div class="dash-panel__head">
                 <div>
-                    <h4 class="card-title mb-0">{{ __('attendance.students_by_class') }}</h4>
-                    <small class="text-muted">{{ __('attendance.total_enrollment_label', ['count' => $overview['total_enrollment']]) }}</small>
+                    <h4 class="dash-panel__title mb-0">{{ __('attendance.students_by_class') }}</h4>
+                    <span class="dash-mini-label">{{ __('attendance.total_enrollment_label', ['count' => $overview['total_enrollment']]) }}</span>
                 </div>
                 <a href="{{ route('students.index') }}" class="btn btn-sm btn-outline-primary">{{ __('attendance.view_all_students') }}</a>
             </div>
-            <div class="card-body pt-0">
+            <div class="dash-panel__body pt-0">
                 <div class="table-responsive digitex-dt-wrap">
                     <table id="classesOverviewTable" class="table table-hover align-middle mb-0 display" style="width:100%">
                         <thead>
@@ -165,10 +167,10 @@
                             <tr class="class-row" data-class-id="{{ $class['class_section_id'] }}">
                                 <td class="fw-bold">{{ $class['label'] }}</td>
                                 <td class="text-center" data-order="{{ $class['enrollment'] }}">{{ $class['enrollment'] }}</td>
-                                <td class="text-center text-success" data-order="{{ $class['present'] }}">{{ $class['present'] }}</td>
-                                <td class="text-center text-warning" data-order="{{ $class['late'] }}">{{ $class['late'] }}</td>
-                                <td class="text-center text-danger" data-order="{{ $class['absent'] }}">{{ $class['absent'] }}</td>
-                                <td class="text-center text-info" data-order="{{ $class['not_checked_in'] }}">{{ $class['not_checked_in'] }}</td>
+                                <td class="text-center text-tint-success" data-order="{{ $class['present'] }}">{{ $class['present'] }}</td>
+                                <td class="text-center text-tint-warning" data-order="{{ $class['late'] }}">{{ $class['late'] }}</td>
+                                <td class="text-center text-tint-danger" data-order="{{ $class['absent'] }}">{{ $class['absent'] }}</td>
+                                <td class="text-center text-tint-info" data-order="{{ $class['not_checked_in'] }}">{{ $class['not_checked_in'] }}</td>
                                 <td class="text-center" data-order="{{ $class['rate'] }}">{{ $class['rate'] }}%</td>
                                 <td class="text-end">
                                     <button type="button" class="btn btn-xs btn-primary sharp open-details me-1"

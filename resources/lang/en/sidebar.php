@@ -151,7 +151,7 @@ return [
     ],
     'attendance' => [
         'title' => 'Attendance',
-        'overview' => 'Today\'s Overview',
+        'overview' => 'Presence overview',
         'register' => 'Daily Register',
     ],
     'attendance_kiosk' => 'Attendance Kiosk',
