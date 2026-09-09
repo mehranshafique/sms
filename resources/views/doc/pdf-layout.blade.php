@@ -27,8 +27,8 @@
         p { margin: 6px 0 10px; text-align: justify; }
         ul { margin: 6px 0 12px 18px; padding: 0; }
         li { margin-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 9.5pt; }
-        th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 9.5pt; table-layout: fixed; }
+        th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
         th { background: #eef2ff; color: #002b80; font-weight: bold; }
         tr:nth-child(even) td { background: #fafafa; }
         pre {

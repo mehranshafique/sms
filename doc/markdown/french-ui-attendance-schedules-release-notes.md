@@ -13,7 +13,7 @@ This document describes the **September 2026 update**: French localization fixes
 | French UI | DataTables Search / Show entries / pagination use locale (`pagination.*`). Fee frequency and payment mode no longer show raw English enums. |
 | Fee list — Niveau scolaire | Grade-wide fees show a compact section range (e.g. `1e A-E`) instead of only `1e (Toutes les sections)`. |
 | Attendance schedules | Named check-in / check-out / late-margin schedules assignable to **grade levels** and optionally **class sections**. Device/kiosk punches use the student’s class schedule for Present / Late. |
-| Permissions | New module permissions: `attendance_schedule.view|create|update|delete|viewAny|deleteAny`. |
+| Permissions | New module permissions: attendance_schedule.view, .create, .update, .delete, .viewAny, .deleteAny. |
 | Docs | This release note PDF. |
 
 ---

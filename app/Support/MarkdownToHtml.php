@@ -21,7 +21,7 @@ class MarkdownToHtml
             }
             $html[] = '<table>';
             foreach ($tableRows as $i => $row) {
-                $cells = array_map('trim', explode('|', trim($row, '|')));
+                $cells = self::splitTableRow($row);
                 $tag = ($i === 0) ? 'th' : 'td';
                 if ($i === 1 && preg_match('/^[\-\:\|\s]+$/', $row)) {
                     continue;
@@ -109,6 +109,39 @@ class MarkdownToHtml
         }, $body);
 
         return $body;
+    }
+
+    /**
+     * Split a markdown table row on | while ignoring pipes inside `code` spans.
+     *
+     * @return list<string>
+     */
+    private static function splitTableRow(string $row): array
+    {
+        $row = trim($row);
+        $row = trim($row, '|');
+        $cells = [];
+        $current = '';
+        $inCode = false;
+        $len = strlen($row);
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $row[$i];
+            if ($ch === '`') {
+                $inCode = ! $inCode;
+                $current .= $ch;
+                continue;
+            }
+            if ($ch === '|' && ! $inCode) {
+                $cells[] = trim($current);
+                $current = '';
+                continue;
+            }
+            $current .= $ch;
+        }
+        $cells[] = trim($current);
+
+        return $cells;
     }
 
     private static function inline(string $text): string
