@@ -1,0 +1,22 @@
+---
+description: Enforce French/English UI localization parity — no raw English enums or DataTables defaults in French locale
+alwaysApply: true
+---
+
+# French UI localization
+
+Francophone schools judge Digitex harshly when English leaks into a French interface. Treat localization as a product requirement, not a polish pass.
+
+## Rules
+
+1. **Never display raw DB enums** (`yearly`, `termly`, `installment`, `global`, status codes, etc.) in Blade or DataTables JSON. Use `__('…')` or helpers such as `finance_frequency_label()` / `finance_payment_mode_label()`.
+2. **DataTables**: rely on global language defaults set in `resources/views/layout/footer.blade.php` from `pagination.*`. Do not hardcode English Search / Show entries / Previous / Next. If you override `paginate` with icons, still set translated text or omit `language` so defaults apply.
+3. **EN + FR together**: every new key in `resources/lang/en/*.php` must ship with a French counterpart in `resources/lang/fr/*.php` in the same change. Prefer `fr` wording that sounds natural for DRC / francophone Africa (e.g. Installment → Tranche, yearly → Annuel, termly → Trimestriel).
+4. **No English fallbacks in UI strings** like `__('x') ?? 'Select Section'` — if the key is missing, add it to both locales instead.
+5. Keep stored enum values in English for code/DB stability; localize only at display time.
+6. **Fee grade display**: when a fee has a grade but no `class_section_id`, show the compact section range via `finance_fee_grade_label()` (e.g. `1e A-E`), not only “Toutes les sections”. Fall back to `all_sections` only when no sections exist for that grade.
+
+## Quick check before finishing a UI change
+
+- Switch mental model to `locale=fr`: would Search, filters, table cells, badges, and validation messages still show English?
+- Grep for `ucfirst($…frequency)`, `ucfirst($…payment_mode)`, and bare `'yearly'|'termly'|'Installment'` in user-facing output.

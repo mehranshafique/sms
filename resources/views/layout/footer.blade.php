@@ -20,6 +20,29 @@
 
     <script src="{{ asset('vendor/datatables/js/jquery.dataTables.min.js')  }}"></script>
     <script src="{{ asset('vendor/datatables/js/dataTables.responsive.min.js')  }}"></script>
+    <script>
+        if (window.jQuery && jQuery.fn.dataTable) {
+            jQuery.extend(true, jQuery.fn.dataTable.defaults, {
+                language: {
+                    search: @json(__('pagination.search')),
+                    lengthMenu: @json(__('pagination.show') . ' _MENU_ ' . __('pagination.entries')),
+                    info: @json(__('pagination.info')),
+                    infoEmpty: @json(__('pagination.info_empty')),
+                    infoFiltered: @json(__('pagination.info_filtered')),
+                    zeroRecords: @json(__('pagination.zero_records')),
+                    emptyTable: @json(__('pagination.empty_table')),
+                    loadingRecords: @json(__('pagination.loading')),
+                    processing: @json(__('pagination.processing')),
+                    paginate: {
+                        first: @json(__('pagination.first')),
+                        last: @json(__('pagination.last')),
+                        next: @json(__('pagination.next')),
+                        previous: @json(__('pagination.previous')),
+                    },
+                },
+            });
+        }
+    </script>
     <script src="{{ asset('js/plugins-init/datatables.init.js')  }}"></script>
 
 	<script src="{{ asset('js/custom.min.js') }}"></script>

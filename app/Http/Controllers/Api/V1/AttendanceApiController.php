@@ -14,12 +14,13 @@ use App\Models\AcademicSession;
 use App\Models\InstitutionSetting;
 use App\Models\ExamRecord;
 use App\Models\Invoice;
-use App\Models\Institution;
 use App\Models\Timetable;
 use App\Services\NotificationService;
 use App\Services\InAppNotificationService;
 use App\Services\CurrencyService;
 use App\Services\StudentAbsenceNotificationService;
+use App\Services\Attendance\AttendanceGateStatusService;
+use App\Services\Attendance\AttendanceScheduleResolver;
 use App\Enums\RoleEnum;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -31,7 +32,9 @@ class AttendanceApiController extends Controller
     public function __construct(
         protected NotificationService $notificationService,
         protected InAppNotificationService $inAppNotifications,
-        protected CurrencyService $currencyService
+        protected CurrencyService $currencyService,
+        protected AttendanceScheduleResolver $scheduleResolver,
+        protected AttendanceGateStatusService $gateStatusService
     ) {}
 
     public function store(Request $request)
@@ -248,15 +251,19 @@ class AttendanceApiController extends Controller
             return response()->json(['status' => 'error', 'success' => false, 'message' => 'Student is not enrolled in the active session.'], 403);
         }
 
-        $lateMargin = (int) InstitutionSetting::get($institutionId, 'late_margin_time', 1);
         $cooldownMinutes = (int) InstitutionSetting::get($institutionId, 'double_tap_wait_time', 15);
-        $isSubjectWise = $this->isSubjectWiseInstitution($institutionId);
+        $isSubjectWise = $this->gateStatusService->isSubjectWiseInstitution($institutionId);
 
-        $gateContext = $this->resolveGateAttendanceStatus(
-            $enrollment->class_section_id,
+        $resolvedSchedule = $this->scheduleResolver->resolveForClassSection(
+            $institutionId,
+            (int) $enrollment->class_section_id
+        );
+
+        $gateContext = $this->gateStatusService->resolve(
+            (int) $enrollment->class_section_id,
             $institutionId,
             $scanTime,
-            $lateMargin
+            $resolvedSchedule
         );
 
         $status = $gateContext['status'];
@@ -290,7 +297,7 @@ class AttendanceApiController extends Controller
             ]);
             $action = 'arrival';
         } else {
-            $checkInTime = $this->combineDateAndTime(
+            $checkInTime = $this->gateStatusService->combineDateAndTime(
                 Carbon::parse($date),
                 $attendance->check_in
             );
@@ -339,99 +346,9 @@ class AttendanceApiController extends Controller
         ], 200);
     }
 
-    private function isSubjectWiseInstitution(int $institutionId): bool
-    {
-        $institution = Institution::find($institutionId);
-        if (!$institution) {
-            return false;
-        }
-        $type = is_object($institution->type) ? $institution->type->value : $institution->type;
-
-        return in_array($type, ['university', 'vocational', 'lmd'], true);
-    }
-
-    /**
-     * Determine present / late / absent from timetable slot and late margin.
-     */
-    private function resolveGateAttendanceStatus(
-        int $classSectionId,
-        int $institutionId,
-        Carbon $scanTime,
-        int $lateMarginMinutes
-    ): array {
-        $day = strtolower($scanTime->format('l'));
-        $session = AcademicSession::where('institution_id', $institutionId)->where('is_current', true)->first();
-
-        $slotsQuery = Timetable::with('subject')
-            ->where('class_section_id', $classSectionId)
-            ->whereRaw('LOWER(day_of_week) = ?', [$day])
-            ->orderBy('start_time');
-
-        if ($session) {
-            $slotsQuery->where('academic_session_id', $session->id);
-        }
-
-        $slots = $slotsQuery->get();
-
-        // Active class period
-        foreach ($slots as $slot) {
-            $start = $this->combineDateAndTime($scanTime, $slot->start_time);
-            $end = $this->combineDateAndTime($scanTime, $slot->end_time);
-            if ($scanTime->between($start, $end)) {
-                $lateThreshold = $start->copy()->addMinutes($lateMarginMinutes);
-                return [
-                    'status' => $scanTime->lte($lateThreshold) ? 'present' : 'late',
-                    'subject_id' => $slot->subject_id,
-                    'slot_label' => $slot->subject?->name,
-                ];
-            }
-        }
-
-        // After a class ended → absent for the most recently ended slot
-        $lastEnded = null;
-        foreach ($slots as $slot) {
-            $end = $this->combineDateAndTime($scanTime, $slot->end_time);
-            if ($scanTime->gt($end)) {
-                $lastEnded = $slot;
-            }
-        }
-
-        if ($lastEnded) {
-            return [
-                'status' => 'absent',
-                'subject_id' => $lastEnded->subject_id,
-                'slot_label' => $lastEnded->subject?->name,
-            ];
-        }
-
-        // No timetable — fall back to school start time
-        $schoolStartTimeStr = InstitutionSetting::get($institutionId, 'school_start_time', '08:00');
-        try {
-            $parsedStartTime = $this->parseTimeOfDay($schoolStartTimeStr);
-            $expectedTime = $scanTime->copy()->setTime($parsedStartTime['h'], $parsedStartTime['m'], 0);
-            $expectedTime->addMinutes($lateMarginMinutes);
-            $isLate = $scanTime->gt($expectedTime);
-        } catch (\Exception $e) {
-            $isLate = $scanTime->format('H:i') > '08:00';
-        }
-
-        return [
-            'status' => $isLate ? 'late' : 'present',
-            'subject_id' => null,
-            'slot_label' => null,
-        ];
-    }
-
-    /**
-     * Build a datetime on $day's date from a time-of-day value.
-     * Timetable casts start/end as datetime; string-interpolating them causes
-     * "2026-08-11 2026-08-11 08:00:00" double-date parse errors.
-     */
     private function combineDateAndTime(Carbon $day, mixed $timeValue): Carbon
     {
-        $parts = $this->parseTimeOfDay($timeValue);
-
-        return $day->copy()->setTime($parts['h'], $parts['m'], $parts['s']);
+        return $this->gateStatusService->combineDateAndTime($day, $timeValue);
     }
 
     /**
@@ -439,35 +356,7 @@ class AttendanceApiController extends Controller
      */
     private function parseTimeOfDay(mixed $timeValue): array
     {
-        if ($timeValue instanceof Carbon) {
-            return [
-                'h' => (int) $timeValue->hour,
-                'm' => (int) $timeValue->minute,
-                's' => (int) $timeValue->second,
-            ];
-        }
-
-        $raw = trim((string) $timeValue);
-        if ($raw === '') {
-            return ['h' => 8, 'm' => 0, 's' => 0];
-        }
-
-        // Pure time: HH:MM or HH:MM:SS
-        if (preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $raw, $m)) {
-            return [
-                'h' => (int) $m[1],
-                'm' => (int) $m[2],
-                's' => isset($m[3]) ? (int) $m[3] : 0,
-            ];
-        }
-
-        $parsed = Carbon::parse($raw);
-
-        return [
-            'h' => (int) $parsed->hour,
-            'm' => (int) $parsed->minute,
-            's' => (int) $parsed->second,
-        ];
+        return $this->gateStatusService->parseTimeOfDay($timeValue);
     }
 
     private function processStaffAttendance($staff, $date, $time, $scanTime, $method)
@@ -506,7 +395,7 @@ class AttendanceApiController extends Controller
             ]);
             $action = 'arrival';
         } else {
-            $checkInTime = $this->combineDateAndTime(
+            $checkInTime = $this->gateStatusService->combineDateAndTime(
                 Carbon::parse($date),
                 $attendance->check_in
             );

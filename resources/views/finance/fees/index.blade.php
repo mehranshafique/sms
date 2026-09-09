@@ -79,13 +79,7 @@
                 { data: 'grade', name: 'gradeLevel.name' },
                 { data: 'mode', name: 'mode' },
                 { data: 'action', name: 'action', orderable: false, searchable: false, className: 'text-end' }
-            ],
-            language: {
-                paginate: {
-                    next: '<i class="fa fa-angle-right"></i>',
-                    previous: '<i class="fa fa-angle-left"></i>'
-                }
-            }
+            ]
         });
 
         // Delete Handler

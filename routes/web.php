@@ -61,6 +61,7 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StaffAttendanceController;
 use App\Http\Controllers\AttendanceOverviewController;
+use App\Http\Controllers\AttendanceScheduleController;
 use App\Http\Controllers\StaffLeaveController;
 use App\Http\Controllers\StudentPromotionController;
 use App\Http\Controllers\ReenrollmentController;
@@ -419,6 +420,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('attendance/print-report', [StudentAttendanceController::class, 'printReport'])->name('attendance.print_report');
         // NEW: AJAX Route for Subject-Wise Attendance
         Route::get('attendance/get-subjects', [StudentAttendanceController::class, 'getSubjects'])->name('attendance.get_subjects');
+    });
+
+    Route::middleware([CheckModuleAccess::class . ':student_attendance'])->group(function () {
+        Route::resource('attendance-schedules', AttendanceScheduleController::class)
+            ->except(['show']);
     });
 
     // Student Requests

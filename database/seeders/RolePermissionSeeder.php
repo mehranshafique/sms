@@ -49,6 +49,7 @@ class RolePermissionSeeder extends Seeder
             'University Enrollments' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'], // University
             
             'Student Attendance' => ['view', 'create', 'update', 'delete'],
+            'Attendance Schedules' => ['view', 'create', 'update', 'delete', 'viewAny', 'deleteAny'],
             'Student Promotion' => ['view', 'create'],
             'Student Reenrollments' => ['view', 'create', 'update'],
             'Student Transfers' => ['view', 'create', 'print'],

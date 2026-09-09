@@ -80,6 +80,8 @@ return [
     'payment_mode' => 'Payment Mode',
     'global' => 'Global',
     'installment' => 'Installment',
+    'installment_with_order' => 'Installment :order',
+    'grade_section_range' => ':grade :range',
     'class_section' => 'Class Section',
     'optional' => 'Optional',
     'all_sections' => 'All Sections',

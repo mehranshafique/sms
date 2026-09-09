@@ -38,6 +38,8 @@ class FeeStructureController extends BaseController
                 $data->where('fee_structures.institution_id', $institutionId);
             }
 
+            $sectionNamesByGrade = [];
+
             return DataTables::of($data)
                 ->addIndexColumn()
                 ->editColumn('name', function($row){
@@ -59,24 +61,42 @@ class FeeStructureController extends BaseController
                     }
                     return '-'; 
                 })
-                ->addColumn('grade', function($row){
-                    $grade = $row->gradeLevel->name ?? 'All Grades';
-                    if($row->classSection) {
-                        $grade .= ' (' . $row->classSection->name . ')';
-                    } elseif($row->grade_level_id && is_null($row->class_section_id)) {
-                        $grade .= ' (' . __('finance.all_sections') . ')';
+                ->addColumn('grade', function($row) use (&$sectionNamesByGrade) {
+                    if ($row->classSection) {
+                        return finance_fee_grade_label($row->gradeLevel->name ?? null, $row->classSection);
                     }
-                    return $grade;
+
+                    if ($row->grade_level_id && is_null($row->class_section_id)) {
+                        if (! array_key_exists($row->grade_level_id, $sectionNamesByGrade)) {
+                            $query = \App\Models\ClassSection::query()
+                                ->where('grade_level_id', $row->grade_level_id)
+                                ->where('is_active', true)
+                                ->orderBy('name');
+
+                            if ($row->institution_id) {
+                                $query->where('institution_id', $row->institution_id);
+                            }
+
+                            $sectionNamesByGrade[$row->grade_level_id] = $query->pluck('name')->all();
+                        }
+
+                        return finance_fee_grade_label(
+                            $row->gradeLevel->name ?? null,
+                            null,
+                            $sectionNamesByGrade[$row->grade_level_id]
+                        );
+                    }
+
+                    return finance_fee_grade_label($row->gradeLevel->name ?? null);
                 })
                 ->editColumn('amount', function($row){
                     return number_format($row->amount, 2);
                 })
+                ->editColumn('frequency', function($row){
+                    return finance_frequency_label($row->frequency);
+                })
                 ->addColumn('mode', function($row){
-                    $mode = ucfirst($row->payment_mode);
-                    if($row->payment_mode == 'installment') {
-                        $mode .= ' (' . ($row->installment_order ?? '-') . ')';
-                    }
-                    return $mode;
+                    return finance_payment_mode_label($row->payment_mode, $row->installment_order);
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';

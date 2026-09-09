@@ -17,6 +17,9 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 | `markdown/whatsapp-voice-ivr-help-manual.md` | **WhatsApp Voice IVR** — school go-live guide (readiness, Infobip, settings, test call) |
 | `markdown/reenrollment-confirmation-help-manual.md` | **Re-enrollment confirmation** — campaign, parent WhatsApp option 10, review and approve |
 | `markdown/homework-workflow-and-medical-records.md` | **Homework approval, WhatsApp homework alerts, infirmary records** — per-school settings, schema, access control |
+| `markdown/super-admin-production-setup-guide.md` | **Production setup** — Super Admin configuration, SMS templates, security, and pre-school checklist |
+| `markdown/staff-timetable-help-manual.md` | **Staff timetable** — Class Courses prerequisites, create/edit teacher schedule, clashes, print |
+| `markdown/french-ui-attendance-schedules-release-notes.md` | **Release notes** — French UI/fee labels + attendance schedules by level; QA test plan |
 
 ## PDF output
 
@@ -29,6 +32,9 @@ Generated PDFs are written to `pdf/`:
 - `Chafon-Hardware-Bridge-Manual.pdf`
 - `WhatsApp-Voice-IVR-Help-Manual.pdf`
 - `Re-enrollment-Confirmation-Help-Manual.pdf`
+- `Super-Admin-Production-Setup-Guide.pdf`
+- `Staff-Timetable-Help-Manual.pdf`
+- `French-UI-and-Attendance-Schedules-Release-Notes.pdf`
 
 ## Regenerate PDFs
 

@@ -102,6 +102,7 @@ return [
     'select_institute' => 'Sélectionner l\'institut',
     'select_campus' => 'Sélectionner le campus',
     'select_class' => 'Sélectionner la classe',
+    'select_section' => 'Sélectionner la section',
     'select_gender' => 'Sélectionner le genre',
     'select_option' => 'Sélectionner l\'option',
     'academic_year' => 'Année académique',

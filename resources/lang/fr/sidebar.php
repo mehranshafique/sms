@@ -141,6 +141,7 @@ return [
         'title' => 'e-Registre d\'Appel',
         'overview' => 'Aperçu présence',
         'register' => 'Registre journalier',
+        'schedules' => 'Horaires de présence',
     ],
     'attendance_kiosk' => 'Kiosque de présence',
     'promotions' => [

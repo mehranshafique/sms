@@ -321,6 +321,9 @@
                                     </div>
                                     
                                     <h5 class="text-primary mb-3 mt-2"><i class="fa fa-fingerprint me-2"></i>{{ __('configuration.attendance_hardware') ?? 'Attendance & Hardware Settings' }}</h5>
+                                    <p class="text-muted small">{{ __('configuration.attendance_schedules_hint') }}
+                                        <a href="{{ route('attendance-schedules.index') }}">{{ __('sidebar.attendance.schedules') }}</a>
+                                    </p>
                                     <div class="row mb-4">
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label fw-bold">{{ __('configuration.late_margin_time') ?? 'Late Margin Time (Minutes)' }}</label>

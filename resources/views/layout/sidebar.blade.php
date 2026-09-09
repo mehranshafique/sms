@@ -290,7 +290,7 @@
                         $canViewPickups = $user->can('student.view') || $user->hasRole(RoleEnum::TEACHER->value);
 
                         $directoryOpen = request()->routeIs('students.*', 'pre-enrollments.*', 'parents.*');
-                        $attendanceOpen = request()->routeIs('attendance.*');
+                        $attendanceOpen = request()->routeIs('attendance.*', 'attendance-schedules.*');
                         $progressionOpen = request()->routeIs('enrollments.*', 'university.enrollments.*', 'reenrollments.*', 'promotions.*', 'transfers.*');
                         $welfareOpen = request()->routeIs('requests.*', 'discipline.*', 'pickups.*');
                     @endphp
@@ -319,6 +319,7 @@
                             @if($canViewAttendance)
                                 <li><a class="{{ request()->routeIs('attendance.overview*') ? 'mm-active' : '' }}" href="{{ route('attendance.overview') }}">{{ __('sidebar.attendance.overview') }}</a></li>
                                 <li><a class="{{ request()->routeIs('attendance.index', 'attendance.create', 'attendance.report', 'attendance.print_report') ? 'mm-active' : '' }}" href="{{ route('attendance.index') }}">{{ __('sidebar.attendance.register') }}</a></li>
+                                <li><a class="{{ request()->routeIs('attendance-schedules.*') ? 'mm-active' : '' }}" href="{{ route('attendance-schedules.index') }}">{{ __('sidebar.attendance.schedules') }}</a></li>
                                 <li><a class="{{ request()->routeIs('attendance.analytics.*') ? 'mm-active' : '' }}" href="{{ route('attendance.analytics.index') }}">{{ __('sidebar.attendance_analytics') ?? 'Analytics & Reports' }}</a></li>
                             @endif
                             @if($canViewKiosk)

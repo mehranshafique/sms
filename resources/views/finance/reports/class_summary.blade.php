@@ -289,10 +289,10 @@
                                                     <strong class="text-dark">{{ $row['name'] }}</strong>
                                                     <span class="text-muted fs-12">{{ $row['student_id'] }}</span>
                                                     <span class="badge badge-xs badge-{{ $row['payment_mode'] == 'global' ? 'info' : 'light' }} mt-1 w-fit-content no-print border">
-                                                        {{ ucfirst($row['payment_mode']) }}
+                                                        {{ finance_payment_mode_label($row['payment_mode']) }}
                                                     </span>
                                                     {{-- Print-only text for badge --}}
-                                                    <span class="d-none d-print-inline fs-10">({{ ucfirst($row['payment_mode']) }})</span>
+                                                    <span class="d-none d-print-inline fs-10">({{ finance_payment_mode_label($row['payment_mode']) }})</span>
                                                 </div>
                                             </td>
                                             <td>

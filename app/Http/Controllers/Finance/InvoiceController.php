@@ -201,8 +201,8 @@ class InvoiceController extends BaseController
                 'name' => $fee->name,
                 'amount' => CurrencySymbol::default() . ' ' . number_format($fee->amount, 2),
                 'type' => $fee->feeType->name ?? 'N/A',
-                'frequency' => ucfirst($fee->frequency),
-                'payment_mode' => ucfirst($fee->payment_mode),
+                'frequency' => finance_frequency_label($fee->frequency),
+                'payment_mode' => finance_payment_mode_label($fee->payment_mode),
                 'order' => $fee->installment_order ?? '-'
             ]);
 

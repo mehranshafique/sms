@@ -23,6 +23,9 @@ class GenerateDocumentationPdfs extends Command
             'chafon-hardware-bridge-manual' => 'Chafon Hardware Bridge Manual',
             'whatsapp-voice-ivr-help-manual' => 'WhatsApp Voice IVR Help Manual',
             'reenrollment-confirmation-help-manual' => 'Re-enrollment Confirmation Help Manual',
+            'super-admin-production-setup-guide' => 'Super Admin Production Setup Guide',
+            'staff-timetable-help-manual' => 'Staff Timetable Help Manual',
+            'french-ui-attendance-schedules-release-notes' => 'French UI and Attendance Schedules Release Notes',
         ];
 
         $only = $this->argument('slug');

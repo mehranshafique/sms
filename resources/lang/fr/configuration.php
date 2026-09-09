@@ -124,6 +124,12 @@ return [
     'school_hours' => 'Heures de cours',
     'school_start_time' => 'Heure début',
     'school_end_time' => 'Heure fin',
+    'attendance_hardware' => 'Présence et matériel',
+    'late_margin_time' => 'Marge de retard (minutes)',
+    'late_margin_help' => 'Délai de grâce après l\'heure de début avant de marquer un retard. Utilisé par défaut si aucun horaire de présence n\'est affecté.',
+    'attendance_schedules_hint' => 'Pour des horaires différents selon le niveau ou le shift, configurez',
+    'double_tap_wait_time' => 'Délai anti double-tap (minutes)',
+    'double_tap_help' => 'Minutes minimales entre l\'arrivée et le départ pour éviter les doubles scans accidentels.',
     'school_rooms_count' => 'Nombre de salles',
     'school_rooms_count_help' => 'Utilisé pour les examens et l’emploi du temps IA (Salle 1 … Salle N).',
     

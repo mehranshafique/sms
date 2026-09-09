@@ -22,6 +22,6 @@ class InvoiceDescriptionBuilder
             return __($key, ['name' => $fee->name]);
         }
 
-        return "{$fee->name} (" . ucfirst($fee->payment_mode) . ')';
+        return "{$fee->name} (" . finance_payment_mode_label($fee->payment_mode) . ')';
     }
 }

@@ -158,7 +158,8 @@ return [
     'chatbot_free_help' => 'If enabled, this institution will not be charged SMS/WhatsApp credits for automated chatbot interactions, report deliveries, or hardware notifications.',
     'attendance_hardware' => 'Attendance Hardware',
     'late_margin_time' => 'Late Margin Time (minutes)',
-    'late_margin_help' => 'Grace period after school start time before marking as late.',
+    'late_margin_help' => 'Grace period after school start time before marking as late. Used as the default when no attendance schedule is assigned.',
+    'attendance_schedules_hint' => 'For different start times by level or shift, configure',
     'double_tap_wait_time' => 'Double Tap Wait Time (minutes)',
     'double_tap_help' => 'Minimum minutes between check-in and check-out to prevent accidental double taps.',
 

@@ -87,6 +87,8 @@ return [
     'payment_mode' => 'Mode de paiement',
     'global' => 'Global',
     'installment' => 'Tranche',
+    'installment_with_order' => 'Tranche :order',
+    'grade_section_range' => ':grade :range',
     'class_section' => 'Section',
     'optional' => 'Facultatif',
     'all_sections' => 'Toutes les sections',

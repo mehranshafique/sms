@@ -153,6 +153,7 @@ return [
         'title' => 'Attendance',
         'overview' => 'Presence overview',
         'register' => 'Daily Register',
+        'schedules' => 'Attendance schedules',
     ],
     'attendance_kiosk' => 'Attendance Kiosk',
     'promotions' => [

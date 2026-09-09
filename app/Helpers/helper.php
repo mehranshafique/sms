@@ -600,3 +600,139 @@ if (! function_exists('dt_route')) {
         return null;
     }
 }
+
+if (! function_exists('finance_frequency_label')) {
+    /**
+     * Localized display label for fee_structures.frequency enum values.
+     */
+    function finance_frequency_label(?string $frequency): string
+    {
+        if ($frequency === null || $frequency === '') {
+            return '—';
+        }
+
+        $key = 'finance.' . $frequency;
+        $label = __($key);
+
+        return $label !== $key ? $label : ucfirst(str_replace('_', ' ', $frequency));
+    }
+}
+
+if (! function_exists('finance_payment_mode_label')) {
+    /**
+     * Localized display label for payment_mode (global|installment), optional installment order.
+     */
+    function finance_payment_mode_label(?string $mode, $order = null): string
+    {
+        $mode = $mode ?: 'global';
+        $key = 'finance.' . $mode;
+        $label = __($key);
+        if ($label === $key) {
+            $label = ucfirst($mode);
+        }
+
+        if ($mode === 'installment' && $order !== null && $order !== '' && $order !== '-') {
+            return __('finance.installment_with_order', ['order' => $order]);
+        }
+
+        return $label;
+    }
+}
+
+if (! function_exists('compact_section_name_range')) {
+    /**
+     * Compact section names into a short range when they are consecutive letters.
+     * Examples: [A,B,C,D,E] => "A-E"; [A,B,D] => "A-B, D"; [A] => "A"
+     *
+     * @param  list<string>  $names
+     */
+    function compact_section_name_range(array $names): string
+    {
+        $names = array_values(array_unique(array_filter(array_map(
+            static fn ($n) => trim((string) $n),
+            $names
+        ), static fn ($n) => $n !== '')));
+
+        if ($names === []) {
+            return '';
+        }
+
+        if (count($names) === 1) {
+            return $names[0];
+        }
+
+        $letters = [];
+        foreach ($names as $name) {
+            if (! preg_match('/^[A-Za-z]$/u', $name)) {
+                return implode(', ', $names);
+            }
+            $letters[] = strtoupper($name);
+        }
+
+        sort($letters, SORT_STRING);
+        $letters = array_values(array_unique($letters));
+
+        $parts = [];
+        $runStart = $letters[0];
+        $runPrev = $letters[0];
+
+        for ($i = 1, $len = count($letters); $i < $len; $i++) {
+            if (ord($letters[$i]) === ord($runPrev) + 1) {
+                $runPrev = $letters[$i];
+                continue;
+            }
+            $parts[] = $runStart === $runPrev ? $runStart : $runStart.'-'.$runPrev;
+            $runStart = $runPrev = $letters[$i];
+        }
+        $parts[] = $runStart === $runPrev ? $runStart : $runStart.'-'.$runPrev;
+
+        return implode(', ', $parts);
+    }
+}
+
+if (! function_exists('finance_fee_grade_label')) {
+    /**
+     * Display grade + section(s) for a fee structure.
+     * Grade-wide fees (null class_section_id) show a compact section range, e.g. "1e A-E".
+     *
+     * @param  list<string>|null  $sectionNamesForGrade  Preloaded section names for the grade (avoids N+1).
+     */
+    function finance_fee_grade_label(
+        ?string $gradeName,
+        $classSection = null,
+        ?array $sectionNamesForGrade = null
+    ): string {
+        $gradeName = trim((string) ($gradeName ?? ''));
+
+        if ($classSection) {
+            $sectionName = is_object($classSection)
+                ? trim((string) ($classSection->name ?? ''))
+                : trim((string) $classSection);
+
+            if ($gradeName !== '' && $sectionName !== '') {
+                return __('class_section.grade_section', [
+                    'grade' => $gradeName,
+                    'section' => $sectionName,
+                ]);
+            }
+
+            return $gradeName !== '' ? $gradeName : ($sectionName !== '' ? $sectionName : '—');
+        }
+
+        if ($gradeName === '') {
+            return __('timetable.all_grades');
+        }
+
+        $names = $sectionNamesForGrade ?? [];
+        $range = compact_section_name_range($names);
+
+        if ($range === '') {
+            return $gradeName.' ('.__('finance.all_sections').')';
+        }
+
+        return __('finance.grade_section_range', [
+            'grade' => $gradeName,
+            'range' => $range,
+        ]);
+    }
+}

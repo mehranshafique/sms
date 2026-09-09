@@ -188,7 +188,7 @@
                                     </div>
                                     <div class="col-sm-8 col-7">
                                         <span class="badge badge-{{ ($student->payment_mode ?? 'installment') == 'global' ? 'info' : 'primary' }}">
-                                            {{ ucfirst($student->payment_mode ?? 'installment') }}
+                                            {{ finance_payment_mode_label($student->payment_mode ?? 'installment') }}
                                         </span>
                                     </div>
                                 </div>
