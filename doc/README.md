@@ -20,6 +20,7 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 | `markdown/super-admin-production-setup-guide.md` | **Production setup** — Super Admin configuration, SMS templates, security, and pre-school checklist |
 | `markdown/staff-timetable-help-manual.md` | **Staff timetable** — Class Courses prerequisites, create/edit teacher schedule, clashes, print |
 | `markdown/french-ui-attendance-schedules-release-notes.md` | **Release notes** — French UI/fee labels + attendance schedules by level; QA test plan |
+| `markdown/dashboard-subjects-pwa-release-notes.md` | **Release notes** — dashboard/PWA, sessions fix, class list, multi-grade subjects; QA test plan |
 
 ## PDF output
 
@@ -35,6 +36,7 @@ Generated PDFs are written to `pdf/`:
 - `Super-Admin-Production-Setup-Guide.pdf`
 - `Staff-Timetable-Help-Manual.pdf`
 - `French-UI-and-Attendance-Schedules-Release-Notes.pdf`
+- `Dashboard-Subjects-and-PWA-Release-Notes.pdf`
 
 ## Regenerate PDFs
 

@@ -26,6 +26,7 @@ class GenerateDocumentationPdfs extends Command
             'super-admin-production-setup-guide' => 'Super Admin Production Setup Guide',
             'staff-timetable-help-manual' => 'Staff Timetable Help Manual',
             'french-ui-attendance-schedules-release-notes' => 'French UI and Attendance Schedules Release Notes',
+            'dashboard-subjects-pwa-release-notes' => 'Dashboard Subjects and PWA Release Notes',
         ];
 
         $only = $this->argument('slug');
