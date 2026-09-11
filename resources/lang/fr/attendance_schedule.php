@@ -23,6 +23,8 @@ return [
     'sections_label' => 'Sections',
     'select_grades' => 'Niveaux scolaires',
     'select_sections' => 'Sections (dérogations facultatives)',
+    'sections_depend_on_grades' => 'Seules les sections appartenant aux niveaux sélectionnés sont affichées.',
+    'sections_must_match_grades' => 'Les sections sélectionnées doivent appartenir aux niveaux choisis.',
     'fallback_note' => 'Les élèves sans affectation utilisent l\'heure de début et la marge de retard par défaut de la Configuration.',
     'total' => 'Total des horaires',
     'active_count' => 'Actifs',

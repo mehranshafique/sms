@@ -5,6 +5,38 @@ $(function () {
         $('.clockpicker').clockpicker({ autoclose: true });
     }
 
+    var $grades = $('#scheduleGradeSelect');
+    var $sections = $('#scheduleSectionSelect');
+
+    function refreshSectionOptions() {
+        var selectedGrades = ($grades.val() || []).map(String);
+
+        $sections.find('option').each(function () {
+            var $opt = $(this);
+            var gradeId = String($opt.data('grade-id') || '');
+            var matchesGrade = selectedGrades.indexOf(gradeId) !== -1;
+            var keepSelected = $opt.prop('selected') && selectedGrades.length === 0;
+            var visible = matchesGrade || keepSelected;
+
+            // When grades are chosen, drop sections outside those grades.
+            if (selectedGrades.length > 0 && !matchesGrade) {
+                $opt.prop('selected', false);
+                visible = false;
+            }
+
+            $opt.prop('disabled', !visible).toggle(visible);
+        });
+
+        if ($sections.hasClass('selectpicker') || $sections.parent().hasClass('bootstrap-select')) {
+            $sections.selectpicker('refresh');
+        } else if ($sections.data('select2')) {
+            $sections.trigger('change.select2');
+        }
+    }
+
+    $grades.on('changed.bs.select change', refreshSectionOptions);
+    refreshSectionOptions();
+
     $('#attendanceScheduleForm').on('submit', function (e) {
         e.preventDefault();
         var form = this;

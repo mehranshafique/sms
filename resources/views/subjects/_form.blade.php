@@ -36,21 +36,26 @@
                                 </div>
                             @endif
 
-                            {{-- Grade Level --}}
+                            {{-- Grade Levels (multi-assign) --}}
+                            @php
+                                $selectedGrades = old('grade_level_ids', $selectedGradeIds ?? (
+                                    isset($subject) && $subject->grade_level_id ? [$subject->grade_level_id] : []
+                                ));
+                            @endphp
                             <div class="mb-3 col-md-6">
-                                <label class="form-label">{{ __('subject.select_grade') }} <span class="text-danger">*</span></label>
-                                <select name="grade_level_id" id="gradeSelect" class="form-control default-select" required>
-                                    <option value="">{{ __('subject.select_grade') }}</option>
+                                <label class="form-label">{{ __('subject.select_grades') }} <span class="text-danger">*</span></label>
+                                <select name="grade_level_ids[]" id="gradeSelect" class="form-control default-select" multiple required data-live-search="true">
                                     @if(isset($grades))
                                         @foreach($grades as $grade)
-                                            <option value="{{ $grade['id'] }}" 
+                                            <option value="{{ $grade['id'] }}"
                                                     data-cycle="{{ $grade['cycle'] ?? 'primary' }}"
-                                                    {{ (old('grade_level_id', $subject->grade_level_id ?? '') == $grade['id']) ? 'selected' : '' }}>
+                                                    {{ in_array($grade['id'], $selectedGrades) ? 'selected' : '' }}>
                                                 {{ $grade['name'] }}
                                             </option>
                                         @endforeach
                                     @endif
                                 </select>
+                                <small class="text-muted">{{ __('subject.select_grades_help') }}</small>
                             </div>
                             
                             {{-- Basic Info --}}
@@ -179,18 +184,19 @@
         // Toggle University Section based on Grade Cycle
         function toggleUniFields() {
             if (!gradeSelect) return;
-            const selectedOption = gradeSelect.options[gradeSelect.selectedIndex];
-            const cycle = selectedOption.getAttribute('data-cycle');
-            
-            if (cycle === 'university' || cycle === 'lmd') { 
-                uniFields.style.display = 'block';
-            } else {
-                uniFields.style.display = 'none';
-            }
+            let showUni = false;
+            Array.from(gradeSelect.selectedOptions || []).forEach(function (opt) {
+                const cycle = opt.getAttribute('data-cycle');
+                if (cycle === 'university' || cycle === 'lmd') showUni = true;
+            });
+            uniFields.style.display = showUni ? 'block' : 'none';
         }
 
         if (gradeSelect) {
             gradeSelect.addEventListener('change', toggleUniFields);
+            if (window.jQuery) {
+                $(gradeSelect).on('changed.bs.select', toggleUniFields);
+            }
             toggleUniFields(); // Init on load
         }
 
@@ -198,7 +204,6 @@
         if (programFilter) {
             programFilter.addEventListener('change', function() {
                 const programId = this.value;
-                const gradeId = gradeSelect.value;
                 
                 // Reset Unit Dropdown
                 unitSelect.innerHTML = '<option value="">{{ __('student.loading') }}</option>';
@@ -206,11 +211,9 @@
                 if($.fn.selectpicker) $(unitSelect).selectpicker('refresh');
 
                 // Build URL
-                let url = "{{ route('subjects.get_units') }}"; // Route to be created in web.php
+                let url = "{{ route('subjects.get_units') }}";
                 let params = new URLSearchParams();
                 if(programId) params.append('program_id', programId);
-                // Optional: Filter by Grade too if desired, though Programs usually span grades
-                // params.append('grade_level_id', gradeId); 
 
                 fetch(`${url}?${params.toString()}`)
                     .then(response => response.json())

@@ -63,7 +63,7 @@ class StudentAttendanceController extends BaseController
             $subjectIds = array_unique(array_merge($allocated, $timetable));
             
             if (empty($subjectIds)) {
-                $subjectIds = Subject::where('grade_level_id', $classSection->grade_level_id)
+                $subjectIds = Subject::forGrade( $classSection->grade_level_id)
                     ->where('is_active', true)->pluck('id')->toArray();
             }
         } else {

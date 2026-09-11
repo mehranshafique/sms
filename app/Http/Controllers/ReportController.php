@@ -728,7 +728,7 @@ class ReportController extends BaseController
                 ->get();
         }
 
-        return Subject::where('grade_level_id', $classSection->grade_level_id)
+        return Subject::forGrade( $classSection->grade_level_id)
             ->where('is_active', true)
             ->orderBy('name')
             ->get();

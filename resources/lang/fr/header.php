@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'back' => 'Retour',
     'select_institute' => 'Sélectionner l\'institut',
     'my_institute' => 'Mon Institut',
     'global_view' => 'Vue globale',

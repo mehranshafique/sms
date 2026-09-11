@@ -48,8 +48,8 @@ class AcademicSessionController extends BaseController
                     return dt_link(dt_route('academic-sessions.show', $row->id, 'academic-sessions.edit'), $row->name);
                 })
                 ->editColumn('is_current', function($row){
-                    return $row->is_current 
-                        ? '<span class="badge badge-success">'.__('academic_session.yes').'</span>' 
+                    return $row->is_current
+                        ? '<span class="badge badge-success">'.__('academic_session.yes').'</span>'
                         : '<span class="badge badge-secondary">'.__('academic_session.no').'</span>';
                 })
                 ->editColumn('status', function($row){
@@ -58,18 +58,32 @@ class AcademicSessionController extends BaseController
                         'planned' => 'badge-info',
                         'closed' => 'badge-danger',
                     ];
-                    $class = $badges[$row->status] ?? 'badge-secondary';
-                    return '<span class="badge '.$class.'">'.ucfirst($row->status).'</span>';
+                    $status = (string) $row->status;
+                    $class = $badges[$status] ?? 'badge-secondary';
+                    $label = __('academic_session.status_'.$status);
+                    if ($label === 'academic_session.status_'.$status) {
+                        $label = ucfirst($status);
+                    }
+
+                    return '<span class="badge '.$class.'">'.$label.'</span>';
                 })
                 ->editColumn('start_date', function($row){
-                    return $row->start_date ? $row->start_date->format('d F, Y') : '-';
+                    try {
+                        return $row->start_date ? $row->start_date->format('Y-m-d') : '-';
+                    } catch (\Throwable $e) {
+                        return (string) ($row->getRawOriginal('start_date') ?? '-');
+                    }
                 })
                 ->editColumn('end_date', function($row){
-                    return $row->end_date ? $row->end_date->format('d F, Y') : '-';
+                    try {
+                        return $row->end_date ? $row->end_date->format('Y-m-d') : '-';
+                    } catch (\Throwable $e) {
+                        return (string) ($row->getRawOriginal('end_date') ?? '-');
+                    }
                 })
                 ->addColumn('action', function($row){
                     $btn = '<div class="d-flex justify-content-end action-buttons">';
-                    
+
                     if(auth()->user()->can('update', $row)){
                         $btn .= '<a href="'.route('academic-sessions.edit', $row->id).'" class="btn btn-primary shadow btn-xs sharp me-1" title="'.__('academic_session.edit').'">
                                     <i class="fa fa-pencil"></i>
@@ -81,7 +95,7 @@ class AcademicSessionController extends BaseController
                                     <i class="fa fa-trash"></i>
                                 </button>';
                     }
-                    
+
                     $btn .= '</div>';
                     return $btn;
                 })

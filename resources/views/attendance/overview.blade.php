@@ -26,20 +26,30 @@
     $staff = $overview['staff'];
     $classes = $overview['classes'];
     $todayLabel = \Carbon\Carbon::parse($date)->translatedFormat('l, d F Y');
+    $pctOf = static function ($value, $expected) {
+        $expected = (int) $expected;
+        if ($expected <= 0) {
+            return 0.0;
+        }
+
+        return round(((int) $value / $expected) * 100, 1);
+    };
     $studentKpis = [
-        ['bucket' => 'expected', 'value' => $students['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-users', 'valueClass' => ''],
-        ['bucket' => 'present', 'value' => $students['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle', 'valueClass' => 'text-tint-success'],
-        ['bucket' => 'absent', 'value' => $students['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle', 'valueClass' => 'text-tint-danger'],
-        ['bucket' => 'late', 'value' => $students['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock', 'valueClass' => 'text-tint-warning'],
-        ['bucket' => 'not_checked_in', 'value' => $students['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half', 'valueClass' => 'text-tint-info'],
+        ['bucket' => 'expected', 'value' => $students['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-users', 'valueClass' => '', 'progress' => 100, 'hint' => __('attendance.total_enrollment_label', ['count' => $students['expected']])],
+        ['bucket' => 'present', 'value' => $students['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle', 'valueClass' => 'text-tint-success', 'progress' => $pctOf($students['present'], $students['expected']), 'hint' => $pctOf($students['present'], $students['expected']).'%'],
+        ['bucket' => 'absent', 'value' => $students['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle', 'valueClass' => 'text-tint-danger', 'progress' => $pctOf($students['absent'], $students['expected']), 'hint' => $pctOf($students['absent'], $students['expected']).'%'],
+        ['bucket' => 'late', 'value' => $students['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock', 'valueClass' => 'text-tint-warning', 'progress' => $pctOf($students['late'], $students['expected']), 'hint' => $pctOf($students['late'], $students['expected']).'%'],
+        ['bucket' => 'not_checked_in', 'value' => $students['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half', 'valueClass' => 'text-tint-info', 'progress' => $pctOf($students['not_checked_in'], $students['expected']), 'hint' => $pctOf($students['not_checked_in'], $students['expected']).'%'],
     ];
     $staffKpis = [
-        ['bucket' => 'expected', 'value' => $staff['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-user-tie', 'valueClass' => ''],
-        ['bucket' => 'present', 'value' => $staff['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle', 'valueClass' => 'text-tint-success'],
-        ['bucket' => 'absent', 'value' => $staff['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle', 'valueClass' => 'text-tint-danger'],
-        ['bucket' => 'late', 'value' => $staff['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock', 'valueClass' => 'text-tint-warning'],
-        ['bucket' => 'not_checked_in', 'value' => $staff['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half', 'valueClass' => 'text-tint-info'],
+        ['bucket' => 'expected', 'value' => $staff['expected'], 'label' => __('attendance.expected'), 'tint' => 'primary', 'icon' => 'la la-user-tie', 'valueClass' => '', 'progress' => 100, 'hint' => null],
+        ['bucket' => 'present', 'value' => $staff['present'], 'label' => __('attendance.present'), 'tint' => 'success', 'icon' => 'la la-check-circle', 'valueClass' => 'text-tint-success', 'progress' => $pctOf($staff['present'], $staff['expected']), 'hint' => $pctOf($staff['present'], $staff['expected']).'%'],
+        ['bucket' => 'absent', 'value' => $staff['absent'], 'label' => __('attendance.absent'), 'tint' => 'danger', 'icon' => 'la la-times-circle', 'valueClass' => 'text-tint-danger', 'progress' => $pctOf($staff['absent'], $staff['expected']), 'hint' => $pctOf($staff['absent'], $staff['expected']).'%'],
+        ['bucket' => 'late', 'value' => $staff['late'], 'label' => __('attendance.late'), 'tint' => 'warning', 'icon' => 'la la-clock', 'valueClass' => 'text-tint-warning', 'progress' => $pctOf($staff['late'], $staff['expected']), 'hint' => $pctOf($staff['late'], $staff['expected']).'%'],
+        ['bucket' => 'not_checked_in', 'value' => $staff['not_checked_in'], 'label' => __('attendance.not_checked_in'), 'tint' => 'info', 'icon' => 'la la-hourglass-half', 'valueClass' => 'text-tint-info', 'progress' => $pctOf($staff['not_checked_in'], $staff['expected']), 'hint' => $pctOf($staff['not_checked_in'], $staff['expected']).'%'],
     ];
+    $studentRateClass = $students['rate'] >= 85 ? 'is-good' : ($students['rate'] >= 60 ? 'is-warn' : 'is-bad');
+    $staffRateClass = $staff['rate'] >= 85 ? 'is-good' : ($staff['rate'] >= 60 ? 'is-warn' : 'is-bad');
 @endphp
 <div class="content-body att-overview">
     <div class="container-fluid">
@@ -74,16 +84,19 @@
                 <h4 class="dash-panel__title">{{ __('attendance.overview_students') }}</h4>
                 <div class="d-flex align-items-center gap-2">
                     <a href="{{ route('attendance.analytics.index') }}" class="text-tint-primary small">{{ __('attendance.analytics_title') }}</a>
-                    <span class="badge rounded-pill" style="background:rgba(91,83,232,.12);color:var(--dash-primary);">
+                    <span class="badge rounded-pill dash-live-badge {{ $studentRateClass }}">
                         {{ __('attendance.attendance_rate') }}: {{ $students['rate'] }}%
                     </span>
                 </div>
             </div>
             <div class="dash-panel__body pt-0">
-                <div class="row g-3">
+                <div class="dash-progress mb-3">
+                    <span style="width: {{ min(100, (float) $students['rate']) }}%; background: var(--dash-success);"></span>
+                </div>
+                <div class="row g-3 dash-stat-grid">
                     @foreach($studentKpis as $kpi)
                     <div class="col-xl col-md-4 col-6">
-                        <div class="dash-stat open-details"
+                        <div class="dash-stat tint-edge-{{ $kpi['tint'] }} open-details"
                              data-audience="students"
                              data-bucket="{{ $kpi['bucket'] }}"
                              role="button"
@@ -93,7 +106,13 @@
                                 <div>
                                     <p class="dash-stat__label">{{ $kpi['label'] }}</p>
                                     <h4 class="dash-stat__value {{ $kpi['valueClass'] }}">{{ $kpi['value'] }}</h4>
+                                    @if(!empty($kpi['hint']))
+                                        <small class="dash-stat__hint {{ $kpi['valueClass'] }}">{{ $kpi['hint'] }}</small>
+                                    @endif
                                 </div>
+                            </div>
+                            <div class="dash-stat__meter">
+                                <span style="width: {{ min(100, (float) $kpi['progress']) }}%;"></span>
                             </div>
                         </div>
                     </div>
@@ -109,16 +128,19 @@
                 <h4 class="dash-panel__title">{{ __('attendance.overview_staff') }}</h4>
                 <div class="d-flex align-items-center gap-2">
                     <a href="{{ route('staff-attendance.analytics') }}" class="text-tint-primary small">{{ __('attendance.staff_analytics_title') }}</a>
-                    <span class="badge rounded-pill" style="background:rgba(43,182,115,.12);color:var(--dash-success);">
+                    <span class="badge rounded-pill dash-live-badge {{ $staffRateClass }}">
                         {{ __('attendance.attendance_rate') }}: {{ $staff['rate'] }}%
                     </span>
                 </div>
             </div>
             <div class="dash-panel__body pt-0">
-                <div class="row g-3">
+                <div class="dash-progress mb-3">
+                    <span style="width: {{ min(100, (float) $staff['rate']) }}%; background: var(--dash-primary);"></span>
+                </div>
+                <div class="row g-3 dash-stat-grid">
                     @foreach($staffKpis as $kpi)
                     <div class="col-xl col-md-4 col-6">
-                        <div class="dash-stat open-details"
+                        <div class="dash-stat tint-edge-{{ $kpi['tint'] }} open-details"
                              data-audience="staff"
                              data-bucket="{{ $kpi['bucket'] }}"
                              role="button"
@@ -128,7 +150,13 @@
                                 <div>
                                     <p class="dash-stat__label">{{ $kpi['label'] }}</p>
                                     <h4 class="dash-stat__value {{ $kpi['valueClass'] }}">{{ $kpi['value'] }}</h4>
+                                    @if(!empty($kpi['hint']))
+                                        <small class="dash-stat__hint {{ $kpi['valueClass'] }}">{{ $kpi['hint'] }}</small>
+                                    @endif
                                 </div>
+                            </div>
+                            <div class="dash-stat__meter">
+                                <span style="width: {{ min(100, (float) $kpi['progress']) }}%;"></span>
                             </div>
                         </div>
                     </div>

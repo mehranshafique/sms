@@ -180,7 +180,7 @@ class ScheduleBuilderService
         }
 
         if ($allocations->isEmpty()) {
-            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
+            $subjects = Subject::forGrade( $classSection->grade_level_id)
                 ->where('is_active', true)
                 ->when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
                 ->get();
@@ -265,7 +265,7 @@ class ScheduleBuilderService
         if ($allocatedIds->isNotEmpty()) {
             $subjects = Subject::whereIn('id', $allocatedIds)->where('is_active', true)->get();
         } else {
-            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
+            $subjects = Subject::forGrade( $classSection->grade_level_id)
                 ->where('is_active', true)
                 ->get();
         }

@@ -15,12 +15,13 @@
         @include('dashboard.partials.welcome-banner', ['institution' => $institution, 'currentSession' => $currentSession ?? null])
 
         {{-- ROW 1: KEY STATS --}}
-        <div class="row g-3 mb-2">
+        <div class="row g-3 mb-2 dash-stat-grid">
             <div class="col-xl-3 col-sm-6 mb-3">
                 @include('dashboard.partials.stat-card', [
                     'icon' => 'la la-users', 'tint' => 'primary',
                     'label' => __('dashboard.total_enrollment'), 'value' => $totalEnrollment,
                     'hint' => __('dashboard.new_students', ['count' => $newComers]), 'hintClass' => 'text-tint-primary',
+                    'progress' => 100,
                 ])
             </div>
             <div class="col-xl-3 col-sm-6 mb-3">
@@ -28,6 +29,7 @@
                     'icon' => 'la la-check-circle', 'tint' => 'success',
                     'label' => __('dashboard.paid_students'), 'value' => $paidCount,
                     'hint' => $paidPercent . '% ' . __('dashboard.fully_settled'), 'hintClass' => 'text-tint-success',
+                    'progress' => $paidPercent,
                 ])
             </div>
             <div class="col-xl-3 col-sm-6 mb-3">
@@ -35,6 +37,7 @@
                     'icon' => 'la la-exclamation-circle', 'tint' => 'danger',
                     'label' => __('dashboard.unpaid_students'), 'value' => $unpaidCount,
                     'hint' => __('dashboard.pending_dues'), 'hintClass' => 'text-tint-danger',
+                    'progress' => $totalPayStudents > 0 ? round(($unpaidCount / $totalPayStudents) * 100) : 0,
                 ])
             </div>
             <div class="col-xl-3 col-sm-6 mb-3">
@@ -42,6 +45,7 @@
                     'icon' => 'la la-chalkboard-teacher', 'tint' => 'warning',
                     'label' => __('dashboard.personnel'), 'value' => $totalStaff,
                     'hint' => $totalTeachers . ' ' . __('dashboard.teachers'), 'hintClass' => 'text-tint-warning',
+                    'progress' => $totalStaff > 0 ? round(($totalTeachers / max(1, $totalStaff)) * 100) : 0,
                 ])
             </div>
         </div>
@@ -52,7 +56,7 @@
                 <div class="dash-panel h-100">
                     <div class="dash-panel__head">
                         <h4 class="dash-panel__title">{{ __('dashboard.financial_health') }}</h4>
-                        <span class="badge rounded-pill" style="background: rgba(91,83,232,.12); color: var(--dash-primary);">
+                        <span class="badge rounded-pill dash-live-badge {{ $collectionPercent >= 70 ? 'is-good' : ($collectionPercent >= 40 ? 'is-warn' : 'is-bad') }}">
                             {{ number_format($collectionPercent, 1) }}% {{ __('dashboard.collected') }}
                         </span>
                     </div>
@@ -88,57 +92,91 @@
                         <a href="{{ route('attendance.overview') }}" class="text-tint-primary small">{{ __('dashboard.view_overview') }}</a>
                     </div>
                     <div class="dash-panel__body">
+                        @php
+                            $studentRateToday = ($studentsExpected ?? 0) > 0 ? (int) $attendanceRate : 0;
+                            $staffRateToday = (int) ($staffAttendanceRate ?? 0);
+                        @endphp
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="dash-mini-label">{{ __('attendance.overview_students') }}</span>
-                            <strong>{{ ($studentsExpected ?? 0) > 0 ? $attendanceRate : 0 }}%</strong>
+                            <span class="badge rounded-pill dash-live-badge {{ $studentRateToday >= 85 ? 'is-good' : ($studentRateToday >= 60 ? 'is-warn' : 'is-bad') }}">
+                                {{ $studentRateToday }}%
+                            </span>
                         </div>
-                        <div class="row text-center mb-3">
-                            <div class="col-4 mb-2">
-                                <div class="fw-bold">{{ $studentsExpected ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('attendance.expected') }}</small>
+                        <div class="dash-progress mb-3">
+                            <span style="width: {{ min(100, $studentRateToday) }}%; background: var(--dash-success);"></span>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-4">
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value">{{ $studentsExpected ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('attendance.expected') }}</span>
+                                </div>
                             </div>
-                            <div class="col-4 mb-2">
-                                <div class="fw-bold text-tint-success">{{ $presentCount }}</div>
-                                <small class="dash-mini-label">{{ __('dashboard.present') }}</small>
+                            <div class="col-4">
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-success">{{ $presentCount }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('dashboard.present') }}</span>
+                                </div>
                             </div>
-                            <div class="col-4 mb-2">
-                                <div class="fw-bold text-tint-danger">{{ $absentCount }}</div>
-                                <small class="dash-mini-label">{{ __('dashboard.absent') }}</small>
+                            <div class="col-4">
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-danger">{{ $absentCount }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('dashboard.absent') }}</span>
+                                </div>
                             </div>
                             <div class="col-6">
-                                <div class="fw-bold text-tint-warning">{{ $lateCount }}</div>
-                                <small class="dash-mini-label">{{ __('dashboard.late') }}</small>
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-warning">{{ $lateCount }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('dashboard.late') }}</span>
+                                </div>
                             </div>
                             <div class="col-6">
-                                <div class="fw-bold text-tint-info">{{ $studentsNotCheckedIn ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('attendance.not_checked_in') }}</small>
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-info">{{ $studentsNotCheckedIn ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('attendance.not_checked_in') }}</span>
+                                </div>
                             </div>
                         </div>
-                        <hr class="my-2">
+                        <hr class="my-2 dash-divider">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="dash-mini-label">{{ __('attendance.overview_staff') }}</span>
-                            <strong>{{ $staffAttendanceRate ?? 0 }}%</strong>
+                            <span class="badge rounded-pill dash-live-badge {{ $staffRateToday >= 85 ? 'is-good' : ($staffRateToday >= 60 ? 'is-warn' : 'is-bad') }}">
+                                {{ $staffRateToday }}%
+                            </span>
                         </div>
-                        <div class="row text-center">
-                            <div class="col-4 mb-2">
-                                <div class="fw-bold">{{ $staffExpected ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('attendance.expected') }}</small>
+                        <div class="dash-progress mb-3">
+                            <span style="width: {{ min(100, $staffRateToday) }}%; background: var(--dash-primary);"></span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value">{{ $staffExpected ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('attendance.expected') }}</span>
+                                </div>
                             </div>
-                            <div class="col-4 mb-2">
-                                <div class="fw-bold text-tint-success">{{ $staffPresent ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('dashboard.present') }}</small>
+                            <div class="col-4">
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-success">{{ $staffPresent ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('dashboard.present') }}</span>
+                                </div>
                             </div>
-                            <div class="col-4 mb-2">
-                                <div class="fw-bold text-tint-danger">{{ $staffAbsent ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('dashboard.absent') }}</small>
+                            <div class="col-4">
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-danger">{{ $staffAbsent ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('dashboard.absent') }}</span>
+                                </div>
                             </div>
                             <div class="col-6">
-                                <div class="fw-bold text-tint-warning">{{ $staffLate ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('dashboard.late') }}</small>
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-warning">{{ $staffLate ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('dashboard.late') }}</span>
+                                </div>
                             </div>
                             <div class="col-6">
-                                <div class="fw-bold text-tint-info">{{ $staffNotCheckedIn ?? 0 }}</div>
-                                <small class="dash-mini-label">{{ __('attendance.not_checked_in') }}</small>
+                                <div class="dash-metric-chip">
+                                    <div class="dash-metric-chip__value text-tint-info">{{ $staffNotCheckedIn ?? 0 }}</div>
+                                    <span class="dash-metric-chip__label">{{ __('attendance.not_checked_in') }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>

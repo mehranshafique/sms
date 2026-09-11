@@ -30,6 +30,9 @@ return [
     'action' => 'Action',
     'yes' => 'Yes',
     'no' => 'No',
+    'status_active' => 'Active',
+    'status_planned' => 'Planned',
+    'status_closed' => 'Closed',
 
     // Form Labels
     'add_session' => 'Add Session',

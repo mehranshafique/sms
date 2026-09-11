@@ -79,7 +79,7 @@
                     <div class="row">
                         <div class="mb-3 col-md-6">
                             <label class="form-label">{{ __('attendance_schedule.select_grades') }}</label>
-                            <select name="grade_level_ids[]" class="form-control default-select" multiple>
+                            <select name="grade_level_ids[]" id="scheduleGradeSelect" class="form-control default-select" multiple>
                                 @foreach($grades as $grade)
                                     <option value="{{ $grade->id }}" @selected(in_array($grade->id, old('grade_level_ids', $selectedGradeIds ?? [])))>
                                         {{ $grade->name }}
@@ -89,13 +89,16 @@
                         </div>
                         <div class="mb-3 col-md-6">
                             <label class="form-label">{{ __('attendance_schedule.select_sections') }}</label>
-                            <select name="class_section_ids[]" class="form-control default-select" multiple>
+                            <select name="class_section_ids[]" id="scheduleSectionSelect" class="form-control default-select" multiple>
                                 @foreach($sections as $section)
-                                    <option value="{{ $section->id }}" @selected(in_array($section->id, old('class_section_ids', $selectedSectionIds ?? [])))>
+                                    <option value="{{ $section->id }}"
+                                            data-grade-id="{{ $section->grade_level_id }}"
+                                            @selected(in_array($section->id, old('class_section_ids', $selectedSectionIds ?? [])))>
                                         {{ class_section_label($section, 'grade_dash_section') }}
                                     </option>
                                 @endforeach
                             </select>
+                            <small class="text-muted d-block mt-1">{{ __('attendance_schedule.sections_depend_on_grades') }}</small>
                         </div>
                     </div>
                     <p class="text-muted small">{{ __('attendance_schedule.fallback_note') }}</p>

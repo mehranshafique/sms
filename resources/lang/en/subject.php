@@ -33,6 +33,8 @@ return [
     'edit_subject' => 'Edit Subject',
     'basic_information' => 'Basic Information',
     'select_grade' => 'Select Grade Level',
+    'select_grades' => 'Grade levels',
+    'select_grades_help' => 'Create the subject once, then assign it to every grade that teaches it (e.g. Mathematics → 1e, 2e, 3e).',
     'select_institution' => 'Select Institution',
     'institution_label' => 'Institution',
     

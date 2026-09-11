@@ -24,7 +24,10 @@
                                 <option value="">{{ __('class_subject.select_class_placeholder') }}</option>
                                 @foreach($classes as $cls)
                                     <option value="{{ $cls->id }}" {{ (isset($selectedClass) && $selectedClass->id == $cls->id) ? 'selected' : '' }}>
-                                        {{ $cls->gradeLevel->name }} - {{ $cls->name }}
+                                        {{ class_section_label($cls, 'grade_dash_section') }}
+                                        @unless($cls->is_active)
+                                            ({{ __('class_section.inactive') }})
+                                        @endunless
                                     </option>
                                 @endforeach
                             </select>

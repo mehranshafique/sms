@@ -446,7 +446,7 @@ class TimetableController extends BaseController
         }
 
         if (empty($subjects) && $gradeId) {
-            $query = Subject::with('academicUnit')->where('grade_level_id', $gradeId)->where('is_active', true);
+            $query = Subject::with('academicUnit')->forGrade( $gradeId)->where('is_active', true);
             if ($institutionId) $query->where('institution_id', $institutionId);
             
             $subjects = $query->get()->map(function($sub) {

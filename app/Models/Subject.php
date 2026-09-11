@@ -42,6 +42,43 @@ class Subject extends Model
         return $this->belongsTo(GradeLevel::class);
     }
 
+    /**
+     * Grades this subject is taught in (central catalogue → multi-grade assignment).
+     */
+    public function gradeLevels()
+    {
+        return $this->belongsToMany(GradeLevel::class, 'subject_grade_level')
+            ->withTimestamps();
+    }
+
+    /**
+     * Subjects available for a grade: legacy grade_level_id or pivot assignment.
+     */
+    public function scopeForGrade($query, $gradeLevelId)
+    {
+        $gradeLevelId = (int) $gradeLevelId;
+
+        return $query->where(function ($q) use ($gradeLevelId) {
+            $q->where('subjects.grade_level_id', $gradeLevelId)
+                ->orWhereHas('gradeLevels', function ($g) use ($gradeLevelId) {
+                    $g->where('grade_levels.id', $gradeLevelId);
+                });
+        });
+    }
+
+    /**
+     * Sync pivot grades and keep legacy grade_level_id as the first grade for older code paths.
+     *
+     * @param  list<int>  $gradeIds
+     */
+    public function syncGradeLevels(array $gradeIds): void
+    {
+        $gradeIds = array_values(array_unique(array_filter(array_map('intval', $gradeIds))));
+        $this->gradeLevels()->sync($gradeIds);
+        $this->grade_level_id = $gradeIds[0] ?? null;
+        $this->save();
+    }
+
     // New: Department Relationship
     public function department()
     {

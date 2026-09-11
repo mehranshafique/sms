@@ -237,10 +237,10 @@ class ExamMarkController extends BaseController
                 if ($allocatedIds->isNotEmpty()) {
                     $query = Subject::with('academicUnit')->whereIn('id', $allocatedIds)->where('is_active', true);
                 } else {
-                    $query = Subject::with('academicUnit')->where('grade_level_id', $gradeLevelId)->where('is_active', true);
+                    $query = Subject::with('academicUnit')->forGrade( $gradeLevelId)->where('is_active', true);
                 }
             } else {
-                $query = Subject::with('academicUnit')->where('grade_level_id', $gradeLevelId)->where('is_active', true);
+                $query = Subject::with('academicUnit')->forGrade( $gradeLevelId)->where('is_active', true);
             }
         }
 

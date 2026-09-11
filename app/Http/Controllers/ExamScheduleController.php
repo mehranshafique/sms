@@ -132,7 +132,7 @@ class ExamScheduleController extends BaseController
                 ->get();
         } else {
             // Fallback: General Grade Level Subjects
-            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)
+            $subjects = Subject::forGrade( $classSection->grade_level_id)
                 ->where('is_active', true)
                 ->get();
         }
@@ -210,7 +210,7 @@ class ExamScheduleController extends BaseController
         if ($allocatedSubjectIds->isNotEmpty()) {
             $subjects = Subject::whereIn('id', $allocatedSubjectIds)->where('is_active', true)->get();
         } else {
-            $subjects = Subject::where('grade_level_id', $classSection->grade_level_id)->where('is_active', true)->get();
+            $subjects = Subject::forGrade( $classSection->grade_level_id)->where('is_active', true)->get();
         }
 
         $excludedIds = ExamClassSubjectSetting::where('exam_id', $exam->id)

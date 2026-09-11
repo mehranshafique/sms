@@ -2,6 +2,7 @@
 
 return [
     // Navigation & Menus
+    'back' => 'Back',
     'select_institute' => 'Select Institute',
     'my_institute' => 'My Institute',
     'global_view' => 'Global View',

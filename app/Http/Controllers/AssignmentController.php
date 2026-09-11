@@ -222,7 +222,7 @@ class AssignmentController extends BaseController
             if ($allocated->isNotEmpty()) {
                 $subjects = $allocated->pluck('subject');
             } else {
-                $subjects = Subject::where('grade_level_id', $section->grade_level_id)
+                $subjects = Subject::forGrade( $section->grade_level_id)
                     ->where('is_active', true)
                     ->get();
             }

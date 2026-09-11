@@ -213,14 +213,14 @@
                 @endcan
             ],
             ordering: true,
-            order: [[1, 'desc']], 
+            order: [[ @can('deleteAny', App\Models\AcademicSession::class) 2 @else 1 @endcan, 'desc']],
             columns: [
                 @can('deleteAny', App\Models\AcademicSession::class)
                 { data: 'checkbox', name: 'checkbox', orderable: false, searchable: false },
                 @endcan
-                { data: 'DT_RowIndex', name: 'id', orderable: false, searchable: false },
+                { data: 'DT_RowIndex', name: 'DT_RowIndex', orderable: false, searchable: false },
                 { data: 'name', name: 'name' },
-                { data: 'institution_name', name: 'institution.name' },
+                { data: 'institution_name', name: 'institution_name', orderable: false, searchable: false },
                 { data: 'start_date', name: 'start_date' },
                 { data: 'end_date', name: 'end_date' },
                 { data: 'status', name: 'status' },

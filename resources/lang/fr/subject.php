@@ -27,6 +27,8 @@ return [
     'edit_subject' => 'Modifier la matière',
     'basic_information' => 'Informations de base',
     'select_grade' => 'Sélectionner le niveau scolaire',
+    'select_grades' => 'Niveaux scolaires',
+    'select_grades_help' => 'Créez le cours une seule fois, puis assignez-le à tous les niveaux qui l\'enseignent (ex. : Mathématiques → 1e, 2e, 3e).',
     'select_institution' => 'Sélectionner l\'institution',
     'institution_label' => 'Institution',
     'subject_name' => 'Nom de la matière',

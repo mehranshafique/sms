@@ -23,6 +23,8 @@ return [
     'sections_label' => 'Sections',
     'select_grades' => 'Grade levels',
     'select_sections' => 'Class sections (optional overrides)',
+    'sections_depend_on_grades' => 'Only sections belonging to the selected grade levels are listed.',
+    'sections_must_match_grades' => 'Selected sections must belong to the selected grade levels.',
     'fallback_note' => 'Students without a matching assignment use the school default start time and late margin from Configuration.',
     'total' => 'Total schedules',
     'active_count' => 'Active',

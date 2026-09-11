@@ -1,15 +1,17 @@
 {{--
     Reusable clean stat card.
     Props: $icon (la class), $tint (primary|success|warning|danger|info|dark),
-           $label, $value, $hint (optional), $hintClass (optional), $url (optional)
+           $label, $value, $hint (optional), $hintClass (optional), $url (optional),
+           $progress (optional 0-100 share bar under the value)
 --}}
 @php
     $tint = $tint ?? 'primary';
     $hint = $hint ?? null;
     $hintClass = $hintClass ?? 'text-muted';
     $url = $url ?? null;
+    $progress = isset($progress) ? max(0, min(100, (float) $progress)) : null;
 @endphp
-<div class="dash-stat">
+<div class="dash-stat tint-edge-{{ $tint }}">
     <div class="d-flex align-items-center" style="gap: 14px;">
         <span class="dash-stat__icon tint-{{ $tint }}"><i class="{{ $icon }}"></i></span>
         <div class="flex-grow-1">
@@ -25,4 +27,9 @@
             </a>
         @endif
     </div>
+    @if($progress !== null)
+        <div class="dash-stat__meter" title="{{ round($progress) }}%">
+            <span style="width: {{ $progress }}%;"></span>
+        </div>
+    @endif
 </div>

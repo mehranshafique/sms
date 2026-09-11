@@ -31,7 +31,13 @@ class ClassSubjectController extends BaseController
         
         $classes = ClassSection::with('gradeLevel')
             ->where('institution_id', $institutionId)
-            ->where('is_active', true)
+            ->when(
+                true,
+                fn ($q) => $q->leftJoin('grade_levels', 'class_sections.grade_level_id', '=', 'grade_levels.id')
+                    ->orderBy('grade_levels.order_index')
+                    ->orderBy('class_sections.name')
+                    ->select('class_sections.*')
+            )
             ->get();
 
         $selectedClass = null;
@@ -42,10 +48,10 @@ class ClassSubjectController extends BaseController
         if ($request->has('class_section_id')) {
             $selectedClass = ClassSection::find($request->class_section_id);
             if ($selectedClass && $selectedClass->institution_id == $institutionId) {
-                
-                // 1. Get Subjects for this Grade (scoped to institution)
+
+                // Subjects for this grade (central multi-grade + legacy single-grade)
                 $gradeSubjects = Subject::with('academicUnit')
-                    ->where('grade_level_id', $selectedClass->grade_level_id)
+                    ->forGrade((int) $selectedClass->grade_level_id)
                     ->where('institution_id', $institutionId)
                     ->where('is_active', true)
                     ->orderBy('name')

@@ -277,6 +277,23 @@ class AttendanceScheduleController extends BaseController
 
         $validated['is_active'] = $request->boolean('is_active', true);
 
+        $gradeIds = array_map('intval', $request->input('grade_level_ids', []) ?: []);
+        $sectionIds = array_map('intval', $request->input('class_section_ids', []) ?: []);
+
+        if ($gradeIds !== [] && $sectionIds !== []) {
+            $invalidSection = ClassSection::query()
+                ->whereIn('id', $sectionIds)
+                ->where('institution_id', $institutionId)
+                ->whereNotIn('grade_level_id', $gradeIds)
+                ->exists();
+
+            if ($invalidSection) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'class_section_ids' => [__('attendance_schedule.sections_must_match_grades')],
+                ]);
+            }
+        }
+
         return $validated;
     }
 

@@ -481,6 +481,36 @@
         @media (max-width: 991px) {
             .global-search-wrap.is-expanded { width: min(280px, 55vw); }
         }
+
+        /* PWA / mobile back control */
+        .pwa-back-btn {
+            display: none;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 10px;
+            border: 1px solid #e6eaf0;
+            background: #fff;
+            color: #1f2533;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 1px 2px rgba(31, 37, 51, 0.04);
+        }
+        .pwa-back-btn i { font-size: 18px; line-height: 1; }
+        .pwa-back-btn:hover { background: #f5f7fb; color: #5b53e8; }
+        .pwa-back-btn.is-visible { display: inline-flex; }
+        @media (max-width: 991.98px) {
+            .pwa-back-btn.is-mobile-visible { display: inline-flex; }
+        }
+        @media (display-mode: standalone) {
+            .pwa-back-btn.is-pwa-visible { display: inline-flex; }
+        }
+        [data-theme-version="dark"] .pwa-back-btn {
+            background: var(--dz-card-bg, #1e2746);
+            border-color: rgba(255,255,255,.08);
+            color: #fff;
+        }
     </style>
     @include('layout.partials.theme-dark')
     @include('layout.partials.nav-layout-styles')
@@ -562,6 +592,13 @@
                     <div class="collapse navbar-collapse justify-content-between">
                         <div class="header-left flex-grow-1">
                             <div class="d-flex align-items-center gap-3 w-100">
+                                <button type="button"
+                                        id="pwaBackBtn"
+                                        class="btn btn-sm btn-light pwa-back-btn"
+                                        aria-label="{{ __('header.back') }}"
+                                        title="{{ __('header.back') }}">
+                                    <i class="la la-arrow-left"></i>
+                                </button>
                                 <div class="dashboard_bar h4 mb-0 text-nowrap">
                                     {{ $pageTitle ?? ''  }}
                                 </div>
@@ -1123,6 +1160,30 @@
                     });
                 });
             }
+
+            (function () {
+                var btn = document.getElementById('pwaBackBtn');
+                if (!btn) return;
+
+                var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                    || window.navigator.standalone === true;
+                var isMobile = window.matchMedia('(max-width: 991.98px)').matches;
+                var path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+                var isDashboard = path === '/dashboard' || path.endsWith('/dashboard');
+
+                if (!isDashboard) {
+                    if (isStandalone) btn.classList.add('is-pwa-visible', 'is-visible');
+                    if (isMobile) btn.classList.add('is-mobile-visible', 'is-visible');
+                }
+
+                btn.addEventListener('click', function () {
+                    if (window.history.length > 1) {
+                        window.history.back();
+                        return;
+                    }
+                    window.location.href = @json(route('dashboard'));
+                });
+            })();
 
             // GLOBAL IN-APP OFFLINE LISTENER
             window.addEventListener('offline', function() {
