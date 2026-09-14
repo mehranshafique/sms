@@ -18,6 +18,7 @@ use App\Http\Controllers\UserProfileController;
 use App\Http\Controllers\ConfigurationController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\SchoolBackupController;
+use App\Http\Controllers\PlatformDatabaseBackupController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AssessmentPeriodController;
 use App\Http\Controllers\InstitutionContextController;
@@ -908,6 +909,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/retry/{id}', [QueueMonitorController::class, 'retry'])->name('retry');
         Route::post('/retry-all', [QueueMonitorController::class, 'retryAll'])->name('retry_all');
         Route::post('/test-job', [QueueMonitorController::class, 'dispatchTest'])->name('test');
+    });
+
+    Route::middleware([RoleMiddleware::class . ':Super Admin'])->prefix('platform/database-backups')->name('platform.database-backups.')->group(function () {
+        Route::get('/', [PlatformDatabaseBackupController::class, 'index'])->name('index');
+        Route::post('/', [PlatformDatabaseBackupController::class, 'store'])->name('store');
+        Route::post('/settings', [PlatformDatabaseBackupController::class, 'updateSettings'])->name('settings');
+        Route::get('/{platformBackup}/download', [PlatformDatabaseBackupController::class, 'download'])->name('download');
+        Route::delete('/{platformBackup}', [PlatformDatabaseBackupController::class, 'destroy'])->name('destroy');
     });
 
     Route::middleware([RoleMiddleware::class . ':Super Admin'])->prefix('platform/agent-payments')->name('agent-payments.')->group(function () {

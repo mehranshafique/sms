@@ -20,6 +20,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Platform database backup (mysqldump)
+    |--------------------------------------------------------------------------
+    |
+    | Optional absolute path to mysqldump when it is not on PATH (common on
+    | Windows/XAMPP hosts). Used by Super Admin platform DB backups.
+    |
+    */
+
+    'backup' => [
+        'mysqldump_path' => env('DB_MYSQLDUMP_PATH'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Database Connections
     |--------------------------------------------------------------------------
     |

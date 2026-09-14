@@ -30,6 +30,7 @@ return [
     'sms_templates' => 'SMS Templates', 
     'currency' => 'Currency',
     'school_backups' => 'School Backups',
+    'platform_db_backups' => 'Platform DB Backup',
     
     'tracking' => 'Tracking',
     'audit_log' => 'Audit Log',

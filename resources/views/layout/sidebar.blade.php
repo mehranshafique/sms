@@ -162,7 +162,7 @@
                 </li>
 
                 <li class="nav-label">{{ __('sidebar.configuration') }}</li>
-                <li class="mega-menu-md {{ request()->routeIs('configuration.index', 'sms_templates.*', 'email_templates.*', 'message-logs.*', 'platform.queue-monitor.*', 'currency.*') ? 'mm-active' : '' }}">
+                <li class="mega-menu-md {{ request()->routeIs('configuration.index', 'sms_templates.*', 'email_templates.*', 'message-logs.*', 'platform.queue-monitor.*', 'platform.database-backups.*', 'currency.*') ? 'mm-active' : '' }}">
                     <a class="has-arrow ai-icon" href="javascript:void(0)" aria-expanded="false"><i class="la la-cogs"></i><span class="nav-text">{{ __('sidebar.system_config') }}</span></a>
                     <ul aria-expanded="false">
                         <li><a class="{{ request()->routeIs('configuration.index') ? 'mm-active' : '' }}" href="{{ route('configuration.index') }}">{{ __('sidebar.system_config') }}</a></li>
@@ -170,6 +170,7 @@
                         <li><a class="{{ request()->routeIs('email_templates.*') ? 'mm-active' : '' }}" href="{{ route('email_templates.index') }}">{{ __('email_template.page_title') }}</a></li>
                         <li><a class="{{ request()->routeIs('message-logs.*') ? 'mm-active' : '' }}" href="{{ route('message-logs.index') }}">{{ __('sidebar.message_logs') }}</a></li>
                         <li><a class="{{ request()->routeIs('platform.queue-monitor.*') ? 'mm-active' : '' }}" href="{{ route('platform.queue-monitor.index') }}">{{ __('sidebar.queue_monitor') }}</a></li>
+                        <li><a class="{{ request()->routeIs('platform.database-backups.*') ? 'mm-active' : '' }}" href="{{ route('platform.database-backups.index') }}">{{ __('sidebar.platform_db_backups') }}</a></li>
                         @if($isGlobalMode && ($user->can('currency.view') || $user->hasRole(['Super Admin', 'School Admin', 'Head Officer'])))
                             <li><a class="{{ request()->routeIs('currency.*') ? 'mm-active' : '' }}" href="{{ route('currency.index') }}"><i class="fa fa-coins me-1"></i> {{ __('sidebar.currency') }}</a></li>
                         @endif
