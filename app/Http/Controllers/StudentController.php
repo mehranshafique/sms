@@ -156,7 +156,7 @@ class StudentController extends BaseController
                     <div class="d-flex">
                         <a href="'.$show.'" class="btn btn-info shadow btn-xs sharp me-1" title="View"><i class="fa fa-eye"></i></a>
                         <a href="'.$edit.'" class="btn btn-primary shadow btn-xs sharp me-1" title="Edit"><i class="fa fa-pencil"></i></a>
-                        <button class="btn btn-danger shadow btn-xs sharp delete-btn" data-url="'.$delete.'" title="Delete"><i class="fa fa-trash"></i></button>
+                        <button class="btn btn-danger shadow btn-xs sharp delete-btn" data-id="'.$row->id.'" data-url="'.$delete.'" title="Delete"><i class="fa fa-trash"></i></button>
                     </div>';
                 })
                 ->filter(function ($query) use ($request, $currentSessionId) {
@@ -484,6 +484,21 @@ class StudentController extends BaseController
                 $data['parent_id'] = $parent->id; 
                 $data['admission_number'] = $admissionNumber;
 
+                // Block the same child twice under the same parent (same names + DOB).
+                $duplicateSibling = Student::query()
+                    ->where('institution_id', $institutionId)
+                    ->where('parent_id', $parent->id)
+                    ->whereRaw('LOWER(TRIM(first_name)) = ?', [mb_strtolower(trim((string) $data['first_name']))])
+                    ->whereRaw('LOWER(TRIM(last_name)) = ?', [mb_strtolower(trim((string) $data['last_name']))])
+                    ->when(! empty($data['dob']), function ($q) use ($data) {
+                        $q->whereDate('dob', $data['dob']);
+                    })
+                    ->exists();
+
+                if ($duplicateSibling) {
+                    throw new \RuntimeException('DUPLICATE_UNDER_PARENT');
+                }
+
                 if ($request->hasFile('student_photo')) {
                     $data['student_photo'] = $request->file('student_photo')->store('students', 'public');
                 }
@@ -565,6 +580,12 @@ class StudentController extends BaseController
                 return response()->json(['message' => __('student.error_duplicate', ['default' => 'Duplicate entry detected! The Email, Phone Number, or Admission Number is already linked to another account.'])], 422);
             }
             return response()->json(['message' => __('student.error_database', ['default' => 'A database error occurred while saving. Please review your entries and try again.'])], 500);
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === 'DUPLICATE_UNDER_PARENT') {
+                return response()->json(['message' => __('student.error_duplicate_under_parent')], 422);
+            }
+            \Illuminate\Support\Facades\Log::error("Student Store Exception: " . $e->getMessage());
+            return response()->json(['message' => __('student.error_occurred', ['default' => 'An unexpected error occurred: ']) . $e->getMessage()], 500);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Student Store Exception: " . $e->getMessage());
             return response()->json(['message' => __('student.error_occurred', ['default' => 'An unexpected error occurred: ']) . $e->getMessage()], 500);
@@ -740,17 +761,31 @@ class StudentController extends BaseController
     public function destroy(Student $student)
     {
         $institutionId = $this->getInstitutionId();
-        if ($institutionId && $student->institution_id != $institutionId) abort(403);
-        
+        if ($institutionId && (int) $student->institution_id !== (int) $institutionId) {
+            abort(403);
+        }
+
         try {
             DB::transaction(function () use ($student) {
-                if ($student->student_photo) Storage::disk('public')->delete($student->student_photo);
-                if($student->user_id) User::destroy($student->user_id);
+                if ($student->student_photo) {
+                    Storage::disk('public')->delete($student->student_photo);
+                }
+                $userId = $student->user_id;
                 $student->delete();
+                if ($userId) {
+                    User::where('id', $userId)->delete();
+                }
             });
+
             return response()->json(['message' => __('student.messages.success_delete')]);
         } catch (QueryException $e) {
-            return response()->json(['message' => 'Error deleting student.'], 500);
+            \Illuminate\Support\Facades\Log::error('Student delete failed: '.$e->getMessage());
+
+            return response()->json(['message' => __('student.messages.cannot_delete_linked_data') ?: __('student.error_delete_related')], 500);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Student delete failed: '.$e->getMessage());
+
+            return response()->json(['message' => __('student.messages.cannot_delete_linked_data') ?: __('student.error_delete_related')], 500);
         }
     }
 }

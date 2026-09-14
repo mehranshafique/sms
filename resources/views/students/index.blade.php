@@ -167,8 +167,12 @@
 
         $('#studentTable').on('click', '.delete-btn', function() {
             var id = $(this).data('id');
-            var deleteUrl = "{{ route('students.destroy', ':id') }}";
-            deleteUrl = deleteUrl.replace(':id', id);
+            var deleteUrl = $(this).data('url') || ("{{ route('students.destroy', ':id') }}".replace(':id', id));
+
+            if (!deleteUrl) {
+                Swal.fire("{{ __('student.error') }}", "{{ __('student.something_went_wrong') }}", 'error');
+                return;
+            }
 
             Swal.fire({
                 title: "{{ __('student.are_you_sure') }}",
@@ -184,9 +188,8 @@
                     $.ajax({
                         url: deleteUrl,
                         type: 'DELETE',
-                        data: {
-                            _token: "{{ csrf_token() }}"
-                        },
+                        headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
+                        data: { _token: "{{ csrf_token() }}" },
                         success: function(response) {
                             table.ajax.reload();
                             Swal.fire(
@@ -196,11 +199,11 @@
                             );
                         },
                         error: function(xhr) {
-                            Swal.fire(
-                                "{{ __('student.error') }}",
-                                "{{ __('student.something_went_wrong') }}",
-                                'error'
-                            );
+                            var msg = "{{ __('student.something_went_wrong') }}";
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                msg = xhr.responseJSON.message;
+                            }
+                            Swal.fire("{{ __('student.error') }}", msg, 'error');
                         }
                     });
                 }

@@ -29,15 +29,13 @@ class ClassSubjectController extends BaseController
     {
         $institutionId = $this->getInstitutionId();
         
-        $classes = ClassSection::with('gradeLevel')
-            ->where('institution_id', $institutionId)
-            ->when(
-                true,
-                fn ($q) => $q->leftJoin('grade_levels', 'class_sections.grade_level_id', '=', 'grade_levels.id')
-                    ->orderBy('grade_levels.order_index')
-                    ->orderBy('class_sections.name')
-                    ->select('class_sections.*')
-            )
+        $classes = ClassSection::query()
+            ->with('gradeLevel')
+            ->leftJoin('grade_levels', 'class_sections.grade_level_id', '=', 'grade_levels.id')
+            ->where('class_sections.institution_id', $institutionId)
+            ->orderBy('grade_levels.order_index')
+            ->orderBy('class_sections.name')
+            ->select('class_sections.*')
             ->get();
 
         $selectedClass = null;

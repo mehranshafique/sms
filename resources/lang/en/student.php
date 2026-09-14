@@ -160,6 +160,8 @@ return [
     'payment_global' => 'Global (Annual)',
     'payment_installment' => 'Installment',
     'error_duplicate' => 'Duplicate entry detected! The Email, Phone Number, or Admission Number is already linked to another account.',
+    'error_duplicate_under_parent' => 'This student already exists under the same parent (same first name, last name, and date of birth).',
+    'error_delete_related' => 'Unable to delete this student because related records could not be removed. Please contact support.',
     'error_database' => 'A database error occurred while saving. Please review your entries and try again.',
 
     // Scholarship / Discount
