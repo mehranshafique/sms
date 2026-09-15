@@ -246,6 +246,14 @@ class StudentEnrollmentController extends BaseController
 
         $enrollment->update($validated);
 
+        // Mirror placement onto the student profile so both stay aligned.
+        if (($validated['status'] ?? $enrollment->status) === 'active') {
+            $enrollment->student?->update([
+                'class_section_id' => $classSection->id,
+                'grade_level_id' => $classSection->grade_level_id,
+            ]);
+        }
+
         return response()->json(['message' => __('enrollment.messages.success_update'), 'redirect' => route('enrollments.index')]);
     }
 

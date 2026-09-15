@@ -733,12 +733,64 @@ class StudentController extends BaseController
                     }
                 }
 
-                $enrollment = $student->enrollments()->latest()->first();
+                // Keep active enrollment in sync with profile class/section so
+                // Collection, Payment, balances, and lists all show the same placement.
+                $enrollmentPayload = [
+                    'discount_amount' => $request->discount_amount ?? 0,
+                    'discount_type' => $request->discount_type ?? 'fixed',
+                    'scholarship_reason' => $request->scholarship_reason,
+                ];
+
+                $classSectionId = $request->input('class_section_id', $student->class_section_id);
+                $gradeLevelId = $request->input('grade_level_id', $student->grade_level_id);
+
+                if ($classSectionId) {
+                    $section = ClassSection::find($classSectionId);
+                    if ($section) {
+                        $enrollmentPayload['class_section_id'] = $section->id;
+                        $enrollmentPayload['grade_level_id'] = $gradeLevelId ?: $section->grade_level_id;
+
+                        // Ensure denormalized student fields match the section's grade.
+                        if ((int) $student->class_section_id !== (int) $section->id
+                            || (int) $student->grade_level_id !== (int) $section->grade_level_id) {
+                            $student->update([
+                                'class_section_id' => $section->id,
+                                'grade_level_id' => $section->grade_level_id,
+                            ]);
+                        }
+                    }
+                }
+
+                $currentSessionId = AcademicSession::where('institution_id', $student->institution_id)
+                    ->where('is_current', true)
+                    ->value('id');
+
+                $enrollment = null;
+                if ($currentSessionId) {
+                    $enrollment = $student->enrollments()
+                        ->where('academic_session_id', $currentSessionId)
+                        ->where('status', 'active')
+                        ->latest('id')
+                        ->first();
+                }
+                if (! $enrollment) {
+                    $enrollment = $student->enrollments()->latest('id')->first();
+                }
+
                 if ($enrollment) {
-                    $enrollment->update([
-                        'discount_amount' => $request->discount_amount ?? 0,
-                        'discount_type' => $request->discount_type ?? 'fixed',
-                        'scholarship_reason' => $request->scholarship_reason,
+                    $enrollment->update($enrollmentPayload);
+                } elseif ($classSectionId && $currentSessionId && $request->status === 'active') {
+                    StudentEnrollment::create([
+                        'institution_id' => $student->institution_id,
+                        'academic_session_id' => $currentSessionId,
+                        'student_id' => $student->id,
+                        'grade_level_id' => $enrollmentPayload['grade_level_id'] ?? $gradeLevelId,
+                        'class_section_id' => $classSectionId,
+                        'status' => 'active',
+                        'enrolled_at' => now(),
+                        'discount_amount' => $enrollmentPayload['discount_amount'],
+                        'discount_type' => $enrollmentPayload['discount_type'],
+                        'scholarship_reason' => $enrollmentPayload['scholarship_reason'],
                     ]);
                 }
             });

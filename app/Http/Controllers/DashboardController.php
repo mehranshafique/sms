@@ -338,8 +338,11 @@ class DashboardController extends BaseController
                 $totalEnrollment = $totalStudents;
             }
 
+            // New admissions in the current session window who are also actively enrolled
+            // (avoids "91 new" under a smaller total enrollment when old records share dates).
             $newComers = Student::where('institution_id', $institutionId)
                 ->whereBetween('admission_date', [$currentSession->start_date, $currentSession->end_date])
+                ->whereIn('id', $enrollments->pluck('student_id'))
                 ->count();
 
             $feeStructures = FeeStructure::where('institution_id', $institutionId)

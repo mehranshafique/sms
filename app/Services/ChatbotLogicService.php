@@ -302,14 +302,7 @@ class ChatbotLogicService
                 return $this->startGuestSession($phone, (int) $institutionFromBot, $locale);
             }
 
-            // Parent/student builtins without a school: if WhatsApp number maps to one school, offer guest admissions.
-            if ($institutionFromBot && in_array($builtinMenuProfile, [
-                ChatbotMenuProfile::PARENT->value,
-                ChatbotMenuProfile::STUDENT->value,
-            ], true)) {
-                return $this->startGuestSession($phone, (int) $institutionFromBot, $locale);
-            }
-
+            // Parent / student / staff builtins → login for that menu (not guest admissions).
             return $this->startKeywordSession($phone, $builtinMenuProfile, $institutionFromBot, $locale);
         }
 

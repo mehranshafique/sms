@@ -371,6 +371,11 @@ class ReenrollmentService
                 ]);
             }
 
+            Student::where('id', $confirmation->student_id)->update([
+                'grade_level_id' => $targetClass->grade_level_id,
+                'class_section_id' => $targetClass->id,
+            ]);
+
             $confirmation->update([
                 'status' => ReenrollmentConfirmation::STATUS_CONFIRMED,
                 'approved_class_section_id' => $targetClass->id,

@@ -85,10 +85,10 @@
                             
                             if ($status !== '-') {
                                 $totalMarked++;
-                                if ($status == 'present') { $code = 'P'; $class = 'status-p'; $presents++; }
-                                elseif ($status == 'absent') { $code = 'A'; $class = 'status-a'; }
-                                elseif ($status == 'late') { $code = 'L'; $class = 'status-l'; }
-                                elseif ($status == 'excused') { $code = 'E'; $class = 'status-e'; }
+                                if ($status == 'present') { $code = __('attendance.code_present'); $class = 'status-p'; $presents++; }
+                                elseif ($status == 'absent') { $code = __('attendance.code_absent'); $class = 'status-a'; }
+                                elseif ($status == 'late') { $code = __('attendance.code_late'); $class = 'status-l'; }
+                                elseif ($status == 'excused') { $code = __('attendance.code_excused'); $class = 'status-e'; }
                                 elseif ($status == 'half_day') { $code = 'H'; $class = 'status-h'; }
                             }
                         @endphp

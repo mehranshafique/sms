@@ -63,6 +63,10 @@ return [
     'late' => 'Late',
     'excused' => 'Excused',
     'half_day' => 'Half Day',
+    'code_present' => 'P',
+    'code_absent' => 'A',
+    'code_late' => 'L',
+    'code_excused' => 'E',
     
     'mark_all_present' => 'Mark All Present',
     'mark_all_absent' => 'Mark All Absent',

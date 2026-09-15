@@ -53,7 +53,7 @@ return [
     'present' => 'Présent',
     'absent' => 'Absent',
     'late' => 'En retard',
-    'excused' => 'Excusé',
+    'excused' => 'Justifié',
     'half_day' => 'Demi-journée',
     'no_staff_found' => 'Aucun personnel actif trouvé.',
     'save_staff' => 'Enregistrer le personnel',

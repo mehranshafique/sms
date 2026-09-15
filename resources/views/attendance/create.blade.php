@@ -146,7 +146,12 @@
                                 <div class="att-meta">#{{ $index + 1 }} · {{ $student->admission_number }}</div>
                             </div>
                             <div class="att-status-group">
-                                @foreach(['present' => ['P', 'att-p'], 'absent' => ['A', 'att-a'], 'late' => ['L', 'att-l'], 'excused' => ['E', 'att-e']] as $val => $conf)
+                                @foreach([
+                                    'present' => [__('attendance.code_present'), 'att-p'],
+                                    'absent' => [__('attendance.code_absent'), 'att-a'],
+                                    'late' => [__('attendance.code_late'), 'att-l'],
+                                    'excused' => [__('attendance.code_excused'), 'att-e'],
+                                ] as $val => $conf)
                                     <div class="att-chip">
                                         <input class="status-radio" type="radio"
                                                name="attendance[{{ $student->id }}]"
@@ -154,7 +159,7 @@
                                                id="{{ $val }}_{{ $student->id }}"
                                                {{ $currentStatus == $val ? 'checked' : '' }}
                                                {{ $isLocked ? 'disabled' : '' }}>
-                                        <label class="{{ $conf[1] }}" for="{{ $val }}_{{ $student->id }}">{{ $conf[0] }}</label>
+                                        <label class="{{ $conf[1] }}" for="{{ $val }}_{{ $student->id }}" title="{{ __('attendance.'.$val) }}">{{ $conf[0] }}</label>
                                     </div>
                                 @endforeach
                             </div>
@@ -164,8 +169,8 @@
                     <div class="att-footer">
                         <div class="att-count">
                             {{ __('attendance.total_students') }}: <strong>{{ count($students) }}</strong>
-                            · <span id="presentCount">0</span> P
-                            · <span id="absentCount">0</span> A
+                            · <span id="presentCount">0</span> {{ __('attendance.code_present') }}
+                            · <span id="absentCount">0</span> {{ __('attendance.code_absent') }}
                         </div>
                         <div>
                             @if(!$isLocked)

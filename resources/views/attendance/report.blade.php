@@ -124,10 +124,10 @@
                                                     
                                                     if ($status !== '-') {
                                                         $totalMarked++;
-                                                        if ($status == 'present') { $code = 'P'; $color = 'text-success fw-bold'; $presents++; }
-                                                        elseif ($status == 'absent') { $code = 'A'; $color = 'text-danger fw-bold'; }
-                                                        elseif ($status == 'late') { $code = 'L'; $color = 'text-warning'; }
-                                                        elseif ($status == 'excused') { $code = 'E'; $color = 'text-info'; }
+                                                        if ($status == 'present') { $code = __('attendance.code_present'); $color = 'text-success fw-bold'; $presents++; }
+                                                        elseif ($status == 'absent') { $code = __('attendance.code_absent'); $color = 'text-danger fw-bold'; }
+                                                        elseif ($status == 'late') { $code = __('attendance.code_late'); $color = 'text-warning'; }
+                                                        elseif ($status == 'excused') { $code = __('attendance.code_excused'); $color = 'text-info'; }
                                                         elseif ($status == 'half_day') { $code = 'H'; $color = 'text-primary'; }
                                                     }
                                                 @endphp
