@@ -3,44 +3,47 @@
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
-        <div class="row page-titles mx-0">
-            <div class="col-sm-6 p-md-0">
-                <div class="welcome-text">
-                    <h4>{{ __('voting.my_elections') }}</h4>
-                    <p class="mb-0">{{ __('voting.active_polls') }}</p>
-                </div>
+        <div class="row page-titles mx-0 mb-3">
+            <div class="col-12 text-center">
+                <h4>{{ __('voting.my_elections') }}</h4>
+                <p class="text-muted">{{ __('voting.active_polls') }}</p>
             </div>
         </div>
 
         <div class="row">
-            @forelse($elections as $election)
-                <div class="col-xl-4 col-lg-6 col-md-6">
-                    <div class="card">
-                        <div class="card-header border-0 pb-0">
-                            <h5 class="card-title">{{ $election->title }}</h5>
-                        </div>
+            @forelse($open as $election)
+                @php $done = in_array($election->id, $participatedIds, true); @endphp
+                <div class="col-md-6 col-xl-4 mb-3">
+                    <div class="card h-100">
                         <div class="card-body">
-                            <p class="card-text text-muted">{{ Str::limit($election->description, 100) }}</p>
-                            <div class="d-flex justify-content-between align-items-center mt-4">
-                                <span class="badge badge-primary">{{ __('voting.closes_in') }} {{ $election->end_date->diffForHumans() }}</span>
-                                <a href="{{ route('student.elections.show', $election->id) }}" class="btn btn-outline-primary btn-sm">
-                                    {{ __('voting.vote_now') }}
-                                </a>
-                            </div>
+                            <h5>{{ $election->title }}</h5>
+                            @if($election->cycle)
+                                <div class="small text-muted mb-2">{{ $election->cycle->title }}</div>
+                            @endif
+                            <div class="small mb-3">{{ __('voting.closes_in') }}: {{ $election->end_date?->format('Y-m-d H:i') }}</div>
+                            @if($done)
+                                <span class="badge badge-success">{{ __('voting.participation_recorded') }}</span>
+                            @else
+                                <a href="{{ route('student.elections.show', $election) }}" class="btn btn-primary btn-sm">{{ __('voting.vote_now') }}</a>
+                            @endif
                         </div>
                     </div>
                 </div>
             @empty
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body text-center py-5">
-                            <i class="fa fa-box-open fa-3x text-muted mb-3"></i>
-                            <h4 class="text-muted">{{ __('voting.no_active_elections') }}</h4>
-                        </div>
-                    </div>
-                </div>
+                <div class="col-12"><div class="alert alert-light text-center">{{ __('voting.no_active_elections') }}</div></div>
             @endforelse
         </div>
+
+        @if($publishedResults->isNotEmpty())
+            <h5 class="mt-4">{{ __('voting.published_results') }}</h5>
+            <div class="row">
+                @foreach($publishedResults as $election)
+                    <div class="col-md-4 mb-2">
+                        <a href="{{ route('student.elections.results', $election) }}" class="btn btn-outline-primary btn-sm w-100">{{ $election->title }}</a>
+                    </div>
+                @endforeach
+            </div>
+        @endif
     </div>
 </div>
 @endsection

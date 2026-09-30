@@ -3,61 +3,43 @@
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
-        <!-- Title -->
-        <div class="row page-titles mx-0">
-            <div class="col-sm-12 p-md-0">
-                <div class="welcome-text text-center">
-                    <h4>{{ $election->title }}</h4>
-                    <p class="mb-0">{{ __('voting.cast_your_vote') }}</p>
-                </div>
-            </div>
+        <div class="text-center mb-4">
+            <h4>{{ $election->title }}</h4>
+            <p class="text-muted">{{ __('voting.cast_your_vote') }}</p>
         </div>
 
-        @foreach($election->positions as $position)
-            <div class="row mb-5">
-                <div class="col-12">
-                    <h3 class="text-primary border-bottom pb-2 mb-4">{{ $position->name }}</h3>
-                </div>
-                
-                @php
-                    $hasVoted = isset($myVotes[$position->id]);
-                @endphp
-
-                @foreach($position->candidates as $candidate)
-                    <div class="col-xl-3 col-lg-4 col-md-6 col-sm-12">
-                        <div class="card candidate-card {{ $hasVoted && $myVotes[$position->id] == $candidate->id ? 'border-primary shadow' : '' }}">
-                            <div class="card-body text-center">
-                                <div class="new-arrival-product">
-                                    <div class="new-arrivals-img-contnal">
-                                        <img class="img-fluid rounded-circle" src="{{ $candidate->student->student_photo ? asset('storage/'.$candidate->student->student_photo) : asset('images/no-image.png') }}" alt="" style="width:120px; height:120px; object-fit:cover;">
-                                    </div>
-                                    <div class="new-arrival-content text-center mt-3">
-                                        <h4>{{ $candidate->student->full_name }}</h4>
-                                        <p class="text-muted small">{{ $candidate->student->admission_number }}</p>
-                                        
-                                        @if($hasVoted)
-                                            @if($myVotes[$position->id] == $candidate->id)
-                                                <button class="btn btn-success btn-sm mt-2" disabled>
-                                                    <i class="fa fa-check"></i> {{ __('voting.voted') }}
-                                                </button>
-                                            @else
-                                                <button class="btn btn-light btn-sm mt-2" disabled>{{ __('voting.vote') }}</button>
-                                            @endif
-                                        @else
-                                            <button class="btn btn-outline-primary btn-sm mt-2 vote-btn" 
-                                                data-position="{{ $position->id }}" 
-                                                data-candidate="{{ $candidate->id }}">
-                                                {{ __('voting.vote') }}
-                                            </button>
-                                        @endif
-                                    </div>
+        @if($hasVoted)
+            <div class="alert alert-success text-center">
+                {{ __('voting.participation_recorded') }}
+                <div class="small mt-1">{{ __('voting.secrecy_receipt') }}</div>
+            </div>
+            <div class="text-center">
+                <a href="{{ route('student.elections.index') }}" class="btn btn-secondary">{{ __('voting.back_to_dashboard') }}</a>
+            </div>
+        @else
+            <form id="ballotForm">
+                @foreach($election->positions as $position)
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 text-primary">{{ $position->name }}</h5>
+                        <div class="row">
+                            @foreach($position->candidates as $candidate)
+                                <div class="col-md-4 col-lg-3 mb-3">
+                                    <label class="card h-100 p-3 text-center" style="cursor:pointer;">
+                                        <img src="{{ $candidate->photoUrl() }}" class="rounded-circle mx-auto mb-2" style="width:100px;height:100px;object-fit:cover;" alt="">
+                                        <div class="fw-bold">{{ $candidate->displayName() }}</div>
+                                        <div class="small text-muted mb-2">{{ $candidate->classLabel() }}</div>
+                                        <input type="radio" name="choices[{{ $position->id }}]" value="{{ $candidate->id }}" required>
+                                    </label>
                                 </div>
-                            </div>
+                            @endforeach
                         </div>
                     </div>
                 @endforeach
-            </div>
-        @endforeach
+                <div class="text-center mb-5">
+                    <button type="submit" class="btn btn-primary btn-lg">{{ __('voting.submit_ballot') }}</button>
+                </div>
+            </form>
+        @endif
     </div>
 </div>
 @endsection
@@ -65,42 +47,30 @@
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    $(document).ready(function() {
-        $('.vote-btn').click(function() {
-            let btn = $(this);
-            let positionId = btn.data('position');
-            let candidateId = btn.data('candidate');
-            let url = "{{ route('student.elections.vote', $election->id) }}";
-
-            Swal.fire({
-                title: "{{ __('voting.confirm_vote') }}",
-                text: "{{ __('voting.vote_warning') }}",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: "{{ __('voting.yes_vote') }}",
-                cancelButtonText: "{{ __('voting.cancel') }}"
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: url,
-                        type: 'POST',
-                        data: {
-                            _token: "{{ csrf_token() }}",
-                            position_id: positionId,
-                            candidate_id: candidateId
-                        },
-                        success: function(response) {
-                            Swal.fire("{{ __('voting.success') }}", response.message, 'success')
-                                .then(() => window.location.reload());
-                        },
-                        error: function(xhr) {
-                            let msg = xhr.responseJSON.message || "{{ __('voting.error') }}";
-                            Swal.fire("{{ __('voting.error') }}", msg, 'error');
-                        }
-                    });
-                }
-            });
+$('#ballotForm').on('submit', function (e) {
+    e.preventDefault();
+    const choices = {};
+    $(this).find('input[type=radio]:checked').each(function () {
+        const name = $(this).attr('name'); // choices[12]
+        const match = name.match(/\[(\d+)\]/);
+        if (match) choices[match[1]] = parseInt($(this).val(), 10);
+    });
+    Swal.fire({
+        title: @json(__('voting.confirm_vote')),
+        text: @json(__('voting.vote_warning')),
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: @json(__('voting.yes_vote'))
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url: @json(route('student.elections.vote', $election)),
+            method: 'POST',
+            data: { _token: @json(csrf_token()), choices },
+            success: (res) => Swal.fire({icon:'success', text: res.message}).then(() => location.reload()),
+            error: (xhr) => Swal.fire({icon:'error', text: xhr.responseJSON?.message || @json(__('voting.system_error'))})
         });
     });
+});
 </script>
 @endsection
