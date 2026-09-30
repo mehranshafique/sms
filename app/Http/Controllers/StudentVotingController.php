@@ -3,133 +3,149 @@
 namespace App\Http\Controllers;
 
 use App\Models\Election;
-use App\Models\Vote;
+use App\Models\ElectionParticipation;
 use App\Models\Student;
+use App\Services\Voting\BallotCastingService;
+use App\Services\Voting\ElectionEligibilityService;
+use App\Services\Voting\ElectionResultsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log; // Added for logging
 
 class StudentVotingController extends BaseController
 {
-    public function __construct()
-    {
-        $this->middleware('auth'); 
+    public function __construct(
+        protected BallotCastingService $casting,
+        protected ElectionEligibilityService $eligibility,
+        protected ElectionResultsService $results
+    ) {
+        $this->middleware('auth');
+        $this->setPageTitle(__('voting.my_elections'));
     }
 
-    /**
-     * List available elections for the logged-in student
-     */
     public function index()
     {
-        $user = Auth::user();
-        
-        $student = Student::where('user_id', $user->id)->first();
-
-        if (!$student) {
+        $student = Student::where('user_id', Auth::id())->first();
+        if (! $student) {
             return view('students.elections.error', ['message' => __('voting.student_profile_not_found')]);
         }
 
-        // 2. Find Active Elections for Student's Institution
-        $elections = Election::where('institution_id', $student->institution_id)
-            ->where('status', 'published') // Only published elections
-            ->where('start_date', '<=', now())
-            ->where('end_date', '>=', now())
-            ->withCount(['votes' => function($q) use ($student) {
-                $q->where('voter_id', $student->id);
-            }])
-            ->latest()
+        $open = Election::query()
+            ->where('institution_id', $student->institution_id)
+            ->where('status', Election::STATUS_OPEN)
+            ->where(function ($q) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->whereHas('voters', fn ($q) => $q->where('student_id', $student->id))
+            ->with('cycle')
+            ->latest('id')
             ->get();
 
-        return view('students.elections.index', compact('elections', 'student'));
+        // Lazy sync all_students elections so newly published rolls include this student
+        $maybe = Election::query()
+            ->where('institution_id', $student->institution_id)
+            ->where('status', Election::STATUS_OPEN)
+            ->where('eligibility_type', '!=', Election::ELIGIBILITY_MANUAL)
+            ->whereDoesntHave('voters', fn ($q) => $q->where('student_id', $student->id))
+            ->get();
+        foreach ($maybe as $election) {
+            $this->eligibility->syncFromRules($election);
+        }
+
+        if ($maybe->isNotEmpty()) {
+            $open = Election::query()
+                ->where('institution_id', $student->institution_id)
+                ->where('status', Election::STATUS_OPEN)
+                ->where(function ($q) {
+                    $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+                })
+                ->where(function ($q) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                })
+                ->whereHas('voters', fn ($q) => $q->where('student_id', $student->id))
+                ->with('cycle')
+                ->latest('id')
+                ->get();
+        }
+
+        $voterIds = \App\Models\ElectionVoter::where('student_id', $student->id)->pluck('id');
+        $participatedIds = ElectionParticipation::whereIn('election_voter_id', $voterIds)
+            ->whereIn('election_id', $open->pluck('id'))
+            ->pluck('election_id')
+            ->all();
+
+        $publishedResults = Election::query()
+            ->where('institution_id', $student->institution_id)
+            ->where('status', Election::STATUS_RESULTS_PUBLISHED)
+            ->where('results_visible_to_voters', true)
+            ->whereHas('voters', fn ($q) => $q->where('student_id', $student->id))
+            ->latest('id')
+            ->limit(10)
+            ->get();
+
+        return view('students.elections.index', compact('open', 'student', 'participatedIds', 'publishedResults'));
     }
 
-    /**
-     * Show the Ballot Paper
-     */
     public function show(Election $election)
     {
-        $user = Auth::user();
-        $student = Student::where('user_id', $user->id)->firstOrFail();
-
-        // 1. Eligibility Check
-        if ($election->institution_id !== $student->institution_id) {
+        $student = Student::where('user_id', Auth::id())->firstOrFail();
+        if ((int) $election->institution_id !== (int) $student->institution_id) {
             abort(403, __('voting.unauthorized_election'));
         }
 
-        // 2. Load Ballot Data
+        $voter = $this->eligibility->findVoterForStudent($election, $student->id);
+        if (! $voter && $election->eligibility_type !== Election::ELIGIBILITY_MANUAL) {
+            $this->eligibility->syncFromRules($election);
+            $voter = $this->eligibility->findVoterForStudent($election, $student->id);
+        }
+        if (! $voter) {
+            abort(403, __('voting.not_eligible'));
+        }
+
+        $hasVoted = $this->casting->hasParticipated($election, $voter);
         $election->load(['positions.candidates.student']);
 
-        // 3. Check existing votes
-        $myVotes = Vote::where('election_id', $election->id)
-            ->where('voter_id', $student->id)
-            ->pluck('candidate_id', 'election_position_id')
-            ->toArray();
-
-        return view('students.elections.show', compact('election', 'student', 'myVotes'));
+        return view('students.elections.show', compact('election', 'student', 'hasVoted'));
     }
 
-    /**
-     * Submit a Vote
-     */
     public function vote(Request $request, Election $election)
     {
-        $user = Auth::user();
-        $student = Student::where('user_id', $user->id)->firstOrFail();
+        $student = Student::where('user_id', Auth::id())->firstOrFail();
 
-        $request->validate([
-            'position_id' => 'required|exists:election_positions,id',
-            'candidate_id' => 'required|exists:candidates,id',
+        $data = $request->validate([
+            'choices' => 'required|array|min:1',
+            'choices.*' => 'required|integer|exists:candidates,id',
         ]);
 
-        // Transaction for safety
-        try {
-            DB::beginTransaction();
-
-            // 1. Check Double Voting (Race Condition Safe Lock)
-            // We use lockForUpdate to prevent simultaneous submissions
-            $exists = Vote::where('voter_id', $student->id)
-                ->where('election_position_id', $request->position_id)
-                ->lockForUpdate() 
-                ->exists();
-
-            if ($exists) {
-                DB::rollBack();
-                return response()->json(['message' => __('voting.already_voted_position')], 422);
-            }
-
-            // 2. Cast Vote
-            // FIX: Use DB::table directly to avoid Eloquent assuming 'updated_at' exists
-            // The error "Unknown column 'updated_at'" indicates the table doesn't have timestamps.
-            DB::table('votes')->insert([
-                'election_id' => $election->id,
-                'election_position_id' => $request->position_id,
-                'candidate_id' => $request->candidate_id,
-                'voter_id' => $student->id,
-                'voted_at' => now(),
-                'device_id' => $request->ip() // Simple tracking
-            ]);
-
-            DB::commit();
-
-            return response()->json(['message' => __('voting.vote_success'), 'status' => 'success']);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            // Log the actual error for debugging
-            Log::error("Voting Error: " . $e->getMessage());
-
-            // Return specific error message if available, else generic
-            // Check for specific SQL duplicate entry error (Code 23000)
-            if ($e instanceof \Illuminate\Database\QueryException && $e->getCode() == 23000) {
-                 return response()->json(['message' => __('voting.already_voted_position')], 422);
-            }
-
-            return response()->json([
-                'message' => __('voting.system_error') . ' (Debug: ' . $e->getMessage() . ')', 
-                'error_detail' => $e->getMessage() // For easier debugging in browser console
-            ], 500);
+        // choices keyed by position_id
+        $choices = [];
+        foreach ($data['choices'] as $positionId => $candidateId) {
+            $choices[(int) $positionId] = (int) $candidateId;
         }
+
+        try {
+            $this->casting->castForStudent($election, $student->id, $choices, $request->ip());
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['message' => __('voting.vote_success'), 'status' => 'success']);
+    }
+
+    public function results(Election $election)
+    {
+        $student = Student::where('user_id', Auth::id())->firstOrFail();
+        if (! $this->results->canViewResults($election, false)) {
+            abort(403, __('voting.results_not_available'));
+        }
+        if (! $this->eligibility->findVoterForStudent($election, $student->id)) {
+            abort(403, __('voting.not_eligible'));
+        }
+
+        $blocks = $this->results->resultsByPosition($election);
+
+        return view('students.elections.results', compact('election', 'blocks'));
     }
 }

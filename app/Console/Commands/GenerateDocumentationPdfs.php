@@ -27,6 +27,9 @@ class GenerateDocumentationPdfs extends Command
             'staff-timetable-help-manual' => 'Staff Timetable Help Manual',
             'french-ui-attendance-schedules-release-notes' => 'French UI and Attendance Schedules Release Notes',
             'dashboard-subjects-pwa-release-notes' => 'Dashboard Subjects and PWA Release Notes',
+            'offline-capability-client-consultation' => 'DigiteX Offline Capability Client Consultation',
+            'voting-module-client-briefing' => 'DigiteX Voting Module Client Briefing',
+            'voting-v2-operations-guide' => 'DigiteX Voting V2 Operations Guide',
         ];
 
         $only = $this->argument('slug');

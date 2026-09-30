@@ -3,29 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Models\Election;
-use App\Models\Vote;
 use App\Models\Student;
+use App\Services\Voting\BallotCastingService;
+use App\Services\Voting\ElectionEligibilityService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 class VotingController extends BaseController
 {
-    public function __construct()
-    {
+    public function __construct(
+        protected BallotCastingService $casting,
+        protected ElectionEligibilityService $eligibility
+    ) {
         $this->middleware('auth');
         $this->middleware(PermissionMiddleware::class . ':election.view|voting.create')->only(['identifyVoter', 'castVote']);
     }
 
-    /**
-     * Step 1: Scan QR/NFC to identify Voter
-     * Returns available elections for this student
-     */
     public function identifyVoter(Request $request)
     {
         $request->validate([
             'identity_token' => 'required',
-            'type' => 'required|in:qr,nfc'
+            'type' => 'required|in:qr,nfc',
         ]);
 
         $column = $request->type === 'nfc' ? 'nfc_tag_uid' : 'qr_code_token';
@@ -37,11 +35,33 @@ class VotingController extends BaseController
         }
 
         $activeElections = Election::where('institution_id', $student->institution_id)
-            ->where('status', 'ongoing')
-            ->where('start_date', '<=', now())
-            ->where('end_date', '>=', now())
+            ->where('status', Election::STATUS_OPEN)
+            ->where(function ($q) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->whereHas('voters', fn ($q) => $q->where('student_id', $student->id))
             ->with(['positions.candidates.student'])
             ->get();
+
+        if ($activeElections->isEmpty()) {
+            // Attempt sync for open filter-based elections
+            Election::where('institution_id', $student->institution_id)
+                ->where('status', Election::STATUS_OPEN)
+                ->where('eligibility_type', '!=', Election::ELIGIBILITY_MANUAL)
+                ->get()
+                ->each(fn ($e) => $this->eligibility->syncFromRules($e));
+
+            $activeElections = Election::where('institution_id', $student->institution_id)
+                ->where('status', Election::STATUS_OPEN)
+                ->whereHas('voters', fn ($q) => $q->where('student_id', $student->id))
+                ->with(['positions.candidates.student'])
+                ->get()
+                ->filter(fn (Election $e) => $e->isOpenForVoting())
+                ->values();
+        }
 
         if ($activeElections->isEmpty()) {
             return response()->json(['message' => __('voting.no_active_elections')], 404);
@@ -49,21 +69,22 @@ class VotingController extends BaseController
 
         return response()->json([
             'student' => $student->only(['id', 'first_name', 'last_name', 'class_section_id']),
-            'elections' => $activeElections
+            'elections' => $activeElections,
         ]);
     }
 
-    /**
-     * Step 2: Submit a Vote
-     */
     public function castVote(Request $request)
     {
         $validated = $request->validate([
             'election_id' => 'required|exists:elections,id',
-            'election_position_id' => 'required|exists:election_positions,id',
-            'candidate_id' => 'required|exists:candidates,id',
             'voter_id' => 'required|exists:students,id',
-            'device_id' => 'nullable|string'
+            'choices' => 'required|array|min:1',
+            'choices.*.election_position_id' => 'required|exists:election_positions,id',
+            'choices.*.candidate_id' => 'required|exists:candidates,id',
+            'device_id' => 'nullable|string',
+            // Legacy single-choice payload still accepted
+            'election_position_id' => 'nullable|exists:election_positions,id',
+            'candidate_id' => 'nullable|exists:candidates,id',
         ]);
 
         $student = Student::findOrFail($validated['voter_id']);
@@ -72,33 +93,25 @@ class VotingController extends BaseController
             abort(403);
         }
 
-        try {
-            DB::beginTransaction();
+        $election = Election::findOrFail($validated['election_id']);
 
-            $exists = Vote::where('voter_id', $validated['voter_id'])
-                          ->where('election_position_id', $validated['election_position_id'])
-                          ->exists();
-
-            if ($exists) {
-                return response()->json(['error' => __('voting.already_voted_for_position')], 409);
+        $choices = [];
+        if (! empty($validated['choices'])) {
+            foreach ($validated['choices'] as $row) {
+                $choices[(int) $row['election_position_id']] = (int) $row['candidate_id'];
             }
-
-            Vote::create([
-                'election_id' => $validated['election_id'],
-                'election_position_id' => $validated['election_position_id'],
-                'candidate_id' => $validated['candidate_id'],
-                'voter_id' => $validated['voter_id'],
-                'device_id' => $request->input('device_id'),
-                'voted_at' => now(),
-            ]);
-
-            DB::commit();
-
-            return response()->json(['message' => __('voting.vote_cast_success')]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => __('voting.system_error')], 500);
+        } elseif (! empty($validated['election_position_id']) && ! empty($validated['candidate_id'])) {
+            $choices[(int) $validated['election_position_id']] = (int) $validated['candidate_id'];
         }
+
+        try {
+            $this->casting->castForStudent($election, $student->id, $choices, $request->input('device_id'));
+        } catch (\Throwable $e) {
+            $code = str_contains($e->getMessage(), __('voting.already_voted_election')) ? 409 : 422;
+
+            return response()->json(['error' => $e->getMessage()], $code);
+        }
+
+        return response()->json(['message' => __('voting.vote_cast_success')]);
     }
 }

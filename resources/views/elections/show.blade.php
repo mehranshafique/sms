@@ -3,266 +3,307 @@
 @section('content')
 <div class="content-body">
     <div class="container-fluid">
-        <div class="row page-titles mx-0">
-            <div class="col-sm-6 p-md-0">
-                <div class="welcome-text">
-                    <h4>{{ $election->title }}</h4>
-                    <p class="mb-0 text-muted">{{ __('voting.status') }}: {{ ucfirst($election->status) }}</p>
-                </div>
+        @if(session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-danger">{{ session('error') }}</div>
+        @endif
+
+        <div class="row page-titles mx-0 mb-3 p-3 bg-white rounded shadow-sm">
+            <div class="col-md-7">
+                <h4 class="mb-1">{{ $election->title }}</h4>
+                <p class="mb-0 text-muted">
+                    @if($election->cycle)
+                        <a href="{{ route('electoral-cycles.show', $election->cycle) }}">{{ $election->cycle->title }}</a> ·
+                    @endif
+                    {{ $election->statusLabel() }} · {{ $election->eligibilityLabel() }}
+                </p>
             </div>
-            <div class="col-sm-6 p-md-0 justify-content-sm-end mt-2 mt-sm-0 d-flex">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ route('elections.index') }}">{{ __('voting.election_list') }}</a></li>
-                    <li class="breadcrumb-item active"><a href="javascript:void(0)">{{ __('voting.manage') }}</a></li>
-                </ol>
+            <div class="col-md-5 text-md-end">
+                @if(in_array($election->status, ['draft','scheduled'], true))
+                    <button type="button" class="btn btn-success btn-sm status-btn" data-url="{{ route('elections.open', $election) }}">{{ __('voting.open_voting') }}</button>
+                @endif
+                @if($election->status === 'open')
+                    <button type="button" class="btn btn-dark btn-sm status-btn" data-url="{{ route('elections.close', $election) }}">{{ __('voting.close') }}</button>
+                @endif
+                @if($election->status === 'closed')
+                    <button type="button" class="btn btn-primary btn-sm status-btn" data-url="{{ route('elections.publish-results', $election) }}">{{ __('voting.publish_results') }}</button>
+                @endif
             </div>
         </div>
 
-        <div class="row">
-            {{-- POSITIONS & CANDIDATES --}}
-            <div class="col-xl-8">
-                <div class="card shadow-sm">
-                    <div class="card-header d-flex justify-content-between">
-                        <h4 class="card-title">{{ __('voting.ballot_structure') }}</h4>
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPositionModal">
-                            <i class="fa fa-plus"></i> {{ __('voting.add_position') }}
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        @forelse($election->positions as $position)
-                            <div class="border rounded p-3 mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0 text-primary">{{ $position->name }}</h5>
-                                    <button class="btn btn-xs btn-primary" onclick="openCandidateModal({{ $position->id }})">
-                                        <i class="fa fa-user-plus"></i> {{ __('voting.add_candidate') }}
-                                    </button>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>{{ __('voting.candidate_name') }}</th>
-                                                <th>{{ __('voting.class') }}</th>
-                                                <th>{{ __('voting.status') }}</th>
-                                                <th class="text-end">{{ __('voting.actions') }}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($position->candidates as $candidate)
-                                                <tr>
-                                                    <td>{{ $candidate->student->first_name }} {{ $candidate->student->last_name }}</td>
-                                                    <td>{{ $candidate->student->classSection->name ?? '-' }}</td>
-                                                    <td><span class="badge badge-success badge-xs">{{ $candidate->status }}</span></td>
-                                                    <td class="text-end">
-                                                        <button type="button" class="btn btn-danger shadow btn-xs sharp delete-candidate-btn" data-id="{{ $candidate->id }}">
-                                                            <i class="fa fa-trash"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr><td colspan="4" class="text-center text-muted">{{ __('voting.no_candidates') }}</td></tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="text-center py-5 text-muted">
-                                <i class="fa fa-list-alt fa-3x mb-3"></i>
-                                <p>{{ __('voting.no_positions') }}</p>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
-            
-            {{-- SIDEBAR STATS --}}
-            <div class="col-xl-4">
-                <div class="card shadow-sm">
-                    <div class="card-header">
-                        <h4 class="card-title">{{ __('voting.event_details') }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between">
-                                <span class="mb-0">{{ __('voting.start_date') }}</span> <strong>{{ $election->start_date->format('M d, H:i') }}</strong>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between">
-                                <span class="mb-0">{{ __('voting.end_date') }}</span> <strong>{{ $election->end_date->format('M d, H:i') }}</strong>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between">
-                                <span class="mb-0">{{ __('voting.candidates_count') }}</span> <strong>{{ $election->candidates->count() }}</strong>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="card-footer">
-                        @if($election->status !== 'published' && $election->status !== 'completed')
-                        <button type="button" class="btn btn-success w-100 mb-2" id="publishBtn" data-id="{{ $election->id }}">{{ __('voting.publish') }}</button>
-                        @endif
-                        
-                        @if($election->status !== 'completed')
-                        <button type="button" class="btn btn-secondary w-100" id="closeBtn" data-id="{{ $election->id }}">{{ __('voting.close') }}</button>
+        <ul class="nav nav-tabs mb-3">
+            @foreach(['settings' => __('voting.tab_settings'), 'ballot' => __('voting.tab_ballot'), 'voters' => __('voting.tab_voters'), 'monitoring' => __('voting.tab_monitoring'), 'results' => __('voting.tab_results')] as $key => $label)
+                <li class="nav-item">
+                    <a class="nav-link {{ $tab === $key ? 'active' : '' }}" href="{{ route('elections.show', [$election, 'tab' => $key]) }}">{{ $label }}</a>
+                </li>
+            @endforeach
+        </ul>
+
+        @if($tab === 'settings')
+            <div class="card"><div class="card-body">
+                <form method="POST" action="{{ route('elections.settings', $election) }}">
+                    @csrf
+                    @method('PUT')
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('voting.title') }}</label>
+                            <input type="text" name="title" class="form-control" value="{{ $election->title }}" @disabled(!in_array($election->status, ['draft','scheduled']))>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">{{ __('voting.start_date') }}</label>
+                            <input type="datetime-local" name="start_date" class="form-control" value="{{ $election->start_date?->format('Y-m-d\TH:i') }}" @disabled(!in_array($election->status, ['draft','scheduled']))>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">{{ __('voting.end_date') }}</label>
+                            <input type="datetime-local" name="end_date" class="form-control" value="{{ $election->end_date?->format('Y-m-d\TH:i') }}" @disabled(!in_array($election->status, ['draft','scheduled']))>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('voting.eligibility') }}</label>
+                            <select name="eligibility_type" class="form-control" id="eligType" @disabled(!in_array($election->status, ['draft','scheduled']))>
+                                @foreach(['all_students','grade_levels','class_sections','departments','manual_list'] as $t)
+                                    <option value="{{ $t }}" @selected($election->eligibility_type === $t)>{{ __('voting.eligibility_'.$t) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-8 mb-3" id="eligIdsWrap">
+                            <label class="form-label">{{ __('voting.eligibility_ids') }}</label>
+                            <select name="eligibility_ids[]" class="form-control" multiple size="6" @disabled(!in_array($election->status, ['draft','scheduled']))>
+                                @foreach($grades as $g)
+                                    <option value="{{ $g->id }}" data-type="grade_levels" @selected(in_array($g->id, $election->eligibility_ids ?? []))>{{ $g->name }}</option>
+                                @endforeach
+                                @foreach($sections as $s)
+                                    <option value="{{ $s->id }}" data-type="class_sections" @selected(in_array($s->id, $election->eligibility_ids ?? []))>{{ class_section_label($s) }}</option>
+                                @endforeach
+                                @foreach($departments as $d)
+                                    <option value="{{ $d->id }}" data-type="departments" @selected(in_array($d->id, $election->eligibility_ids ?? []))>{{ $d->name }}</option>
+                                @endforeach
+                            </select>
+                            <small class="text-muted">{{ __('voting.eligibility_ids_help') }}</small>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">{{ __('voting.description') }}</label>
+                            <textarea name="description" class="form-control" rows="2" @disabled(!in_array($election->status, ['draft','scheduled']))>{{ $election->description }}</textarea>
+                        </div>
+                        <div class="col-12 mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="results_visible_to_voters" value="1" id="visVoters" @checked($election->results_visible_to_voters) @disabled(!in_array($election->status, ['draft','scheduled']))>
+                            <label class="form-check-label" for="visVoters">{{ __('voting.results_visible_to_voters') }}</label>
+                        </div>
+                        @if(in_array($election->status, ['draft','scheduled'], true))
+                        <div class="col-12"><button class="btn btn-primary">{{ __('voting.save_settings') }}</button></div>
                         @endif
                     </div>
+                </form>
+            </div></div>
+        @endif
+
+        @if($tab === 'ballot')
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <h5 class="mb-0">{{ __('voting.ballot_structure') }}</h5>
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addPositionModal">{{ __('voting.add_position') }}</button>
+                </div>
+                <div class="card-body">
+                    @forelse($election->positions as $position)
+                        <div class="border rounded p-3 mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <h5 class="text-primary mb-0">{{ $position->name }}</h5>
+                                <button class="btn btn-xs btn-primary" onclick="openCandidateModal({{ $position->id }})">{{ __('voting.add_candidate') }}</button>
+                            </div>
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>{{ __('voting.candidate_name') }}</th><th>{{ __('voting.class') }}</th><th></th></tr></thead>
+                                <tbody>
+                                @forelse($position->candidates as $candidate)
+                                    <tr>
+                                        <td>{{ $candidate->displayName() }}</td>
+                                        <td>{{ $candidate->classLabel() }}</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-danger btn-xs delete-candidate-btn" data-id="{{ $candidate->id }}"><i class="fa fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="3" class="text-muted">{{ __('voting.no_candidates') }}</td></tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    @empty
+                        <p class="text-muted">{{ __('voting.no_positions') }}</p>
+                    @endforelse
                 </div>
             </div>
+        @endif
+
+        @if($tab === 'voters')
+            <div class="row">
+                <div class="col-lg-4 mb-3">
+                    <div class="card h-100"><div class="card-header"><h5 class="mb-0">{{ __('voting.sync_voters') }}</h5></div><div class="card-body">
+                        <p class="small text-muted">{{ __('voting.sync_voters_help') }}</p>
+                        <form method="POST" action="{{ route('elections.voters.sync', $election) }}">@csrf
+                            <button class="btn btn-primary btn-sm">{{ __('voting.sync_now') }}</button>
+                        </form>
+                        <hr>
+                        <form method="POST" action="{{ route('elections.voters.add', $election) }}" class="mb-3">@csrf
+                            <input type="hidden" name="mode" value="digitex">
+                            <label class="form-label">{{ __('voting.admission_number') }}</label>
+                            <input type="text" name="admission_number" class="form-control mb-2" required>
+                            <button class="btn btn-outline-primary btn-sm">{{ __('voting.add_digitex_voter') }}</button>
+                        </form>
+                        <form method="POST" action="{{ route('elections.voters.add', $election) }}">@csrf
+                            <input type="hidden" name="mode" value="external">
+                            <label class="form-label">{{ __('voting.external_voter') }}</label>
+                            <input type="text" name="display_name" class="form-control mb-2" placeholder="{{ __('voting.candidate_name') }}" required>
+                            <input type="text" name="voter_code" class="form-control mb-2" placeholder="{{ __('voting.voter_code') }}">
+                            <button class="btn btn-outline-secondary btn-sm">{{ __('voting.add_external_voter') }}</button>
+                        </form>
+                        <hr>
+                        <form method="POST" action="{{ route('elections.voters.import', $election) }}" enctype="multipart/form-data">@csrf
+                            <label class="form-label">{{ __('voting.import_csv') }}</label>
+                            <input type="file" name="csv_file" class="form-control mb-2" accept=".csv,text/csv" required>
+                            <button class="btn btn-dark btn-sm">{{ __('voting.import') }}</button>
+                        </form>
+                    </div></div>
+                </div>
+                <div class="col-lg-8 mb-3">
+                    <div class="card"><div class="card-header d-flex justify-content-between">
+                        <h5 class="mb-0">{{ __('voting.voter_list') }} ({{ $election->voters()->count() }})</h5>
+                        <a class="btn btn-sm btn-outline-success" href="{{ route('elections.export.turnout', $election) }}">{{ __('voting.export_turnout') }}</a>
+                    </div><div class="card-body table-responsive" style="max-height:480px;overflow:auto;">
+                        <table class="table table-sm">
+                            <thead><tr><th>{{ __('voting.voter_code') }}</th><th>{{ __('voting.candidate_name') }}</th><th>{{ __('voting.source') }}</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach($election->voters as $voter)
+                                <tr>
+                                    <td>{{ $voter->voter_code }}</td>
+                                    <td>{{ $voter->displayName() }}</td>
+                                    <td>{{ __('voting.source_'.$voter->source) }}</td>
+                                    <td class="text-end">
+                                        <form method="POST" action="{{ route('elections.voters.destroy', $voter) }}" class="d-inline" onsubmit="return confirm(@json(__('voting.confirm_delete')))">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-xs btn-outline-danger">{{ __('voting.delete') }}</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div></div>
+                </div>
+            </div>
+        @endif
+
+        @if($tab === 'monitoring')
+            <div class="row mb-3">
+                <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">{{ __('voting.registered') }}</div><h3>{{ $turnout['registered'] }}</h3></div></div></div>
+                <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">{{ __('voting.voted') }}</div><h3 class="text-success">{{ $turnout['voted'] }}</h3></div></div></div>
+                <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">{{ __('voting.not_voted') }}</div><h3 class="text-warning">{{ $turnout['not_voted'] }}</h3></div></div></div>
+                <div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">{{ __('voting.turnout') }}</div><h3>{{ $turnout['turnout_percent'] }}%</h3></div></div></div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card"><div class="card-header">{{ __('voting.who_voted') }}</div><div class="card-body" style="max-height:320px;overflow:auto;">
+                        <ul class="mb-0">@foreach($lists['voted'] as $v)<li>{{ $v->displayName() }} ({{ $v->voter_code }})</li>@endforeach</ul>
+                        <p class="small text-muted mt-2 mb-0">{{ __('voting.secrecy_note') }}</p>
+                    </div></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card"><div class="card-header">{{ __('voting.who_not_voted') }}</div><div class="card-body" style="max-height:320px;overflow:auto;">
+                        <ul class="mb-0">@foreach($lists['notVoted'] as $v)<li>{{ $v->displayName() }} ({{ $v->voter_code }})</li>@endforeach</ul>
+                    </div></div>
+                </div>
+            </div>
+        @endif
+
+        @if($tab === 'results')
+            @if(empty($results))
+                <div class="alert alert-info">{{ __('voting.results_after_close') }}</div>
+            @else
+                <div class="mb-3">
+                    <a class="btn btn-sm btn-outline-success" href="{{ route('elections.export.results', $election) }}">{{ __('voting.export_results') }}</a>
+                </div>
+                @foreach($results as $block)
+                    <div class="card mb-3"><div class="card-header"><strong>{{ $block['position_name'] }}</strong> · {{ $block['total_ballots'] }} {{ __('voting.ballots') }}</div>
+                        <div class="card-body table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>{{ __('voting.candidate_name') }}</th><th>{{ __('voting.votes') }}</th><th>%</th></tr></thead>
+                                <tbody>
+                                @foreach($block['candidates'] as $c)
+                                    <tr><td>{{ $c['name'] }}</td><td>{{ $c['votes'] }}</td><td>{{ $c['percent'] }}%</td></tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endforeach
+            @endif
+        @endif
+    </div>
+</div>
+
+<div class="modal fade" id="addPositionModal"><div class="modal-dialog"><form class="modal-content" id="addPositionForm" method="POST" action="{{ route('elections.addPosition', $election) }}">@csrf
+    <div class="modal-header"><h5 class="modal-title">{{ __('voting.add_position') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+        <input type="text" name="name" class="form-control" placeholder="{{ __('voting.position_name') }}" required>
+        <input type="number" name="sequence" class="form-control mt-2" value="0" min="0">
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary">{{ __('voting.save_position') }}</button></div>
+</form></div></div>
+
+<div class="modal fade" id="addCandidateModal"><div class="modal-dialog"><form class="modal-content" id="addCandidateForm" method="POST" action="{{ route('elections.addCandidate', $election) }}" enctype="multipart/form-data">@csrf
+    <input type="hidden" name="election_position_id" id="candPositionId">
+    <div class="modal-header"><h5 class="modal-title">{{ __('voting.add_candidate') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+        <select name="mode" id="candMode" class="form-control mb-2">
+            <option value="digitex">{{ __('voting.from_digitex') }}</option>
+            <option value="external">{{ __('voting.independent_candidate') }}</option>
+        </select>
+        <div id="digitexFields">
+            <input type="text" name="admission_number" class="form-control" placeholder="{{ __('voting.admission_number') }}">
+        </div>
+        <div id="externalFields" class="d-none">
+            <input type="text" name="external_name" class="form-control mb-2" placeholder="{{ __('voting.candidate_name') }}">
+            <input type="text" name="external_class_label" class="form-control mb-2" placeholder="{{ __('voting.class') }}">
+            <input type="file" name="external_photo" class="form-control mb-2" accept="image/*">
         </div>
     </div>
-</div>
-
-{{-- MODALS --}}
-<!-- Add Position Modal -->
-<div class="modal fade" id="addPositionModal">
-    <div class="modal-dialog">
-        <form action="{{ route('elections.addPosition', $election->id) }}" method="POST" class="ajax-form">
-            @csrf
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ __('voting.add_position') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>{{ __('voting.position_name') }} <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" required>
-                    </div>
-                    <div class="form-group mt-2">
-                        <label>{{ __('voting.sequence') }}</label>
-                        <input type="number" name="sequence" class="form-control" value="1">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">{{ __('voting.save_position') }}</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Add Candidate Modal -->
-<div class="modal fade" id="addCandidateModal">
-    <div class="modal-dialog">
-        <form action="{{ route('elections.addCandidate', $election->id) }}" method="POST" class="ajax-form">
-            @csrf
-            <input type="hidden" name="election_position_id" id="modalPositionId">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ __('voting.add_candidate') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group mb-2">
-                        <label>{{ __('voting.admission_number') }} <span class="text-danger">*</span></label>
-                        <input type="text" name="admission_number" class="form-control" placeholder="{{ __('voting.admission_number') }}" required>
-                        <small class="text-muted">Enter student admission ID to search</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">{{ __('voting.add_candidate') }}</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
+    <div class="modal-footer"><button class="btn btn-primary">{{ __('voting.save_candidate') }}</button></div>
+</form></div></div>
 @endsection
 
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    function openCandidateModal(positionId) {
-        document.getElementById('modalPositionId').value = positionId;
-        new bootstrap.Modal(document.getElementById('addCandidateModal')).show();
-    }
-
-    $(document).ready(function(){
-        // Delete Candidate Logic
-        $(document).on('click', '.delete-candidate-btn', function() {
-            let id = $(this).data('id');
-            let url = "{{ route('elections.destroyCandidate', ':id') }}".replace(':id', id);
-            
-            Swal.fire({
-                title: "{{ __('voting.delete_warning') }}",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: "{{ __('voting.yes_delete') }}",
-                cancelButtonText: "{{ __('voting.cancel') }}"
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: url,
-                        type: 'DELETE',
-                        headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
-                        success: function(response) {
-                            Swal.fire("{{ __('voting.success') }}", response.message, 'success');
-                            window.location.reload();
-                        },
-                        error: function() {
-                            Swal.fire("{{ __('voting.error') }}", "{{ __('voting.system_error') }}", 'error');
-                        }
-                    });
-                }
-            });
-        });
-
-        // Publish Election Logic
-        $('#publishBtn').click(function() {
-            let id = $(this).data('id');
-            let url = "{{ route('elections.publish', ':id') }}".replace(':id', id);
-
-            Swal.fire({
-                title: "{{ __('voting.confirm_publish') }}",
-                text: "This will make the election visible to voters.",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: "Yes, Publish",
-                confirmButtonColor: '#28a745'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: url,
-                        type: 'POST',
-                        headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
-                        success: function(response) {
-                            Swal.fire("{{ __('voting.success') }}", response.message, 'success')
-                                .then(() => window.location.reload());
-                        },
-                        error: function() {
-                            Swal.fire("{{ __('voting.error') }}", "{{ __('voting.system_error') }}", 'error');
-                        }
-                    });
-                }
-            });
-        });
-
-        // Close Election Logic
-        $('#closeBtn').click(function() {
-            let id = $(this).data('id');
-            let url = "{{ route('elections.close', ':id') }}".replace(':id', id);
-
-            Swal.fire({
-                title: "{{ __('voting.confirm_close') }}",
-                text: "Voting will be stopped immediately.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: "Yes, Close Election",
-                confirmButtonColor: '#6c757d'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        url: url,
-                        type: 'POST',
-                        headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
-                        success: function(response) {
-                            Swal.fire("{{ __('voting.success') }}", response.message, 'success')
-                                .then(() => window.location.reload());
-                        },
-                        error: function() {
-                            Swal.fire("{{ __('voting.error') }}", "{{ __('voting.system_error') }}", 'error');
-                        }
-                    });
-                }
-            });
-        });
+function openCandidateModal(positionId) {
+    $('#candPositionId').val(positionId);
+    new bootstrap.Modal(document.getElementById('addCandidateModal')).show();
+}
+$('#candMode').on('change', function () {
+    const ext = $(this).val() === 'external';
+    $('#externalFields').toggleClass('d-none', !ext);
+    $('#digitexFields').toggleClass('d-none', ext);
+});
+$('#addPositionForm,#addCandidateForm').on('submit', function (e) {
+    e.preventDefault();
+    const form = this;
+    const fd = new FormData(form);
+    $.ajax({ url: form.action, method: 'POST', data: fd, processData: false, contentType: false })
+        .done(res => location.href = res.redirect || location.href)
+        .fail(xhr => Swal.fire({icon:'error', text: xhr.responseJSON?.message || '{{ __("voting.system_error") }}'}));
+});
+$('.delete-candidate-btn').on('click', function () {
+    const id = $(this).data('id');
+    const url = @json(url('elections/candidates')).replace(/\/?$/, '/') + id;
+    Swal.fire({title:@json(__('voting.confirm_delete')), icon:'warning', showCancelButton:true}).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({ url, method: 'DELETE', data: {_token: @json(csrf_token())} }).done(() => location.reload());
     });
+});
+$('.status-btn').on('click', function () {
+    const url = $(this).data('url');
+    $.post(url, {_token: @json(csrf_token())})
+        .done(res => Swal.fire({icon:'success', text: res.message}).then(() => location.reload()))
+        .fail(xhr => Swal.fire({icon:'error', text: xhr.responseJSON?.message || '{{ __("voting.system_error") }}'}));
+});
 </script>
 @endsection

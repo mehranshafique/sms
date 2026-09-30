@@ -563,8 +563,8 @@
                         <li><a class="ai-icon {{ request()->routeIs('voice.*') ? 'mm-active' : '' }}" href="{{ route('voice.settings.index') }}"><i class="fa fa-phone"></i><span class="nav-text">{{ __('sidebar.voice_ivr') }}</span></a></li>
                     @endif
 
-                    @if($hasModule('voting') && $user->can('election.view'))
-                        <li><a class="ai-icon {{ request()->routeIs('elections.*') ? 'mm-active' : '' }}" href="{{ route('elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
+                    @if(($hasModule('voting') || $hasModule('elections')) && $user->can('election.view'))
+                        <li><a class="ai-icon {{ request()->routeIs('elections.*', 'electoral-cycles.*') ? 'mm-active' : '' }}" href="{{ route('electoral-cycles.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.elections.title') }}</span></a></li>
                     @endif
                 @endif
 
@@ -675,7 +675,7 @@
                 <li><a class="ai-icon {{ request()->routeIs('student.notices.*') ? 'mm-active' : '' }}" href="{{ route('student.notices.index') }}"><i class="la la-bullhorn"></i><span class="nav-text">{{ __('sidebar.my_notices') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'notices'])</a></li>
                 <li><a class="ai-icon {{ request()->routeIs('requests.*') ? 'mm-active' : '' }}" href="{{ route('requests.index') }}"><i class="la la-envelope"></i><span class="nav-text">{{ __('sidebar.requests') }}</span>@include('layout.partials.sidebar-badge', ['key' => 'requests'])</a></li>
                 
-                @if($hasModule('voting'))
+                @if($hasModule('voting') || $hasModule('elections'))
                     <li><a class="ai-icon {{ request()->routeIs('student.elections.*') ? 'mm-active' : '' }}" href="{{ route('student.elections.index') }}"><i class="la la-vote-yea"></i><span class="nav-text">{{ __('sidebar.my_elections') }}</span></a></li>
                 @endif
             @endif

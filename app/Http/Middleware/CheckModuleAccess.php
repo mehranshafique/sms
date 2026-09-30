@@ -58,16 +58,28 @@ class CheckModuleAccess
             abort(403, __('subscription.expired_or_missing'));
         }
 
-        if (!$this->moduleAccess->isModuleEnabled($institutionId, $moduleName)) {
+        $moduleNames = array_values(array_filter(array_map('trim', preg_split('/[|,]/', $moduleName) ?: [])));
+        $moduleEnabled = false;
+        $enabledSlug = $moduleNames[0] ?? $moduleName;
+        foreach ($moduleNames as $slug) {
+            if ($this->moduleAccess->isModuleEnabled($institutionId, $slug)) {
+                $moduleEnabled = true;
+                $enabledSlug = $slug;
+                break;
+            }
+        }
+
+        if (! $moduleEnabled) {
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['message' => 'Module access denied.'], 403);
             }
 
-            $prettyName = ucwords(str_replace('_', ' ', $moduleName));
+            $prettyName = ucwords(str_replace('_', ' ', $enabledSlug));
             abort(403, "Access Denied: The '{$prettyName}' module is not enabled for your institution.");
         }
 
-        if (!$this->moduleAccess->userHasModulePermission($user, $moduleName)) {
+        if (!$this->moduleAccess->userHasModulePermission($user, $enabledSlug)
+            && ! collect($moduleNames)->contains(fn ($slug) => $this->moduleAccess->userHasModulePermission($user, $slug))) {
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['message' => __('configuration.unauthorized_action')], 403);
             }

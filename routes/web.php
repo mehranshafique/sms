@@ -87,6 +87,7 @@ use App\Http\Controllers\GuardianPortalController;
 use App\Http\Controllers\NoticeController;
 use App\Http\Controllers\StudentNoticeController;
 use App\Http\Controllers\ElectionController;
+use App\Http\Controllers\ElectoralCycleController;
 use App\Http\Controllers\VotingController;
 use App\Http\Controllers\StudentVotingController;
 use App\Http\Controllers\ChatbotSettingController;
@@ -838,22 +839,37 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
 
     // Student Interface
-    Route::middleware([CheckModuleAccess::class . ':elections'])->group(function() {
+    Route::middleware([CheckModuleAccess::class . ':voting|elections'])->group(function() {
         Route::get('/my-elections', [StudentVotingController::class, 'index'])->name('student.elections.index');
         Route::get('/my-elections/{election}', [StudentVotingController::class, 'show'])->name('student.elections.show');
         Route::post('/my-elections/{election}/vote', [StudentVotingController::class, 'vote'])->name('student.elections.vote');
+        Route::get('/my-elections/{election}/results', [StudentVotingController::class, 'results'])->name('student.elections.results');
     });
 
     // Admin Interface
-    Route::middleware([CheckModuleAccess::class . ':elections'])->group(function () {
+    Route::middleware([CheckModuleAccess::class . ':voting|elections'])->group(function () {
+        Route::get('electoral-cycles', [ElectoralCycleController::class, 'index'])->name('electoral-cycles.index');
+        Route::get('electoral-cycles/create', [ElectoralCycleController::class, 'create'])->name('electoral-cycles.create');
+        Route::post('electoral-cycles', [ElectoralCycleController::class, 'store'])->name('electoral-cycles.store');
+        Route::get('electoral-cycles/{electoralCycle}', [ElectoralCycleController::class, 'show'])->name('electoral-cycles.show');
+        Route::post('electoral-cycles/{electoralCycle}/elections', [ElectoralCycleController::class, 'storeElection'])->name('electoral-cycles.elections.store');
+
         Route::post('elections/{election}/positions', [ElectionController::class, 'addPosition'])->name('elections.addPosition');
         Route::post('elections/{election}/candidates', [ElectionController::class, 'addCandidate'])->name('elections.addCandidate');
         Route::delete('elections/candidates/{candidate}', [ElectionController::class, 'destroyCandidate'])->name('elections.destroyCandidate');
+        Route::put('elections/{election}/settings', [ElectionController::class, 'updateSettings'])->name('elections.settings');
+        Route::post('elections/{election}/voters/sync', [ElectionController::class, 'syncVoters'])->name('elections.voters.sync');
+        Route::post('elections/{election}/voters', [ElectionController::class, 'addVoter'])->name('elections.voters.add');
+        Route::post('elections/{election}/voters/import', [ElectionController::class, 'importVoters'])->name('elections.voters.import');
+        Route::delete('elections/voters/{electionVoter}', [ElectionController::class, 'destroyVoter'])->name('elections.voters.destroy');
+        Route::post('elections/{election}/open', [ElectionController::class, 'open'])->name('elections.open');
         Route::post('elections/{election}/publish', [ElectionController::class, 'publish'])->name('elections.publish');
         Route::post('elections/{election}/close', [ElectionController::class, 'close'])->name('elections.close');
-        Route::resource('elections', ElectionController::class);
-        
-        // Voting Device Logic
+        Route::post('elections/{election}/publish-results', [ElectionController::class, 'publishResults'])->name('elections.publish-results');
+        Route::get('elections/{election}/export/turnout', [ElectionController::class, 'exportTurnout'])->name('elections.export.turnout');
+        Route::get('elections/{election}/export/results', [ElectionController::class, 'exportResults'])->name('elections.export.results');
+        Route::resource('elections', ElectionController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+
         Route::post('voting/identify', [VotingController::class, 'identifyVoter'])->name('voting.identify');
         Route::post('voting/cast', [VotingController::class, 'castVote'])->name('voting.cast');
     });

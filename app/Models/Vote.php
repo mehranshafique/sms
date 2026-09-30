@@ -9,46 +9,39 @@ class Vote extends Model
 {
     use HasFactory;
 
+    /** Legacy V1 linked votes (renamed after Voting V2 migration). */
+    protected $table = 'votes_legacy_v1';
+
+    public $timestamps = false;
+
     protected $fillable = [
         'election_id',
         'election_position_id',
         'candidate_id',
-        'voter_id', // Student ID
+        'voter_id',
         'voted_at',
-        'device_id', // Optional: for tracking/security
+        'device_id',
     ];
 
     protected $casts = [
         'voted_at' => 'datetime',
     ];
 
-    /**
-     * Relationship: The election this vote belongs to.
-     */
     public function election()
     {
         return $this->belongsTo(Election::class);
     }
 
-    /**
-     * Relationship: The position this vote is for.
-     */
     public function position()
     {
         return $this->belongsTo(ElectionPosition::class, 'election_position_id');
     }
 
-    /**
-     * Relationship: The candidate voted for.
-     */
     public function candidate()
     {
         return $this->belongsTo(Candidate::class);
     }
 
-    /**
-     * Relationship: The student who cast the vote.
-     */
     public function voter()
     {
         return $this->belongsTo(Student::class, 'voter_id');

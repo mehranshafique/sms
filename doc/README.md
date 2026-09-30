@@ -21,6 +21,9 @@ This folder contains user, developer, and API documentation for the Digitex Scho
 | `markdown/staff-timetable-help-manual.md` | **Staff timetable** — Class Courses prerequisites, create/edit teacher schedule, clashes, print |
 | `markdown/french-ui-attendance-schedules-release-notes.md` | **Release notes** — French UI/fee labels + attendance schedules by level; QA test plan |
 | `markdown/dashboard-subjects-pwa-release-notes.md` | **Release notes** — dashboard/PWA, sessions fix, class list, multi-grade subjects; QA test plan |
+| `markdown/offline-capability-client-consultation.md` | **Client consultation** — offline DigiteX options (PWA, Android, local server, Excel) with pros/cons and feedback form |
+| `markdown/voting-module-client-briefing.md` | **Client briefing** — Voting Version 1 vs Sept 2026 spec, operational vs under development, step-by-step test guide |
+| `markdown/voting-v2-operations-guide.md` | **Ops guide** — Voting V2 Priority 1 cycles, eligibility, secret ballots, turnout/results |
 
 ## PDF output
 
@@ -37,6 +40,9 @@ Generated PDFs are written to `pdf/`:
 - `Staff-Timetable-Help-Manual.pdf`
 - `French-UI-and-Attendance-Schedules-Release-Notes.pdf`
 - `Dashboard-Subjects-and-PWA-Release-Notes.pdf`
+- `DigiteX-Offline-Capability-Client-Consultation.pdf`
+- `DigiteX-Voting-Module-Client-Briefing.pdf`
+- `DigiteX-Voting-V2-Operations-Guide.pdf`
 
 ## Regenerate PDFs
 
